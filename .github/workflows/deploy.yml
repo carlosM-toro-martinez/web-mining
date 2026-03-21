@@ -25,7 +25,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/marte-frontend:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/marte-frontend:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/marte-frontend:latest
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
@@ -35,5 +37,27 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/systems/marte-mining/web-mining
+
+            echo "📦 Guardando imagen actual..."
+            CURRENT_IMAGE=$(docker inspect --format='{{.Config.Image}}' web-mining-frontend-1 || echo "none")
+
+            echo "⬇️ Pull nueva imagen..."
             docker compose pull frontend
+
+            echo "🚀 Deploy nueva versión..."
             docker compose up -d frontend
+
+            echo "⏳ Esperando healthcheck..."
+            sleep 10
+
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' web-mining-frontend-1 || echo "starting")
+
+            if [ "$STATUS" != "healthy" ]; then
+              echo "❌ Falló deploy. Haciendo rollback..."
+
+              if [ "$CURRENT_IMAGE" != "none" ]; then
+                docker run -d -p 80:80 $CURRENT_IMAGE
+              fi
+            else
+              echo "✅ Deploy exitoso"
+            fi

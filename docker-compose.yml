@@ -1,8 +1,22 @@
 version: '3.8'
 
 services:
-  frontend:
-    image: carlostoro96/marte-frontend:latest
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
+      - "8080:8080" # panel de traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  frontend:
+    image: carlostoro96/marte-frontend:latest
     restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
