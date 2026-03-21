@@ -7,6 +7,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,6 +26,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/marte-frontend:${{ github.sha }}
             ${{ secrets.DOCKER_USERNAME }}/marte-frontend:latest
@@ -38,8 +41,13 @@ jobs:
           script: |
             cd /root/systems/marte-mining/web-mining
 
-            echo "📦 Guardando imagen actual..."
-            CURRENT_IMAGE=$(docker inspect --format='{{.Config.Image}}' web-mining-frontend-1 || echo "none")
+            echo "📦 Versión actual:"
+            CURRENT_VERSION=$(docker inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' web-mining-frontend-1 || echo "none")
+            echo $CURRENT_VERSION
+
+            echo "🚀 Nueva versión: ${{ github.sha }}"
+
+            export VERSION=${{ github.sha }}
 
             echo "⬇️ Pull nueva imagen..."
             docker compose pull frontend
@@ -48,16 +56,21 @@ jobs:
             docker compose up -d frontend
 
             echo "⏳ Esperando healthcheck..."
-            sleep 10
+            sleep 15
 
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' web-mining-frontend-1 || echo "starting")
 
             if [ "$STATUS" != "healthy" ]; then
-              echo "❌ Falló deploy. Haciendo rollback..."
+              echo "❌ Falló deploy. Rollback..."
 
-              if [ "$CURRENT_IMAGE" != "none" ]; then
-                docker run -d -p 80:80 $CURRENT_IMAGE
+              if [ "$CURRENT_VERSION" != "none" ]; then
+                export VERSION=$CURRENT_VERSION
+
+                echo "🔙 Volviendo a versión anterior: $VERSION"
+                docker compose up -d frontend
+              else
+                echo "No hay versión anterior"
               fi
             else
-              echo "✅ Deploy exitoso"
+              echo "Deploy exitoso"
             fi

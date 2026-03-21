@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   traefik:
     image: traefik:v3.0
@@ -9,12 +7,12 @@ services:
       - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
-      - "8080:8080" # panel de traefik
+      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   frontend:
-    image: carlostoro96/marte-frontend:latest
+    image: carlostoro96/marte-frontend:${VERSION}
     restart: always
     labels:
       - "traefik.enable=true"
