@@ -53,7 +53,7 @@ jobs:
             docker compose pull frontend
 
             echo "🚀 Deploy nueva versión..."
-            docker compose up -d frontend
+            docker compose up -d
 
             echo "⏳ Esperando healthcheck..."
             sleep 15
@@ -67,7 +67,7 @@ jobs:
                 export VERSION=$CURRENT_VERSION
 
                 echo "🔙 Volviendo a versión anterior: $VERSION"
-                docker compose up -d frontend
+                docker compose up -d
               else
                 echo "No hay versión anterior"
               fi
