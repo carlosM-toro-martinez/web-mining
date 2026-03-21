@@ -34,6 +34,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/marte
-            docker-compose pull frontend
-            docker-compose up -d frontend
+            cd /root/systems/marte-mining/web-mining
+            docker compose pull frontend
+            docker compose up -d frontend
