@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marte Mining | Sistema en Progreso</title>
+  <!-- Google Fonts + Font Awesome -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0a0c12, #030507);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Efecto de partículas sutiles (estilo minero) */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" opacity="0.05"><path fill="%23d4af37" d="M70,40 L80,20 L90,40 L110,45 L95,60 L100,80 L80,72 L60,80 L65,60 L50,45 L70,40Z"/><circle cx="140" cy="120" r="8"/><circle cx="30" cy="150" r="5"/></svg>');
+      background-repeat: repeat;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Contenedor principal */
+    .container {
+      position: relative;
+      z-index: 2;
+      max-width: 1200px;
+      width: 90%;
+      margin: 2rem auto;
+      backdrop-filter: blur(2px);
+    }
+
+    /* Card principal estilo vidrio */
+    .glass-card {
+      background: rgba(10, 14, 23, 0.65);
+      backdrop-filter: blur(12px);
+      border-radius: 2.5rem;
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1);
+      padding: 2rem 2rem 3rem;
+      transition: all 0.3s ease;
+    }
+
+    /* Header con logo de Marte */
+    .brand {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .brand i {
+      font-size: 3.8rem;
+      background: linear-gradient(135deg, #d4af37, #b33b2c);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+    }
+    .brand h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #ece8dd;
+      margin-top: 0.5rem;
+    }
+    .brand p {
+      color: #b9b3a0;
+      font-size: 0.9rem;
+    }
+
+    /* Área de progreso */
+    .progress-area {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    .progress-area h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      background: linear-gradient(120deg, #f3e7c0, #d4af37);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 2rem;
+      letter-spacing: -0.5px;
+    }
+
+    /* Loader principal (anillo giratorio) */
+    .loader-ring {
+      display: inline-block;
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin-bottom: 1.8rem;
+    }
+    .loader-ring div {
+      box-sizing: border-box;
+      display: block;
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      margin: 8px;
+      border: 6px solid #d4af37;
+      border-radius: 50%;
+      animation: loader-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+      border-color: #d4af37 transparent transparent transparent;
+    }
+    .loader-ring div:nth-child(1) { animation-delay: -0.45s; }
+    .loader-ring div:nth-child(2) { animation-delay: -0.3s; }
+    .loader-ring div:nth-child(3) { animation-delay: -0.15s; }
+    @keyframes loader-ring {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Barra de progreso sutil */
+    .progress-bar-container {
+      max-width: 400px;
+      margin: 1.5rem auto;
+      background: rgba(255,255,240,0.1);
+      border-radius: 50px;
+      height: 6px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #d4af37, #b85c1a);
+      border-radius: 50px;
+      transition: width 0.2s linear;
+    }
+
+    .status-text {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #e0d6bd;
+      background: rgba(0,0,0,0.4);
+      display: inline-block;
+      padding: 0.4rem 1.2rem;
+      border-radius: 40px;
+      backdrop-filter: blur(4px);
+      letter-spacing: 0.3px;
+    }
+
+    /* Sección iconos (creador + empresa) */
+    .icons-section {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 3rem;
+      margin-bottom: 1.5rem;
+    }
+    .icon-card {
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+      border-radius: 2rem;
+      padding: 1.5rem 2rem;
+      text-align: center;
+      width: 240px;
+      transition: transform 0.25s ease, border 0.2s;
+      border: 1px solid rgba(212, 175, 55, 0.3);
+    }
+    .icon-card:hover {
+      transform: translateY(-6px);
+      border-color: #d4af37;
+      background: rgba(20, 24, 35, 0.7);
+    }
+    .icon-card i {
+      font-size: 3.2rem;
+      color: #d4af37;
+      margin-bottom: 1rem;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+    }
+    .icon-card h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #f2e8cf;
+      margin-bottom: 0.3rem;
+    }
+    .icon-card p {
+      font-size: 0.85rem;
+      color: #c7bd97;
+    }
+
+    /* Footer */
+    .footer-note {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #7c6f50;
+      border-top: 1px dashed rgba(212,175,55,0.2);
+      padding-top: 1.5rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 680px) {
+      .glass-card {
+        padding: 1.5rem;
+      }
+      .progress-area h1 {
+        font-size: 1.8rem;
+      }
+      .icon-card {
+        width: 200px;
+        padding: 1rem 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="glass-card">
+    <div class="brand">
+      <i class="fas fa-planet-ringed"></i> <!-- Icono planeta + anillos (Marte) -->
+      <h2>MARTE MINING</h2>
+      <p>Innovación y desarrollo minero</p>
+    </div>
+
+    <div class="progress-area">
+      <h1>SISTEMA EN PROGRESO</h1>
+      <div class="loader-ring"><div></div><div></div><div></div><div></div></div>
+      <div class="progress-bar-container">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="status-text" id="statusMessage">Desarrollando núcleo operativo...</div>
+    </div>
+
+    <div class="icons-section">
+      <div class="icon-card">
+        <img src="images/miner.png" alt="Creador" style="width: 100px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));">
+        <h3>Creador</h3>
+        <p>Equipo de ingeniería<br>Encuentra Software Solutions</p>
+      </div>
+      <div class="icon-card">
+        <i class="fas fa-hard-hat" style="padding-top: 2rem;"></i>
+        <div style="margin-top: .5rem;">
+            <h3>Marte Mining</h3>
+            <p>Excelencia en operaciones<br>mineras sostenibles</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      <i class="fas fa-cogs"></i> Despliegue continuo • v2.0.1
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // Lista de mensajes dinámicos que simulan avance del sistema
+    const messages = [
+
+      "Sistema en progreso — Marte Mining listo"
+    ];
+
+    let step = 0;
+    let progress = 0;
+    const progressFill = document.getElementById('progressFill');
+    const statusSpan = document.getElementById('statusMessage');
+    let intervalId = null;
+
+    // function updateProgress() {
+    //   if (progress < 100) {
+    //     // Incremento variable entre 1.5% y 3% por paso
+    //     const increment = Math.floor(Math.random() * 2) + 2;
+    //     progress = Math.min(progress + increment, 100);
+    //     progressFill.style.width = progress + '%';
+    //   }
+      
+    //   // Cambia mensaje cada cierto avance o por tiempo
+    //   if (step < messages.length) {
+    //     statusSpan.textContent = messages[step];
+    //     step++;
+    //   } else if (progress >= 100 && step >= messages.length) {
+    //     // Cuando llega a 100% muestra mensaje final estable
+    //     statusSpan.textContent = "✅ Sistema operativo — listo para producción";
+    //     if (intervalId) clearInterval(intervalId);
+    //     return;
+    //   }
+      
+    //   // Si llegamos al final de los mensajes pero aún no 100%, seguimos mostrando el último
+    //   if (step >= messages.length && progress < 100) {
+    //     statusSpan.textContent = messages[messages.length-1] + " • optimizando";
+    //   }
+    // }
+
+    // Simulación de carga progresiva (cada 0.9s - 1.2s)
+    intervalId = setInterval(() => {
+      updateProgress();
+      if (progress >= 100) {
+        clearInterval(intervalId);
+        // Al finalizar, se puede añadir un efecto de brillo (opcional)
+        const loaderDiv = document.querySelector('.loader-ring');
+        loaderDiv.style.opacity = '0.6';
+      }
+    }, 980);
+    
+    // Para que empiece desde 0 y primer mensaje
+    updateProgress(); // arranca primer mensaje
+  })();
+</script>
+</body>
+</html>
