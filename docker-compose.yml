@@ -2,19 +2,48 @@ services:
   traefik:
     image: traefik:v3.0
     command:
-      - "--api.insecure=true"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
+
+      # HTTP
       - "--entrypoints.web.address=:80"
+
+      # HTTPS
+      - "--entrypoints.websecure.address=:443"
+
+      # Let's Encrypt
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.email=tuemail@gmail.com"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+
     ports:
       - "80:80"
-      - "8080:8080"
+      - "443:443"
+
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
 
   frontend:
     image: carlostoro96/marte-frontend:${VERSION}
     restart: always
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+
+      # dominio real
+      - "traefik.http.routers.frontend.rule=Host(`marte.encuentrass.lat`)"
+
+      # HTTPS
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=le"
+
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.frontend-http.rule=Host(`marte.encuentrass.lat`)"
+      - "traefik.http.routers.frontend-http.entrypoints=web"
+      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
+
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+      # puerto interno del contenedor
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
