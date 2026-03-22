@@ -3,15 +3,11 @@ services:
     image: traefik:v3.0
     command:
       - "--api.dashboard=true"
-      #- "--providers.docker=true"
-      - "--providers.file.filename=/etc/traefik/dynamic.yml"
-      # HTTP
-      - "--entrypoints.web.address=:80"
+      - "--providers.docker=true"
 
-      # HTTPS
+      - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
 
-      # Let's Encrypt
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.le.acme.email=tuemail@gmail.com"
