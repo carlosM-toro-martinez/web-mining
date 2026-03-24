@@ -23,25 +23,30 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
 
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.traefik.rule=Host(`traefik.marte.encuentrass.lat`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=le"
+
+      - "traefik.http.routers.traefik.service=api@internal"
+
   frontend:
     image: carlostoro96/marte-frontend:${VERSION}
     restart: always
     labels:
       - "traefik.enable=true"
 
-      # dominio real
       - "traefik.http.routers.frontend.rule=Host(`marte.encuentrass.lat`)"
-
-      # HTTPS
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=le"
 
-      # HTTP → HTTPS redirect
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+      # redirect
       - "traefik.http.routers.frontend-http.rule=Host(`marte.encuentrass.lat`)"
       - "traefik.http.routers.frontend-http.entrypoints=web"
       - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
 
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-
-      # puerto interno del contenedor
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
