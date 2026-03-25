@@ -1,3 +1,4 @@
+# ---------- BUILD ----------
 FROM node:20-alpine AS build
 
 WORKDIR /app
@@ -8,14 +9,21 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# ---------- RUN ----------
 FROM nginx:alpine
 
 LABEL org.opencontainers.image.revision=$GITHUB_SHA
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copiar build de React
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# Configuración SPA correcta
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-  CMD wget -qO- http://localhost || exit 1
+# Healthcheck CORRECTO (sin localhost)
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=10s \
+  CMD wget --spider -q http://127.0.0.1 || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
