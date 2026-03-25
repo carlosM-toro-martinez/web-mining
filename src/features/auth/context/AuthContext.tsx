@@ -1,11 +1,18 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren
+} from "react";
 import type { AuthSession, AuthUser } from "@/features/auth/model/auth.schema";
 import {
   clearStoredAuthSession,
   getStoredAuthSession,
   setStoredAuthSession
 } from "@/features/auth/lib/authSessionStorage";
-import { clearAuthToken, setAuthToken } from "@/shared/lib/authToken";
+import { clearAuthToken, isAuthTokenExpired, setAuthToken } from "@/shared/lib/authToken";
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -49,6 +56,42 @@ export function AuthProvider({ children }: PropsWithChildren) {
       logout
     };
   }, [session]);
+
+  useEffect(() => {
+    if (!session?.token) return;
+
+    const validateToken = () => {
+      if (isAuthTokenExpired(session.token)) {
+        setSession(null);
+        clearStoredAuthSession();
+        clearAuthToken();
+      }
+    };
+
+    validateToken();
+    const intervalId = window.setInterval(validateToken, 30_000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) validateToken();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [session?.token]);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setSession(null);
+      clearStoredAuthSession();
+      clearAuthToken();
+    };
+
+    window.addEventListener("auth:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", onUnauthorized);
+  }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

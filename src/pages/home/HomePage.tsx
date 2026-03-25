@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { BarChart3 } from "lucide-react";
 
 export function HomePage() {
   return (
@@ -14,7 +15,7 @@ export function HomePage() {
             to="/kardex-valorado"
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90"
           >
-            <span className="material-symbols-outlined text-lg">analytics</span>
+            <BarChart3 size={18} />
             Ir a Kardex Valorado
           </Link>
         </div>
