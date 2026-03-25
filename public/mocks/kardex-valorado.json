@@ -1,0 +1,81 @@
+{
+  "title": "Kardex Valorizado",
+  "subtitle": "Análisis detallado de movimientos de almacén, entradas, salidas y valorización histórica de inventarios mineros.",
+  "breadcrumbs": ["Reportes", "Kardex de Existencias"],
+  "filters": {
+    "dateRange": "01/10/2023 - 31/10/2023",
+    "costCenters": [
+      "CC-4500: Operación Tajo Abierto",
+      "CC-4600: Planta Concentradora",
+      "CC-4700: Mantenimiento Pesado"
+    ],
+    "productFamilies": [
+      "EPP - Seguridad",
+      "Repuestos Mecánicos",
+      "Lubricantes y Grasas",
+      "Herramientas de Perforación"
+    ]
+  },
+  "summary": {
+    "initialBalance": { "value": "1,240.00", "label": "Unidades en stock" },
+    "totalEntries": { "value": "450.00", "label": "+12.5% vs Mes anterior" },
+    "totalOutputs": { "value": "685.00", "label": "-5.2% Consumo operativo" },
+    "finalTotalValue": { "value": "USD 42.1k", "label": "Valorización a costo promedio" }
+  },
+  "rows": [
+    {
+      "date": "2023-10-02",
+      "movement": "ENTRADA",
+      "documentRef": "OC-23941 - Proveedor Caterpillar",
+      "quantity": "+120.00",
+      "balance": "1,360.00",
+      "unitCost": "USD 145.20",
+      "totalCost": "USD 17,424.00"
+    },
+    {
+      "date": "2023-10-05",
+      "movement": "SALIDA",
+      "documentRef": "VAL-9921 - Manto. Camión 797F",
+      "quantity": "-45.00",
+      "balance": "1,315.00",
+      "unitCost": "USD 145.20",
+      "totalCost": "USD 6,534.00"
+    },
+    {
+      "date": "2023-10-08",
+      "movement": "SALIDA",
+      "documentRef": "VAL-9945 - Perforación Zona B",
+      "quantity": "-210.00",
+      "balance": "1,105.00",
+      "unitCost": "USD 145.20",
+      "totalCost": "USD 30,492.00"
+    },
+    {
+      "date": "2023-10-12",
+      "movement": "ENTRADA",
+      "documentRef": "OC-24102 - Ferreyros SA",
+      "quantity": "+330.00",
+      "balance": "1,435.00",
+      "unitCost": "USD 148.10",
+      "totalCost": "USD 48,873.00"
+    },
+    {
+      "date": "2023-10-25",
+      "movement": "SALIDA",
+      "documentRef": "VAL-10056 - Emergencia Hidráulica",
+      "quantity": "-430.00",
+      "balance": "1,005.00",
+      "unitCost": "USD 147.50",
+      "totalCost": "USD 63,425.00"
+    }
+  ],
+  "pagination": {
+    "label": "Mostrando 1-15 de 248 movimientos",
+    "pages": [1, 2, 3],
+    "currentPage": 1
+  },
+  "notes": {
+    "valuationMethod": "Este reporte utiliza el método de Costo Promedio Ponderado (CPP) según las políticas contables de la unidad minera. Los valores son actualizados en tiempo real tras cada cierre de vale.",
+    "lastSync": "Los datos mostrados fueron sincronizados hace 4 minutos. Existe una discrepancia detectada de 2 items en tránsito desde Almacén Central hacia Zona Norte."
+  }
+}

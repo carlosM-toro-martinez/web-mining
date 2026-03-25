@@ -2,3 +2,6 @@
 .github
 .gitignore
 README.md
+node_modules
+dist
+npm-debug.log

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-fixed": "#3a3f4d",
+              "tertiary-container": "#f8a018",
+              "on-tertiary": "#583500",
+              "primary": "#9ecaff",
+              "primary-dim": "#82bdff",
+              "secondary-container": "#363b49",
+              "surface": "#090e1a",
+              "on-secondary-container": "#babfd0",
+              "secondary": "#999dae",
+              "on-primary": "#004272",
+              "outline-variant": "#37476d",
+              "on-tertiary-fixed": "#2a1700",
+              "tertiary": "#ffb14b",
+              "on-error": "#490106",
+              "inverse-on-surface": "#505564",
+              "on-surface-variant": "#9aaad6",
+              "surface-container-high": "#111f3c",
+              "surface-bright": "#152a56",
+              "inverse-primary": "#0062a5",
+              "surface-tint": "#9ecaff",
+              "on-secondary-fixed-variant": "#565b6a",
+              "on-surface": "#dde5ff",
+              "on-tertiary-fixed-variant": "#563400",
+              "on-primary-fixed-variant": "#005e9f",
+              "surface-dim": "#090e1a",
+              "outline": "#65759e",
+              "secondary-fixed": "#dee2f4",
+              "secondary-fixed-dim": "#d0d4e6",
+              "primary-fixed": "#d1e4ff",
+              "tertiary-fixed": "#f8a018",
+              "on-error-container": "#ff9993",
+              "on-primary-fixed": "#004171",
+              "surface-variant": "#132549",
+              "inverse-surface": "#faf8ff",
+              "secondary-dim": "#999dae",
+              "error": "#ee7d77",
+              "error-container": "#7f2927",
+              "surface-container": "#0e1930",
+              "primary-fixed-dim": "#b8d7ff",
+              "on-secondary": "#1b202d",
+              "surface-container-lowest": "#000000",
+              "primary-container": "#00497d",
+              "on-tertiary-container": "#4a2c00",
+              "tertiary-dim": "#e89300",
+              "surface-container-low": "#0b1324",
+              "tertiary-fixed-dim": "#e89300",
+              "background": "#090e1a",
+              "error-dim": "#bb5551",
+              "on-primary-container": "#b1d3ff",
+              "surface-container-highest": "#132549",
+              "on-background": "#dde5ff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { background-color: #090e1a; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090e1a; }
+        ::-webkit-scrollbar-thumb { background: #132549; border-radius: 10px; }
+    </style>
+</head>
+<body class="font-body text-on-surface antialiased">
+<!-- SideNavBar Anchor -->
+<aside class="fixed left-0 top-0 h-full w-64 bg-[#090e1a] flex flex-col py-6 z-50">
+<div class="px-6 mb-8">
+<h1 class="text-xl font-bold text-[#9ecaff] tracking-wider uppercase font-headline">Gestión Minera</h1>
+<p class="text-[10px] text-slate-500 font-medium tracking-widest mt-1">OPERACIONES V2.4</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="text-sm font-medium">Inventario</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="text-sm font-medium">Compras</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="text-sm font-medium">Vales</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+<span class="text-sm font-medium">Entrega de Materiales</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#9ecaff] bg-[#1a243a] border-l-4 border-[#9ecaff] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="text-sm font-medium">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="engineering">engineering</span>
+<span class="text-sm font-medium">EPP</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-slate-100 hover:bg-[#121b2e] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-sm font-medium">Ajustes</span>
+</a>
+</nav>
+<div class="px-6 pt-6 mt-auto border-t border-white/5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container-high flex items-center justify-center text-primary text-xs font-bold">UO</div>
+<div>
+<p class="text-xs font-semibold text-on-surface">Usuario Operativo</p>
+<p class="text-[10px] text-slate-500">Mina Norte Area A</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Anchor -->
+<header class="fixed top-0 right-0 left-64 h-16 bg-[#090e1a]/80 backdrop-blur-md border-b border-white/5 z-40 flex justify-between items-center px-8">
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg group-focus-within:text-primary transition-colors" data-icon="search">search</span>
+<input class="bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-sm w-80 focus:ring-1 focus:ring-primary transition-all text-on-surface placeholder:text-slate-600" placeholder="Buscar reporte..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="sync">sync</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-1.5 h-1.5 bg-tertiary rounded-full"></span>
+</button>
+<div class="h-6 w-px bg-white/10 mx-2"></div>
+<button class="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-all active:scale-95">
+<span>Perfil</span>
+<img alt="Avatar del operador" class="w-8 h-8 rounded-full border border-white/10" data-alt="close-up portrait of a professional industrial mining operator in a dark setting with subtle blue lighting accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBudVX1vcjDRWpZ0-ZdxpUI2uUJzTbJFB4BVfWzOk6sZi83AkZQEAv75FjBf4SyhS5kGrPqGzWqLFyDGa8TobZnFxOJSkpQmo-Y1MQUFk7EOaGAWtkbaDdTuSZwIgahlWP5J8ArvEqKtdkitRsw0O1IUOOcltvF5sP7uLnI0HPeCnek-XKISWileS4nJyK9Bz8yYA__yzMlXWZ7_1P2q2BtGpWJFghTOSfgSEOBo6kA8RI3171BAGqC2QNA5nmU9fskPnKW4EFbnWhk"/>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-24 pb-12 px-8 min-h-screen">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
+<div>
+<nav class="flex items-center gap-2 text-xs text-slate-500 mb-2 uppercase tracking-widest font-semibold">
+<span>Reportes</span>
+<span class="material-symbols-outlined text-xs" data-icon="chevron_right">chevron_right</span>
+<span class="text-primary-dim">Kardex de Existencias</span>
+</nav>
+<h2 class="text-4xl font-extrabold font-headline text-on-surface tracking-tight">Kardex Valorizado</h2>
+<p class="text-slate-400 mt-1 max-w-xl text-sm">Análisis detallado de movimientos de almacén, entradas, salidas y valorización histórica de inventarios mineros.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-5 py-2.5 bg-surface-container-high text-on-surface rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-surface-bright transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="picture_as_pdf">picture_as_pdf</span>
+                    Descargar PDF
+                </button>
+<button class="px-5 py-2.5 bg-primary text-on-primary rounded-lg text-sm font-semibold flex items-center gap-2 hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="table_view">table_view</span>
+                    Exportar Excel
+                </button>
+</div>
+</div>
+<!-- Filter Shell -->
+<div class="bg-surface-container-low p-6 rounded-xl mb-8 flex flex-wrap gap-6 items-end">
+<div class="flex-1 min-w-[200px]">
+<label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rango de Fechas</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" data-icon="calendar_today">calendar_today</span>
+<input class="w-full bg-surface-container-highest border-none text-sm rounded-lg pl-10 pr-4 py-2.5 text-on-surface focus:ring-1 focus:ring-primary" type="text" value="01/10/2023 - 31/10/2023"/>
+</div>
+</div>
+<div class="flex-1 min-w-[200px]">
+<label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Centro de Costo</label>
+<select class="w-full bg-surface-container-highest border-none text-sm rounded-lg px-4 py-2.5 text-on-surface focus:ring-1 focus:ring-primary appearance-none">
+<option>CC-4500: Operación Tajo Abierto</option>
+<option>CC-4600: Planta Concentradora</option>
+<option>CC-4700: Mantenimiento Pesado</option>
+</select>
+</div>
+<div class="flex-1 min-w-[200px]">
+<label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Familia de Productos</label>
+<select class="w-full bg-surface-container-highest border-none text-sm rounded-lg px-4 py-2.5 text-on-surface focus:ring-1 focus:ring-primary appearance-none">
+<option>EPP - Seguridad</option>
+<option>Repuestos Mecánicos</option>
+<option>Lubricantes y Grasas</option>
+<option>Herramientas de Perforación</option>
+</select>
+</div>
+<button class="bg-surface-bright text-primary px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-all">
+<span class="material-symbols-outlined" data-icon="filter_alt">filter_alt</span>
+                Aplicar Filtros
+            </button>
+</div>
+<!-- Analytics Bento Summary -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+<div class="bg-surface-container-high p-5 rounded-xl">
+<p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Saldo Inicial</p>
+<p class="text-3xl font-headline font-extrabold text-on-surface">1,240.00</p>
+<p class="text-[11px] text-slate-500 mt-1 uppercase tracking-tighter">Unidades en stock</p>
+</div>
+<div class="bg-surface-container-high p-5 rounded-xl border-l-4 border-primary">
+<p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Total Entradas</p>
+<p class="text-3xl font-headline font-extrabold text-primary-dim">450.00</p>
+<p class="text-[11px] text-primary mt-1 uppercase tracking-tighter">+12.5% vs Mes anterior</p>
+</div>
+<div class="bg-surface-container-high p-5 rounded-xl border-l-4 border-tertiary">
+<p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Total Salidas</p>
+<p class="text-3xl font-headline font-extrabold text-tertiary">685.00</p>
+<p class="text-[11px] text-tertiary mt-1 uppercase tracking-tighter">-5.2% Consumo operativo</p>
+</div>
+<div class="bg-surface-container-highest p-5 rounded-xl shadow-xl">
+<p class="text-xs font-bold text-primary uppercase tracking-widest mb-3">Valor Total Final</p>
+<p class="text-3xl font-headline font-extrabold text-white">USD 42.1k</p>
+<p class="text-[11px] text-slate-400 mt-1 uppercase tracking-tighter">Valorización a costo promedio</p>
+</div>
+</div>
+<!-- Kardex Table Container -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden shadow-2xl">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high">
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fecha</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Movimiento</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Documento Ref</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Cantidad</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Saldo</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Costo Unitario</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Costo Total</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<!-- Row 1 -->
+<tr class="group hover:bg-surface-container-highest transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-slate-300">2023-10-02</td>
+<td class="px-6 py-4">
+<span class="flex items-center gap-2 text-xs font-semibold text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_downward">arrow_downward</span>
+                                    ENTRADA
+                                </span>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface">OC-23941 - Proveedor Caterpillar</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-on-surface">+120.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-400">1,360.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-300">USD 145.20</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-white font-bold">USD 17,424.00</td>
+</tr>
+<!-- Row 2 -->
+<tr class="group hover:bg-surface-container-highest transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-slate-300">2023-10-05</td>
+<td class="px-6 py-4">
+<span class="flex items-center gap-2 text-xs font-semibold text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_upward">arrow_upward</span>
+                                    SALIDA
+                                </span>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface">VAL-9921 - Manto. Camión 797F</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-on-surface">-45.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-400">1,315.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-300">USD 145.20</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-white font-bold">USD 6,534.00</td>
+</tr>
+<!-- Row 3 -->
+<tr class="group hover:bg-surface-container-highest transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-slate-300">2023-10-08</td>
+<td class="px-6 py-4">
+<span class="flex items-center gap-2 text-xs font-semibold text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_upward">arrow_upward</span>
+                                    SALIDA
+                                </span>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface">VAL-9945 - Perforación Zona B</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-on-surface">-210.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-400">1,105.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-300">USD 145.20</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-white font-bold">USD 30,492.00</td>
+</tr>
+<!-- Row 4 -->
+<tr class="group hover:bg-surface-container-highest transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-slate-300">2023-10-12</td>
+<td class="px-6 py-4">
+<span class="flex items-center gap-2 text-xs font-semibold text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_downward">arrow_downward</span>
+                                    ENTRADA
+                                </span>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface">OC-24102 - Ferreyros SA</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-on-surface">+330.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-400">1,435.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-300">USD 148.10</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-white font-bold">USD 48,873.00</td>
+</tr>
+<!-- Row 5 -->
+<tr class="group hover:bg-surface-container-highest transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-slate-300">2023-10-25</td>
+<td class="px-6 py-4">
+<span class="flex items-center gap-2 text-xs font-semibold text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_upward">arrow_upward</span>
+                                    SALIDA
+                                </span>
+</td>
+<td class="px-6 py-4 text-xs font-medium text-on-surface">VAL-10056 - Emergencia Hidráulica</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-on-surface">-430.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-400">1,005.00</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-slate-300">USD 147.50</td>
+<td class="px-6 py-4 font-mono text-xs text-right text-white font-bold">USD 63,425.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination / Table Footer -->
+<div class="px-6 py-4 bg-surface-container-high/50 flex items-center justify-between border-t border-white/5">
+<span class="text-xs text-slate-500 font-medium">Mostrando 1-15 de 248 movimientos</span>
+<div class="flex items-center gap-2">
+<button class="p-1.5 rounded bg-surface-container-highest text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="first_page">first_page</span>
+</button>
+<button class="p-1.5 rounded bg-surface-container-highest text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="chevron_left">chevron_left</span>
+</button>
+<div class="flex items-center gap-1 px-2">
+<span class="w-8 h-8 flex items-center justify-center bg-primary text-on-primary text-xs font-bold rounded">1</span>
+<span class="w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-bold rounded hover:bg-surface-container-highest cursor-pointer transition-colors">2</span>
+<span class="w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-bold rounded hover:bg-surface-container-highest cursor-pointer transition-colors">3</span>
+</div>
+<button class="p-1.5 rounded bg-surface-container-highest text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="chevron_right">chevron_right</span>
+</button>
+<button class="p-1.5 rounded bg-surface-container-highest text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="last_page">last_page</span>
+</button>
+</div>
+</div>
+</div>
+<!-- System Logs / Metadata Area -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-surface-container border border-white/5 p-4 rounded-lg flex items-start gap-4">
+<div class="p-3 bg-primary/10 rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="info">info</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-on-surface mb-1">Método de Valorización</h4>
+<p class="text-xs text-slate-400 leading-relaxed">Este reporte utiliza el método de **Costo Promedio Ponderado** (CPP) según las políticas contables de la unidad minera. Los valores son actualizados en tiempo real tras cada cierre de vale.</p>
+</div>
+</div>
+<div class="bg-surface-container border border-white/5 p-4 rounded-lg flex items-start gap-4">
+<div class="p-3 bg-tertiary/10 rounded-lg">
+<span class="material-symbols-outlined text-tertiary" data-icon="history">history</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-on-surface mb-1">Última Sincronización</h4>
+<p class="text-xs text-slate-400 leading-relaxed">Los datos mostrados fueron sincronizados hace 4 minutos. Existe una discrepancia detectada de 2 items en tránsito desde Almacén Central hacia Zona Norte.</p>
+</div>
+</div>
+</div>
+</main>
+</body></html>
