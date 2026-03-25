@@ -1,6 +1,7 @@
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
-import type { ZodType } from "zod";
+import { ZodError, type ZodType } from "zod";
 import { httpClient } from "@/shared/api/core/httpClient";
+import { ApiError } from "@/shared/api/core/apiError";
 
 interface RequestOptions<TResponse> {
   url: string;
@@ -24,7 +25,21 @@ export async function getRequest<TResponse>({
   client = httpClient
 }: RequestOptions<TResponse>): Promise<TResponse> {
   const response = await client.get(url, config);
-  return schema.parse(response.data);
+  try {
+    return schema.parse(response.data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new ApiError("Respuesta del servidor con formato inesperado.", {
+        details: {
+          url,
+          method: "GET",
+          response: response.data,
+          issues: error.issues
+        }
+      });
+    }
+    throw error;
+  }
 }
 
 export async function postRequest<TResponse, TBody>({
@@ -35,5 +50,19 @@ export async function postRequest<TResponse, TBody>({
   client = httpClient
 }: PostRequestOptions<TResponse, TBody>): Promise<TResponse> {
   const response = await client.post(url, body, config);
-  return schema.parse(response.data);
+  try {
+    return schema.parse(response.data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new ApiError("Respuesta del servidor con formato inesperado.", {
+        details: {
+          url,
+          method: "POST",
+          response: response.data,
+          issues: error.issues
+        }
+      });
+    }
+    throw error;
+  }
 }

@@ -1,12 +1,20 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRegisterMutation } from "@/features/auth/hooks/useRegisterMutation";
 import { ApiError } from "@/shared/api/core/apiError";
 import type { AuthRole } from "@/features/auth/model/auth.schema";
+import { PasswordInput } from "@/shared/ui/PasswordInput";
+import { useToast } from "@/shared/ui/toast/ToastProvider";
+import {
+  authInputClassName,
+  authLabelClassName,
+  authPrimaryButtonClassName
+} from "@/pages/auth/authUi";
 
 const roleOptions: AuthRole[] = ["ADMIN", "ALMACENERO", "SUPERINTENDENTE", "TRABAJADOR"];
 
 export function RegisterUserPage() {
   const registerMutation = useRegisterMutation();
+  const { showError, showSuccess } = useToast();
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -15,52 +23,56 @@ export function RegisterUserPage() {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    registerMutation.mutate({ nombre, email, password, role });
+    registerMutation.mutate(
+      { nombre, email, password, role },
+      {
+        onSuccess: (response) =>
+          showSuccess(`Usuario registrado: ${response.data.nombre} (${response.data.role})`),
+        onError: (error) => {
+          const message =
+            error instanceof ApiError ? error.message : "No se pudo registrar el usuario.";
+          showError(message);
+        }
+      }
+    );
   }
 
-  const message = useMemo(() => {
-    if (registerMutation.isSuccess) {
-      return `Usuario registrado: ${registerMutation.data.data.nombre} (${registerMutation.data.data.role})`;
-    }
-    if (registerMutation.error instanceof ApiError) {
-      return registerMutation.error.message;
-    }
-    return "";
-  }, [registerMutation.data, registerMutation.error, registerMutation.isSuccess]);
-
   return (
-    <section className="max-w-2xl rounded-xl border border-white/10 bg-[#0b1324] p-6 text-[#dde5ff]">
+    <section className="relative max-w-2xl rounded-xl border border-[var(--color-outline-variant)]/60 bg-[linear-gradient(160deg,rgba(17,31,60,0.9),rgba(11,19,36,0.95))] p-6 text-[var(--color-on-surface)]">
+      <span className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-[var(--color-tertiary)]/20 blur-xl" />
       <h1 className="font-headline text-3xl font-extrabold">Registrar nuevo usuario</h1>
-      <p className="mt-2 text-sm text-[#9aaad6]">Solo administradores pueden crear cuentas.</p>
+      <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+        Solo administradores pueden crear cuentas.
+      </p>
 
       <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
         <div className="md:col-span-2">
-          <label className="mb-1 block text-xs uppercase tracking-widest text-[#6f7fa3]">Nombre</label>
+          <label className={authLabelClassName}>Nombre</label>
           <input
             required
             value={nombre}
             onChange={(event) => setNombre(event.target.value)}
-            className="w-full rounded-lg border-none bg-[#132549] px-4 py-2.5 text-sm text-[#dde5ff] focus:ring-1 focus:ring-[#9ecaff]"
+            className={authInputClassName}
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-widest text-[#6f7fa3]">Email</label>
+          <label className={authLabelClassName}>Email</label>
           <input
             required
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded-lg border-none bg-[#132549] px-4 py-2.5 text-sm text-[#dde5ff] focus:ring-1 focus:ring-[#9ecaff]"
+            className={authInputClassName}
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-widest text-[#6f7fa3]">Role</label>
+          <label className={authLabelClassName}>Role</label>
           <select
             value={role}
             onChange={(event) => setRole(event.target.value as AuthRole)}
-            className="w-full rounded-lg border-none bg-[#132549] px-4 py-2.5 text-sm text-[#dde5ff] focus:ring-1 focus:ring-[#9ecaff]"
+            className={authInputClassName}
           >
             {roleOptions.map((item) => (
               <option key={item} value={item}>
@@ -70,31 +82,22 @@ export function RegisterUserPage() {
           </select>
         </div>
 
-        <div className="md:col-span-2">
-          <label className="mb-1 block text-xs uppercase tracking-widest text-[#6f7fa3]">
-            Contraseña
-          </label>
-          <input
-            required
-            type="password"
-            minLength={8}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="w-full rounded-lg border-none bg-[#132549] px-4 py-2.5 text-sm text-[#dde5ff] focus:ring-1 focus:ring-[#9ecaff]"
-          />
-        </div>
-
-        {message ? (
-          <p className={`md:col-span-2 text-sm ${registerMutation.isSuccess ? "text-[#9ecaff]" : "text-[#ff9993]"}`}>
-            {message}
-          </p>
-        ) : null}
+        <PasswordInput
+          required
+          label="Contraseña"
+          minLength={8}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          labelClassName={authLabelClassName}
+          wrapperClassName="md:col-span-2"
+          className={`${authInputClassName} pr-10`}
+        />
 
         <div className="md:col-span-2">
           <button
             type="submit"
             disabled={registerMutation.isPending}
-            className="rounded-lg bg-[#9ecaff] px-5 py-2.5 text-sm font-semibold text-[#004272] transition hover:opacity-90 disabled:opacity-60"
+            className={authPrimaryButtonClassName}
           >
             {registerMutation.isPending ? "Registrando..." : "Crear usuario"}
           </button>

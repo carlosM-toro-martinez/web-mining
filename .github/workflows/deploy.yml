@@ -28,6 +28,7 @@ jobs:
           push: true
           build-args: |
             GITHUB_SHA=${{ github.sha }}
+            VITE_API_BASE_URL=https://api.marte.encuentrass.lat
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/marte-frontend:${{ github.sha }}
             ${{ secrets.DOCKER_USERNAME }}/marte-frontend:latest
