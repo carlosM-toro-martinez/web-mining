@@ -39,11 +39,25 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -euo pipefail
+
             cd /root/systems/marte-mining/web-mining
-            git pull origin main
+
+            echo "Sincronizando repo remoto (forzando estado de main)..."
+            git fetch origin main
+            git checkout -f main
+            git reset --hard origin/main
+
             echo "Versión actual:"
-            CURRENT_VERSION=$(docker inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' web-mining-frontend-1 || echo "none")
-            echo $CURRENT_VERSION
+            CURRENT_IMAGE=$(docker inspect --format='{{.Config.Image}}' web-mining-frontend-1 2>/dev/null || true)
+            CURRENT_VERSION=""
+            if [ -n "${CURRENT_IMAGE:-}" ] && [[ "$CURRENT_IMAGE" == *":"* ]]; then
+              CURRENT_VERSION="${CURRENT_IMAGE##*:}"
+            fi
+            if [ -z "${CURRENT_VERSION:-}" ]; then
+              CURRENT_VERSION="none"
+            fi
+            echo "$CURRENT_VERSION"
 
             echo "Nueva versión: ${{ github.sha }}"
 
@@ -56,21 +70,30 @@ jobs:
             docker compose up -d
 
             echo "Esperando healthcheck..."
-            sleep 15
-
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' web-mining-frontend-1 || echo "starting")
+            ATTEMPTS=18
+            STATUS="starting"
+            for i in $(seq 1 $ATTEMPTS); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' web-mining-frontend-1 2>/dev/null || echo "starting")
+              echo "Healthcheck intento $i/$ATTEMPTS: $STATUS"
+              if [ "$STATUS" = "healthy" ]; then
+                break
+              fi
+              sleep 5
+            done
 
             if [ "$STATUS" != "healthy" ]; then
               echo "Falló deploy. Rollback..."
 
-              if [ "$CURRENT_VERSION" != "none" ]; then
+              if [ "$CURRENT_VERSION" != "none" ] && [ -n "${CURRENT_VERSION:-}" ]; then
                 export VERSION=$CURRENT_VERSION
 
                 echo "Volviendo a versión anterior: $VERSION"
+                docker compose pull frontend
                 docker compose up -d
               else
                 echo "No hay versión anterior"
               fi
+              exit 1
             else
               echo "Deploy exitoso"
             fi
