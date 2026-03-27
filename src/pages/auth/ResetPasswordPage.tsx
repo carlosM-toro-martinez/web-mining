@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { FormEvent, useMemo, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useResetPasswordMutation } from "@/features/auth/hooks/useResetPasswordMutation";
 import { ApiError } from "@/shared/api/core/apiError";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
@@ -17,9 +17,27 @@ import {
   getAuthMessageClassName
 } from "@/pages/auth/authUi";
 
+const resetPasswordTokenStorageKey = "auth:reset-password-token";
+
 export function ResetPasswordPage() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [token, setToken] = useState(searchParams.get("token") ?? "");
+  const tokenFromState = (location.state as { token?: string } | null)?.token ?? "";
+  const tokenFromQuery = searchParams.get("token") ?? "";
+  const tokenFromSession = window.sessionStorage.getItem(resetPasswordTokenStorageKey) ?? "";
+  const resolvedInitialToken = useMemo(
+    () => tokenFromState || tokenFromSession || tokenFromQuery,
+    [tokenFromQuery, tokenFromSession, tokenFromState]
+  );
+
+  if (tokenFromState) {
+    window.sessionStorage.setItem(resetPasswordTokenStorageKey, tokenFromState);
+  } else if (tokenFromQuery) {
+    window.sessionStorage.setItem(resetPasswordTokenStorageKey, tokenFromQuery);
+  }
+
+  const [token, setToken] = useState(resolvedInitialToken);
+  const [isManualTokenMode, setIsManualTokenMode] = useState(!resolvedInitialToken);
   const resetPasswordMutation = useResetPasswordMutation();
   const { showError, showSuccess } = useToast();
 
@@ -43,7 +61,10 @@ export function ResetPasswordPage() {
         confirmPassword
       },
       {
-        onSuccess: (response) => showSuccess(response.message),
+        onSuccess: (response) => {
+          window.sessionStorage.removeItem(resetPasswordTokenStorageKey);
+          showSuccess(response.message);
+        },
         onError: (error) => {
           const message =
             error instanceof ApiError ? error.message : "No se pudo restablecer la contraseña.";
@@ -73,23 +94,39 @@ export function ResetPasswordPage() {
           <div className={authFormPanelClassName}>
             <h2 className="font-headline text-3xl font-extrabold">Actualizar contraseña</h2>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-              Ingresa token y credenciales nuevas.
+              Configura tu nueva contraseña para completar la recuperacion.
             </p>
 
             <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-              <div>
-                <label className={authLabelClassName} htmlFor="reset-token">
-                  Token de recuperación
-                </label>
-                <input
-                  id="reset-token"
-                  required
-                  value={token}
-                  onChange={(event) => setToken(event.target.value)}
-                  className={authInputClassName}
-                  placeholder="Pega aquí el token del correo"
-                />
-              </div>
+              {isManualTokenMode ? (
+                <div>
+                  <label className={authLabelClassName} htmlFor="reset-token">
+                    Token de recuperación
+                  </label>
+                  <input
+                    id="reset-token"
+                    required
+                    value={token}
+                    onChange={(event) => setToken(event.target.value)}
+                    className={authInputClassName}
+                    placeholder="Pega aquí el token del correo"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/12 px-3 py-2 text-xs font-semibold text-[var(--color-success)]">
+                  Token de recuperacion detectado automaticamente.
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualTokenMode(true);
+                      setToken("");
+                    }}
+                    className="ml-2 underline underline-offset-2"
+                  >
+                    Usar otro token
+                  </button>
+                </div>
+              )}
 
               <PasswordInput
                 required

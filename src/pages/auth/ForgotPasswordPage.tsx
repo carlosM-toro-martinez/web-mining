@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForgotPasswordMutation } from "@/features/auth/hooks/useForgotPasswordMutation";
 import { ApiError } from "@/shared/api/core/apiError";
@@ -16,6 +16,8 @@ import {
   authSplitCardClassName
 } from "@/pages/auth/authUi";
 
+const resetPasswordTokenStorageKey = "auth:reset-password-token";
+
 export function ForgotPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -23,6 +25,20 @@ export function ForgotPasswordPage() {
   const { showError, showSuccess } = useToast();
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [token, setToken] = useState("");
+
+  useEffect(() => {
+    const tokenFromEmailLink = searchParams.get("token");
+    if (!tokenFromEmailLink) return;
+
+    const normalizedToken = tokenFromEmailLink.trim();
+    if (!normalizedToken) return;
+
+    window.sessionStorage.setItem(resetPasswordTokenStorageKey, normalizedToken);
+    navigate("/reset-password", {
+      replace: true,
+      state: { token: normalizedToken }
+    });
+  }, [navigate, searchParams]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,10 +60,12 @@ export function ForgotPasswordPage() {
   function onUseToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedToken = token.trim();
-    const path = normalizedToken
-      ? `/reset-password?token=${encodeURIComponent(normalizedToken)}`
-      : "/reset-password";
-    navigate(path);
+    if (normalizedToken) {
+      window.sessionStorage.setItem(resetPasswordTokenStorageKey, normalizedToken);
+    }
+    navigate("/reset-password", {
+      state: normalizedToken ? { token: normalizedToken } : undefined
+    });
   }
 
   return (

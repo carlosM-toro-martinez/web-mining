@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { App } from "@/app/App";
-import minerImage from "@/assets/miner.png";
+import minerImage from "@/assets/favicon.png";
 import "@/styles/globals.css";
 import "@/styles/theme.css";
 
