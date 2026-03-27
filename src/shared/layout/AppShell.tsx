@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Boxes,
+  CircleUserRound,
+  ChevronLeft,
+  ChevronRight,
   LayoutDashboard,
   Menu,
   Search,
@@ -11,6 +14,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import minerImage from "@/assets/miner.png";
 
 interface NavItem {
   label: string;
@@ -18,21 +22,27 @@ interface NavItem {
   to: string;
 }
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/" },
-  { label: "Inventario", icon: Boxes, to: "/inventario" }
-];
+const baseNavItems: NavItem[] = [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }];
 
 export function AppShell() {
   const navigate = useNavigate();
   const { user, isAdmin, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
+  const isAlmacenero = user?.role === "ALMACENERO";
+  const canSeeInventory = isAlmacenero || isAdmin;
 
   const displayItems = useMemo(() => {
-    if (!isAdmin) return navItems;
-    return [...navItems, { label: "Trabajadores", icon: UserPlus, to: "/usuarios/nuevo" }];
-  }, [isAdmin]);
+    const items: NavItem[] = [...baseNavItems];
+    if (canSeeInventory) {
+      items.push({ label: "Inventario", icon: Boxes, to: "/inventario" });
+    }
+    if (isAdmin) {
+      items.push({ label: "Trabajadores", icon: UserPlus, to: "/usuarios/nuevo" });
+    }
+    return items;
+  }, [isAdmin, canSeeInventory]);
 
   const avatarLabel = useMemo(() => {
     const source = user?.nombre?.trim();
@@ -45,20 +55,55 @@ export function AppShell() {
     return initials || "UO";
   }, [user?.nombre]);
 
+  useEffect(() => {
+    const persisted = window.localStorage.getItem("ui:sidebar-collapsed");
+    if (persisted === "true") {
+      setIsSidebarCollapsed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("ui:sidebar-collapsed", isSidebarCollapsed ? "true" : "false");
+  }, [isSidebarCollapsed]);
+
   return (
     <div className="min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-[var(--color-surface-container-low)] px-0 py-6 transition-transform duration-200 lg:translate-x-0 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-[var(--color-surface-container-low)] px-0 py-6 transition-all duration-300 lg:translate-x-0 ${
+          isSidebarCollapsed ? "lg:w-20" : "lg:w-64"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="mb-8 px-6">
-          <h1 className="font-headline text-xl font-bold uppercase tracking-[0.03em] text-[var(--color-primary)]">
-            Minera Marte
-          </h1>
-          <p className="mt-1 text-[8px] font-medium tracking-[0.2em] text-[var(--color-tertiary)]">
-            SISTEMA MINERO INTEGRAL V1.0
-          </p>
+        <div className={`${isSidebarCollapsed ? "mb-6 px-3" : "mb-8 px-6"}`}>
+          <div className="relative min-h-[28px]">
+            <div
+              className={`absolute left-0 top-0 flex items-center gap-1 transition-all duration-300 ${
+                isSidebarCollapsed
+                  ? "translate-x-0 opacity-100"
+                  : "-translate-x-2 opacity-0 pointer-events-none"
+              }`}
+            >
+              <h1 className="font-headline text-xl font-bold uppercase tracking-[0.03em] text-[var(--color-primary)]">
+                MM
+              </h1>
+              <span className="text-[8px] font-medium tracking-[0.2em] text-[var(--color-tertiary)]">
+                v0.1
+              </span>
+            </div>
+            <div
+              className={`overflow-hidden transition-all duration-500 ${
+                isSidebarCollapsed
+                  ? "max-w-0 translate-x-1 opacity-0"
+                  : "max-w-[210px] translate-x-0 opacity-100 delay-200"
+              }`}
+            >
+              <h1 className="whitespace-nowrap font-headline text-xl font-bold uppercase tracking-[0.03em] text-[var(--color-primary)]">
+                Minera Marte
+              </h1>
+              <p className="mt-1 whitespace-nowrap text-[8px] font-medium tracking-[0.2em] text-[var(--color-tertiary)]">
+                SISTEMA MINERO INTEGRAL V1.0
+              </p>
+            </div>
+          </div>
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -68,7 +113,9 @@ export function AppShell() {
               to={item.to}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all ${
+                `flex items-center py-3 text-sm font-medium transition-all ${
+                  isSidebarCollapsed ? "justify-center px-2" : "gap-3 px-4"
+                } ${
                   isActive
                     ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
                     : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
@@ -76,28 +123,47 @@ export function AppShell() {
               }
             >
               <item.icon size={18} />
-              <span>{item.label}</span>
+              {isSidebarCollapsed ? null : <span>{item.label}</span>}
             </NavLink>
           ))}
         </nav>
 
-        <div className="mt-auto border-t border-[var(--color-border-soft)] px-6 pt-6">
+        <div
+          className={`mt-auto border-t border-[var(--color-border-soft)] pt-6 ${isSidebarCollapsed ? "px-3" : "px-6"}`}
+        >
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded bg-[var(--color-surface-container-highest)] text-xs font-bold text-[var(--color-primary)]">
               {avatarLabel}
             </div>
-            <div>
-              <p className="text-xs font-semibold text-[var(--color-on-surface)]">{user?.nombre ?? "Usuario"}</p>
-              <p className="text-[10px] uppercase text-[var(--color-on-surface-variant)]">
-                {user?.role ?? "SIN ROL"}
-              </p>
-            </div>
+            {isSidebarCollapsed ? null : (
+              <div>
+                <p className="text-xs font-semibold text-[var(--color-on-surface)]">
+                  {user?.nombre ?? "Usuario"}
+                </p>
+                <p className="text-[10px] uppercase text-[var(--color-on-surface-variant)]">
+                  {user?.role ?? "SIN ROL"}
+                </p>
+              </div>
+            )}
           </div>
-          <p className="mt-4 text-[10px] tracking-wide text-[var(--color-on-surface-variant)]/80">
-            Marte Mining {yearLabel}
-          </p>
+          {isSidebarCollapsed ? null : (
+            <p className="mt-4 text-[10px] tracking-wide text-[var(--color-on-surface-variant)]/80">
+              Marte Mining {yearLabel}
+            </p>
+          )}
         </div>
       </aside>
+
+      <button
+        type="button"
+        onClick={() => setIsSidebarCollapsed((current) => !current)}
+        className={`fixed top-20 z-[60] hidden rounded-full border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-1.5 text-[var(--color-on-surface-variant)] shadow-lg transition-all duration-300 hover:text-[var(--color-primary)] lg:block ${
+          isSidebarCollapsed ? "left-[68px]" : "left-[244px]"
+        }`}
+        aria-label={isSidebarCollapsed ? "Expandir menu lateral" : "Colapsar menu lateral"}
+      >
+        {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+      </button>
 
       {mobileOpen ? (
         <button
@@ -108,7 +174,11 @@ export function AppShell() {
         />
       ) : null}
 
-      <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]/90 px-4 backdrop-blur-md lg:left-64 lg:px-8">
+      <header
+        className={`fixed right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]/90 px-4 backdrop-blur-md transition-all duration-300 lg:px-8 ${
+          isSidebarCollapsed ? "left-0 lg:left-20" : "left-0 lg:left-64"
+        }`}
+      >
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -146,11 +216,9 @@ export function AppShell() {
             className="hidden items-center gap-2 text-sm font-medium text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)] sm:flex"
           >
             <span>Perfil</span>
-            <img
-              alt="Avatar del operador"
-              className="h-8 w-8 rounded-full border border-white/10"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBudVX1vcjDRWpZ0-ZdxpUI2uUJzTbJFB4BVfWzOk6sZi83AkZQEAv75FjBf4SyhS5kGrPqGzWqLFyDGa8TobZnFxOJSkpQmo-Y1MQUFk7EOaGAWtkbaDdTuSZwIgahlWP5J8ArvEqKtdkitRsw0O1IUOOcltvF5sP7uLnI0HPeCnek-XKISWileS4nJyK9Bz8yYA__yzMlXWZ7_1P2q2BtGpWJFghTOSfgSEOBo6kA8RI3171BAGqC2QNA5nmU9fskPnKW4EFbnWhk"
-            />
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] text-[var(--color-on-surface-variant)]">
+              <CircleUserRound size={16} />
+            </span>
           </button>
           <button
             type="button"
@@ -165,12 +233,16 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="min-h-screen px-4 pb-12 pt-24 lg:ml-64 lg:px-8">
+      <main
+        className={`min-h-screen px-4 pb-12 pt-24 transition-all duration-300 lg:px-8 ${
+          isSidebarCollapsed ? "lg:ml-20" : "lg:ml-64"
+        }`}
+      >
         <Outlet />
       </main>
 
       <img
-        src="/images/miner.png"
+        src={minerImage}
         alt=""
         aria-hidden="true"
         className="pointer-events-none fixed bottom-5 right-5 z-30 h-24 w-24 opacity-90 md:h-28 md:w-28"

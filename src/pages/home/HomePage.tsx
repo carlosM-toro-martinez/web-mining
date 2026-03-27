@@ -1,39 +1,88 @@
 import { Link } from "react-router-dom";
-import { BarChart3 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Boxes, LayoutDashboard, MoveRight, UserPlus } from "lucide-react";
+import { useAuth } from "@/features/auth/context/AuthContext";
+
+interface DashboardItem {
+  title: string;
+  description: string;
+  to: string;
+  icon: LucideIcon;
+}
 
 export function HomePage() {
-  return (
-    <section className="space-y-6">
-      <div className="rounded-xl bg-surface-container-low p-6">
-        <h2 className="font-headline text-3xl font-extrabold text-on-surface">Dashboard Operativo</h2>
-        <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          Este tablero ya usa el nuevo theme de Kardex Valorado. Desde aqui puedes navegar a
-          reportes, inventario y modulos operativos con una interfaz unificada.
-        </p>
-        <div className="mt-5">
-          <Link
-            to="/kardex-valorado"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:opacity-90"
-          >
-            <BarChart3 size={18} />
-            Ir a Kardex Valorado
-          </Link>
-        </div>
-      </div>
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
+  const isAlmacenero = user?.role === "ALMACENERO";
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <article className="rounded-xl bg-surface-container-high p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-500">Alertas</p>
-          <p className="mt-2 font-headline text-2xl font-bold text-tertiary">3 Activas</p>
-        </article>
-        <article className="rounded-xl bg-surface-container-high p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-500">Ordenes del dia</p>
-          <p className="mt-2 font-headline text-2xl font-bold text-primary-dim">18</p>
-        </article>
-        <article className="rounded-xl bg-surface-container-high p-5">
-          <p className="text-xs uppercase tracking-widest text-slate-500">Sincronizacion</p>
-          <p className="mt-2 font-headline text-2xl font-bold text-on-surface">Hace 4 min</p>
-        </article>
+  const items: DashboardItem[] = [
+    {
+      title: "Dashboard",
+      description: "Vista general del sistema y estado operativo.",
+      to: "/",
+      icon: LayoutDashboard
+    }
+  ];
+
+  if (isAdmin || isAlmacenero) {
+    items.push({
+      title: "Inventario",
+      description: "Gestión de categorías, productos y flujos de almacén.",
+      to: "/inventario",
+      icon: Boxes
+    });
+  }
+
+  if (isAdmin) {
+    items.push({
+      title: "Trabajadores",
+      description: "Administración de usuarios, permisos y cuentas.",
+      to: "/usuarios/nuevo",
+      icon: UserPlus
+    });
+  }
+
+  return (
+    <section className="space-y-6 text-[var(--color-on-surface)]">
+      <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
+        <h1 className="font-headline text-4xl font-extrabold">Panel Principal</h1>
+        <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+          Accesos rápidos a los módulos principales del sistema.
+        </p>
+      </header>
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <article
+              key={item.title}
+              className="group rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-6 transition hover:-translate-y-0.5 hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-surface-container-highest)]"
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <span className="inline-flex rounded-xl bg-[var(--color-primary)]/15 p-3 text-[var(--color-primary)]">
+                  <Icon size={22} />
+                </span>
+                <span className="rounded-full bg-[var(--color-tertiary)]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-tertiary)]">
+                  módulo
+                </span>
+              </div>
+
+              <h2 className="text-2xl font-bold">{item.title}</h2>
+              <p className="mt-2 min-h-[48px] text-sm text-[var(--color-on-surface-variant)]">
+                {item.description}
+              </p>
+
+              <Link
+                to={item.to}
+                className="mt-6 inline-flex items-center gap-2 rounded-lg border border-[var(--color-primary)]/50 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition group-hover:bg-[var(--color-primary)]/10"
+              >
+                Ir al módulo
+                <MoveRight size={15} />
+              </Link>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

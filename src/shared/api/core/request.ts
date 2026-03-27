@@ -18,6 +18,21 @@ interface PostRequestOptions<TResponse, TBody> {
   client?: AxiosInstance;
 }
 
+interface PutRequestOptions<TResponse, TBody> {
+  url: string;
+  body: TBody;
+  config?: AxiosRequestConfig;
+  schema: ZodType<TResponse>;
+  client?: AxiosInstance;
+}
+
+interface DeleteRequestOptions<TResponse> {
+  url: string;
+  config?: AxiosRequestConfig;
+  schema: ZodType<TResponse>;
+  client?: AxiosInstance;
+}
+
 export async function getRequest<TResponse>({
   url,
   config,
@@ -58,6 +73,55 @@ export async function postRequest<TResponse, TBody>({
         details: {
           url,
           method: "POST",
+          response: response.data,
+          issues: error.issues
+        }
+      });
+    }
+    throw error;
+  }
+}
+
+export async function putRequest<TResponse, TBody>({
+  url,
+  body,
+  config,
+  schema,
+  client = httpClient
+}: PutRequestOptions<TResponse, TBody>): Promise<TResponse> {
+  const response = await client.put(url, body, config);
+  try {
+    return schema.parse(response.data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new ApiError("Respuesta del servidor con formato inesperado.", {
+        details: {
+          url,
+          method: "PUT",
+          response: response.data,
+          issues: error.issues
+        }
+      });
+    }
+    throw error;
+  }
+}
+
+export async function deleteRequest<TResponse>({
+  url,
+  config,
+  schema,
+  client = httpClient
+}: DeleteRequestOptions<TResponse>): Promise<TResponse> {
+  const response = await client.delete(url, config);
+  try {
+    return schema.parse(response.data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new ApiError("Respuesta del servidor con formato inesperado.", {
+        details: {
+          url,
+          method: "DELETE",
           response: response.data,
           issues: error.issues
         }

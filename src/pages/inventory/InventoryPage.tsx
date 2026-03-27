@@ -1,12 +1,36 @@
 import { Link } from "react-router-dom";
-import { Boxes, ClipboardList, HardHat, PackageCheck, ReceiptText, Settings, Truck } from "lucide-react";
+import {
+  Boxes,
+  ClipboardList,
+  FolderTree,
+  HardHat,
+  PackageSearch,
+  PackageCheck,
+  ReceiptText,
+  Settings,
+  Truck
+} from "lucide-react";
 
 const cards = [
+  // {
+  //   title: "Kardex Valorado",
+  //   description: "Consulta movimientos, saldos y valorizacion historica de materiales.",
+  //   to: "/kardex-valorado",
+  //   icon: ClipboardList,
+  //   available: true
+  // },
   {
-    title: "Kardex Valorado",
-    description: "Consulta movimientos, saldos y valorizacion historica de materiales.",
-    to: "/kardex-valorado",
-    icon: ClipboardList,
+    title: "Categorias",
+    description: "Define grupos y subgrupos para mantener la jerarquia de inventario.",
+    to: "/inventario/categorias",
+    icon: FolderTree,
+    available: true
+  },
+  {
+    title: "Productos",
+    description: "Crea, filtra y edita productos por grupo y subgrupo.",
+    to: "/inventario/productos",
+    icon: PackageSearch,
     available: true
   },
   {

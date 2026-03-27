@@ -1,5 +1,13 @@
+import type { CSSProperties } from "react";
+import backgroundImage from "@/assets/background.jpeg";
+import minerImage from "@/assets/miner.png";
+
 export const authLayoutClassName =
-  "relative flex min-h-screen items-center justify-center overflow-hidden bg-[url('/images/background.jpeg')] bg-cover bg-center bg-no-repeat p-6 text-[var(--color-on-surface)]";
+  "relative flex min-h-screen items-center justify-center overflow-hidden bg-cover bg-center bg-no-repeat p-6 text-[var(--color-on-surface)]";
+
+export const authLayoutStyle: CSSProperties = {
+  backgroundImage: `url(${backgroundImage})`
+};
 
 export const authCardClassName =
   "relative z-10 w-full max-w-md rounded-2xl border border-[var(--auth-card-border)] [background:var(--auth-card-bg)] p-7 shadow-[0_24px_70px_rgba(1,6,15,0.45)] backdrop-blur-md";
@@ -43,7 +51,7 @@ export function AuthMiningBackdrop() {
         </p>
       </div>
       <img
-        src="/images/miner.png"
+        src={minerImage}
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute top-1 right-6 z-20 h-24 w-24 opacity-95 drop-shadow-[0_0_20px_rgba(245,201,136,0.45)] md:h-32 md:w-32"

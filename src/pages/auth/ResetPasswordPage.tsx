@@ -10,6 +10,7 @@ import {
   authInputClassName,
   authLabelClassName,
   authLayoutClassName,
+  authLayoutStyle,
   authPrimaryButtonClassName,
   authSidePanelClassName,
   authSplitCardClassName,
@@ -53,7 +54,7 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <main className={authLayoutClassName}>
+    <main className={authLayoutClassName} style={authLayoutStyle}>
       <AuthMiningBackdrop />
       <section className={authSplitCardClassName}>
         <div className="grid md:grid-cols-[1.15fr_1fr]">

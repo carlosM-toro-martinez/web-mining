@@ -1,4 +1,5 @@
 import { useSystemStatus } from "@/features/system-status/hooks/useSystemStatus";
+import minerImage from "@/assets/miner.png";
 
 function LoaderRing() {
   return (
@@ -52,7 +53,7 @@ export function SystemProgressCard() {
         <div className="mb-6 mt-10 flex flex-wrap justify-center gap-8">
           <article className="w-[240px] rounded-[2rem] border border-mars-gold/30 bg-black/45 p-6 text-center transition hover:-translate-y-1.5 hover:border-mars-gold hover:bg-[#141823b3]">
             <img
-              src="/images/miner.png"
+              src={minerImage}
               alt="Creador"
               className="mx-auto mb-4 w-24 object-contain [filter:drop-shadow(0_2px_6px_rgba(0,0,0,0.4))]"
             />

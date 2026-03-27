@@ -6,5 +6,19 @@ export const queryKeys = {
   kardexValorado: {
     all: ["kardex-valorado"] as const,
     detail: () => [...queryKeys.kardexValorado.all, "detail"] as const
+  },
+  categoriasInventario: {
+    all: ["categorias-inventario"] as const,
+    tree: () => [...queryKeys.categoriasInventario.all, "tree"] as const
+  },
+  productos: {
+    all: ["productos"] as const,
+    list: (params: {
+      page: number;
+      limit: number;
+      search?: string;
+      grupoId?: number;
+      subgrupoId?: number;
+    }) => [...queryKeys.productos.all, "list", params] as const
   }
 };

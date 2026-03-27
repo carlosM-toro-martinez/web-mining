@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import minerImage from "@/assets/miner.png";
 
 type MiningBackdropVariant = "auth" | "app";
 
@@ -42,7 +43,7 @@ export function MiningBackdrop({ variant = "app" }: MiningBackdropProps) {
         />
       </div>
       <img
-        src="/images/miner.png"
+        src={minerImage}
         alt=""
         aria-hidden="true"
         className={`pointer-events-none absolute bottom-6 right-6 h-36 w-36 md:h-44 md:w-44 ${palette.logoOpacity} drop-shadow-[0_0_36px_rgba(255,177,75,0.9)]`}

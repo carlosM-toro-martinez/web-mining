@@ -4,6 +4,8 @@ import { HomePage } from "@/pages/home/HomePage";
 import { NotFoundPage } from "@/pages/not-found/NotFoundPage";
 import { KardexValoradoPage } from "@/pages/kardex-valorado/KardexValoradoPage";
 import { InventoryPage } from "@/pages/inventory/InventoryPage";
+import { CategoriesPage } from "@/pages/inventory/CategoriesPage";
+import { ProductsPage } from "@/pages/inventory/ProductsPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -12,6 +14,7 @@ import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
+import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
 
 export function AppRouter() {
   return (
@@ -27,7 +30,11 @@ export function AppRouter() {
           <Route path="/" element={<HomePage />} />
           <Route path="/kardex-valorado" element={<KardexValoradoPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
-          <Route path="/inventario" element={<InventoryPage />} />
+          <Route element={<AlmaceneroRoute />}>
+            <Route path="/inventario" element={<InventoryPage />} />
+            <Route path="/inventario/categorias" element={<CategoriesPage />} />
+            <Route path="/inventario/productos" element={<ProductsPage />} />
+          </Route>
           <Route path="/compras" element={<NotFoundPage />} />
           <Route path="/vales" element={<NotFoundPage />} />
           <Route path="/entregas" element={<NotFoundPage />} />
