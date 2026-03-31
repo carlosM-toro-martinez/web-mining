@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import {
   Boxes,
-  ClipboardList,
+  Landmark,
   FolderTree,
   HardHat,
   PackageSearch,
@@ -31,6 +31,13 @@ const cards = [
     description: "Crea, filtra y edita productos por grupo y subgrupo.",
     to: "/inventario/productos",
     icon: PackageSearch,
+    available: true
+  },
+  {
+    title: "Contabilidad",
+    description: "Administra centros de costo, funciones de gasto y cuentas contables.",
+    to: "/inventario/contabilidad",
+    icon: Landmark,
     available: true
   },
   {
