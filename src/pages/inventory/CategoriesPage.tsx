@@ -10,6 +10,7 @@ import {
 import type { CategoriaTreeNode } from "@/features/categorias-inventario/model/categoria.schema";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { ApiError } from "@/shared/api/core/apiError";
+import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
@@ -178,6 +179,9 @@ export function CategoriesPage() {
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
+        <div className="mb-4">
+          <SubrouteBackButton />
+        </div>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-[var(--color-tertiary)]/16 p-2.5 text-[var(--color-tertiary)]">

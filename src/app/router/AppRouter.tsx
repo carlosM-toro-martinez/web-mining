@@ -6,6 +6,7 @@ import { KardexValoradoPage } from "@/pages/kardex-valorado/KardexValoradoPage";
 import { InventoryPage } from "@/pages/inventory/InventoryPage";
 import { CategoriesPage } from "@/pages/inventory/CategoriesPage";
 import { ProductsPage } from "@/pages/inventory/ProductsPage";
+import { AccountingPage } from "@/pages/inventory/AccountingPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -36,6 +37,7 @@ export function AppRouter() {
             <Route path="/inventario" element={<InventoryPage />} />
             <Route path="/inventario/categorias" element={<CategoriesPage />} />
             <Route path="/inventario/productos" element={<ProductsPage />} />
+            <Route path="/inventario/contabilidad" element={<AccountingPage />} />
           </Route>
           <Route path="/compras" element={<NotFoundPage />} />
           <Route path="/vales" element={<NotFoundPage />} />

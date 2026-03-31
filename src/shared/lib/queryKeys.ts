@@ -19,6 +19,14 @@ export const queryKeys = {
       search?: string;
       grupoId?: number;
       subgrupoId?: number;
+      cuentaId?: number;
+      sinCuenta?: boolean;
     }) => [...queryKeys.productos.all, "list", params] as const
+  },
+  contabilidad: {
+    all: ["contabilidad"] as const,
+    centrosCosto: () => [...queryKeys.contabilidad.all, "centros-costo"] as const,
+    funcionesGasto: () => [...queryKeys.contabilidad.all, "funciones-gasto"] as const,
+    cuentas: () => [...queryKeys.contabilidad.all, "cuentas"] as const
   }
 };
