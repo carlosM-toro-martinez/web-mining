@@ -3,22 +3,22 @@ import backgroundImage from "@/assets/background.jpeg";
 import minerImage from "@/assets/miner.png";
 
 export const authLayoutClassName =
-  "relative flex min-h-screen items-center justify-center overflow-hidden bg-cover bg-center bg-no-repeat p-6 text-[var(--color-on-surface)]";
+  "auth-layout relative flex min-h-screen items-center justify-center overflow-hidden bg-cover bg-center bg-no-repeat p-6 text-[var(--color-on-surface)]";
 
 export const authLayoutStyle: CSSProperties = {
   backgroundImage: `url(${backgroundImage})`
 };
 
 export const authCardClassName =
-  "relative z-10 w-full max-w-md rounded-2xl border border-[var(--auth-card-border)] [background:var(--auth-card-bg)] p-7 shadow-[0_24px_70px_rgba(1,6,15,0.45)] backdrop-blur-md";
+  "auth-card relative z-10 w-full max-w-md rounded-2xl border border-[var(--auth-card-border)] [background:var(--auth-card-bg)] p-7 shadow-[0_24px_70px_rgba(1,6,15,0.45)] backdrop-blur-md";
 
 export const authSplitCardClassName =
-  "relative z-10 w-full max-w-6xl overflow-hidden rounded-2xl border border-[var(--auth-card-border)] [background:var(--auth-card-bg)] shadow-[0_24px_70px_rgba(1,6,15,0.45)] backdrop-blur-md";
+  "auth-split-card relative z-10 w-full max-w-6xl overflow-hidden rounded-2xl border border-[var(--auth-card-border)] [background:var(--auth-card-bg)] shadow-[0_24px_70px_rgba(1,6,15,0.45)] backdrop-blur-md";
 
 export const authSidePanelClassName =
-  "relative border-b border-[var(--color-border-soft)] p-7 md:border-b-0 md:border-r md:border-[var(--color-border-soft)] md:p-10";
+  "auth-side-panel relative border-b border-[var(--color-border-soft)] p-7 md:border-b-0 md:border-r md:border-[var(--color-border-soft)] md:p-10";
 
-export const authFormPanelClassName = "p-7 md:p-10";
+export const authFormPanelClassName = "auth-form-panel p-7 md:p-10";
 
 export const authLabelClassName =
   "mb-1 block text-xs uppercase tracking-widest text-[var(--color-on-surface-variant)]";
@@ -42,7 +42,7 @@ export function AuthMiningBackdrop() {
   return (
     <>
       <div className="pointer-events-none absolute inset-0 bg-[var(--auth-overlay)]" />
-      <div className="pointer-events-none absolute left-6 top-6 z-20 rounded-xl border border-[var(--auth-brand-chip-border)] bg-[var(--auth-brand-chip-bg)] px-4 py-3 backdrop-blur-sm">
+      <div className="auth-brand-chip pointer-events-none absolute left-6 top-6 z-20 rounded-xl border border-[var(--auth-brand-chip-border)] bg-[var(--auth-brand-chip-bg)] px-4 py-3 backdrop-blur-sm">
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--auth-brand-title)]">
           Empresa Minera Marte
         </p>
@@ -54,7 +54,7 @@ export function AuthMiningBackdrop() {
         src={minerImage}
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute top-1 right-6 z-20 h-24 w-24 opacity-95 drop-shadow-[0_0_20px_rgba(245,201,136,0.45)] md:h-32 md:w-32"
+        className="auth-miner-image pointer-events-none absolute top-1 right-6 z-20 h-24 w-24 opacity-95 drop-shadow-[0_0_20px_rgba(245,201,136,0.45)] md:h-32 md:w-32"
       />
     </>
   );

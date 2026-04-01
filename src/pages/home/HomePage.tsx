@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
-import { Boxes, LayoutDashboard, MoveRight, UserPlus } from "lucide-react";
+import { Boxes, LayoutDashboard, Map, MoveRight, UserPlus } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 interface DashboardItem {
@@ -22,6 +22,12 @@ export function HomePage() {
       to: "/",
       icon: LayoutDashboard
     }
+    // {
+    //   title: "Mapa",
+    //   description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
+    //   to: "/mapa",
+    //   icon: Map
+    // }
   ];
 
   if (isAdmin || isAlmacenero) {
@@ -45,7 +51,7 @@ export function HomePage() {
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
-        <h1 className="font-headline text-4xl font-extrabold">Panel Principal</h1>
+        <h1 className="page-title font-headline text-4xl font-extrabold">Panel Principal</h1>
         <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
           Accesos rápidos a los módulos principales del sistema.
         </p>

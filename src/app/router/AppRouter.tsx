@@ -11,6 +11,7 @@ import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
+import { MapPage } from "@/pages/map/MapPage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
@@ -30,6 +31,7 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/mapa" element={<MapPage />} />
           <Route path="/kardex-valorado" element={<KardexValoradoPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
           <Route element={<AlmaceneroRoute />}>

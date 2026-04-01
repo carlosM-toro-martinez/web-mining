@@ -4,7 +4,9 @@ import { registerSW } from "virtual:pwa-register";
 import { App } from "@/app/App";
 import minerImage from "@/assets/favicon.png";
 import "@/styles/globals.css";
+import "@/styles/screens.css";
 import "@/styles/theme.css";
+import "leaflet/dist/leaflet.css";
 
 registerSW({ immediate: true });
 setAppFavicon(minerImage);

@@ -79,7 +79,7 @@ export function InventoryPage() {
             <Boxes size={22} />
           </div>
           <div>
-            <h1 className="font-headline text-3xl font-extrabold">Inventario</h1>
+            <h1 className="page-title font-headline text-3xl font-extrabold">Inventario</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
               Desde aqui eliges el proceso que quieres ejecutar dentro del area de inventario.
             </p>

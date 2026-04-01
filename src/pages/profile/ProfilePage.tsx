@@ -24,7 +24,7 @@ export function ProfilePage() {
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
-        <h1 className="font-headline text-3xl font-extrabold">Mi perfil</h1>
+        <h1 className="page-title font-headline text-3xl font-extrabold">Mi perfil</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
           Revisa tus datos de usuario y personaliza la apariencia del sistema.
         </p>

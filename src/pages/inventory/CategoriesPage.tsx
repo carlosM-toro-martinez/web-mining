@@ -184,7 +184,7 @@ export function CategoriesPage() {
               <FolderTree size={18} />
             </div>
             <div>
-              <h1 className="font-headline text-3xl font-extrabold">Categorias de Inventario</h1>
+              <h1 className="page-title font-headline text-3xl font-extrabold">Categorias de Inventario</h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
                 Crea primero el grupo y luego sus subgrupos para poder registrar productos.
               </p>
@@ -361,7 +361,7 @@ export function CategoriesPage() {
           <span className="text-xs text-[var(--color-on-surface-variant)]">{flatRows.length} categorias</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="table-scroll overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>

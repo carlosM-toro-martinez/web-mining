@@ -59,12 +59,12 @@ export function KardexValoradoPage() {
             <ChevronRight size={14} />
             <span className="text-[var(--color-primary)]">{data.breadcrumbs[1]}</span>
           </nav>
-          <h2 className="font-headline text-[62px] text-4xl font-extrabold tracking-tight text-[var(--color-on-surface)]">
+          <h2 className="page-title font-headline text-4xl font-extrabold tracking-tight text-[var(--color-on-surface)] md:text-5xl">
             {data.title}
           </h2>
           <p className="mt-1 max-w-xl text-sm text-[var(--color-on-surface-variant)]">{data.subtitle}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="page-toolbar flex items-center gap-3">
           <button className="flex items-center gap-2 rounded-lg bg-[var(--color-surface-container-high)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-surface)] transition hover:bg-[var(--color-surface-container-highest)]">
             <FileText size={18} />
             Descargar PDF
@@ -167,7 +167,7 @@ export function KardexValoradoPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] shadow-2xl">
-        <div className="overflow-x-auto">
+        <div className="table-scroll overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="bg-[var(--color-surface-container-high)]">

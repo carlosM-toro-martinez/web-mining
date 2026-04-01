@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
+  Map,
   Menu,
   Search,
   UserPlus,
@@ -22,7 +23,10 @@ interface NavItem {
   to: string;
 }
 
-const baseNavItems: NavItem[] = [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }];
+const baseNavItems: NavItem[] = [
+  { label: "Dashboard", icon: LayoutDashboard, to: "/" }
+  // { label: "Mapa", icon: Map, to: "/mapa" }
+];
 
 export function AppShell() {
   const navigate = useNavigate();
@@ -67,7 +71,7 @@ export function AppShell() {
   }, [isSidebarCollapsed]);
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
+    <div className="app-shell min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
       <aside
         className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-[var(--color-surface-container-low)] px-0 py-6 transition-all duration-300 lg:translate-x-0 ${
           isSidebarCollapsed ? "lg:w-20" : "lg:w-64"
@@ -179,7 +183,7 @@ export function AppShell() {
           isSidebarCollapsed ? "left-0 lg:left-20" : "left-0 lg:left-64"
         }`}
       >
-        <div className="flex items-center gap-4">
+        <div className="app-shell__header-search flex items-center gap-4">
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
@@ -196,12 +200,12 @@ export function AppShell() {
             <input
               type="text"
               placeholder="Buscar reporte..."
-              className="w-56 rounded-lg border-none bg-[var(--color-surface-container)] py-2 pl-10 pr-4 text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)] focus:ring-1 focus:ring-[var(--color-primary)] lg:w-80"
+              className="app-shell__search-input w-56 rounded-lg border-none bg-[var(--color-surface-container)] py-2 pl-10 pr-4 text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)] focus:ring-1 focus:ring-[var(--color-primary)] lg:w-80"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 lg:gap-4">
+        <div className="app-shell__header-actions flex items-center gap-2 lg:gap-4">
           <button className="p-2 text-[var(--color-on-surface-variant)] transition-colors hover:text-[var(--color-primary)]">
             <RefreshCw size={18} />
           </button>
@@ -226,7 +230,7 @@ export function AppShell() {
               logout();
               navigate("/login", { replace: true });
             }}
-            className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            className="app-shell__logout-btn rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
           >
             Cerrar sesión
           </button>
@@ -245,7 +249,7 @@ export function AppShell() {
         src={minerImage}
         alt=""
         aria-hidden="true"
-        className="pointer-events-none fixed bottom-5 right-5 z-30 h-24 w-24 opacity-90 md:h-28 md:w-28"
+        className="app-shell__miner pointer-events-none fixed bottom-5 right-5 z-30 h-24 w-24 opacity-90 md:h-28 md:w-28"
       />
     </div>
   );

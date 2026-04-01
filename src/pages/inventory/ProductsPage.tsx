@@ -244,14 +244,14 @@ export function ProductsPage() {
               <Tags size={18} />
             </div>
             <div>
-              <h1 className="font-headline text-3xl font-extrabold">Productos</h1>
+              <h1 className="page-title font-headline text-3xl font-extrabold">Productos</h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
                 Registra productos por grupo y subgrupo. Si falta categoria, creala en la ventana emergente.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="page-toolbar flex items-center gap-3">
             <button
               type="button"
               onClick={() => showSuccess("Exportar PDF estara disponible en la siguiente fase.")}
@@ -494,7 +494,7 @@ export function ProductsPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="table-scroll overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>

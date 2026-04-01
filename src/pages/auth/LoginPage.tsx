@@ -57,7 +57,7 @@ export function LoginPage() {
             <div className="inline-flex rounded-full border border-[var(--color-primary)]/35 bg-[var(--color-primary)]/12 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">
               Plataforma Operativa
             </div>
-            <h1 className="mt-4 font-headline text-4xl font-extrabold leading-tight">
+            <h1 className="page-title mt-4 font-headline text-4xl font-extrabold leading-tight">
               Bienvenido a Minera Marte
             </h1>
             <p className="mt-3 max-w-md text-sm text-[var(--color-on-surface-variant)]">
@@ -87,7 +87,7 @@ export function LoginPage() {
           </aside>
 
           <div className={authFormPanelClassName}>
-            <h2 className="font-headline text-3xl font-extrabold">Iniciar sesión</h2>
+            <h2 className="page-title font-headline text-3xl font-extrabold">Iniciar sesión</h2>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
               Accede con tu cuenta corporativa.
             </p>

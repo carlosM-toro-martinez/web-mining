@@ -40,7 +40,7 @@ export function RegisterUserPage() {
   return (
     <section className="relative max-w-2xl rounded-xl border border-[var(--color-outline-variant)]/60 bg-[linear-gradient(160deg,rgba(17,31,60,0.9),rgba(11,19,36,0.95))] p-6 text-[var(--color-on-surface)]">
       <span className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-[var(--color-tertiary)]/20 blur-xl" />
-      <h1 className="font-headline text-3xl font-extrabold">Registrar nuevo usuario</h1>
+      <h1 className="page-title font-headline text-3xl font-extrabold">Registrar nuevo usuario</h1>
       <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
         Solo administradores pueden crear cuentas.
       </p>
