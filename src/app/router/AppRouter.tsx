@@ -13,6 +13,7 @@ import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { MapPage } from "@/pages/map/MapPage";
 import { ExploracionesPage } from "@/pages/exploraciones/ExploracionesPage";
+import { ExploracionesReportesPage } from "@/pages/exploraciones/ExploracionesReportesPage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
@@ -34,6 +35,7 @@ export function AppRouter() {
           <Route path="/" element={<HomePage />} />
           <Route path="/mapa" element={<MapPage />} />
           <Route path="/exploraciones" element={<ExploracionesPage />} />
+          <Route path="/exploraciones/reportes" element={<ExploracionesReportesPage />} />
           <Route path="/kardex-valorado" element={<KardexValoradoPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
           <Route element={<AlmaceneroRoute />}>

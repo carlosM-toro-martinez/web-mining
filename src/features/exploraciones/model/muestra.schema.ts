@@ -8,6 +8,8 @@ export const muestraResultadoSchema = z.object({
 export const exploracionMuestraPayloadSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio."),
   numero: z.number().int().optional(),
+  tipoMuestra: z.string().optional(),
+  sector: z.string().optional(),
   laboratorio1: z.string().optional(),
   laboratorio2: z.string().optional(),
   laboratorio3: z.string().optional(),
@@ -69,6 +71,8 @@ export const exploracionMuestraResponseSchema = z.object({
   id: z.string(),
   nombre: z.string(),
   numero: z.number().int().nullable().optional(),
+  tipoMuestra: z.string().nullable().optional(),
+  sector: z.string().nullable().optional(),
   laboratorio1: z.string().nullable().optional(),
   laboratorio2: z.string().nullable().optional(),
   laboratorio3: z.string().nullable().optional(),

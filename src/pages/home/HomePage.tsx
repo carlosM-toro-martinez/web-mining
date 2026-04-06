@@ -22,12 +22,12 @@ export function HomePage() {
       to: "/",
       icon: LayoutDashboard
     },
-    {
-      title: "Mapa",
-      description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
-      to: "/mapa",
-      icon: Map
-    },
+    // {
+    //   title: "Mapa",
+    //   description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
+    //   to: "/mapa",
+    //   icon: Map
+    // },
     {
       title: "Exploraciones",
       description: "Registro de muestras geologicas en campo con soporte offline y sync.",

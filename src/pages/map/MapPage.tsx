@@ -41,10 +41,7 @@ export function MapPage() {
 
   const currentPosition = userPosition ?? laPazPosition;
   const markerLabel = useMemo(
-    () =>
-      userPosition
-        ? "Tu ubicacion aproximada"
-        : "Ubicacion base Minera Marte (La Paz)",
+    () => (userPosition ? "Tu ubicacion aproximada" : "Ubicacion base Minera Marte (La Paz)"),
     [userPosition]
   );
 
@@ -57,10 +54,7 @@ export function MapPage() {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const coords: [number, number] = [
-          position.coords.latitude,
-          position.coords.longitude
-        ];
+        const coords: [number, number] = [position.coords.latitude, position.coords.longitude];
 
         setUserPosition(coords);
         setIsLocating(false);
@@ -87,7 +81,9 @@ export function MapPage() {
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="page-title font-headline text-3xl font-extrabold">Mapa y Geolocalizacion</h1>
+            <h1 className="page-title font-headline text-3xl font-extrabold">
+              Mapa y Geolocalizacion
+            </h1>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
               Visualiza ubicaciones operativas y centra el mapa en tu posicion actual.
             </p>
@@ -107,7 +103,12 @@ export function MapPage() {
 
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
         <div className="map-wrapper h-[60vh] min-h-[360px] w-full">
-          <MapContainer center={currentPosition} zoom={13} scrollWheelZoom className="h-full w-full">
+          <MapContainer
+            center={currentPosition}
+            zoom={13}
+            scrollWheelZoom
+            className="h-full w-full"
+          >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -65,6 +65,35 @@ export async function updateMuestraOffline(id: number, payload: ExploracionMuest
   return exploracionesDb.muestras.get(id);
 }
 
+export async function queueRemoteEditOffline(remoteId: string, payload: ExploracionMuestraPayload) {
+  const existing = await exploracionesDb.muestras
+    .where("remoteId")
+    .equals(remoteId)
+    .first();
+
+  if (existing?.id) {
+    await exploracionesDb.muestras.update(existing.id, {
+      payload,
+      synced: false,
+      syncError: undefined,
+      updatedAt: new Date().toISOString()
+    });
+    return exploracionesDb.muestras.get(existing.id);
+  }
+
+  const now = new Date().toISOString();
+  const id = await exploracionesDb.muestras.add({
+    localId: buildLocalId(),
+    remoteId,
+    payload,
+    synced: false,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  return exploracionesDb.muestras.get(id);
+}
+
 export async function markMuestraAsSynced(id: number, remoteId?: string) {
   await exploracionesDb.muestras.update(id, {
     synced: true,
