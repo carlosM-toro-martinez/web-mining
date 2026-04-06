@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
-import { Boxes, LayoutDashboard, Map, MoveRight, UserPlus } from "lucide-react";
+import { Boxes, FlaskConical, LayoutDashboard, Map, MoveRight, UserPlus } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 interface DashboardItem {
@@ -21,13 +21,19 @@ export function HomePage() {
       description: "Vista general del sistema y estado operativo.",
       to: "/",
       icon: LayoutDashboard
+    },
+    {
+      title: "Mapa",
+      description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
+      to: "/mapa",
+      icon: Map
+    },
+    {
+      title: "Exploraciones",
+      description: "Registro de muestras geologicas en campo con soporte offline y sync.",
+      to: "/exploraciones",
+      icon: FlaskConical
     }
-    // {
-    //   title: "Mapa",
-    //   description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
-    //   to: "/mapa",
-    //   icon: Map
-    // }
   ];
 
   if (isAdmin || isAlmacenero) {

@@ -7,6 +7,7 @@ import {
   CircleUserRound,
   ChevronLeft,
   ChevronRight,
+  FlaskConical,
   LayoutDashboard,
   Map,
   Menu,
@@ -24,8 +25,9 @@ interface NavItem {
 }
 
 const baseNavItems: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/" }
-  // { label: "Mapa", icon: Map, to: "/mapa" }
+  { label: "Dashboard", icon: LayoutDashboard, to: "/" },
+  { label: "Mapa", icon: Map, to: "/mapa" },
+  { label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" }
 ];
 
 export function AppShell() {

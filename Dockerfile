@@ -14,6 +14,7 @@ RUN npm run build
 # ---------- RUN ----------
 FROM nginx:alpine
 
+ARG GITHUB_SHA=local
 LABEL org.opencontainers.image.revision=$GITHUB_SHA
 
 # Copiar build de React

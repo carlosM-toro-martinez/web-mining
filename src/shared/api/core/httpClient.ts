@@ -1,7 +1,8 @@
 import axios from "axios";
 import { env } from "@/shared/config/env";
 import { normalizeApiError } from "@/shared/api/core/apiError";
-import { getAuthToken } from "@/shared/lib/authToken";
+import { getStoredAuthSession, setStoredAuthSession } from "@/features/auth/lib/authSessionStorage";
+import { getAuthToken, setAuthToken } from "@/shared/lib/authToken";
 
 const resolvedBaseUrl = env.VITE_API_BASE_URL || "http://localhost:3000";
 
@@ -43,6 +44,54 @@ function maskSensitive(value: unknown): unknown {
   );
 }
 
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessTokenIfPossible(): Promise<string | null> {
+  const stored = getStoredAuthSession();
+  if (!stored?.refreshToken) return null;
+
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await axios.post(
+        `${resolvedBaseUrl}/api/auth/refresh`,
+        { refreshToken: stored.refreshToken },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json"
+          },
+          timeout: 12_000
+        }
+      );
+
+      const data = response.data as {
+        data?: { accessToken?: string; refreshToken?: string };
+      };
+      const newAccessToken = data?.data?.accessToken;
+      if (!newAccessToken) return null;
+
+      const nextSession = {
+        ...stored,
+        accessToken: newAccessToken,
+        refreshToken: data?.data?.refreshToken ?? stored.refreshToken
+      };
+      setStoredAuthSession(nextSession);
+      setAuthToken(newAccessToken);
+      return newAccessToken;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 httpClient.interceptors.request.use((config) => {
   const nextConfig = config;
   nextConfig.headers["X-Requested-With"] = "XMLHttpRequest";
@@ -73,6 +122,33 @@ httpClient.interceptors.response.use(
     return response;
   },
   (error: unknown) => {
+    if (axios.isAxiosError(error)) {
+      const originalRequest = error.config;
+      const statusCode = error.response?.status;
+      const url = originalRequest?.url ?? "";
+      const alreadyRetried = Boolean(
+        (originalRequest as { _retry?: boolean } | undefined)?._retry
+      );
+      const isAuthRoute = url.includes("/api/auth/login") || url.includes("/api/auth/refresh");
+
+      if (statusCode === 401 && originalRequest && !alreadyRetried && !isAuthRoute) {
+        (originalRequest as { _retry?: boolean })._retry = true;
+        return refreshAccessTokenIfPossible().then((newToken) => {
+          if (!newToken) {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+            }
+            return Promise.reject(normalizeApiError(error));
+          }
+
+          const nextRequest = originalRequest;
+          nextRequest.headers = nextRequest.headers ?? {};
+          nextRequest.headers.Authorization = `Bearer ${newToken}`;
+          return httpClient(nextRequest);
+        });
+      }
+    }
+
     const normalized = normalizeApiError(error);
     if (normalized.statusCode === 401 && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));

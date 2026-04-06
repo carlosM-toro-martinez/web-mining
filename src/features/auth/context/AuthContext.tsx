@@ -3,16 +3,23 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren
 } from "react";
 import type { AuthSession, AuthUser } from "@/features/auth/model/auth.schema";
+import { logoutSession, refreshSession } from "@/features/auth/api/authApi";
 import {
   clearStoredAuthSession,
   getStoredAuthSession,
   setStoredAuthSession
 } from "@/features/auth/lib/authSessionStorage";
-import { clearAuthToken, isAuthTokenExpired, setAuthToken } from "@/shared/lib/authToken";
+import {
+  clearAuthToken,
+  isAuthTokenExpired,
+  isAuthTokenExpiringSoon,
+  setAuthToken
+} from "@/shared/lib/authToken";
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -27,30 +34,71 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+
   const [session, setSession] = useState<AuthSession | null>(() => {
     const stored = getStoredAuthSession();
-    if (stored) setAuthToken(stored.token);
+    if (stored) setAuthToken(stored.accessToken);
     return stored;
   });
 
+  const applySession = (nextSession: AuthSession | null) => {
+    setSession(nextSession);
+    if (!nextSession) {
+      clearStoredAuthSession();
+      clearAuthToken();
+      return;
+    }
+    setStoredAuthSession(nextSession);
+    setAuthToken(nextSession.accessToken);
+  };
+
+  const refreshAccessToken = async () => {
+    if (!session?.refreshToken) {
+      applySession(null);
+      return;
+    }
+
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    refreshPromiseRef.current = (async () => {
+      try {
+        const response = await refreshSession({ refreshToken: session.refreshToken });
+        applySession({
+          accessToken: response.data.accessToken,
+          refreshToken: response.data.refreshToken ?? session.refreshToken,
+          user: session.user
+        });
+      } catch {
+        applySession(null);
+      } finally {
+        refreshPromiseRef.current = null;
+      }
+    })();
+
+    return refreshPromiseRef.current;
+  };
+
   const value = useMemo<AuthContextValue>(() => {
     const login = (nextSession: AuthSession) => {
-      setSession(nextSession);
-      setStoredAuthSession(nextSession);
-      setAuthToken(nextSession.token);
+      applySession(nextSession);
     };
 
     const logout = () => {
-      setSession(null);
-      clearStoredAuthSession();
-      clearAuthToken();
+      const currentRefreshToken = session?.refreshToken;
+      if (currentRefreshToken) {
+        void logoutSession({ refreshToken: currentRefreshToken });
+      }
+      applySession(null);
     };
 
     return {
       session,
       user: session?.user ?? null,
-      token: session?.token ?? null,
-      isAuthenticated: Boolean(session?.token),
+      token: session?.accessToken ?? null,
+      isAuthenticated: Boolean(session?.accessToken),
       isAdmin: session?.user.role === "ADMIN",
       login,
       logout
@@ -58,40 +106,46 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [session]);
 
   useEffect(() => {
-    if (!session?.token) return;
+    if (!session?.accessToken) return;
 
-    const validateToken = () => {
-      if (isAuthTokenExpired(session.token)) {
-        setSession(null);
-        clearStoredAuthSession();
-        clearAuthToken();
+    const validateOrRefresh = () => {
+      if (isAuthTokenExpired(session.accessToken)) {
+        void refreshAccessToken();
+        return;
+      }
+      if (isAuthTokenExpiringSoon(session.accessToken, 5 * 60 * 1000)) {
+        void refreshAccessToken();
       }
     };
 
-    validateToken();
-    const intervalId = window.setInterval(validateToken, 30_000);
+    validateOrRefresh();
+    const intervalId = window.setInterval(validateOrRefresh, 30_000);
     const onVisibilityChange = () => {
-      if (!document.hidden) validateToken();
+      if (!document.hidden) validateOrRefresh();
+    };
+
+    const onOnline = () => {
+      validateOrRefresh();
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onOnline);
 
     return () => {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onOnline);
     };
-  }, [session?.token]);
+  }, [session?.accessToken, session?.refreshToken]);
 
   useEffect(() => {
     const onUnauthorized = () => {
-      setSession(null);
-      clearStoredAuthSession();
-      clearAuthToken();
+      void refreshAccessToken();
     };
 
     window.addEventListener("auth:unauthorized", onUnauthorized);
     return () => window.removeEventListener("auth:unauthorized", onUnauthorized);
-  }, []);
+  }, [session?.refreshToken]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

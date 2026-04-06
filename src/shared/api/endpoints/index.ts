@@ -3,11 +3,13 @@ import { kardexValoradoEndpoints } from "@/shared/api/endpoints/kardexValorado.e
 import { authEndpoints } from "@/shared/api/endpoints/auth.endpoints";
 import { categoriasInventarioEndpoints } from "@/shared/api/endpoints/categoriasInventario.endpoints";
 import { productosEndpoints } from "@/shared/api/endpoints/productos.endpoints";
+import { exploracionesEndpoints } from "@/shared/api/endpoints/exploraciones.endpoints";
 
 export const apiEndpoints = {
   auth: authEndpoints,
   systemStatus: systemStatusEndpoints,
   kardexValorado: kardexValoradoEndpoints,
   categoriasInventario: categoriasInventarioEndpoints,
-  productos: productosEndpoints
+  productos: productosEndpoints,
+  exploraciones: exploracionesEndpoints
 } as const;
