@@ -1,5 +1,6 @@
-import { postRequest } from "@/shared/api/core/request";
+import { postRequest, putRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
+import { httpClient } from "@/shared/api/core/httpClient";
 import {
   forgotPasswordResponseSchema,
   loginResponseSchema,
@@ -8,11 +9,15 @@ import {
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
   registerResponseSchema,
+  updateUserPayloadSchema,
+  updateUserResponseSchema,
+  usersListResponseSchema,
   type ForgotPasswordPayload,
   type LoginPayload,
   type RefreshPayload,
   type ResetPasswordPayload,
-  type RegisterPayload
+  type RegisterPayload,
+  type UpdateUserPayload
 } from "@/features/auth/model/auth.schema";
 
 export async function login(payload: LoginPayload) {
@@ -28,6 +33,31 @@ export async function registerUser(payload: RegisterPayload) {
     url: apiEndpoints.auth.register,
     body: payload,
     schema: registerResponseSchema
+  });
+}
+
+export async function getUsersList() {
+  const response = await httpClient.get(apiEndpoints.auth.users);
+  const payload = response.data as unknown;
+  const normalized =
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    payload.data &&
+    typeof payload.data === "object" &&
+    "data" in payload.data
+      ? payload.data
+      : payload;
+
+  return usersListResponseSchema.parse(normalized);
+}
+
+export async function updateUserById(id: number, payload: UpdateUserPayload) {
+  const body = updateUserPayloadSchema.parse(payload);
+  return putRequest({
+    url: apiEndpoints.auth.userById(id),
+    body,
+    schema: updateUserResponseSchema
   });
 }
 

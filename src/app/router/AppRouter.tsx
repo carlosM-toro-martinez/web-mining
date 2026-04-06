@@ -50,7 +50,8 @@ export function AppRouter() {
           <Route path="/ajustes" element={<NotFoundPage />} />
 
           <Route element={<AdminRoute />}>
-            <Route path="/usuarios/nuevo" element={<RegisterUserPage />} />
+            <Route path="/trabajadores" element={<RegisterUserPage />} />
+            <Route path="/usuarios/nuevo" element={<Navigate to="/trabajadores" replace />} />
           </Route>
 
           <Route path="/404" element={<NotFoundPage />} />

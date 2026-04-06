@@ -2,9 +2,9 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 export function AdminRoute() {
-  const { isAdmin } = useAuth();
+  const { canManageUsers } = useAuth();
 
-  if (!isAdmin) {
+  if (!canManageUsers) {
     return <Navigate to="/perfil" replace />;
   }
 

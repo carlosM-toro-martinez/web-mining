@@ -32,7 +32,7 @@ const baseNavItems: NavItem[] = [
 
 export function AppShell() {
   const navigate = useNavigate();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, canManageUsers, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
@@ -44,11 +44,11 @@ export function AppShell() {
     if (canSeeInventory) {
       items.push({ label: "Inventario", icon: Boxes, to: "/inventario" });
     }
-    if (isAdmin) {
-      items.push({ label: "Trabajadores", icon: UserPlus, to: "/usuarios/nuevo" });
+    if (canManageUsers) {
+      items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
     return items;
-  }, [isAdmin, canSeeInventory]);
+  }, [canManageUsers, canSeeInventory]);
 
   const avatarLabel = useMemo(() => {
     const source = user?.nombre?.trim();

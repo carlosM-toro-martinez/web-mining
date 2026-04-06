@@ -11,7 +11,7 @@ interface DashboardItem {
 }
 
 export function HomePage() {
-  const { user } = useAuth();
+  const { user, canManageUsers } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const isAlmacenero = user?.role === "ALMACENERO";
 
@@ -45,11 +45,11 @@ export function HomePage() {
     });
   }
 
-  if (isAdmin) {
+  if (canManageUsers) {
     items.push({
       title: "Trabajadores",
       description: "Administración de usuarios, permisos y cuentas.",
-      to: "/usuarios/nuevo",
+      to: "/trabajadores",
       icon: UserPlus
     });
   }

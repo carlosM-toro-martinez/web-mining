@@ -27,6 +27,8 @@ interface AuthContextValue {
   token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isSuperintendente: boolean;
+  canManageUsers: boolean;
   login: (session: AuthSession) => void;
   logout: () => void;
 }
@@ -100,6 +102,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       token: session?.accessToken ?? null,
       isAuthenticated: Boolean(session?.accessToken),
       isAdmin: session?.user.role === "ADMIN",
+      isSuperintendente: session?.user.role === "SUPERINTENDENTE",
+      canManageUsers:
+        session?.user.role === "ADMIN" || session?.user.role === "SUPERINTENDENTE",
       login,
       logout
     };

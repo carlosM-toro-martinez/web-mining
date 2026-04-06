@@ -27,5 +27,9 @@ export const queryKeys = {
     remotas: () => [...queryKeys.exploraciones.all, "remotas"] as const,
     elementos: () => [...queryKeys.exploraciones.all, "elementos"] as const,
     laboratorios: () => [...queryKeys.exploraciones.all, "laboratorios"] as const
+  },
+  auth: {
+    all: ["auth"] as const,
+    users: () => [...queryKeys.auth.all, "users"] as const
   }
 };
