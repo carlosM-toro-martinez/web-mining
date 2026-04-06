@@ -13,7 +13,8 @@ export function useLoginMutation() {
     },
     onSuccess: (response) => {
       auth.login({
-        token: response.data.token,
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
         user: response.data.user
       });
     }

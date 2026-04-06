@@ -1,0 +1,1260 @@
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  FileDown,
+  FileSpreadsheet,
+  FlaskConical,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  Trash2,
+  X
+} from "lucide-react";
+import { ZodError } from "zod";
+import {
+  exploracionMuestraPayloadSchema,
+  type ExploracionMuestraPayload,
+  type ExploracionMuestraResponse
+} from "@/features/exploraciones/model/muestra.schema";
+import {
+  useExploracionesElementosQuery,
+  useExploracionesLaboratoriosQuery,
+  useExploracionesOfflineQuery,
+  useExploracionesRemotasQuery,
+  useSaveMuestraOfflineMutation,
+  useSyncExploracionesMutation,
+  useUpdateMuestraOfflineMutation,
+  useUpdateMuestraRemotaMutation
+} from "@/features/exploraciones/hooks/useExploraciones";
+import type { OfflineExploracionMuestra } from "@/features/exploraciones/db/exploracionesDb";
+import { useToast } from "@/shared/ui/toast/ToastProvider";
+
+const inputClassName =
+  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-4 py-3 text-base text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+
+const filterInputClassName =
+  "rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+
+interface DynamicResultado {
+  id: string;
+  elemento: string;
+  valor: string;
+}
+
+interface FormState {
+  nivel: string;
+  este: string;
+  norte: string;
+  elevacion: string;
+  referenciaLugar: string;
+  nombre: string;
+  numero: string;
+  laboratorio1: string;
+  laboratorio2: string;
+  laboratorio3: string;
+  fechaMuestreo: string;
+  fechaEntrega: string;
+  descripcion: string;
+}
+
+type EditTarget = { mode: "local"; id: number } | { mode: "remota"; id: string } | null;
+type DetailTarget =
+  | { source: "local"; data: OfflineExploracionMuestra }
+  | { source: "remota"; data: ExploracionMuestraResponse }
+  | null;
+
+type RowStatus = "Sincronizado" | "Pendiente local" | "Error de sincronizacion";
+type RowSource = "local" | "remota";
+
+interface TableRow {
+  key: string;
+  source: RowSource;
+  id: number | string;
+  nombre: string;
+  numero?: number;
+  usuarioNombre?: string;
+  nivel: string;
+  laboratorio1?: string;
+  laboratorio2?: string;
+  laboratorio3?: string;
+  fechaMuestreo?: string;
+  fechaEntrega?: string;
+  descripcion?: string;
+  este?: number;
+  norte?: number;
+  elevacion?: number;
+  referenciaLugar?: string;
+  resultadosTexto: string;
+  status: RowStatus;
+  canEdit: boolean;
+}
+
+interface ExportRecord {
+  estado: string;
+  origen: string;
+  nombre: string;
+  codigo: string;
+  usuario: string;
+  nivel: string;
+  este: string;
+  norte: string;
+  elevacion: string;
+  referenciaLugar: string;
+  laboratorio1: string;
+  laboratorio2: string;
+  laboratorio3: string;
+  fechaMuestreo: string;
+  fechaEntrega: string;
+  descripcion: string;
+  resultados: string;
+}
+
+function buildRowId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function buildInitialState(): FormState {
+  return {
+    nivel: "",
+    este: "",
+    norte: "",
+    elevacion: "",
+    referenciaLugar: "",
+    nombre: "",
+    numero: "",
+    laboratorio1: "",
+    laboratorio2: "",
+    laboratorio3: "",
+    fechaMuestreo: "",
+    fechaEntrega: "",
+    descripcion: ""
+  };
+}
+
+function getNowLaPazIso() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}.000-04:00`;
+}
+
+function toIsoDatetime(value: string) {
+  if (!value.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
+function toLocalDatetimeInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("es-BO", {
+    timeZone: "America/La_Paz",
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
+function toOptionalNumber(value: string) {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function fromPayloadToForm(payload: ExploracionMuestraPayload): FormState {
+  return {
+    nivel: payload.ubicacion.nivel,
+    este: payload.ubicacion.este?.toString() ?? "",
+    norte: payload.ubicacion.norte?.toString() ?? "",
+    elevacion: payload.ubicacion.elevacion?.toString() ?? "",
+    referenciaLugar: payload.ubicacion.referenciaLugar ?? "",
+    nombre: payload.nombre,
+    numero: payload.numero?.toString() ?? "",
+    laboratorio1: payload.laboratorio1 ?? "",
+    laboratorio2: payload.laboratorio2 ?? "",
+    laboratorio3: payload.laboratorio3 ?? "",
+    fechaMuestreo: payload.fechaMuestreo ?? "",
+    fechaEntrega: toLocalDatetimeInput(payload.fechaEntrega),
+    descripcion: payload.descripcion ?? ""
+  };
+}
+
+function fromRemoteToPayload(data: ExploracionMuestraResponse): ExploracionMuestraPayload {
+  return {
+    nombre: data.nombre,
+    numero: data.numero ?? undefined,
+    laboratorio1: data.laboratorio1 ?? undefined,
+    laboratorio2: data.laboratorio2 ?? undefined,
+    laboratorio3: data.laboratorio3 ?? undefined,
+    fechaMuestreo: data.fechaMuestreo ?? undefined,
+    fechaEntrega: data.fechaEntrega ?? undefined,
+    descripcion: data.descripcion ?? undefined,
+    ubicacion: {
+      nivel: data.ubicacion.nivel,
+      este: data.ubicacion.este ?? undefined,
+      norte: data.ubicacion.norte ?? undefined,
+      elevacion: data.ubicacion.elevacion ?? undefined,
+      referenciaLugar: data.ubicacion.referenciaLugar ?? undefined
+    },
+    resultados: data.resultados?.map((item) => ({
+      elemento: item.elemento.nombre,
+      valor: item.valor
+    }))
+  };
+}
+
+function exportRecordsToCsv(records: ExportRecord[]) {
+  if (records.length === 0) return;
+  const headers = Object.keys(records[0]);
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const body = records.map((record) =>
+    headers.map((key) => escape(record[key as keyof ExportRecord])).join(",")
+  );
+  const csv = [headers.join(","), ...body].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `exploraciones-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportRecordsToPdf(records: ExportRecord[]) {
+  const rowsHtml = records
+    .map(
+      (row) => `
+      <tr>
+        <td>${row.estado}</td>
+        <td>${row.nombre}</td>
+        <td>${row.codigo}</td>
+        <td>${row.usuario}</td>
+        <td>${row.nivel}</td>
+        <td>${row.fechaMuestreo}</td>
+        <td>${row.fechaEntrega}</td>
+        <td>${row.resultados}</td>
+      </tr>
+    `
+    )
+    .join("");
+
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Reporte Exploraciones</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; }
+          h1 { margin: 0 0 8px; font-size: 20px; }
+          p { margin: 0 0 18px; color: #555; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+          th { background: #f4f4f4; }
+        </style>
+      </head>
+      <body>
+        <h1>Reporte de Muestras - Exploraciones</h1>
+        <p>Generado: ${new Date().toLocaleString("es-BO", { timeZone: "America/La_Paz" })}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Estado</th>
+              <th>Nombre</th>
+              <th>Codigo</th>
+              <th>Usuario</th>
+              <th>Nivel</th>
+              <th>Fecha Muestreo</th>
+              <th>Fecha Entrega</th>
+              <th>Resultados</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml || '<tr><td colspan="8">Sin registros</td></tr>'}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const popup = window.open("", "_blank", "width=1000,height=700");
+  if (!popup) return;
+  popup.document.write(html);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+}
+
+interface DetailContentProps {
+  nombre: string;
+  numero?: number;
+  usuarioNombre?: string;
+  fechaMuestreo?: string;
+  fechaEntrega?: string;
+  laboratorio1?: string;
+  laboratorio2?: string;
+  laboratorio3?: string;
+  descripcion?: string;
+  nivel: string;
+  este?: number;
+  norte?: number;
+  elevacion?: number;
+  referenciaLugar?: string;
+  resultados: Array<{ key: string; label: string; value: string }>;
+}
+
+function DetailContent(props: DetailContentProps) {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <article className="rounded-xl bg-[var(--color-surface-container-high)] p-4">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+          Resumen
+        </p>
+        <div className="space-y-2 text-sm">
+          <p>
+            <strong>Nombre:</strong> {props.nombre}
+          </p>
+          <p>
+            <strong>Codigo:</strong> {props.numero ?? "-"}
+          </p>
+          <p>
+            <strong>Usuario:</strong> {props.usuarioNombre ?? "-"}
+          </p>
+          <p>
+            <strong>Fecha muestreo:</strong> {formatDateTime(props.fechaMuestreo)}
+          </p>
+          <p>
+            <strong>Fecha entrega:</strong> {formatDateTime(props.fechaEntrega)}
+          </p>
+        </div>
+      </article>
+
+      <article className="rounded-xl bg-[var(--color-surface-container-high)] p-4">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+          Laboratorios
+        </p>
+        <div className="space-y-2 text-sm">
+          <p>
+            <strong>Laboratorio 1:</strong> {props.laboratorio1 ?? "-"}
+          </p>
+          <p>
+            <strong>Laboratorio 2:</strong> {props.laboratorio2 ?? "-"}
+          </p>
+          <p>
+            <strong>Laboratorio 3:</strong> {props.laboratorio3 ?? "-"}
+          </p>
+        </div>
+      </article>
+
+      <article className="rounded-xl bg-[var(--color-surface-container-high)] p-4 md:col-span-2">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+          Ubicacion
+        </p>
+        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <p>
+            <strong>Nivel:</strong> {props.nivel}
+          </p>
+          <p>
+            <strong>Este:</strong> {props.este ?? "-"}
+          </p>
+          <p>
+            <strong>Norte:</strong> {props.norte ?? "-"}
+          </p>
+          <p>
+            <strong>Elevacion:</strong> {props.elevacion ?? "-"}
+          </p>
+          <p className="sm:col-span-2">
+            <strong>Referencia:</strong> {props.referenciaLugar ?? "-"}
+          </p>
+        </div>
+      </article>
+
+      <article className="rounded-xl bg-[var(--color-surface-container-high)] p-4 md:col-span-2">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+          Descripcion
+        </p>
+        <p className="text-sm text-[var(--color-on-surface)]">{props.descripcion ?? "-"}</p>
+      </article>
+
+      <article className="rounded-xl bg-[var(--color-surface-container-high)] p-4 md:col-span-2">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+          Resultados quimicos
+        </p>
+        <div className="space-y-2 text-sm">
+          {props.resultados.length === 0 ? (
+            <p>Sin resultados.</p>
+          ) : (
+            props.resultados.map((item) => (
+              <p key={item.key}>
+                <strong>{item.label}:</strong> {item.value}
+              </p>
+            ))
+          )}
+        </div>
+      </article>
+    </div>
+  );
+}
+
+export function ExploracionesPage() {
+  const { showError, showSuccess } = useToast();
+  const saveMutation = useSaveMuestraOfflineMutation();
+  const updateOfflineMutation = useUpdateMuestraOfflineMutation();
+  const updateRemoteMutation = useUpdateMuestraRemotaMutation();
+  const syncMutation = useSyncExploracionesMutation();
+
+  const offlineQuery = useExploracionesOfflineQuery();
+  const remotasQuery = useExploracionesRemotasQuery();
+  const laboratoriosQuery = useExploracionesLaboratoriosQuery();
+  const elementosQuery = useExploracionesElementosQuery();
+
+  const [form, setForm] = useState<FormState>(buildInitialState);
+  const [resultados, setResultados] = useState<DynamicResultado[]>([
+    { id: buildRowId(), elemento: "", valor: "" }
+  ]);
+  const [editTarget, setEditTarget] = useState<EditTarget>(null);
+  const [detailTarget, setDetailTarget] = useState<DetailTarget>(null);
+  const [formCollapsed, setFormCollapsed] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"todos" | RowStatus>("todos");
+  const [sourceFilter, setSourceFilter] = useState<"todos" | RowSource>("todos");
+  const [levelFilter, setLevelFilter] = useState("todos");
+  const [entregaFilter, setEntregaFilter] = useState<"todos" | "con-entrega" | "sin-entrega">(
+    "todos"
+  );
+
+  const pendingLocales = useMemo(
+    () => (offlineQuery.data ?? []).filter((item) => !item.synced),
+    [offlineQuery.data]
+  );
+  const laboratorios = laboratoriosQuery.data?.data ?? [];
+  const elementos = elementosQuery.data?.data ?? [];
+  const tableRows = useMemo<TableRow[]>(() => {
+    const remotas: TableRow[] = (remotasQuery.data?.data ?? []).map((item) => ({
+      key: `r-${item.id}`,
+      source: "remota",
+      id: item.id,
+      nombre: item.nombre,
+      numero: item.numero ?? undefined,
+      usuarioNombre: item.usuario?.nombre ?? undefined,
+      nivel: item.ubicacion.nivel,
+      laboratorio1: item.laboratorio1 ?? undefined,
+      laboratorio2: item.laboratorio2 ?? undefined,
+      laboratorio3: item.laboratorio3 ?? undefined,
+      fechaMuestreo: item.fechaMuestreo ?? undefined,
+      fechaEntrega: item.fechaEntrega ?? undefined,
+      descripcion: item.descripcion ?? undefined,
+      este: item.ubicacion.este ?? undefined,
+      norte: item.ubicacion.norte ?? undefined,
+      elevacion: item.ubicacion.elevacion ?? undefined,
+      referenciaLugar: item.ubicacion.referenciaLugar ?? undefined,
+      resultadosTexto: (item.resultados ?? [])
+        .map(
+          (r) =>
+            `${r.elemento.nombre}: ${r.valor}${r.elemento.unidad ? ` ${r.elemento.unidad}` : ""}`
+        )
+        .join(" | "),
+      status: "Sincronizado",
+      canEdit: !item.fechaEntrega
+    }));
+
+    const locales: TableRow[] = pendingLocales.map((item) => ({
+      key: `l-${item.id}`,
+      source: "local",
+      id: item.id ?? item.localId,
+      nombre: item.payload.nombre,
+      numero: item.payload.numero,
+      usuarioNombre: undefined,
+      nivel: item.payload.ubicacion.nivel,
+      laboratorio1: item.payload.laboratorio1,
+      laboratorio2: item.payload.laboratorio2,
+      laboratorio3: item.payload.laboratorio3,
+      fechaMuestreo: item.payload.fechaMuestreo,
+      fechaEntrega: item.payload.fechaEntrega,
+      descripcion: item.payload.descripcion,
+      este: item.payload.ubicacion.este,
+      norte: item.payload.ubicacion.norte,
+      elevacion: item.payload.ubicacion.elevacion,
+      referenciaLugar: item.payload.ubicacion.referenciaLugar,
+      resultadosTexto: (item.payload.resultados ?? [])
+        .map((r) => `${r.elemento}: ${r.valor}`)
+        .join(" | "),
+      status: item.syncError ? "Error de sincronizacion" : "Pendiente local",
+      canEdit: !item.payload.fechaEntrega
+    }));
+
+    return [...locales, ...remotas];
+  }, [pendingLocales, remotasQuery.data?.data]);
+
+  const levelOptions = useMemo(
+    () =>
+      Array.from(new Set(tableRows.map((row) => row.nivel).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [tableRows]
+  );
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return tableRows.filter((row) => {
+      const matchesSearch =
+        !query ||
+        row.nombre.toLowerCase().includes(query) ||
+        String(row.numero ?? "")
+          .toLowerCase()
+          .includes(query) ||
+        (row.usuarioNombre ?? "").toLowerCase().includes(query) ||
+        row.nivel.toLowerCase().includes(query) ||
+        (row.laboratorio1 ?? "").toLowerCase().includes(query) ||
+        (row.laboratorio2 ?? "").toLowerCase().includes(query) ||
+        (row.laboratorio3 ?? "").toLowerCase().includes(query);
+
+      const matchesStatus = statusFilter === "todos" || row.status === statusFilter;
+      const matchesSource = sourceFilter === "todos" || row.source === sourceFilter;
+      const matchesLevel = levelFilter === "todos" || row.nivel === levelFilter;
+      const hasEntrega = Boolean(row.fechaEntrega);
+      const matchesEntrega =
+        entregaFilter === "todos" ||
+        (entregaFilter === "con-entrega" && hasEntrega) ||
+        (entregaFilter === "sin-entrega" && !hasEntrega);
+
+      return matchesSearch && matchesStatus && matchesSource && matchesLevel && matchesEntrega;
+    });
+  }, [tableRows, search, statusFilter, sourceFilter, levelFilter, entregaFilter]);
+
+  const exportRows = useMemo<ExportRecord[]>(
+    () =>
+      filteredRows.map((row) => ({
+        estado: row.status,
+        origen: row.source === "local" ? "Local" : "Servidor",
+        nombre: row.nombre,
+        codigo: row.numero?.toString() ?? "",
+        usuario: row.usuarioNombre ?? "",
+        nivel: row.nivel,
+        este: row.este?.toString() ?? "",
+        norte: row.norte?.toString() ?? "",
+        elevacion: row.elevacion?.toString() ?? "",
+        referenciaLugar: row.referenciaLugar ?? "",
+        laboratorio1: row.laboratorio1 ?? "",
+        laboratorio2: row.laboratorio2 ?? "",
+        laboratorio3: row.laboratorio3 ?? "",
+        fechaMuestreo: formatDateTime(row.fechaMuestreo),
+        fechaEntrega: formatDateTime(row.fechaEntrega),
+        descripcion: row.descripcion ?? "",
+        resultados: row.resultadosTexto
+      })),
+    [filteredRows]
+  );
+
+  const attemptAutoSync = useCallback(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    if (syncMutation.isPending || pendingLocales.length === 0) return;
+    syncMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        if (result.failed > 0)
+          showError("Algunos registros no pudieron sincronizarse por un error.");
+      }
+    });
+  }, [pendingLocales.length, showError, syncMutation]);
+
+  useEffect(() => {
+    void remotasQuery.refetch();
+    attemptAutoSync();
+  }, [attemptAutoSync, remotasQuery]);
+
+  useEffect(() => {
+    function handleOnline() {
+      void remotasQuery.refetch();
+      attemptAutoSync();
+    }
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [attemptAutoSync, remotasQuery]);
+
+  function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateResultado(id: string, key: "elemento" | "valor", value: string) {
+    setResultados((current) =>
+      current.map((row) => (row.id === id ? { ...row, [key]: value } : row))
+    );
+  }
+
+  function clearForm() {
+    setForm(buildInitialState());
+    setResultados([{ id: buildRowId(), elemento: "", valor: "" }]);
+    setEditTarget(null);
+    setFormCollapsed(true);
+  }
+
+  function loadForm(payload: ExploracionMuestraPayload) {
+    setForm(fromPayloadToForm(payload));
+    setResultados(
+      payload.resultados?.length
+        ? payload.resultados.map((item) => ({
+            id: buildRowId(),
+            elemento: item.elemento,
+            valor: String(item.valor)
+          }))
+        : [{ id: buildRowId(), elemento: "", valor: "" }]
+    );
+    setFormCollapsed(false);
+  }
+
+  function buildPayload(): ExploracionMuestraPayload {
+    const normalizedResultados = resultados
+      .filter((row) => row.elemento.trim() && row.valor.trim())
+      .map((row) => ({ elemento: row.elemento.trim(), valor: Number(row.valor) }))
+      .filter((row) => !Number.isNaN(row.valor));
+
+    return exploracionMuestraPayloadSchema.parse({
+      nombre: form.nombre.trim(),
+      numero: toOptionalNumber(form.numero),
+      laboratorio1: form.laboratorio1.trim() || undefined,
+      laboratorio2: form.laboratorio2.trim() || undefined,
+      laboratorio3: form.laboratorio3.trim() || undefined,
+      fechaMuestreo: editTarget ? form.fechaMuestreo || undefined : getNowLaPazIso(),
+      fechaEntrega: toIsoDatetime(form.fechaEntrega),
+      descripcion: form.descripcion.trim() || undefined,
+      ubicacion: {
+        nivel: form.nivel.trim(),
+        este: toOptionalNumber(form.este),
+        norte: toOptionalNumber(form.norte),
+        elevacion: toOptionalNumber(form.elevacion),
+        referenciaLugar: form.referenciaLugar.trim() || undefined
+      },
+      resultados: normalizedResultados.length ? normalizedResultados : undefined
+    });
+  }
+
+  function onSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const payload = buildPayload();
+
+      if (editTarget?.mode === "local") {
+        updateOfflineMutation.mutate(
+          { id: editTarget.id, payload },
+          {
+            onSuccess: () => {
+              showSuccess("Registro actualizado.");
+              clearForm();
+              attemptAutoSync();
+            }
+          }
+        );
+        return;
+      }
+
+      if (editTarget?.mode === "remota") {
+        updateRemoteMutation.mutate(
+          { id: editTarget.id, payload },
+          {
+            onSuccess: () => {
+              showSuccess("Registro remoto actualizado.");
+              clearForm();
+            }
+          }
+        );
+        return;
+      }
+
+      saveMutation.mutate(payload, {
+        onSuccess: () => {
+          showSuccess("Registro guardado.");
+          clearForm();
+          attemptAutoSync();
+        }
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        showError(error.issues[0]?.message ?? "Revisa los campos.");
+        return;
+      }
+      if (error instanceof Error) {
+        showError(error.message);
+        return;
+      }
+      showError("No se pudo procesar la muestra.");
+    }
+  }
+
+  function startEdit(row: TableRow) {
+    if (!row.canEdit) {
+      showError("Este registro ya tiene fecha de entrega y no se puede editar.");
+      return;
+    }
+
+    if (row.source === "local") {
+      const found = pendingLocales.find((item) => item.id === row.id);
+      if (!found?.id) return;
+      setEditTarget({ mode: "local", id: found.id });
+      loadForm(found.payload);
+      return;
+    }
+
+    const found = (remotasQuery.data?.data ?? []).find((item) => item.id === row.id);
+    if (!found) return;
+    setEditTarget({ mode: "remota", id: found.id });
+    loadForm(fromRemoteToPayload(found));
+  }
+
+  function openDetail(row: TableRow) {
+    if (row.source === "local") {
+      const found = pendingLocales.find((item) => item.id === row.id);
+      if (found) setDetailTarget({ source: "local", data: found });
+      return;
+    }
+    const found = (remotasQuery.data?.data ?? []).find((item) => item.id === row.id);
+    if (found) setDetailTarget({ source: "remota", data: found });
+  }
+
+  const isSubmitting =
+    saveMutation.isPending || updateOfflineMutation.isPending || updateRemoteMutation.isPending;
+  return (
+    <section className="space-y-6 text-[var(--color-on-surface)]">
+      <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="page-title font-headline text-3xl font-extrabold">
+              Registro de muestra
+            </h1>
+            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+              Completa la informacion de ubicacion, laboratorios y resultados quimicos de cada
+              muestra.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormCollapsed((c) => !c)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+          >
+            {formCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            {formCollapsed ? "Mostrar formulario" : "Minimizar formulario"}
+          </button>
+        </div>
+      </header>
+
+      <datalist id="exploraciones-laboratorios">
+        {laboratorios.map((lab) => (
+          <option key={lab} value={lab} />
+        ))}
+      </datalist>
+      <datalist id="exploraciones-elementos">
+        {elementos.map((item) => (
+          <option key={item.id ?? item.nombre} value={item.nombre} />
+        ))}
+      </datalist>
+
+      {formCollapsed ? null : (
+        <form className="space-y-6" onSubmit={onSave}>
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 md:p-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Nivel
+                </label>
+                <input
+                  required
+                  value={form.nivel}
+                  onChange={(e) => updateForm("nivel", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Nombre
+                </label>
+                <input
+                  required
+                  value={form.nombre}
+                  onChange={(e) => updateForm("nombre", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Codigo
+                </label>
+                <input
+                  type="number"
+                  step={1}
+                  inputMode="numeric"
+                  value={form.numero}
+                  onChange={(e) => updateForm("numero", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Laboratorio 1
+                </label>
+                <input
+                  list="exploraciones-laboratorios"
+                  value={form.laboratorio1}
+                  onChange={(e) => updateForm("laboratorio1", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Laboratorio 2
+                </label>
+                <input
+                  list="exploraciones-laboratorios"
+                  value={form.laboratorio2}
+                  onChange={(e) => updateForm("laboratorio2", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Laboratorio 3
+                </label>
+                <input
+                  list="exploraciones-laboratorios"
+                  value={form.laboratorio3}
+                  onChange={(e) => updateForm("laboratorio3", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Fecha de muestreo
+                </label>
+                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-4 py-3 text-sm text-[var(--color-on-surface-variant)]">
+                  {form.fechaMuestreo
+                    ? formatDateTime(form.fechaMuestreo)
+                    : "Se registrara automaticamente al guardar"}
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Fecha de entrega
+                </label>
+                <input
+                  type="datetime-local"
+                  value={form.fechaEntrega}
+                  onChange={(e) => updateForm("fechaEntrega", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Referencia de lugar
+                </label>
+                <input
+                  value={form.referenciaLugar}
+                  onChange={(e) => updateForm("referenciaLugar", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Este
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={form.este}
+                  onChange={(e) => updateForm("este", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Norte
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={form.norte}
+                  onChange={(e) => updateForm("norte", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Elevacion
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={form.elevacion}
+                  onChange={(e) => updateForm("elevacion", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div className="md:col-span-2 xl:col-span-3">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Descripcion
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.descripcion}
+                  onChange={(e) => updateForm("descripcion", e.target.value)}
+                  className={`${inputClassName} min-h-[90px] resize-y`}
+                />
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 md:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-bold">Resultados quimicos</h2>
+              <button
+                type="button"
+                onClick={() =>
+                  setResultados((c) => [...c, { id: buildRowId(), elemento: "", valor: "" }])
+                }
+                className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-primary)]/55 px-4 py-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              >
+                <Plus size={15} />
+                Agregar elemento
+              </button>
+            </div>
+            <div className="space-y-3">
+              {resultados.map((row, index) => (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-1 gap-3 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1.2fr_1fr_auto]"
+                >
+                  <div>
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                      Elemento {index + 1}
+                    </label>
+                    <input
+                      list="exploraciones-elementos"
+                      value={row.elemento}
+                      onChange={(e) => updateResultado(row.id, "elemento", e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                      Valor
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={row.valor}
+                      onChange={(e) => updateResultado(row.id, "valor", e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setResultados((c) =>
+                          c.length === 1 ? c : c.filter((i) => i.id !== row.id)
+                        )
+                      }
+                      disabled={resultados.length === 1}
+                      className="inline-flex h-[50px] w-full items-center justify-center rounded-lg border border-[var(--color-error)]/45 text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:cursor-not-allowed disabled:opacity-50 md:w-[52px]"
+                      aria-label="Eliminar resultado"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <div className="sticky bottom-3 z-20 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3 shadow-xl backdrop-blur-sm md:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-[var(--color-on-surface-variant)]">
+                Completa los campos y guarda el registro para continuar.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={clearForm}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+                >
+                  {editTarget ? "Cancelar edicion" : "Limpiar formulario"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Save size={15} />
+                  {isSubmitting
+                    ? "Guardando..."
+                    : editTarget
+                      ? "Actualizar registro"
+                      : "Guardar registro"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+
+      <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
+        <div className="border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-5 py-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              <FlaskConical size={14} />
+              Registros de muestras
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => exportRecordsToCsv(exportRows)}
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+              >
+                <FileSpreadsheet size={13} />
+                Exportar Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => exportRecordsToPdf(exportRows)}
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+              >
+                <FileDown size={13} />
+                Exportar PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-5">
+            <label className="relative">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-on-surface-variant)]"
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por codigo, usuario, nivel, nombre..."
+                className={`${filterInputClassName} w-full pl-9`}
+              />
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "todos" | RowStatus)}
+              className={filterInputClassName}
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="Sincronizado">Sincronizado</option>
+              <option value="Pendiente local">Pendiente local</option>
+              <option value="Error de sincronizacion">Error de sincronizacion</option>
+            </select>
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value as "todos" | RowSource)}
+              className={filterInputClassName}
+            >
+              <option value="todos">Todos los orígenes</option>
+              <option value="local">Local</option>
+              <option value="remota">Servidor</option>
+            </select>
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className={filterInputClassName}
+            >
+              <option value="todos">Todos los niveles</option>
+              {levelOptions.map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+            <select
+              value={entregaFilter}
+              onChange={(e) =>
+                setEntregaFilter(e.target.value as "todos" | "con-entrega" | "sin-entrega")
+              }
+              className={filterInputClassName}
+            >
+              <option value="todos">Con y sin entrega</option>
+              <option value="con-entrega">Con entrega</option>
+              <option value="sin-entrega">Sin entrega</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="table-scroll overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Nombre
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Codigo
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Usuario
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Nivel
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Muestreo
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Entrega
+                </th>
+                <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-border-soft)]">
+              {filteredRows.map((row) => (
+                <tr
+                  key={row.key}
+                  className="transition hover:bg-[var(--color-surface-container-highest)]"
+                >
+                  <td className="px-4 py-3 text-xs">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${row.status === "Sincronizado" ? "bg-[var(--color-success)]/20 text-[var(--color-success)]" : row.status === "Error de sincronizacion" ? "bg-[var(--color-error)]/18 text-[var(--color-error)]" : "bg-[var(--color-tertiary)]/20 text-[var(--color-tertiary)]"}`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold">{row.nombre}</td>
+                  <td className="px-4 py-3 text-xs">{row.numero ?? "-"}</td>
+                  <td className="px-4 py-3 text-xs uppercase">{row.usuarioNombre ?? "-"}</td>
+                  <td className="px-4 py-3 text-xs">{row.nivel}</td>
+                  <td className="px-4 py-3 text-xs">{formatDateTime(row.fechaMuestreo)}</td>
+                  <td className="px-4 py-3 text-xs">{formatDateTime(row.fechaEntrega)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(row)}
+                        className="inline-flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+                      >
+                        <Eye size={12} />
+                        Ver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(row)}
+                        disabled={!row.canEdit}
+                        className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)] transition hover:bg-[var(--color-tertiary)]/12 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Pencil size={12} />
+                        Editar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredRows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
+                  >
+                    No hay registros para los filtros aplicados.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      {detailTarget ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl md:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4 border-b border-[var(--color-border-soft)] pb-4">
+              <div>
+                <h4 className="text-xl font-bold">Detalle de muestra</h4>
+                <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+                  Vista completa del registro seleccionado.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailTarget(null)}
+                className="rounded-md border border-[var(--color-outline-variant)] p-2 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)]"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {detailTarget.source === "local" ? (
+              <DetailContent
+                nombre={detailTarget.data.payload.nombre}
+                numero={detailTarget.data.payload.numero}
+                usuarioNombre="-"
+                fechaMuestreo={detailTarget.data.payload.fechaMuestreo}
+                fechaEntrega={detailTarget.data.payload.fechaEntrega}
+                laboratorio1={detailTarget.data.payload.laboratorio1}
+                laboratorio2={detailTarget.data.payload.laboratorio2}
+                laboratorio3={detailTarget.data.payload.laboratorio3}
+                descripcion={detailTarget.data.payload.descripcion}
+                nivel={detailTarget.data.payload.ubicacion.nivel}
+                este={detailTarget.data.payload.ubicacion.este}
+                norte={detailTarget.data.payload.ubicacion.norte}
+                elevacion={detailTarget.data.payload.ubicacion.elevacion}
+                referenciaLugar={detailTarget.data.payload.ubicacion.referenciaLugar}
+                resultados={(detailTarget.data.payload.resultados ?? []).map((item, index) => ({
+                  key: `${item.elemento}-${index}`,
+                  label: item.elemento,
+                  value: String(item.valor)
+                }))}
+              />
+            ) : (
+              <DetailContent
+                nombre={detailTarget.data.nombre}
+                numero={detailTarget.data.numero ?? undefined}
+                usuarioNombre={detailTarget.data.usuario?.nombre ?? undefined}
+                fechaMuestreo={detailTarget.data.fechaMuestreo ?? undefined}
+                fechaEntrega={detailTarget.data.fechaEntrega ?? undefined}
+                laboratorio1={detailTarget.data.laboratorio1 ?? undefined}
+                laboratorio2={detailTarget.data.laboratorio2 ?? undefined}
+                laboratorio3={detailTarget.data.laboratorio3 ?? undefined}
+                descripcion={detailTarget.data.descripcion ?? undefined}
+                nivel={detailTarget.data.ubicacion.nivel}
+                este={detailTarget.data.ubicacion.este ?? undefined}
+                norte={detailTarget.data.ubicacion.norte ?? undefined}
+                elevacion={detailTarget.data.ubicacion.elevacion ?? undefined}
+                referenciaLugar={detailTarget.data.ubicacion.referenciaLugar ?? undefined}
+                resultados={(detailTarget.data.resultados ?? []).map((item) => ({
+                  key: item.id ?? `${item.elemento.nombre}-${item.valor}`,
+                  label: item.elemento.nombre,
+                  value: `${item.valor}${item.elemento.unidad ? ` ${item.elemento.unidad}` : ""}`
+                }))}
+              />
+            )}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}

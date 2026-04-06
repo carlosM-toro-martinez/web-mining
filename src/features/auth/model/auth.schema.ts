@@ -17,8 +17,21 @@ export const loginPayloadSchema = z.object({
 export const loginResponseSchema = z.object({
   success: z.boolean(),
   data: z.object({
-    token: z.string().min(1),
+    accessToken: z.string().min(1),
+    refreshToken: z.string().min(1),
     user: authUserSchema
+  })
+});
+
+export const refreshPayloadSchema = z.object({
+  refreshToken: z.string().min(1)
+});
+
+export const refreshResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    accessToken: z.string().min(1),
+    refreshToken: z.string().min(1).optional()
   })
 });
 
@@ -73,7 +86,8 @@ export const resetPasswordRequestSchema = z.object({
 export const resetPasswordResponseSchema = genericMessageResponseSchema;
 
 export const authSessionSchema = z.object({
-  token: z.string().min(1),
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
   user: authUserSchema
 });
 
@@ -83,4 +97,5 @@ export type LoginPayload = z.infer<typeof loginPayloadSchema>;
 export type RegisterPayload = z.infer<typeof registerPayloadSchema>;
 export type ForgotPasswordPayload = z.infer<typeof forgotPasswordPayloadSchema>;
 export type ResetPasswordPayload = z.infer<typeof resetPasswordPayloadSchema>;
+export type RefreshPayload = z.infer<typeof refreshPayloadSchema>;
 export type AuthSession = z.infer<typeof authSessionSchema>;

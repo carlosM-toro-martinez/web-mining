@@ -3,11 +3,14 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   forgotPasswordResponseSchema,
   loginResponseSchema,
+  refreshPayloadSchema,
+  refreshResponseSchema,
   resetPasswordRequestSchema,
   resetPasswordResponseSchema,
   registerResponseSchema,
   type ForgotPasswordPayload,
   type LoginPayload,
+  type RefreshPayload,
   type ResetPasswordPayload,
   type RegisterPayload
 } from "@/features/auth/model/auth.schema";
@@ -25,6 +28,24 @@ export async function registerUser(payload: RegisterPayload) {
     url: apiEndpoints.auth.register,
     body: payload,
     schema: registerResponseSchema
+  });
+}
+
+export async function refreshSession(payload: RefreshPayload) {
+  const body = refreshPayloadSchema.parse(payload);
+  return postRequest({
+    url: apiEndpoints.auth.refresh,
+    body,
+    schema: refreshResponseSchema
+  });
+}
+
+export async function logoutSession(payload: RefreshPayload) {
+  const body = refreshPayloadSchema.parse(payload);
+  return postRequest({
+    url: apiEndpoints.auth.logout,
+    body,
+    schema: forgotPasswordResponseSchema
   });
 }
 

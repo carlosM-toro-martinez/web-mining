@@ -38,3 +38,10 @@ export function isAuthTokenExpired(token: string): boolean {
 
   return Date.now() >= payload.exp * 1000;
 }
+
+export function isAuthTokenExpiringSoon(token: string, bufferMs = 5 * 60 * 1000): boolean {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+  const expiresAtMs = payload.exp * 1000;
+  return Date.now() >= expiresAtMs - bufferMs;
+}

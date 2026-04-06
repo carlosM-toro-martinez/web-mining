@@ -3,6 +3,11 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -14,6 +19,20 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: https://api.marte.encuentrass.lat
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -50,7 +69,11 @@ jobs:
             git reset --hard origin/main
 
             echo "Versión actual:"
-            CURRENT_IMAGE=$(docker inspect --format='{{.Config.Image}}' web-mining-frontend-1 2>/dev/null || true)
+            CURRENT_CONTAINER_ID=$(docker compose ps -q frontend || true)
+            CURRENT_IMAGE=""
+            if [ -n "${CURRENT_CONTAINER_ID:-}" ]; then
+              CURRENT_IMAGE=$(docker inspect --format='{{.Config.Image}}' "$CURRENT_CONTAINER_ID" 2>/dev/null || true)
+            fi
             CURRENT_VERSION=""
             if [ -n "${CURRENT_IMAGE:-}" ] && [[ "$CURRENT_IMAGE" == *":"* ]]; then
               CURRENT_VERSION="${CURRENT_IMAGE##*:}"
@@ -68,13 +91,18 @@ jobs:
             docker compose pull frontend
 
             echo "Deploy nueva versión..."
-            docker compose up -d
+            docker compose up -d --remove-orphans
 
             echo "Esperando healthcheck..."
             ATTEMPTS=18
             STATUS="starting"
+            CONTAINER_ID=$(docker compose ps -q frontend)
+            if [ -z "${CONTAINER_ID:-}" ]; then
+              echo "No se pudo obtener container id de frontend"
+              exit 1
+            fi
             for i in $(seq 1 $ATTEMPTS); do
-              STATUS=$(docker inspect --format='{{.State.Health.Status}}' web-mining-frontend-1 2>/dev/null || echo "starting")
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_ID" 2>/dev/null || echo "starting")
               echo "Healthcheck intento $i/$ATTEMPTS: $STATUS"
               if [ "$STATUS" = "healthy" ]; then
                 break
@@ -90,7 +118,7 @@ jobs:
 
                 echo "Volviendo a versión anterior: $VERSION"
                 docker compose pull frontend
-                docker compose up -d
+                docker compose up -d --remove-orphans
               else
                 echo "No hay versión anterior"
               fi
