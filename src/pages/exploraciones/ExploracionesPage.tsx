@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BarChart3,
   ChevronDown,
   ChevronUp,
   Eye,
@@ -14,6 +15,8 @@ import {
   X
 } from "lucide-react";
 import { ZodError } from "zod";
+import { useNavigate } from "react-router-dom";
+import { ApiError } from "@/shared/api/core/apiError";
 import {
   exploracionMuestraPayloadSchema,
   type ExploracionMuestraPayload,
@@ -23,6 +26,7 @@ import {
   useExploracionesElementosQuery,
   useExploracionesLaboratoriosQuery,
   useExploracionesOfflineQuery,
+  useQueueRemoteEditOfflineMutation,
   useExploracionesRemotasQuery,
   useSaveMuestraOfflineMutation,
   useSyncExploracionesMutation,
@@ -52,6 +56,8 @@ interface FormState {
   referenciaLugar: string;
   nombre: string;
   numero: string;
+  tipoMuestra: string;
+  sector: string;
   laboratorio1: string;
   laboratorio2: string;
   laboratorio3: string;
@@ -75,6 +81,8 @@ interface TableRow {
   id: number | string;
   nombre: string;
   numero?: number;
+  tipoMuestra?: string;
+  sector?: string;
   usuarioNombre?: string;
   nivel: string;
   laboratorio1?: string;
@@ -97,6 +105,8 @@ interface ExportRecord {
   origen: string;
   nombre: string;
   codigo: string;
+  tipoMuestra: string;
+  sector: string;
   usuario: string;
   nivel: string;
   este: string;
@@ -110,6 +120,30 @@ interface ExportRecord {
   fechaEntrega: string;
   descripcion: string;
   resultados: string;
+}
+
+function mapRowToExportRecord(row: TableRow): ExportRecord {
+  return {
+    estado: row.status,
+    origen: row.source === "local" ? "Local" : "Servidor",
+    nombre: row.nombre,
+    codigo: row.numero?.toString() ?? "",
+    tipoMuestra: row.tipoMuestra ?? "",
+    sector: row.sector ?? "",
+    usuario: row.usuarioNombre ?? "",
+    nivel: row.nivel,
+    este: row.este?.toString() ?? "",
+    norte: row.norte?.toString() ?? "",
+    elevacion: row.elevacion?.toString() ?? "",
+    referenciaLugar: row.referenciaLugar ?? "",
+    laboratorio1: row.laboratorio1 ?? "",
+    laboratorio2: row.laboratorio2 ?? "",
+    laboratorio3: row.laboratorio3 ?? "",
+    fechaMuestreo: formatDateTime(row.fechaMuestreo),
+    fechaEntrega: formatDateTime(row.fechaEntrega),
+    descripcion: row.descripcion ?? "",
+    resultados: row.resultadosTexto
+  };
 }
 
 function buildRowId() {
@@ -126,6 +160,8 @@ function buildInitialState(): FormState {
     referenciaLugar: "",
     nombre: "",
     numero: "",
+    tipoMuestra: "",
+    sector: "",
     laboratorio1: "",
     laboratorio2: "",
     laboratorio3: "",
@@ -136,24 +172,20 @@ function buildInitialState(): FormState {
 }
 
 function getNowLaPazIso() {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/La_Paz",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false
-  });
-
-  const parts = formatter.formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
-  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}.000-04:00`;
+  // Keep the exact current instant and serialize in canonical ISO (UTC, Z suffix)
+  // so Zod/API datetime validation is always valid.
+  return new Date().toISOString();
 }
 
 function toIsoDatetime(value: string) {
   if (!value.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
+function normalizeIsoDatetime(value?: string) {
+  if (!value?.trim()) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date.toISOString();
@@ -184,6 +216,25 @@ function toOptionalNumber(value: string) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
+function parseChemicalValue(value: string) {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) return undefined;
+  const match = normalized.match(/^[<>]?\s*-?\d+(\.\d+)?$/);
+  if (!match) return undefined;
+  const numeric = Number(normalized.replace(/[<>]/g, "").trim());
+  if (Number.isNaN(numeric)) return undefined;
+  return numeric;
+}
+
+function isConnectivityIssue(error: unknown) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+  if (error instanceof ApiError) {
+    if (!error.statusCode) return true;
+    if (error.message.toLowerCase().includes("no se pudo conectar")) return true;
+  }
+  return false;
+}
+
 function fromPayloadToForm(payload: ExploracionMuestraPayload): FormState {
   return {
     nivel: payload.ubicacion.nivel,
@@ -193,6 +244,8 @@ function fromPayloadToForm(payload: ExploracionMuestraPayload): FormState {
     referenciaLugar: payload.ubicacion.referenciaLugar ?? "",
     nombre: payload.nombre,
     numero: payload.numero?.toString() ?? "",
+    tipoMuestra: payload.tipoMuestra ?? "",
+    sector: payload.sector ?? "",
     laboratorio1: payload.laboratorio1 ?? "",
     laboratorio2: payload.laboratorio2 ?? "",
     laboratorio3: payload.laboratorio3 ?? "",
@@ -206,6 +259,8 @@ function fromRemoteToPayload(data: ExploracionMuestraResponse): ExploracionMuest
   return {
     nombre: data.nombre,
     numero: data.numero ?? undefined,
+    tipoMuestra: data.tipoMuestra ?? undefined,
+    sector: data.sector ?? undefined,
     laboratorio1: data.laboratorio1 ?? undefined,
     laboratorio2: data.laboratorio2 ?? undefined,
     laboratorio3: data.laboratorio3 ?? undefined,
@@ -251,6 +306,8 @@ function exportRecordsToPdf(records: ExportRecord[]) {
         <td>${row.estado}</td>
         <td>${row.nombre}</td>
         <td>${row.codigo}</td>
+        <td>${row.tipoMuestra}</td>
+        <td>${row.sector}</td>
         <td>${row.usuario}</td>
         <td>${row.nivel}</td>
         <td>${row.fechaMuestreo}</td>
@@ -285,6 +342,8 @@ function exportRecordsToPdf(records: ExportRecord[]) {
               <th>Estado</th>
               <th>Nombre</th>
               <th>Codigo</th>
+              <th>Tipo muestra</th>
+              <th>Sector</th>
               <th>Usuario</th>
               <th>Nivel</th>
               <th>Fecha Muestreo</th>
@@ -292,7 +351,7 @@ function exportRecordsToPdf(records: ExportRecord[]) {
               <th>Resultados</th>
             </tr>
           </thead>
-          <tbody>${rowsHtml || '<tr><td colspan="8">Sin registros</td></tr>'}</tbody>
+          <tbody>${rowsHtml || '<tr><td colspan="10">Sin registros</td></tr>'}</tbody>
         </table>
       </body>
     </html>
@@ -309,6 +368,8 @@ function exportRecordsToPdf(records: ExportRecord[]) {
 interface DetailContentProps {
   nombre: string;
   numero?: number;
+  tipoMuestra?: string;
+  sector?: string;
   usuarioNombre?: string;
   fechaMuestreo?: string;
   fechaEntrega?: string;
@@ -337,6 +398,12 @@ function DetailContent(props: DetailContentProps) {
           </p>
           <p>
             <strong>Codigo:</strong> {props.numero ?? "-"}
+          </p>
+          <p>
+            <strong>Tipo de muestra:</strong> {props.tipoMuestra ?? "-"}
+          </p>
+          <p>
+            <strong>Sector:</strong> {props.sector ?? "-"}
           </p>
           <p>
             <strong>Usuario:</strong> {props.usuarioNombre ?? "-"}
@@ -401,15 +468,25 @@ function DetailContent(props: DetailContentProps) {
         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
           Resultados quimicos
         </p>
-        <div className="space-y-2 text-sm">
+        <div className="text-sm">
           {props.resultados.length === 0 ? (
             <p>Sin resultados.</p>
           ) : (
-            props.resultados.map((item) => (
-              <p key={item.key}>
-                <strong>{item.label}:</strong> {item.value}
-              </p>
-            ))
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {props.resultados.map((item) => (
+                <article
+                  key={item.key}
+                  className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] px-3 py-2"
+                >
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-base font-semibold text-[var(--color-on-surface)]">
+                    {item.value}
+                  </p>
+                </article>
+              ))}
+            </div>
           )}
         </div>
       </article>
@@ -418,9 +495,11 @@ function DetailContent(props: DetailContentProps) {
 }
 
 export function ExploracionesPage() {
+  const navigate = useNavigate();
   const { showError, showSuccess } = useToast();
   const saveMutation = useSaveMuestraOfflineMutation();
   const updateOfflineMutation = useUpdateMuestraOfflineMutation();
+  const queueRemoteEditOfflineMutation = useQueueRemoteEditOfflineMutation();
   const updateRemoteMutation = useUpdateMuestraRemotaMutation();
   const syncMutation = useSyncExploracionesMutation();
 
@@ -438,8 +517,8 @@ export function ExploracionesPage() {
   const [formCollapsed, setFormCollapsed] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | RowStatus>("todos");
-  const [sourceFilter, setSourceFilter] = useState<"todos" | RowSource>("todos");
   const [levelFilter, setLevelFilter] = useState("todos");
+  const [resultadosFilter, setResultadosFilter] = useState<"todos" | "con" | "sin">("todos");
   const [entregaFilter, setEntregaFilter] = useState<"todos" | "con-entrega" | "sin-entrega">(
     "todos"
   );
@@ -451,12 +530,20 @@ export function ExploracionesPage() {
   const laboratorios = laboratoriosQuery.data?.data ?? [];
   const elementos = elementosQuery.data?.data ?? [];
   const tableRows = useMemo<TableRow[]>(() => {
-    const remotas: TableRow[] = (remotasQuery.data?.data ?? []).map((item) => ({
+    const pendingRemoteIds = new Set(
+      pendingLocales.map((item) => item.remoteId).filter((id): id is string => Boolean(id))
+    );
+
+    const remotas: TableRow[] = (remotasQuery.data?.data ?? [])
+      .filter((item) => !pendingRemoteIds.has(item.id))
+      .map((item) => ({
       key: `r-${item.id}`,
       source: "remota",
       id: item.id,
       nombre: item.nombre,
       numero: item.numero ?? undefined,
+      tipoMuestra: item.tipoMuestra ?? undefined,
+      sector: item.sector ?? undefined,
       usuarioNombre: item.usuario?.nombre ?? undefined,
       nivel: item.ubicacion.nivel,
       laboratorio1: item.laboratorio1 ?? undefined,
@@ -485,6 +572,8 @@ export function ExploracionesPage() {
       id: item.id ?? item.localId,
       nombre: item.payload.nombre,
       numero: item.payload.numero,
+      tipoMuestra: item.payload.tipoMuestra,
+      sector: item.payload.sector,
       usuarioNombre: undefined,
       nivel: item.payload.ubicacion.nivel,
       laboratorio1: item.payload.laboratorio1,
@@ -515,6 +604,22 @@ export function ExploracionesPage() {
     [tableRows]
   );
 
+  const sectorOptions = useMemo(
+    () =>
+      Array.from(new Set(tableRows.map((row) => row.sector).filter(Boolean))).sort((a, b) =>
+        String(a).localeCompare(String(b))
+      ),
+    [tableRows]
+  );
+
+  const tipoMuestraOptions = useMemo(
+    () =>
+      Array.from(new Set(tableRows.map((row) => row.tipoMuestra).filter(Boolean))).sort((a, b) =>
+        String(a).localeCompare(String(b))
+      ),
+    [tableRows]
+  );
+
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -525,6 +630,8 @@ export function ExploracionesPage() {
         String(row.numero ?? "")
           .toLowerCase()
           .includes(query) ||
+        (row.tipoMuestra ?? "").toLowerCase().includes(query) ||
+        (row.sector ?? "").toLowerCase().includes(query) ||
         (row.usuarioNombre ?? "").toLowerCase().includes(query) ||
         row.nivel.toLowerCase().includes(query) ||
         (row.laboratorio1 ?? "").toLowerCase().includes(query) ||
@@ -532,39 +639,24 @@ export function ExploracionesPage() {
         (row.laboratorio3 ?? "").toLowerCase().includes(query);
 
       const matchesStatus = statusFilter === "todos" || row.status === statusFilter;
-      const matchesSource = sourceFilter === "todos" || row.source === sourceFilter;
       const matchesLevel = levelFilter === "todos" || row.nivel === levelFilter;
+      const hasResultados = Boolean(row.resultadosTexto.trim());
+      const matchesResultados =
+        resultadosFilter === "todos" ||
+        (resultadosFilter === "con" && hasResultados) ||
+        (resultadosFilter === "sin" && !hasResultados);
       const hasEntrega = Boolean(row.fechaEntrega);
       const matchesEntrega =
         entregaFilter === "todos" ||
         (entregaFilter === "con-entrega" && hasEntrega) ||
         (entregaFilter === "sin-entrega" && !hasEntrega);
 
-      return matchesSearch && matchesStatus && matchesSource && matchesLevel && matchesEntrega;
+      return matchesSearch && matchesStatus && matchesLevel && matchesResultados && matchesEntrega;
     });
-  }, [tableRows, search, statusFilter, sourceFilter, levelFilter, entregaFilter]);
+  }, [tableRows, search, statusFilter, levelFilter, resultadosFilter, entregaFilter]);
 
   const exportRows = useMemo<ExportRecord[]>(
-    () =>
-      filteredRows.map((row) => ({
-        estado: row.status,
-        origen: row.source === "local" ? "Local" : "Servidor",
-        nombre: row.nombre,
-        codigo: row.numero?.toString() ?? "",
-        usuario: row.usuarioNombre ?? "",
-        nivel: row.nivel,
-        este: row.este?.toString() ?? "",
-        norte: row.norte?.toString() ?? "",
-        elevacion: row.elevacion?.toString() ?? "",
-        referenciaLugar: row.referenciaLugar ?? "",
-        laboratorio1: row.laboratorio1 ?? "",
-        laboratorio2: row.laboratorio2 ?? "",
-        laboratorio3: row.laboratorio3 ?? "",
-        fechaMuestreo: formatDateTime(row.fechaMuestreo),
-        fechaEntrega: formatDateTime(row.fechaEntrega),
-        descripcion: row.descripcion ?? "",
-        resultados: row.resultadosTexto
-      })),
+    () => filteredRows.map(mapRowToExportRecord),
     [filteredRows]
   );
 
@@ -625,18 +717,28 @@ export function ExploracionesPage() {
   }
 
   function buildPayload(): ExploracionMuestraPayload {
-    const normalizedResultados = resultados
-      .filter((row) => row.elemento.trim() && row.valor.trim())
-      .map((row) => ({ elemento: row.elemento.trim(), valor: Number(row.valor) }))
-      .filter((row) => !Number.isNaN(row.valor));
+    const resultadoRows = resultados.filter((row) => row.elemento.trim() && row.valor.trim());
+    const invalidResultado = resultadoRows.find((row) => parseChemicalValue(row.valor) === undefined);
+    if (invalidResultado) {
+      throw new Error(
+        `Valor químico inválido en "${invalidResultado.elemento}". Usa formatos como 1.23 o <0.01.`
+      );
+    }
+
+    const normalizedResultados = resultadoRows.map((row) => ({
+      elemento: row.elemento.trim(),
+      valor: parseChemicalValue(row.valor) as number
+    }));
 
     return exploracionMuestraPayloadSchema.parse({
       nombre: form.nombre.trim(),
       numero: toOptionalNumber(form.numero),
+      tipoMuestra: form.tipoMuestra.trim() || undefined,
+      sector: form.sector.trim() || undefined,
       laboratorio1: form.laboratorio1.trim() || undefined,
       laboratorio2: form.laboratorio2.trim() || undefined,
       laboratorio3: form.laboratorio3.trim() || undefined,
-      fechaMuestreo: editTarget ? form.fechaMuestreo || undefined : getNowLaPazIso(),
+      fechaMuestreo: editTarget ? normalizeIsoDatetime(form.fechaMuestreo) : getNowLaPazIso(),
       fechaEntrega: toIsoDatetime(form.fechaEntrega),
       descripcion: form.descripcion.trim() || undefined,
       ubicacion: {
@@ -670,12 +772,37 @@ export function ExploracionesPage() {
       }
 
       if (editTarget?.mode === "remota") {
+        const queueEditOffline = () =>
+          queueRemoteEditOfflineMutation.mutate(
+            { remoteId: editTarget.id, payload },
+            {
+              onSuccess: () => {
+                showSuccess("Sin conexión: edición guardada localmente como pendiente.");
+                clearForm();
+                attemptAutoSync();
+              }
+            }
+          );
+
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          queueEditOffline();
+          return;
+        }
+
         updateRemoteMutation.mutate(
           { id: editTarget.id, payload },
           {
             onSuccess: () => {
               showSuccess("Registro remoto actualizado.");
               clearForm();
+            },
+            onError: (error) => {
+              if (isConnectivityIssue(error)) {
+                queueEditOffline();
+                return;
+              }
+              const message = error instanceof Error ? error.message : "No se pudo actualizar.";
+              showError(message);
             }
           }
         );
@@ -733,7 +860,10 @@ export function ExploracionesPage() {
   }
 
   const isSubmitting =
-    saveMutation.isPending || updateOfflineMutation.isPending || updateRemoteMutation.isPending;
+    saveMutation.isPending ||
+    updateOfflineMutation.isPending ||
+    updateRemoteMutation.isPending ||
+    queueRemoteEditOfflineMutation.isPending;
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 md:p-6">
@@ -763,6 +893,21 @@ export function ExploracionesPage() {
           <option key={lab} value={lab} />
         ))}
       </datalist>
+      <datalist id="exploraciones-niveles">
+        {levelOptions.map((value) => (
+          <option key={value} value={value} />
+        ))}
+      </datalist>
+      <datalist id="exploraciones-sectores">
+        {sectorOptions.map((value) => (
+          <option key={value} value={value ?? ""} />
+        ))}
+      </datalist>
+      <datalist id="exploraciones-tipos">
+        {tipoMuestraOptions.map((value) => (
+          <option key={value} value={value ?? ""} />
+        ))}
+      </datalist>
       <datalist id="exploraciones-elementos">
         {elementos.map((item) => (
           <option key={item.id ?? item.nombre} value={item.nombre} />
@@ -779,6 +924,7 @@ export function ExploracionesPage() {
                 </label>
                 <input
                   required
+                  list="exploraciones-niveles"
                   value={form.nivel}
                   onChange={(e) => updateForm("nivel", e.target.value)}
                   className={inputClassName}
@@ -805,6 +951,28 @@ export function ExploracionesPage() {
                   inputMode="numeric"
                   value={form.numero}
                   onChange={(e) => updateForm("numero", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Tipo de muestra
+                </label>
+                <input
+                  list="exploraciones-tipos"
+                  value={form.tipoMuestra}
+                  onChange={(e) => updateForm("tipoMuestra", e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Sector
+                </label>
+                <input
+                  list="exploraciones-sectores"
+                  value={form.sector}
+                  onChange={(e) => updateForm("sector", e.target.value)}
                   className={inputClassName}
                 />
               </div>
@@ -958,8 +1126,9 @@ export function ExploracionesPage() {
                       Valor
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
+                      placeholder="Ej: 1.23 o <0.01"
                       value={row.valor}
                       onChange={(e) => updateResultado(row.id, "valor", e.target.value)}
                       className={inputClassName}
@@ -1026,6 +1195,14 @@ export function ExploracionesPage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                onClick={() => navigate("/exploraciones/reportes")}
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+              >
+                <BarChart3 size={13} />
+                Reportes y tendencias
+              </button>
+              <button
+                type="button"
                 onClick={() => exportRecordsToCsv(exportRows)}
                 className="inline-flex items-center gap-2 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
               >
@@ -1052,7 +1229,7 @@ export function ExploracionesPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por codigo, usuario, nivel, nombre..."
+                placeholder="Buscar por codigo, tipo, sector, usuario, nivel, nombre..."
                 className={`${filterInputClassName} w-full pl-9`}
               />
             </label>
@@ -1067,15 +1244,6 @@ export function ExploracionesPage() {
               <option value="Error de sincronizacion">Error de sincronizacion</option>
             </select>
             <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value as "todos" | RowSource)}
-              className={filterInputClassName}
-            >
-              <option value="todos">Todos los orígenes</option>
-              <option value="local">Local</option>
-              <option value="remota">Servidor</option>
-            </select>
-            <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
               className={filterInputClassName}
@@ -1086,6 +1254,15 @@ export function ExploracionesPage() {
                   {level}
                 </option>
               ))}
+            </select>
+            <select
+              value={resultadosFilter}
+              onChange={(e) => setResultadosFilter(e.target.value as "todos" | "con" | "sin")}
+              className={filterInputClassName}
+            >
+              <option value="todos">Todos los resultados</option>
+              <option value="con">Con resultados</option>
+              <option value="sin">Sin resultados</option>
             </select>
             <select
               value={entregaFilter}
@@ -1113,6 +1290,12 @@ export function ExploracionesPage() {
                 </th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                   Codigo
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Tipo
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Sector
                 </th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                   Usuario
@@ -1146,6 +1329,8 @@ export function ExploracionesPage() {
                   </td>
                   <td className="px-4 py-3 text-sm font-semibold">{row.nombre}</td>
                   <td className="px-4 py-3 text-xs">{row.numero ?? "-"}</td>
+                  <td className="px-4 py-3 text-xs">{row.tipoMuestra ?? "-"}</td>
+                  <td className="px-4 py-3 text-xs">{row.sector ?? "-"}</td>
                   <td className="px-4 py-3 text-xs uppercase">{row.usuarioNombre ?? "-"}</td>
                   <td className="px-4 py-3 text-xs">{row.nivel}</td>
                   <td className="px-4 py-3 text-xs">{formatDateTime(row.fechaMuestreo)}</td>
@@ -1176,7 +1361,7 @@ export function ExploracionesPage() {
               {filteredRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={10}
                     className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
                   >
                     No hay registros para los filtros aplicados.
@@ -1190,7 +1375,7 @@ export function ExploracionesPage() {
 
       {detailTarget ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl md:p-6">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl md:p-6">
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-[var(--color-border-soft)] pb-4">
               <div>
                 <h4 className="text-xl font-bold">Detalle de muestra</h4>
@@ -1207,51 +1392,57 @@ export function ExploracionesPage() {
               </button>
             </div>
 
-            {detailTarget.source === "local" ? (
-              <DetailContent
-                nombre={detailTarget.data.payload.nombre}
-                numero={detailTarget.data.payload.numero}
-                usuarioNombre="-"
-                fechaMuestreo={detailTarget.data.payload.fechaMuestreo}
-                fechaEntrega={detailTarget.data.payload.fechaEntrega}
-                laboratorio1={detailTarget.data.payload.laboratorio1}
-                laboratorio2={detailTarget.data.payload.laboratorio2}
-                laboratorio3={detailTarget.data.payload.laboratorio3}
-                descripcion={detailTarget.data.payload.descripcion}
-                nivel={detailTarget.data.payload.ubicacion.nivel}
-                este={detailTarget.data.payload.ubicacion.este}
-                norte={detailTarget.data.payload.ubicacion.norte}
-                elevacion={detailTarget.data.payload.ubicacion.elevacion}
-                referenciaLugar={detailTarget.data.payload.ubicacion.referenciaLugar}
-                resultados={(detailTarget.data.payload.resultados ?? []).map((item, index) => ({
-                  key: `${item.elemento}-${index}`,
-                  label: item.elemento,
-                  value: String(item.valor)
-                }))}
-              />
-            ) : (
-              <DetailContent
-                nombre={detailTarget.data.nombre}
-                numero={detailTarget.data.numero ?? undefined}
-                usuarioNombre={detailTarget.data.usuario?.nombre ?? undefined}
-                fechaMuestreo={detailTarget.data.fechaMuestreo ?? undefined}
-                fechaEntrega={detailTarget.data.fechaEntrega ?? undefined}
-                laboratorio1={detailTarget.data.laboratorio1 ?? undefined}
-                laboratorio2={detailTarget.data.laboratorio2 ?? undefined}
-                laboratorio3={detailTarget.data.laboratorio3 ?? undefined}
-                descripcion={detailTarget.data.descripcion ?? undefined}
-                nivel={detailTarget.data.ubicacion.nivel}
-                este={detailTarget.data.ubicacion.este ?? undefined}
-                norte={detailTarget.data.ubicacion.norte ?? undefined}
-                elevacion={detailTarget.data.ubicacion.elevacion ?? undefined}
-                referenciaLugar={detailTarget.data.ubicacion.referenciaLugar ?? undefined}
-                resultados={(detailTarget.data.resultados ?? []).map((item) => ({
-                  key: item.id ?? `${item.elemento.nombre}-${item.valor}`,
-                  label: item.elemento.nombre,
-                  value: `${item.valor}${item.elemento.unidad ? ` ${item.elemento.unidad}` : ""}`
-                }))}
-              />
-            )}
+            <div className="overflow-y-auto pr-1">
+              {detailTarget.source === "local" ? (
+                <DetailContent
+                  nombre={detailTarget.data.payload.nombre}
+                  numero={detailTarget.data.payload.numero}
+                  tipoMuestra={detailTarget.data.payload.tipoMuestra}
+                  sector={detailTarget.data.payload.sector}
+                  usuarioNombre="-"
+                  fechaMuestreo={detailTarget.data.payload.fechaMuestreo}
+                  fechaEntrega={detailTarget.data.payload.fechaEntrega}
+                  laboratorio1={detailTarget.data.payload.laboratorio1}
+                  laboratorio2={detailTarget.data.payload.laboratorio2}
+                  laboratorio3={detailTarget.data.payload.laboratorio3}
+                  descripcion={detailTarget.data.payload.descripcion}
+                  nivel={detailTarget.data.payload.ubicacion.nivel}
+                  este={detailTarget.data.payload.ubicacion.este}
+                  norte={detailTarget.data.payload.ubicacion.norte}
+                  elevacion={detailTarget.data.payload.ubicacion.elevacion}
+                  referenciaLugar={detailTarget.data.payload.ubicacion.referenciaLugar}
+                  resultados={(detailTarget.data.payload.resultados ?? []).map((item, index) => ({
+                    key: `${item.elemento}-${index}`,
+                    label: item.elemento,
+                    value: String(item.valor)
+                  }))}
+                />
+              ) : (
+                <DetailContent
+                  nombre={detailTarget.data.nombre}
+                  numero={detailTarget.data.numero ?? undefined}
+                  tipoMuestra={detailTarget.data.tipoMuestra ?? undefined}
+                  sector={detailTarget.data.sector ?? undefined}
+                  usuarioNombre={detailTarget.data.usuario?.nombre ?? undefined}
+                  fechaMuestreo={detailTarget.data.fechaMuestreo ?? undefined}
+                  fechaEntrega={detailTarget.data.fechaEntrega ?? undefined}
+                  laboratorio1={detailTarget.data.laboratorio1 ?? undefined}
+                  laboratorio2={detailTarget.data.laboratorio2 ?? undefined}
+                  laboratorio3={detailTarget.data.laboratorio3 ?? undefined}
+                  descripcion={detailTarget.data.descripcion ?? undefined}
+                  nivel={detailTarget.data.ubicacion.nivel}
+                  este={detailTarget.data.ubicacion.este ?? undefined}
+                  norte={detailTarget.data.ubicacion.norte ?? undefined}
+                  elevacion={detailTarget.data.ubicacion.elevacion ?? undefined}
+                  referenciaLugar={detailTarget.data.ubicacion.referenciaLugar ?? undefined}
+                  resultados={(detailTarget.data.resultados ?? []).map((item) => ({
+                    key: item.id ?? `${item.elemento.nombre}-${item.valor}`,
+                    label: item.elemento.nombre,
+                    value: `${item.valor}${item.elemento.unidad ? ` ${item.elemento.unidad}` : ""}`
+                  }))}
+                />
+              )}
+            </div>
           </div>
         </div>
       ) : null}

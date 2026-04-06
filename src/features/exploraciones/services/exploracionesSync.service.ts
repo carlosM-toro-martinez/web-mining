@@ -1,5 +1,8 @@
 import { ApiError } from "@/shared/api/core/apiError";
-import { createExploracionMuestra } from "@/features/exploraciones/api/exploracionesApi";
+import {
+  createExploracionMuestra,
+  updateExploracionMuestra
+} from "@/features/exploraciones/api/exploracionesApi";
 import {
   getPendingMuestras,
   markMuestraAsSynced,
@@ -44,8 +47,13 @@ export async function syncPendingExploraciones(): Promise<SyncExploracionesResul
     if (!item.id) continue;
 
     try {
-      const response = await createExploracionMuestra(item.payload);
-      await markMuestraAsSynced(item.id, response.data?.id);
+      if (item.remoteId) {
+        await updateExploracionMuestra(item.remoteId, item.payload);
+        await markMuestraAsSynced(item.id, item.remoteId);
+      } else {
+        const response = await createExploracionMuestra(item.payload);
+        await markMuestraAsSynced(item.id, response.data?.id);
+      }
       synced += 1;
     } catch (error) {
       if (isConnectivityIssue(error)) {

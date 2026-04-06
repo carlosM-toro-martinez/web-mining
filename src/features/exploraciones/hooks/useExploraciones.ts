@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import {
   getMuestrasOffline,
+  queueRemoteEditOffline,
   saveMuestraOffline,
   updateMuestraOffline
 } from "@/features/exploraciones/db/exploracionesDb";
@@ -60,6 +61,18 @@ export function useUpdateMuestraOfflineMutation() {
       updateMuestraOffline(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.offline() });
+    }
+  });
+}
+
+export function useQueueRemoteEditOfflineMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ remoteId, payload }: { remoteId: string; payload: ExploracionMuestraPayload }) =>
+      queueRemoteEditOffline(remoteId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.offline() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.remotas() });
     }
   });
 }

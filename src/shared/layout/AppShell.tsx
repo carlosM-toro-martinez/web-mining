@@ -26,7 +26,7 @@ interface NavItem {
 
 const baseNavItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
-  { label: "Mapa", icon: Map, to: "/mapa" },
+  // { label: "Mapa", icon: Map, to: "/mapa" },
   { label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" }
 ];
 
