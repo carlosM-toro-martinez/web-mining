@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const muestraResultadoSchema = z.object({
   elemento: z.string().trim().min(1, "El elemento es obligatorio."),
-  valor: z.number({ message: "El valor del resultado debe ser numerico." })
+  valor: z.number({ message: "El valor del resultado debe ser numerico." }),
+  prefijo: z.string().trim().min(1).optional()
 });
 
 export const exploracionMuestraPayloadSchema = z.object({
@@ -27,7 +28,8 @@ export const exploracionMuestraPayloadSchema = z.object({
     .array(
       z.object({
         elemento: z.string().min(1),
-        valor: z.number()
+        valor: z.number(),
+        prefijo: z.string().trim().min(1).optional()
       })
     )
     .optional()
@@ -54,6 +56,7 @@ const muestraResultadoResponseSchema = z.object({
   muestraId: z.string().optional(),
   elementoId: z.string().optional(),
   valor: z.number(),
+  prefijo: z.string().nullable().optional(),
   createdAt: z.string().optional(),
   elemento: elementoCatalogSchema
 });

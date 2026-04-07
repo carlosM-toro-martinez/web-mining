@@ -216,14 +216,26 @@ function toOptionalNumber(value: string) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function parseChemicalValue(value: string) {
+function parseChemicalValueWithPrefix(value: string) {
   const normalized = value.trim().replace(",", ".");
   if (!normalized) return undefined;
-  const match = normalized.match(/^[<>]?\s*-?\d+(\.\d+)?$/);
-  if (!match) return undefined;
-  const numeric = Number(normalized.replace(/[<>]/g, "").trim());
+
+  // Read the numeric portion from the tail of the string and keep any
+  // preceding text as prefix (examples: "<0.008", "> 2.5", "ND 0.01").
+  const numericTailMatch = normalized.match(/-?\d+(\.\d+)?$/);
+  if (!numericTailMatch) return undefined;
+
+  const numericToken = numericTailMatch[0];
+  const numeric = Number(numericToken);
   if (Number.isNaN(numeric)) return undefined;
-  return numeric;
+
+  const prefixRaw = normalized.slice(0, normalized.length - numericToken.length).trim();
+  const prefix = prefixRaw.length > 0 ? prefixRaw : undefined;
+
+  return {
+    valor: numeric,
+    prefijo: prefix
+  };
 }
 
 function isConnectivityIssue(error: unknown) {
@@ -276,7 +288,8 @@ function fromRemoteToPayload(data: ExploracionMuestraResponse): ExploracionMuest
     },
     resultados: data.resultados?.map((item) => ({
       elemento: item.elemento.nombre,
-      valor: item.valor
+      valor: item.valor,
+      prefijo: item.prefijo ?? undefined
     }))
   };
 }
@@ -559,7 +572,7 @@ export function ExploracionesPage() {
       resultadosTexto: (item.resultados ?? [])
         .map(
           (r) =>
-            `${r.elemento.nombre}: ${r.valor}${r.elemento.unidad ? ` ${r.elemento.unidad}` : ""}`
+            `${r.elemento.nombre}: ${r.prefijo ?? ""}${r.valor}${r.elemento.unidad ? ` ${r.elemento.unidad}` : ""}`
         )
         .join(" | "),
       status: "Sincronizado",
@@ -587,7 +600,7 @@ export function ExploracionesPage() {
       elevacion: item.payload.ubicacion.elevacion,
       referenciaLugar: item.payload.ubicacion.referenciaLugar,
       resultadosTexto: (item.payload.resultados ?? [])
-        .map((r) => `${r.elemento}: ${r.valor}`)
+        .map((r) => `${r.elemento}: ${r.prefijo ?? ""}${r.valor}`)
         .join(" | "),
       status: item.syncError ? "Error de sincronizacion" : "Pendiente local",
       canEdit: !item.payload.fechaEntrega
@@ -709,7 +722,7 @@ export function ExploracionesPage() {
         ? payload.resultados.map((item) => ({
             id: buildRowId(),
             elemento: item.elemento,
-            valor: String(item.valor)
+            valor: `${item.prefijo ?? ""}${item.valor}`
           }))
         : [{ id: buildRowId(), elemento: "", valor: "" }]
     );
@@ -718,17 +731,26 @@ export function ExploracionesPage() {
 
   function buildPayload(): ExploracionMuestraPayload {
     const resultadoRows = resultados.filter((row) => row.elemento.trim() && row.valor.trim());
-    const invalidResultado = resultadoRows.find((row) => parseChemicalValue(row.valor) === undefined);
+    const invalidResultado = resultadoRows.find(
+      (row) => parseChemicalValueWithPrefix(row.valor) === undefined
+    );
     if (invalidResultado) {
       throw new Error(
-        `Valor químico inválido en "${invalidResultado.elemento}". Usa formatos como 1.23 o <0.01.`
+        `Valor químico inválido en "${invalidResultado.elemento}". Usa formatos como 1.23, <0.01 o ND 0.01.`
       );
     }
 
-    const normalizedResultados = resultadoRows.map((row) => ({
-      elemento: row.elemento.trim(),
-      valor: parseChemicalValue(row.valor) as number
-    }));
+    const normalizedResultados = resultadoRows.map((row) => {
+      const parsed = parseChemicalValueWithPrefix(row.valor) as {
+        valor: number;
+        prefijo?: "<" | ">";
+      };
+      return {
+        elemento: row.elemento.trim(),
+        valor: parsed.valor,
+        prefijo: parsed.prefijo
+      };
+    });
 
     return exploracionMuestraPayloadSchema.parse({
       nombre: form.nombre.trim(),
@@ -1128,7 +1150,7 @@ export function ExploracionesPage() {
                     <input
                       type="text"
                       inputMode="decimal"
-                      placeholder="Ej: 1.23 o <0.01"
+                      placeholder="Ej: 1.23, <0.01, >2.5, ND 0.01"
                       value={row.valor}
                       onChange={(e) => updateResultado(row.id, "valor", e.target.value)}
                       className={inputClassName}
@@ -1414,7 +1436,7 @@ export function ExploracionesPage() {
                   resultados={(detailTarget.data.payload.resultados ?? []).map((item, index) => ({
                     key: `${item.elemento}-${index}`,
                     label: item.elemento,
-                    value: String(item.valor)
+                    value: `${item.prefijo ?? ""}${item.valor}`
                   }))}
                 />
               ) : (
@@ -1438,7 +1460,7 @@ export function ExploracionesPage() {
                   resultados={(detailTarget.data.resultados ?? []).map((item) => ({
                     key: item.id ?? `${item.elemento.nombre}-${item.valor}`,
                     label: item.elemento.nombre,
-                    value: `${item.valor}${item.elemento.unidad ? ` ${item.elemento.unidad}` : ""}`
+                    value: `${item.prefijo ?? ""}${item.valor}${item.elemento.unidad ? ` ${item.elemento.unidad}` : ""}`
                   }))}
                 />
               )}
