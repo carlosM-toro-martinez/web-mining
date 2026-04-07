@@ -3,10 +3,13 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import { httpClient } from "@/shared/api/core/httpClient";
 import {
   exploracionElementosResponseSchema,
+  exploracionElementoPayloadSchema,
+  exploracionElementoWriteResponseSchema,
   exploracionLaboratoriosResponseSchema,
   exploracionMuestraPayloadSchema,
   exploracionMuestrasTodasResponseSchema,
   exploracionMuestraWriteResponseSchema,
+  type ExploracionElementoPayload,
   type ExploracionMuestraPayload
 } from "@/features/exploraciones/model/muestra.schema";
 
@@ -49,6 +52,15 @@ export async function getExploracionesElementos() {
   return getRequest({
     url: apiEndpoints.exploraciones.elementos,
     schema: exploracionElementosResponseSchema
+  });
+}
+
+export async function createExploracionElemento(payload: ExploracionElementoPayload) {
+  const body = exploracionElementoPayloadSchema.parse(payload);
+  return postRequest({
+    url: apiEndpoints.exploraciones.elementos,
+    body,
+    schema: exploracionElementoWriteResponseSchema
   });
 }
 

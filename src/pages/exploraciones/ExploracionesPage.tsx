@@ -5,6 +5,7 @@ import {
   ChevronUp,
   Eye,
   FileDown,
+  FileUp,
   FileSpreadsheet,
   FlaskConical,
   Pencil,
@@ -29,12 +30,20 @@ import {
   useQueueRemoteEditOfflineMutation,
   useExploracionesRemotasQuery,
   useSaveMuestraOfflineMutation,
+  useSaveMuestrasOfflineBatchMutation,
   useSyncExploracionesMutation,
   useUpdateMuestraOfflineMutation,
   useUpdateMuestraRemotaMutation
 } from "@/features/exploraciones/hooks/useExploraciones";
 import type { OfflineExploracionMuestra } from "@/features/exploraciones/db/exploracionesDb";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import {
+  downloadTemplateXlsx,
+  normalizeIsoFromCell,
+  normalizeKey,
+  parsePrefixedNumeric,
+  readExcelRows
+} from "@/features/exploraciones/lib/excel.utils";
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-4 py-3 text-base text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
@@ -236,6 +245,62 @@ function parseChemicalValueWithPrefix(value: string) {
     valor: numeric,
     prefijo: prefix
   };
+}
+
+function getCellValue(row: Record<string, unknown>, key: string) {
+  const normalizedTarget = normalizeKey(key);
+  for (const [currentKey, currentValue] of Object.entries(row)) {
+    if (normalizeKey(currentKey) === normalizedTarget) {
+      return currentValue;
+    }
+  }
+  return undefined;
+}
+
+function toStringOrUndefined(value: unknown) {
+  if (value === null || value === undefined) return undefined;
+  const text = String(value).trim();
+  return text ? text : undefined;
+}
+
+function toNumberOrUndefined(value: unknown) {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "number") return Number.isNaN(value) ? undefined : value;
+  const parsed = Number(String(value).trim().replace(",", "."));
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function extractResultadosFromExcelRow(row: Record<string, unknown>) {
+  const results: Array<{ elemento: string; valor: number; prefijo?: string }> = [];
+
+  for (const [rawKey, rawValue] of Object.entries(row)) {
+    const key = normalizeKey(rawKey);
+    if (!key.startsWith("elemento_")) continue;
+    const elemento = rawKey.slice(rawKey.indexOf("_") + 1).trim() || rawKey;
+    const parsed = parsePrefixedNumeric(rawValue);
+    if (!parsed) continue;
+    results.push({
+      elemento,
+      valor: parsed.valor,
+      prefijo: parsed.prefijo
+    });
+  }
+
+  for (let index = 1; index <= 100; index += 1) {
+    const elemento = toStringOrUndefined(getCellValue(row, `resultado_${index}_elemento`));
+    if (!elemento) continue;
+    const rawValor = getCellValue(row, `resultado_${index}_valor`);
+    const rawPrefijo = toStringOrUndefined(getCellValue(row, `resultado_${index}_prefijo`));
+    const parsed = parsePrefixedNumeric(rawValor);
+    if (!parsed) continue;
+    results.push({
+      elemento,
+      valor: parsed.valor,
+      prefijo: rawPrefijo ?? parsed.prefijo
+    });
+  }
+
+  return results;
 }
 
 function isConnectivityIssue(error: unknown) {
@@ -511,6 +576,7 @@ export function ExploracionesPage() {
   const navigate = useNavigate();
   const { showError, showSuccess } = useToast();
   const saveMutation = useSaveMuestraOfflineMutation();
+  const saveBatchMutation = useSaveMuestrasOfflineBatchMutation();
   const updateOfflineMutation = useUpdateMuestraOfflineMutation();
   const queueRemoteEditOfflineMutation = useQueueRemoteEditOfflineMutation();
   const updateRemoteMutation = useUpdateMuestraRemotaMutation();
@@ -535,6 +601,97 @@ export function ExploracionesPage() {
   const [entregaFilter, setEntregaFilter] = useState<"todos" | "con-entrega" | "sin-entrega">(
     "todos"
   );
+
+  function downloadMuestrasTemplate() {
+    downloadTemplateXlsx(
+      "Muestras",
+      [
+        {
+          nombre: "N80 VETA S",
+          numero: 52,
+          tipoMuestra: "Canal",
+          sector: "SUR",
+          laboratorio1: "INGENIO LITORAL Chillcobija",
+          laboratorio2: "",
+          laboratorio3: "",
+          fechaEntrega: "",
+          descripcion: "Descripcion de la muestra",
+          nivel: "NIV - 80",
+          este: 763235.063,
+          norte: 7593360.633,
+          elevacion: 5072.42,
+          referenciaLugar: "VETA DE SULFUROS",
+          elemento_Ag: "<0.008",
+          elemento_Au: "0.01",
+          resultado_1_elemento: "",
+          resultado_1_valor: "",
+          resultado_1_prefijo: ""
+        }
+      ],
+      "plantilla-muestras-exploraciones.xlsx"
+    );
+  }
+
+  async function onImportMuestrasFile(file: File) {
+    try {
+      const rows = await readExcelRows(file);
+      if (rows.length === 0) {
+        showError("El archivo no tiene filas para procesar.");
+        return;
+      }
+
+      const payloads: ExploracionMuestraPayload[] = [];
+
+      for (const row of rows) {
+        const nombre = toStringOrUndefined(getCellValue(row, "nombre"));
+        const nivel = toStringOrUndefined(getCellValue(row, "nivel"));
+        if (!nombre || !nivel) continue;
+
+        const resultados = extractResultadosFromExcelRow(row);
+        const payload = exploracionMuestraPayloadSchema.parse({
+          nombre,
+          numero: toNumberOrUndefined(getCellValue(row, "numero")),
+          tipoMuestra: toStringOrUndefined(getCellValue(row, "tipoMuestra")),
+          sector: toStringOrUndefined(getCellValue(row, "sector")),
+          laboratorio1: toStringOrUndefined(getCellValue(row, "laboratorio1")),
+          laboratorio2: toStringOrUndefined(getCellValue(row, "laboratorio2")),
+          laboratorio3: toStringOrUndefined(getCellValue(row, "laboratorio3")),
+          fechaMuestreo: normalizeIsoFromCell(getCellValue(row, "fechaMuestreo")) ?? getNowLaPazIso(),
+          fechaEntrega: normalizeIsoFromCell(getCellValue(row, "fechaEntrega")),
+          descripcion: toStringOrUndefined(getCellValue(row, "descripcion")),
+          ubicacion: {
+            nivel,
+            este: toNumberOrUndefined(getCellValue(row, "este")),
+            norte: toNumberOrUndefined(getCellValue(row, "norte")),
+            elevacion: toNumberOrUndefined(getCellValue(row, "elevacion")),
+            referenciaLugar: toStringOrUndefined(getCellValue(row, "referenciaLugar"))
+          },
+          resultados: resultados.length ? resultados : undefined
+        });
+
+        payloads.push(payload);
+      }
+
+      if (payloads.length === 0) {
+        showError("No se encontraron filas válidas con nombre y nivel.");
+        return;
+      }
+
+      saveBatchMutation.mutate(payloads, {
+        onSuccess: () => {
+          showSuccess(`${payloads.length} muestras cargadas a la cola local.`);
+          attemptAutoSync();
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : "No se pudo cargar el archivo.";
+          showError(message);
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo procesar el Excel.";
+      showError(message);
+    }
+  }
 
   const pendingLocales = useMemo(
     () => (offlineQuery.data ?? []).filter((item) => !item.synced),
@@ -883,6 +1040,7 @@ export function ExploracionesPage() {
 
   const isSubmitting =
     saveMutation.isPending ||
+    saveBatchMutation.isPending ||
     updateOfflineMutation.isPending ||
     updateRemoteMutation.isPending ||
     queueRemoteEditOfflineMutation.isPending;
@@ -899,14 +1057,45 @@ export function ExploracionesPage() {
               muestra.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setFormCollapsed((c) => !c)}
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-          >
-            {formCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-            {formCollapsed ? "Mostrar formulario" : "Minimizar formulario"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadMuestrasTemplate}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              <FileSpreadsheet size={15} />
+              Plantilla Excel
+            </button>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--color-primary)]/55 px-4 py-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10">
+              <FileUp size={15} />
+              Cargar Excel
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onImportMuestrasFile(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => navigate("/exploraciones/elementos")}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              Elementos
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormCollapsed((c) => !c)}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              {formCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              {formCollapsed ? "Mostrar formulario" : "Minimizar formulario"}
+            </button>
+          </div>
         </div>
       </header>
 

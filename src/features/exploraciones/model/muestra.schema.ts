@@ -41,6 +41,11 @@ export const elementoCatalogSchema = z.object({
   unidad: z.string().nullable().optional()
 });
 
+export const exploracionElementoPayloadSchema = z.object({
+  nombre: z.string().trim().min(1),
+  unidad: z.string().trim().min(1).optional()
+});
+
 const muestraUbicacionResponseSchema = z.object({
   id: z.string().optional(),
   nivel: z.string(),
@@ -106,6 +111,12 @@ export const exploracionElementosResponseSchema = z.object({
   data: z.array(elementoCatalogSchema).default([])
 });
 
+export const exploracionElementoWriteResponseSchema = z.object({
+  success: z.boolean().optional(),
+  message: z.string().optional(),
+  data: elementoCatalogSchema.optional()
+});
+
 export const exploracionLaboratoriosResponseSchema = z.object({
   success: z.boolean().optional(),
   data: z.array(z.string()).default([])
@@ -122,3 +133,5 @@ export type ExploracionElementosResponse = z.infer<typeof exploracionElementosRe
 export type ExploracionLaboratoriosResponse = z.infer<
   typeof exploracionLaboratoriosResponseSchema
 >;
+export type ExploracionElementoPayload = z.infer<typeof exploracionElementoPayloadSchema>;
+export type ExploracionElementoWriteResponse = z.infer<typeof exploracionElementoWriteResponseSchema>;
