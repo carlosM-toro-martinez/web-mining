@@ -1,13 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import {
+  getElementosOffline,
   getMuestrasOffline,
   queueRemoteEditOffline,
   saveMuestraOffline,
+  saveMuestrasOfflineBatch,
+  saveElementosOfflineBatch,
   updateMuestraOffline
 } from "@/features/exploraciones/db/exploracionesDb";
 import { syncPendingExploraciones } from "@/features/exploraciones/services/exploracionesSync.service";
-import type { ExploracionMuestraPayload } from "@/features/exploraciones/model/muestra.schema";
+import { syncPendingExploracionesElementos } from "@/features/exploraciones/services/exploracionesElementosSync.service";
+import type {
+  ExploracionElementoPayload,
+  ExploracionMuestraPayload
+} from "@/features/exploraciones/model/muestra.schema";
 import {
   getExploracionesElementos,
   getExploracionesLaboratorios,
@@ -19,6 +26,13 @@ export function useExploracionesOfflineQuery() {
   return useQuery({
     queryKey: queryKeys.exploraciones.offline(),
     queryFn: getMuestrasOffline
+  });
+}
+
+export function useExploracionesElementosOfflineQuery() {
+  return useQuery({
+    queryKey: queryKeys.exploraciones.elementosOffline(),
+    queryFn: getElementosOffline
   });
 }
 
@@ -54,6 +68,16 @@ export function useSaveMuestraOfflineMutation() {
   });
 }
 
+export function useSaveMuestrasOfflineBatchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payloads: ExploracionMuestraPayload[]) => saveMuestrasOfflineBatch(payloads),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.offline() });
+    }
+  });
+}
+
 export function useUpdateMuestraOfflineMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -61,6 +85,16 @@ export function useUpdateMuestraOfflineMutation() {
       updateMuestraOffline(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.offline() });
+    }
+  });
+}
+
+export function useSaveElementosOfflineBatchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payloads: ExploracionElementoPayload[]) => saveElementosOfflineBatch(payloads),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.elementosOffline() });
     }
   });
 }
@@ -96,6 +130,17 @@ export function useSyncExploracionesMutation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.offline() });
       await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.remotas() });
+    }
+  });
+}
+
+export function useSyncExploracionesElementosMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: syncPendingExploracionesElementos,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.elementosOffline() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.exploraciones.elementos() });
     }
   });
 }

@@ -24,6 +24,7 @@ export const queryKeys = {
   exploraciones: {
     all: ["exploraciones"] as const,
     offline: () => [...queryKeys.exploraciones.all, "offline"] as const,
+    elementosOffline: () => [...queryKeys.exploraciones.all, "elementos-offline"] as const,
     remotas: () => [...queryKeys.exploraciones.all, "remotas"] as const,
     elementos: () => [...queryKeys.exploraciones.all, "elementos"] as const,
     laboratorios: () => [...queryKeys.exploraciones.all, "laboratorios"] as const
