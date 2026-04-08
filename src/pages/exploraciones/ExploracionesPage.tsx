@@ -48,6 +48,8 @@ import {
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-4 py-3 text-base text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
 
+const numberInputClassName = `${inputClassName} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
+
 const filterInputClassName =
   "rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
 
@@ -656,7 +658,8 @@ export function ExploracionesPage() {
           laboratorio1: toStringOrUndefined(getCellValue(row, "laboratorio1")),
           laboratorio2: toStringOrUndefined(getCellValue(row, "laboratorio2")),
           laboratorio3: toStringOrUndefined(getCellValue(row, "laboratorio3")),
-          fechaMuestreo: normalizeIsoFromCell(getCellValue(row, "fechaMuestreo")) ?? getNowLaPazIso(),
+          fechaMuestreo:
+            normalizeIsoFromCell(getCellValue(row, "fechaMuestreo")) ?? getNowLaPazIso(),
           fechaEntrega: normalizeIsoFromCell(getCellValue(row, "fechaEntrega")),
           descripcion: toStringOrUndefined(getCellValue(row, "descripcion")),
           ubicacion: {
@@ -707,34 +710,34 @@ export function ExploracionesPage() {
     const remotas: TableRow[] = (remotasQuery.data?.data ?? [])
       .filter((item) => !pendingRemoteIds.has(item.id))
       .map((item) => ({
-      key: `r-${item.id}`,
-      source: "remota",
-      id: item.id,
-      nombre: item.nombre,
-      numero: item.numero ?? undefined,
-      tipoMuestra: item.tipoMuestra ?? undefined,
-      sector: item.sector ?? undefined,
-      usuarioNombre: item.usuario?.nombre ?? undefined,
-      nivel: item.ubicacion.nivel,
-      laboratorio1: item.laboratorio1 ?? undefined,
-      laboratorio2: item.laboratorio2 ?? undefined,
-      laboratorio3: item.laboratorio3 ?? undefined,
-      fechaMuestreo: item.fechaMuestreo ?? undefined,
-      fechaEntrega: item.fechaEntrega ?? undefined,
-      descripcion: item.descripcion ?? undefined,
-      este: item.ubicacion.este ?? undefined,
-      norte: item.ubicacion.norte ?? undefined,
-      elevacion: item.ubicacion.elevacion ?? undefined,
-      referenciaLugar: item.ubicacion.referenciaLugar ?? undefined,
-      resultadosTexto: (item.resultados ?? [])
-        .map(
-          (r) =>
-            `${r.elemento.nombre}: ${r.prefijo ?? ""}${r.valor}${r.elemento.unidad ? ` ${r.elemento.unidad}` : ""}`
-        )
-        .join(" | "),
-      status: "Sincronizado",
-      canEdit: !item.fechaEntrega
-    }));
+        key: `r-${item.id}`,
+        source: "remota",
+        id: item.id,
+        nombre: item.nombre,
+        numero: item.numero ?? undefined,
+        tipoMuestra: item.tipoMuestra ?? undefined,
+        sector: item.sector ?? undefined,
+        usuarioNombre: item.usuario?.nombre ?? undefined,
+        nivel: item.ubicacion.nivel,
+        laboratorio1: item.laboratorio1 ?? undefined,
+        laboratorio2: item.laboratorio2 ?? undefined,
+        laboratorio3: item.laboratorio3 ?? undefined,
+        fechaMuestreo: item.fechaMuestreo ?? undefined,
+        fechaEntrega: item.fechaEntrega ?? undefined,
+        descripcion: item.descripcion ?? undefined,
+        este: item.ubicacion.este ?? undefined,
+        norte: item.ubicacion.norte ?? undefined,
+        elevacion: item.ubicacion.elevacion ?? undefined,
+        referenciaLugar: item.ubicacion.referenciaLugar ?? undefined,
+        resultadosTexto: (item.resultados ?? [])
+          .map(
+            (r) =>
+              `${r.elemento.nombre}: ${r.prefijo ?? ""}${r.valor}${r.elemento.unidad ? ` ${r.elemento.unidad}` : ""}`
+          )
+          .join(" | "),
+        status: "Sincronizado",
+        canEdit: !item.fechaEntrega
+      }));
 
     const locales: TableRow[] = pendingLocales.map((item) => ({
       key: `l-${item.id}`,
@@ -842,9 +845,10 @@ export function ExploracionesPage() {
   }, [pendingLocales.length, showError, syncMutation]);
 
   useEffect(() => {
-    void remotasQuery.refetch();
+    // Initial remote fetch happens through React Query automatically.
+    // Only attempt syncing local pending queue here.
     attemptAutoSync();
-  }, [attemptAutoSync, remotasQuery]);
+  }, [attemptAutoSync]);
 
   useEffect(() => {
     function handleOnline() {
@@ -853,7 +857,7 @@ export function ExploracionesPage() {
     }
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
-  }, [attemptAutoSync, remotasQuery]);
+  }, [attemptAutoSync]);
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -1138,6 +1142,7 @@ export function ExploracionesPage() {
                   list="exploraciones-niveles"
                   value={form.nivel}
                   onChange={(e) => updateForm("nivel", e.target.value)}
+                  placeholder="Ej: NIV-8"
                   className={inputClassName}
                 />
               </div>
@@ -1149,6 +1154,7 @@ export function ExploracionesPage() {
                   required
                   value={form.nombre}
                   onChange={(e) => updateForm("nombre", e.target.value)}
+                  placeholder=""
                   className={inputClassName}
                 />
               </div>
@@ -1159,10 +1165,12 @@ export function ExploracionesPage() {
                 <input
                   type="number"
                   step={1}
+                  min={0}
                   inputMode="numeric"
                   value={form.numero}
                   onChange={(e) => updateForm("numero", e.target.value)}
-                  className={inputClassName}
+                  placeholder="Ej: 52"
+                  className={numberInputClassName}
                 />
               </div>
               <div>
@@ -1173,6 +1181,7 @@ export function ExploracionesPage() {
                   list="exploraciones-tipos"
                   value={form.tipoMuestra}
                   onChange={(e) => updateForm("tipoMuestra", e.target.value)}
+                  placeholder="Ej: SIMPLE"
                   className={inputClassName}
                 />
               </div>
@@ -1184,6 +1193,7 @@ export function ExploracionesPage() {
                   list="exploraciones-sectores"
                   value={form.sector}
                   onChange={(e) => updateForm("sector", e.target.value)}
+                  placeholder=""
                   className={inputClassName}
                 />
               </div>
@@ -1195,6 +1205,7 @@ export function ExploracionesPage() {
                   list="exploraciones-laboratorios"
                   value={form.laboratorio1}
                   onChange={(e) => updateForm("laboratorio1", e.target.value)}
+                  placeholder="Ej: INGENIO LITORAL Chillcobija"
                   className={inputClassName}
                 />
               </div>
@@ -1206,6 +1217,7 @@ export function ExploracionesPage() {
                   list="exploraciones-laboratorios"
                   value={form.laboratorio2}
                   onChange={(e) => updateForm("laboratorio2", e.target.value)}
+                  placeholder=""
                   className={inputClassName}
                 />
               </div>
@@ -1217,6 +1229,7 @@ export function ExploracionesPage() {
                   list="exploraciones-laboratorios"
                   value={form.laboratorio3}
                   onChange={(e) => updateForm("laboratorio3", e.target.value)}
+                  placeholder=""
                   className={inputClassName}
                 />
               </div>
@@ -1238,6 +1251,7 @@ export function ExploracionesPage() {
                   type="datetime-local"
                   value={form.fechaEntrega}
                   onChange={(e) => updateForm("fechaEntrega", e.target.value)}
+                  placeholder="Selecciona fecha y hora"
                   className={inputClassName}
                 />
               </div>
@@ -1248,6 +1262,7 @@ export function ExploracionesPage() {
                 <input
                   value={form.referenciaLugar}
                   onChange={(e) => updateForm("referenciaLugar", e.target.value)}
+                  placeholder=""
                   className={inputClassName}
                 />
               </div>
@@ -1258,9 +1273,11 @@ export function ExploracionesPage() {
                 <input
                   type="number"
                   inputMode="decimal"
+                  min={0}
                   value={form.este}
                   onChange={(e) => updateForm("este", e.target.value)}
-                  className={inputClassName}
+                  placeholder="Ej: 763235.063"
+                  className={numberInputClassName}
                 />
               </div>
               <div>
@@ -1270,9 +1287,11 @@ export function ExploracionesPage() {
                 <input
                   type="number"
                   inputMode="decimal"
+                  min={0}
                   value={form.norte}
                   onChange={(e) => updateForm("norte", e.target.value)}
-                  className={inputClassName}
+                  placeholder="Ej: 7593360.633"
+                  className={numberInputClassName}
                 />
               </div>
               <div>
@@ -1282,9 +1301,11 @@ export function ExploracionesPage() {
                 <input
                   type="number"
                   inputMode="decimal"
+                  min={0}
                   value={form.elevacion}
                   onChange={(e) => updateForm("elevacion", e.target.value)}
-                  className={inputClassName}
+                  placeholder="Ej: 5072.42"
+                  className={numberInputClassName}
                 />
               </div>
               <div className="md:col-span-2 xl:col-span-3">
@@ -1295,6 +1316,7 @@ export function ExploracionesPage() {
                   rows={3}
                   value={form.descripcion}
                   onChange={(e) => updateForm("descripcion", e.target.value)}
+                  placeholder="Describe litología, alteración, mineralización y observaciones relevantes."
                   className={`${inputClassName} min-h-[90px] resize-y`}
                 />
               </div>
@@ -1329,6 +1351,7 @@ export function ExploracionesPage() {
                       list="exploraciones-elementos"
                       value={row.elemento}
                       onChange={(e) => updateResultado(row.id, "elemento", e.target.value)}
+                      placeholder="Ej: Ag DM (L1)"
                       className={inputClassName}
                     />
                   </div>
