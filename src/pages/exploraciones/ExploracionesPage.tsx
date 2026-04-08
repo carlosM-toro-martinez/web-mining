@@ -222,9 +222,7 @@ function formatDateTime(value?: string | null) {
 }
 
 function toOptionalNumber(value: string) {
-  if (!value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  return toNumberOrUndefined(value);
 }
 
 function parseChemicalValueWithPrefix(value: string) {
@@ -250,9 +248,12 @@ function parseChemicalValueWithPrefix(value: string) {
 }
 
 function getCellValue(row: Record<string, unknown>, key: string) {
-  const normalizedTarget = normalizeKey(key);
+  const normalizeLooseKey = (text: string) =>
+    normalizeKey(text).replace(/[^a-z0-9]/g, "");
+
+  const normalizedTarget = normalizeLooseKey(key);
   for (const [currentKey, currentValue] of Object.entries(row)) {
-    if (normalizeKey(currentKey) === normalizedTarget) {
+    if (normalizeLooseKey(currentKey) === normalizedTarget) {
       return currentValue;
     }
   }
@@ -268,7 +269,23 @@ function toStringOrUndefined(value: unknown) {
 function toNumberOrUndefined(value: unknown) {
   if (value === null || value === undefined || value === "") return undefined;
   if (typeof value === "number") return Number.isNaN(value) ? undefined : value;
-  const parsed = Number(String(value).trim().replace(",", "."));
+
+  const raw = String(value).trim();
+  if (!raw) return undefined;
+
+  const compact = raw.replace(/\s+/g, "");
+  const lastComma = compact.lastIndexOf(",");
+  const lastDot = compact.lastIndexOf(".");
+  const decimalSeparatorIndex = Math.max(lastComma, lastDot);
+
+  const normalized =
+    decimalSeparatorIndex >= 0
+      ? `${compact.slice(0, decimalSeparatorIndex).replace(/[.,]/g, "")}.${compact
+          .slice(decimalSeparatorIndex + 1)
+          .replace(/[.,]/g, "")}`
+      : compact.replace(/[.,]/g, "");
+
+  const parsed = Number(normalized);
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
@@ -1272,6 +1289,7 @@ export function ExploracionesPage() {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   min={0}
                   value={form.este}
@@ -1286,6 +1304,7 @@ export function ExploracionesPage() {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   min={0}
                   value={form.norte}
@@ -1300,6 +1319,7 @@ export function ExploracionesPage() {
                 </label>
                 <input
                   type="number"
+                  step="any"
                   inputMode="decimal"
                   min={0}
                   value={form.elevacion}

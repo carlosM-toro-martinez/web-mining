@@ -1,5 +1,32 @@
 import { z } from "zod";
 
+function toOptionalNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return value;
+  if (typeof value === "number") return value;
+
+  const compact = String(value).trim().replace(/\s+/g, "");
+  if (!compact) return undefined;
+
+  const lastComma = compact.lastIndexOf(",");
+  const lastDot = compact.lastIndexOf(".");
+  const decimalSeparatorIndex = Math.max(lastComma, lastDot);
+
+  const normalized =
+    decimalSeparatorIndex >= 0
+      ? `${compact.slice(0, decimalSeparatorIndex).replace(/[.,]/g, "")}.${compact
+          .slice(decimalSeparatorIndex + 1)
+          .replace(/[.,]/g, "")}`
+      : compact.replace(/[.,]/g, "");
+
+  const parsed = Number(normalized);
+  return Number.isNaN(parsed) ? value : parsed;
+}
+
+const optionalNullableNumericSchema = z.preprocess(
+  toOptionalNumber,
+  z.number().nullable().optional()
+);
+
 export const muestraResultadoSchema = z.object({
   elemento: z.string().trim().min(1, "El elemento es obligatorio."),
   valor: z.number({ message: "El valor del resultado debe ser numerico." }),
@@ -46,15 +73,30 @@ export const exploracionElementoPayloadSchema = z.object({
   unidad: z.string().trim().min(1).optional()
 });
 
-const muestraUbicacionResponseSchema = z.object({
-  id: z.string().optional(),
-  nivel: z.string(),
-  este: z.number().nullable().optional(),
-  norte: z.number().nullable().optional(),
-  elevacion: z.number().nullable().optional(),
-  referenciaLugar: z.string().nullable().optional(),
-  createdAt: z.string().optional()
-});
+const muestraUbicacionResponseSchema = z.preprocess(
+  (input) => {
+    if (!input || typeof input !== "object") return input;
+    const source = input as Record<string, unknown>;
+    return {
+      ...source,
+      nivel: source.nivel ?? source.NIVEL ?? source.Nivel,
+      este: source.este ?? source.ESTE ?? source.Este,
+      norte: source.norte ?? source.NORTE ?? source.Norte,
+      elevacion: source.elevacion ?? source.ELEVACION ?? source.Elevacion,
+      referenciaLugar:
+        source.referenciaLugar ?? source.REFERENCIALUGAR ?? source.referencia_lugar
+    };
+  },
+  z.object({
+    id: z.string().optional(),
+    nivel: z.string(),
+    este: optionalNullableNumericSchema,
+    norte: optionalNullableNumericSchema,
+    elevacion: optionalNullableNumericSchema,
+    referenciaLugar: z.string().nullable().optional(),
+    createdAt: z.string().optional()
+  })
+);
 
 const muestraResultadoResponseSchema = z.object({
   id: z.string().optional(),

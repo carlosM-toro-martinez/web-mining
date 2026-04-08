@@ -15,18 +15,34 @@ import {
 
 export async function createExploracionMuestra(payload: ExploracionMuestraPayload) {
   const body = exploracionMuestraPayloadSchema.parse(payload);
+  const bodyWithAliases = {
+    ...body,
+    ubicacion: {
+      ...body.ubicacion,
+      Norte: body.ubicacion.norte,
+      ELEVACION: body.ubicacion.elevacion
+    }
+  };
   return postRequest({
     url: apiEndpoints.exploraciones.muestras,
-    body,
+    body: bodyWithAliases,
     schema: exploracionMuestraWriteResponseSchema
   });
 }
 
 export async function updateExploracionMuestra(id: string, payload: ExploracionMuestraPayload) {
   const body = exploracionMuestraPayloadSchema.parse(payload);
+  const bodyWithAliases = {
+    ...body,
+    ubicacion: {
+      ...body.ubicacion,
+      Norte: body.ubicacion.norte,
+      ELEVACION: body.ubicacion.elevacion
+    }
+  };
   return putRequest({
     url: apiEndpoints.exploraciones.muestraById(id),
-    body,
+    body: bodyWithAliases,
     schema: exploracionMuestraWriteResponseSchema
   });
 }
