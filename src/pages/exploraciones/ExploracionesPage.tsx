@@ -247,15 +247,24 @@ function parseChemicalValueWithPrefix(value: string) {
   };
 }
 
-function getCellValue(row: Record<string, unknown>, key: string) {
-  const normalizeLooseKey = (text: string) =>
-    normalizeKey(text).replace(/[^a-z0-9]/g, "");
+function normalizeLooseKey(text: string) {
+  return normalizeKey(text).replace(/[^a-z0-9]/g, "");
+}
 
+function getCellValue(row: Record<string, unknown>, key: string) {
   const normalizedTarget = normalizeLooseKey(key);
   for (const [currentKey, currentValue] of Object.entries(row)) {
     if (normalizeLooseKey(currentKey) === normalizedTarget) {
       return currentValue;
     }
+  }
+  return undefined;
+}
+
+function getCellValueByAliases(row: Record<string, unknown>, aliases: string[]) {
+  for (const alias of aliases) {
+    const value = getCellValue(row, alias);
+    if (value !== undefined) return value;
   }
   return undefined;
 }
@@ -289,8 +298,195 @@ function toNumberOrUndefined(value: unknown) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function extractResultadosFromExcelRow(row: Record<string, unknown>) {
+const excelMetadataKeys = new Set(
+  [
+    "nivel",
+    "fechaMuestreo",
+    "fecha muestreo",
+    "fechaEntrega",
+    "fecha entrega",
+    "nombre",
+    "tipoMuestra",
+    "tipo de muestra",
+    "tipo muestra",
+    "codigo",
+    "código",
+    "numero",
+    "nro",
+    "referenciaLugar",
+    "referencia del lugar",
+    "referencia de lugar",
+    "sector",
+    "este",
+    "norte",
+    "elevacion",
+    "elevación",
+    "descripcion",
+    "descripción",
+    "laboratorio1",
+    "laboratorio 1",
+    "laboratorio2",
+    "laboratorio 2",
+    "laboratorio3",
+    "laboratorio 3"
+  ].map(normalizeLooseKey)
+);
+
+function inferElementoFromHeader(header: string) {
+  const cleaned = header.trim().replace(/\s+/g, " ");
+  const symbolMatch = cleaned.match(/^([A-Za-z]{1,3})\b/);
+  if (symbolMatch) {
+    const raw = symbolMatch[1];
+    return raw.length === 1
+      ? raw.toUpperCase()
+      : `${raw[0].toUpperCase()}${raw.slice(1).toLowerCase()}`;
+  }
+
+  const fallback = cleaned
+    .replace(/\(\s*l\s*\d+\s*\)/gi, "")
+    .replace(/\bL\s*\d+\b/gi, "")
+    .replace(/[%]/g, "")
+    .trim();
+  return fallback || cleaned;
+}
+
+function normalizeElementoMatch(value: string, removeUnits: boolean) {
+  const tokens =
+    value
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/%/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(" ")
+      .map((token) => token.trim())
+      .filter(Boolean) ?? [];
+
+  const filtered = removeUnits
+    ? tokens.filter((token) => !["dm", "g", "gr", "tn", "ppm", "ppb", "pct"].includes(token))
+    : tokens;
+
+  return filtered.join("");
+}
+
+function extractLabToken(value: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const match = normalized.match(/(?:^|[^a-z0-9])l\s*([1-9])(?:[^a-z0-9]|$)|\(\s*l\s*([1-9])\s*\)/i);
+  return match?.[1] ?? match?.[2] ?? undefined;
+}
+
+function extractSymbolToken(value: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const symbol = normalized.match(/[a-z]{1,3}/);
+  return symbol?.[0];
+}
+
+interface CatalogElementCandidate {
+  nombre: string;
+  exact: string;
+  relaxed: string;
+  symbol?: string;
+  lab?: string;
+}
+
+function buildCatalogElementCandidates(elementNames: string[]): CatalogElementCandidate[] {
+  return elementNames
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({
+      nombre: name,
+      exact: normalizeElementoMatch(name, false),
+      relaxed: normalizeElementoMatch(name, true),
+      symbol: extractSymbolToken(name),
+      lab: extractLabToken(name)
+    }));
+}
+
+function pickBestCandidate(
+  candidates: CatalogElementCandidate[],
+  headerSymbol?: string,
+  headerLab?: string
+) {
+  if (candidates.length === 0) return undefined;
+
+  const withLabPriority =
+    headerLab !== undefined
+      ? candidates.find((candidate) => candidate.lab === headerLab) ??
+        candidates.find((candidate) => candidate.lab === undefined) ??
+        candidates[0]
+      : candidates[0];
+
+  if (withLabPriority) return withLabPriority;
+
+  if (!headerSymbol) return candidates[0];
+  return candidates.find((candidate) => candidate.symbol === headerSymbol) ?? candidates[0];
+}
+
+function resolveCatalogElementName(
+  rawLabel: string,
+  catalog: CatalogElementCandidate[]
+): string | undefined {
+  const exact = normalizeElementoMatch(rawLabel, false);
+  const relaxed = normalizeElementoMatch(rawLabel, true);
+  const symbol = extractSymbolToken(rawLabel);
+  const lab = extractLabToken(rawLabel);
+
+  const exactMatches = catalog.filter((candidate) => candidate.exact === exact);
+  const exactBest = pickBestCandidate(exactMatches, symbol, lab);
+  if (exactBest) return exactBest.nombre;
+
+  const relaxedMatches = catalog.filter((candidate) => candidate.relaxed === relaxed);
+  const relaxedBest = pickBestCandidate(relaxedMatches, symbol, lab);
+  if (relaxedBest) return relaxedBest.nombre;
+
+  const symbolLabMatches = catalog.filter((candidate) => {
+    if (!symbol || candidate.symbol !== symbol) return false;
+    if (!lab) return true;
+    return candidate.lab === lab;
+  });
+  const symbolLabBest = pickBestCandidate(symbolLabMatches, symbol, lab);
+  if (symbolLabBest) return symbolLabBest.nombre;
+
+  if (!symbol) return undefined;
+  const symbolOnlyMatches = catalog.filter((candidate) => candidate.symbol === symbol);
+  if (symbolOnlyMatches.length === 1) return symbolOnlyMatches[0]?.nombre;
+
+  return undefined;
+}
+
+function extractResultadosFromExcelRow(
+  row: Record<string, unknown>,
+  availableElementNames: string[]
+) {
   const results: Array<{ elemento: string; valor: number; prefijo?: string }> = [];
+  const unmatchedHeaders = new Set<string>();
+  const catalog = buildCatalogElementCandidates(availableElementNames);
+
+  const pushResolvedResult = (
+    rawLabel: string,
+    parsed: { valor: number; prefijo?: string },
+    explicitPrefijo?: string
+  ) => {
+    const resolvedName = resolveCatalogElementName(rawLabel, catalog);
+    if (!resolvedName) {
+      unmatchedHeaders.add(rawLabel);
+      return;
+    }
+    results.push({
+      elemento: resolvedName,
+      valor: parsed.valor,
+      prefijo: explicitPrefijo ?? parsed.prefijo
+    });
+  };
 
   for (const [rawKey, rawValue] of Object.entries(row)) {
     const key = normalizeKey(rawKey);
@@ -298,11 +494,7 @@ function extractResultadosFromExcelRow(row: Record<string, unknown>) {
     const elemento = rawKey.slice(rawKey.indexOf("_") + 1).trim() || rawKey;
     const parsed = parsePrefixedNumeric(rawValue);
     if (!parsed) continue;
-    results.push({
-      elemento,
-      valor: parsed.valor,
-      prefijo: parsed.prefijo
-    });
+    pushResolvedResult(elemento, parsed);
   }
 
   for (let index = 1; index <= 100; index += 1) {
@@ -312,14 +504,29 @@ function extractResultadosFromExcelRow(row: Record<string, unknown>) {
     const rawPrefijo = toStringOrUndefined(getCellValue(row, `resultado_${index}_prefijo`));
     const parsed = parsePrefixedNumeric(rawValor);
     if (!parsed) continue;
-    results.push({
-      elemento,
-      valor: parsed.valor,
-      prefijo: rawPrefijo ?? parsed.prefijo
-    });
+    pushResolvedResult(elemento, parsed, rawPrefijo);
   }
 
-  return results;
+  for (const [rawKey, rawValue] of Object.entries(row)) {
+    const looseKey = normalizeLooseKey(rawKey);
+    if (!looseKey || looseKey.startsWith("empty")) continue;
+    if (excelMetadataKeys.has(looseKey)) continue;
+    if (looseKey.startsWith("resultado")) continue;
+    if (looseKey.startsWith("elemento")) continue;
+
+    const parsed = parsePrefixedNumeric(rawValue);
+    if (!parsed) continue;
+
+    pushResolvedResult(rawKey, parsed);
+  }
+
+  const uniqueResults = Array.from(
+    new Map(
+      results.map((item) => [`${normalizeLooseKey(item.elemento)}|${item.valor}|${item.prefijo ?? ""}`, item])
+    ).values()
+  );
+
+  return { results: uniqueResults, unmatchedHeaders };
 }
 
 function isConnectivityIssue(error: unknown) {
@@ -659,32 +866,73 @@ export function ExploracionesPage() {
         return;
       }
 
+      const catalogElementNames = elementos
+        .map((item) => item.nombre?.trim())
+        .filter((name): name is string => Boolean(name));
+
+      if (catalogElementNames.length === 0) {
+        showError(
+          "No hay catálogo de elementos disponible. Sincroniza/crea elementos primero para importar resultados."
+        );
+        return;
+      }
+
       const payloads: ExploracionMuestraPayload[] = [];
+      const unmatchedResultHeaders = new Set<string>();
 
       for (const row of rows) {
-        const nombre = toStringOrUndefined(getCellValue(row, "nombre"));
-        const nivel = toStringOrUndefined(getCellValue(row, "nivel"));
+        const nombre = toStringOrUndefined(
+          getCellValueByAliases(row, ["nombre", "muestra", "sample", "idMuestra"])
+        );
+        const nivel = toStringOrUndefined(getCellValueByAliases(row, ["nivel"]));
         if (!nombre || !nivel) continue;
 
-        const resultados = extractResultadosFromExcelRow(row);
+        const { results: resultados, unmatchedHeaders } = extractResultadosFromExcelRow(
+          row,
+          catalogElementNames
+        );
+        for (const header of unmatchedHeaders) unmatchedResultHeaders.add(header);
         const payload = exploracionMuestraPayloadSchema.parse({
           nombre,
-          numero: toNumberOrUndefined(getCellValue(row, "numero")),
-          tipoMuestra: toStringOrUndefined(getCellValue(row, "tipoMuestra")),
-          sector: toStringOrUndefined(getCellValue(row, "sector")),
-          laboratorio1: toStringOrUndefined(getCellValue(row, "laboratorio1")),
-          laboratorio2: toStringOrUndefined(getCellValue(row, "laboratorio2")),
-          laboratorio3: toStringOrUndefined(getCellValue(row, "laboratorio3")),
+          numero: toNumberOrUndefined(
+            getCellValueByAliases(row, ["numero", "nro", "codigo", "código", "cod"])
+          ),
+          tipoMuestra: toStringOrUndefined(
+            getCellValueByAliases(row, ["tipoMuestra", "tipo de muestra", "tipo muestra"])
+          ),
+          sector: toStringOrUndefined(getCellValueByAliases(row, ["sector"])),
+          laboratorio1: toStringOrUndefined(
+            getCellValueByAliases(row, ["laboratorio1", "laboratorio 1"])
+          ),
+          laboratorio2: toStringOrUndefined(
+            getCellValueByAliases(row, ["laboratorio2", "laboratorio 2"])
+          ),
+          laboratorio3: toStringOrUndefined(
+            getCellValueByAliases(row, ["laboratorio3", "laboratorio 3"])
+          ),
           fechaMuestreo:
-            normalizeIsoFromCell(getCellValue(row, "fechaMuestreo")) ?? getNowLaPazIso(),
-          fechaEntrega: normalizeIsoFromCell(getCellValue(row, "fechaEntrega")),
-          descripcion: toStringOrUndefined(getCellValue(row, "descripcion")),
+            normalizeIsoFromCell(
+              getCellValueByAliases(row, ["fechaMuestreo", "fecha muestreo"])
+            ) ?? getNowLaPazIso(),
+          fechaEntrega: normalizeIsoFromCell(
+            getCellValueByAliases(row, ["fechaEntrega", "fecha entrega"])
+          ),
+          descripcion: toStringOrUndefined(
+            getCellValueByAliases(row, ["descripcion", "descripción"])
+          ),
           ubicacion: {
             nivel,
-            este: toNumberOrUndefined(getCellValue(row, "este")),
-            norte: toNumberOrUndefined(getCellValue(row, "norte")),
-            elevacion: toNumberOrUndefined(getCellValue(row, "elevacion")),
-            referenciaLugar: toStringOrUndefined(getCellValue(row, "referenciaLugar"))
+            este: toNumberOrUndefined(getCellValueByAliases(row, ["este"])),
+            norte: toNumberOrUndefined(getCellValueByAliases(row, ["norte"])),
+            elevacion: toNumberOrUndefined(getCellValueByAliases(row, ["elevacion", "elevación"])),
+            referenciaLugar: toStringOrUndefined(
+              getCellValueByAliases(row, [
+                "referenciaLugar",
+                "referencia del lugar",
+                "referencia de lugar",
+                "referencia"
+              ])
+            )
           },
           resultados: resultados.length ? resultados : undefined
         });
@@ -699,7 +947,14 @@ export function ExploracionesPage() {
 
       saveBatchMutation.mutate(payloads, {
         onSuccess: () => {
-          showSuccess(`${payloads.length} muestras cargadas a la cola local.`);
+          const unmatchedCount = unmatchedResultHeaders.size;
+          if (unmatchedCount > 0) {
+            showError(
+              `Se cargaron ${payloads.length} muestras, pero ${unmatchedCount} columnas de resultados no coincidieron con elementos existentes.`
+            );
+          } else {
+            showSuccess(`${payloads.length} muestras cargadas a la cola local.`);
+          }
           attemptAutoSync();
         },
         onError: (error) => {
