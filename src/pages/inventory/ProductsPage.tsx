@@ -112,8 +112,10 @@ export function ProductsPage() {
   const [centroCostoIdForm, setCentroCostoIdForm] = useState("");
   const [funcionGastoIdForm, setFuncionGastoIdForm] = useState("");
   const [cuentaAutocomplete, setCuentaAutocomplete] = useState("");
+  const [cuentaIdForm, setCuentaIdForm] = useState("");
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [rowCuentaSelection, setRowCuentaSelection] = useState<Record<number, string>>({});
 
   const availableSubgrupos = grupoId ? (subgruposPorGrupo.get(Number(grupoId)) ?? []) : [];
   const filterSubgrupos = grupoDraft ? (subgruposPorGrupo.get(Number(grupoDraft)) ?? []) : [];
@@ -140,6 +142,7 @@ export function ProductsPage() {
     setCentroCostoIdForm("");
     setFuncionGastoIdForm("");
     setCuentaAutocomplete("");
+    setCuentaIdForm("");
     setEditingProductId(null);
   }
 
@@ -194,8 +197,11 @@ export function ProductsPage() {
     setGrupoId(selectedGrupoId ? String(selectedGrupoId) : "");
     setSubgrupoId(String(product.categoria.id));
     setCentroCostoIdForm(product.cuenta?.centroCosto ? String(product.cuenta.centroCosto.id) : "");
-    setFuncionGastoIdForm(product.cuenta?.funcionGasto ? String(product.cuenta.funcionGasto.id) : "");
+    setFuncionGastoIdForm(
+      product.cuenta?.funcionGasto ? String(product.cuenta.funcionGasto.id) : ""
+    );
     setCuentaAutocomplete(product.cuenta?.codigoCompleto ?? "");
+    setCuentaIdForm(product.cuentaId ? String(product.cuentaId) : "");
   }
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
@@ -248,6 +254,7 @@ export function ProductsPage() {
       showError("Debes seleccionar grupo, subgrupo, centro de costo y funcion de gasto.");
       return;
     }
+    const parsedCuentaId = cuentaIdForm ? Number(cuentaIdForm) : undefined;
 
     if (editingProductId) {
       updateProductoMutation.mutate(
@@ -261,6 +268,7 @@ export function ProductsPage() {
             subgrupoId: parsedSubgrupoId,
             centroCostoId: parsedCentroCostoId,
             funcionGastoId: parsedFuncionGastoId,
+            cuentaId: parsedCuentaId ?? null,
             esEpp
           }
         },
@@ -286,6 +294,7 @@ export function ProductsPage() {
         subgrupoId: parsedSubgrupoId,
         centroCostoId: parsedCentroCostoId,
         funcionGastoId: parsedFuncionGastoId,
+        cuentaId: parsedCuentaId ?? null,
         esEpp
       },
       {
@@ -392,7 +401,14 @@ export function ProductsPage() {
         const esEpp = ["1", "si", "sí", "true", "x"].includes(eppRaw);
         const rowLabel = `Fila ${index + 2}`;
 
-        if (!codigo || !nombre || !codigoGrupo || !codigoSubgrupo || !codigoCentro || !codigoFuncion) {
+        if (
+          !codigo ||
+          !nombre ||
+          !codigoGrupo ||
+          !codigoSubgrupo ||
+          !codigoCentro ||
+          !codigoFuncion
+        ) {
           failed += 1;
           errors.push(`${rowLabel}: faltan campos obligatorios.`);
           continue;
@@ -445,7 +461,9 @@ export function ProductsPage() {
         }
       }
 
-      showSuccess(`Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`);
+      showSuccess(
+        `Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`
+      );
       if (errors.length) {
         showError(errors.slice(0, 3).join(" | "));
       }
@@ -455,6 +473,22 @@ export function ProductsPage() {
       setIsImporting(false);
     }
   }
+  function handleAssignCuenta(productId: number) {
+    const selected = rowCuentaSelection[productId];
+    const parsedCuentaId = selected ? Number(selected) : null;
+    updateProductoMutation.mutate(
+      {
+        id: productId,
+        payload: { cuentaId: parsedCuentaId }
+      },
+      {
+        onSuccess: () => showSuccess("Cuenta contable asignada correctamente."),
+        onError: (error) =>
+          showError(normalizeError(error, "No se pudo asignar la cuenta al producto."))
+      }
+    );
+  }
+  console.log(products);
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -931,12 +965,8 @@ export function ProductsPage() {
                     <td className="px-4 py-3 text-right text-xs font-semibold">
                       {product.stock.cantidad}
                     </td>
-                    <td className="px-4 py-3 text-right text-xs">
-                      {product.stock.precioUnit}
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs">
-                      {product.stock.precioProm}
-                    </td>
+                    <td className="px-4 py-3 text-right text-xs">{product.stock.precioUnit}</td>
+                    <td className="px-4 py-3 text-right text-xs">{product.stock.precioProm}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button

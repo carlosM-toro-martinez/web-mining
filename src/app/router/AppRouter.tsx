@@ -35,9 +35,9 @@ export function AppRouter() {
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path={"/forgot-password\""} element={<ForgotPasswordPage />} />
+        <Route path={'/forgot-password"'} element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path={"/reset-password\""} element={<ResetPasswordPage />} />
+        <Route path={'/reset-password"'} element={<ResetPasswordPage />} />
       </Route>
 
       <Route element={<ProtectedRoute />}>
@@ -64,7 +64,6 @@ export function AppRouter() {
               element={<Navigate to="/inventario/reportes/bin-card" replace />}
             />
             <Route path="/inventario/reportes/:tipo" element={<ReportesPage />} />
-            <Route path="/inventario/contabilidad" element={<AccountingPage />} />
             <Route path="/inventario/proveedores" element={<ProveedoresPage />} />
             <Route element={<WarehouseOpsRoute />}>
               <Route path="/inventario/entregas" element={<EntregasPage />} />
@@ -73,6 +72,7 @@ export function AppRouter() {
                 element={<Navigate to="/inventario/entregas" replace />}
               />
             </Route>
+            <Route path="/inventario/contabilidad" element={<AccountingPage />} />
           </Route>
           <Route path="/entregas" element={<Navigate to="/inventario/entregas" replace />} />
           <Route path="/epp" element={<NotFoundPage />} />

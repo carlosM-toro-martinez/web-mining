@@ -43,6 +43,7 @@ const productoCuentaSchema = z.object({
     })
     .optional()
     .nullable()
+    .optional()
 });
 
 export const productoSchema = z.object({
@@ -87,6 +88,7 @@ export const createProductoPayloadSchema = z.object({
   subgrupoId: z.number().int().positive("Debes elegir un subgrupo."),
   centroCostoId: z.number().int().positive("Debes elegir un centro de costo."),
   funcionGastoId: z.number().int().positive("Debes elegir una funcion de gasto."),
+  cuentaId: z.number().int().positive().nullable().optional(),
   esEpp: z.boolean().optional().default(false)
 });
 

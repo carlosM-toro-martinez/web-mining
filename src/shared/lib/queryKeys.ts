@@ -89,6 +89,7 @@ export const queryKeys = {
   employees: {
     all: ["employees"] as const,
     list: () => [...queryKeys.employees.all, "list"] as const,
-    syncQueue: () => [...queryKeys.employees.all, "sync-queue"] as const
+    syncQueue: () => [...queryKeys.employees.all, "sync-queue"] as const,
+    cuentas: () => [...queryKeys.contabilidad.all, "cuentas"] as const
   }
 };

@@ -172,7 +172,7 @@ export const createCuentaPayloadSchema = z.object({
 export const createSalidaPayloadSchema = z.object({
   productoId: z.number().int().positive("Debes elegir un producto."),
   cantidad: z.number().positive("La cantidad debe ser mayor a cero."),
-  cuentaId: z.number().int().positive("Cuenta contable invalida.").optional(),
+  cuentaId: z.number().int().positive("Debes elegir una cuenta contable."),
   referencia: z.string().trim().min(1, "La referencia es obligatoria."),
   referenciaId: z.string().trim().min(1, "El ID de referencia es obligatorio.")
 });

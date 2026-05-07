@@ -285,7 +285,9 @@ export function CategoriesPage() {
         }
       }
 
-      showSuccess(`Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`);
+      showSuccess(
+        `Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`
+      );
       if (errors.length) {
         showError(errors.slice(0, 3).join(" | "));
       }
@@ -307,7 +309,9 @@ export function CategoriesPage() {
   if (categoriasQuery.isError) {
     return (
       <section className="rounded-xl border border-[var(--color-error)]/50 bg-[var(--color-surface-container-low)] p-6 text-[var(--color-on-surface)]">
-        <p className="text-sm text-[var(--color-error)]">No se pudo cargar el arbol de categorias.</p>
+        <p className="text-sm text-[var(--color-error)]">
+          No se pudo cargar el arbol de categorias.
+        </p>
       </section>
     );
   }
@@ -324,7 +328,9 @@ export function CategoriesPage() {
               <FolderTree size={18} />
             </div>
             <div>
-              <h1 className="page-title font-headline text-3xl font-extrabold">Categorias de Inventario</h1>
+              <h1 className="page-title font-headline text-3xl font-extrabold">
+                Categorias de Inventario
+              </h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
                 Crea primero el grupo y luego sus subgrupos para poder registrar productos.
               </p>
@@ -534,7 +540,9 @@ export function CategoriesPage() {
             <Boxes size={14} />
             Arbol grupo y subgrupos
           </h3>
-          <span className="text-xs text-[var(--color-on-surface-variant)]">{flatRows.length} categorias</span>
+          <span className="text-xs text-[var(--color-on-surface-variant)]">
+            {flatRows.length} categorias
+          </span>
         </div>
 
         <div className="table-scroll overflow-x-auto">
@@ -560,7 +568,10 @@ export function CategoriesPage() {
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {flatRows.map((row) => (
-                <tr key={row.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+                <tr
+                  key={row.id}
+                  className="transition hover:bg-[var(--color-surface-container-highest)]"
+                >
                   <td className="px-4 py-3 text-xs font-semibold uppercase text-[var(--color-on-surface)]">
                     {row.nivel}
                   </td>
@@ -599,7 +610,10 @@ export function CategoriesPage() {
 
               {flatRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
+                  >
                     No hay categorias registradas.
                   </td>
                 </tr>
