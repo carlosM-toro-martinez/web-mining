@@ -12,7 +12,13 @@ import {
   authPrimaryButtonClassName
 } from "@/pages/auth/authUi";
 
-const roleOptions: AuthRole[] = ["ADMIN", "ALMACENERO", "SUPERINTENDENTE", "TRABAJADOR"];
+const roleOptions: AuthRole[] = [
+  "ADMIN",
+  "ALMACENERO",
+  "RECEPCIONISTA",
+  "SUPERINTENDENTE",
+  "TRABAJADOR"
+];
 
 interface EditFormState {
   id: number;

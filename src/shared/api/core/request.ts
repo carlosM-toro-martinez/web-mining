@@ -26,6 +26,14 @@ interface PutRequestOptions<TResponse, TBody> {
   client?: AxiosInstance;
 }
 
+interface PatchRequestOptions<TResponse, TBody> {
+  url: string;
+  body: TBody;
+  config?: AxiosRequestConfig;
+  schema: ZodType<TResponse>;
+  client?: AxiosInstance;
+}
+
 interface DeleteRequestOptions<TResponse> {
   url: string;
   config?: AxiosRequestConfig;
@@ -98,6 +106,31 @@ export async function putRequest<TResponse, TBody>({
         details: {
           url,
           method: "PUT",
+          response: response.data,
+          issues: error.issues
+        }
+      });
+    }
+    throw error;
+  }
+}
+
+export async function patchRequest<TResponse, TBody>({
+  url,
+  body,
+  config,
+  schema,
+  client = httpClient
+}: PatchRequestOptions<TResponse, TBody>): Promise<TResponse> {
+  const response = await client.patch(url, body, config);
+  try {
+    return schema.parse(response.data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new ApiError("Respuesta del servidor con formato inesperado.", {
+        details: {
+          url,
+          method: "PATCH",
           response: response.data,
           issues: error.issues
         }

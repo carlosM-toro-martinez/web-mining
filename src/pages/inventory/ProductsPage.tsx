@@ -1,22 +1,40 @@
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
   FileText,
+  FileSpreadsheet,
   Filter,
   PencilLine,
   Plus,
   Table2,
-  Tags
+  Tags,
+  Upload
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCategoriasTreeQuery,
   useCreateCategoriaMutation
 } from "@/features/categorias-inventario/hooks/useCategoriasInventario";
-import { useCreateProductoMutation, useProductosQuery, useUpdateProductoMutation } from "@/features/productos/hooks/useProductos";
+import {
+  useCentrosCostoQuery,
+  useCuentasQuery,
+  useFuncionesGastoQuery
+} from "@/features/contabilidad/hooks/useContabilidad";
+import {
+  useCreateProductoMutation,
+  useProductosQuery,
+  useUpdateProductoMutation
+} from "@/features/productos/hooks/useProductos";
 import type { Producto } from "@/features/productos/model/producto.schema";
 import { ApiError } from "@/shared/api/core/apiError";
+import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
+import {
+  downloadProductosCsvTemplate,
+  downloadProductosExcelTemplate
+} from "@/shared/lib/importTemplates";
+import { normalizeSpreadsheetRow, readSpreadsheetSheets } from "@/shared/lib/spreadsheetImport";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
@@ -29,10 +47,16 @@ function normalizeError(error: unknown, fallbackMessage: string) {
 
 export function ProductsPage() {
   const { user } = useAuth();
-  const canManage = user?.role === "ADMIN" || user?.role === "ALMACENERO";
+  const canManage =
+    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "RECEPCIONISTA";
   const { showError, showSuccess } = useToast();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const categoriasQuery = useCategoriasTreeQuery();
+  const centrosCostoQuery = useCentrosCostoQuery();
+  const funcionesGastoQuery = useFuncionesGastoQuery();
+  const cuentasQuery = useCuentasQuery();
   const createCategoriaMutation = useCreateCategoriaMutation();
 
   const [page, setPage] = useState(1);
@@ -41,17 +65,23 @@ export function ProductsPage() {
   const [searchDraft, setSearchDraft] = useState("");
   const [grupoDraft, setGrupoDraft] = useState("");
   const [subgrupoDraft, setSubgrupoDraft] = useState("");
+  const [cuentaDraft, setCuentaDraft] = useState("");
+  const [sinCuentaDraft, setSinCuentaDraft] = useState(false);
 
   const [searchApplied, setSearchApplied] = useState("");
   const [grupoApplied, setGrupoApplied] = useState<number | undefined>(undefined);
   const [subgrupoApplied, setSubgrupoApplied] = useState<number | undefined>(undefined);
+  const [cuentaApplied, setCuentaApplied] = useState<number | undefined>(undefined);
+  const [sinCuentaApplied, setSinCuentaApplied] = useState(false);
 
   const productosQuery = useProductosQuery({
     page,
     limit,
     search: searchApplied || undefined,
     grupoId: grupoApplied,
-    subgrupoId: subgrupoApplied
+    subgrupoId: subgrupoApplied,
+    cuentaId: cuentaApplied,
+    sinCuenta: sinCuentaApplied || undefined
   });
 
   const createProductoMutation = useCreateProductoMutation();
@@ -63,7 +93,11 @@ export function ProductsPage() {
       new Map(
         grupos.map((grupo) => [
           grupo.id,
-          grupo.children.map((subgrupo) => ({ id: subgrupo.id, nombre: subgrupo.nombre, codigo: subgrupo.codigo }))
+          grupo.children.map((subgrupo) => ({
+            id: subgrupo.id,
+            nombre: subgrupo.nombre,
+            codigo: subgrupo.codigo
+          }))
         ])
       ),
     [grupos]
@@ -75,17 +109,25 @@ export function ProductsPage() {
   const [grupoId, setGrupoId] = useState("");
   const [subgrupoId, setSubgrupoId] = useState("");
   const [esEpp, setEsEpp] = useState(false);
+  const [centroCostoIdForm, setCentroCostoIdForm] = useState("");
+  const [funcionGastoIdForm, setFuncionGastoIdForm] = useState("");
+  const [cuentaAutocomplete, setCuentaAutocomplete] = useState("");
+  const [cuentaIdForm, setCuentaIdForm] = useState("");
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [rowCuentaSelection, setRowCuentaSelection] = useState<Record<number, string>>({});
 
-  const availableSubgrupos = grupoId ? subgruposPorGrupo.get(Number(grupoId)) ?? [] : [];
-  const filterSubgrupos = grupoDraft ? subgruposPorGrupo.get(Number(grupoDraft)) ?? [] : [];
+  const availableSubgrupos = grupoId ? (subgruposPorGrupo.get(Number(grupoId)) ?? []) : [];
+  const filterSubgrupos = grupoDraft ? (subgruposPorGrupo.get(Number(grupoDraft)) ?? []) : [];
 
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [modalTipo, setModalTipo] = useState<"grupo" | "subgrupo">("grupo");
   const [modalCodigo, setModalCodigo] = useState("");
   const [modalNombre, setModalNombre] = useState("");
   const [modalParentId, setModalParentId] = useState("");
+  const centrosCosto = centrosCostoQuery.data?.data ?? [];
+  const funcionesGasto = funcionesGastoQuery.data?.data ?? [];
+  const cuentas = cuentasQuery.data?.data ?? [];
 
   const products = productosQuery.data?.data ?? [];
   const meta = productosQuery.data?.meta;
@@ -97,7 +139,50 @@ export function ProductsPage() {
     setGrupoId("");
     setSubgrupoId("");
     setEsEpp(false);
+    setCentroCostoIdForm("");
+    setFuncionGastoIdForm("");
+    setCuentaAutocomplete("");
+    setCuentaIdForm("");
     setEditingProductId(null);
+  }
+
+  function findCuentaByCodigoCompleto(value: string) {
+    return cuentas.find(
+      (cuenta) => cuenta.codigoCompleto.toLowerCase() === value.trim().toLowerCase()
+    );
+  }
+
+  function syncCuentaAutocomplete(nextCentroCostoId: string, nextFuncionGastoId: string) {
+    const centroId = Number(nextCentroCostoId);
+    const funcionId = Number(nextFuncionGastoId);
+
+    if (!centroId || !funcionId) {
+      setCuentaAutocomplete("");
+      return;
+    }
+
+    const matchedCuenta = cuentas.find(
+      (cuenta) => cuenta.centroCostoId === centroId && cuenta.funcionGastoId === funcionId
+    );
+    setCuentaAutocomplete(matchedCuenta?.codigoCompleto ?? "");
+  }
+
+  function handleCuentaAutocompleteChange(value: string) {
+    setCuentaAutocomplete(value);
+    const matchedCuenta = findCuentaByCodigoCompleto(value);
+    if (!matchedCuenta) return;
+    setCentroCostoIdForm(String(matchedCuenta.centroCostoId));
+    setFuncionGastoIdForm(String(matchedCuenta.funcionGastoId));
+  }
+
+  function handleCentroCostoChange(value: string) {
+    setCentroCostoIdForm(value);
+    syncCuentaAutocomplete(value, funcionGastoIdForm);
+  }
+
+  function handleFuncionGastoChange(value: string) {
+    setFuncionGastoIdForm(value);
+    syncCuentaAutocomplete(centroCostoIdForm, value);
   }
 
   function selectProduct(product: Producto) {
@@ -111,6 +196,12 @@ export function ProductsPage() {
     const selectedGrupoId = product.categoria.parent?.id;
     setGrupoId(selectedGrupoId ? String(selectedGrupoId) : "");
     setSubgrupoId(String(product.categoria.id));
+    setCentroCostoIdForm(product.cuenta?.centroCosto ? String(product.cuenta.centroCosto.id) : "");
+    setFuncionGastoIdForm(
+      product.cuenta?.funcionGasto ? String(product.cuenta.funcionGasto.id) : ""
+    );
+    setCuentaAutocomplete(product.cuenta?.codigoCompleto ?? "");
+    setCuentaIdForm(product.cuentaId ? String(product.cuentaId) : "");
   }
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
@@ -119,15 +210,21 @@ export function ProductsPage() {
     setSearchApplied(searchDraft.trim());
     setGrupoApplied(grupoDraft ? Number(grupoDraft) : undefined);
     setSubgrupoApplied(subgrupoDraft ? Number(subgrupoDraft) : undefined);
+    setCuentaApplied(cuentaDraft ? Number(cuentaDraft) : undefined);
+    setSinCuentaApplied(sinCuentaDraft);
   }
 
   function handleClearFilters() {
     setSearchDraft("");
     setGrupoDraft("");
     setSubgrupoDraft("");
+    setCuentaDraft("");
+    setSinCuentaDraft(false);
     setSearchApplied("");
     setGrupoApplied(undefined);
     setSubgrupoApplied(undefined);
+    setCuentaApplied(undefined);
+    setSinCuentaApplied(false);
     setPage(1);
   }
 
@@ -150,11 +247,14 @@ export function ProductsPage() {
 
     const parsedGrupoId = Number(grupoId);
     const parsedSubgrupoId = Number(subgrupoId);
+    const parsedCentroCostoId = Number(centroCostoIdForm);
+    const parsedFuncionGastoId = Number(funcionGastoIdForm);
 
-    if (!parsedGrupoId || !parsedSubgrupoId) {
-      showError("Debes seleccionar grupo y subgrupo.");
+    if (!parsedGrupoId || !parsedSubgrupoId || !parsedCentroCostoId || !parsedFuncionGastoId) {
+      showError("Debes seleccionar grupo, subgrupo, centro de costo y funcion de gasto.");
       return;
     }
+    const parsedCuentaId = cuentaIdForm ? Number(cuentaIdForm) : undefined;
 
     if (editingProductId) {
       updateProductoMutation.mutate(
@@ -166,6 +266,9 @@ export function ProductsPage() {
             unidad,
             grupoId: parsedGrupoId,
             subgrupoId: parsedSubgrupoId,
+            centroCostoId: parsedCentroCostoId,
+            funcionGastoId: parsedFuncionGastoId,
+            cuentaId: parsedCuentaId ?? null,
             esEpp
           }
         },
@@ -189,6 +292,9 @@ export function ProductsPage() {
         unidad,
         grupoId: parsedGrupoId,
         subgrupoId: parsedSubgrupoId,
+        centroCostoId: parsedCentroCostoId,
+        funcionGastoId: parsedFuncionGastoId,
+        cuentaId: parsedCuentaId ?? null,
         esEpp
       },
       {
@@ -235,9 +341,161 @@ export function ProductsPage() {
     });
   }
 
+  function openImportDialog() {
+    importInputRef.current?.click();
+  }
+
+  async function handleImportProducts(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!canManage) {
+      showError("No tienes permisos para importar productos.");
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const sheets = await readSpreadsheetSheets(file);
+      const sourceRows = sheets[0]?.rows ?? [];
+      if (!sourceRows.length) {
+        showError("El archivo no tiene filas para importar.");
+        return;
+      }
+
+      const rows = sourceRows.map((row) => normalizeSpreadsheetRow(row));
+
+      const groupCodeToId = new Map<string, number>();
+      const subgroupByKeyToId = new Map<string, number>();
+      for (const group of grupos) {
+        const groupCode = group.codigo.trim().toUpperCase();
+        groupCodeToId.set(groupCode, group.id);
+        for (const sub of group.children) {
+          const subCode = sub.codigo.trim().toUpperCase();
+          subgroupByKeyToId.set(`${groupCode}::${subCode}`, sub.id);
+        }
+      }
+
+      const centroCodeToId = new Map(
+        centrosCosto.map((centro) => [centro.codigo.trim().toUpperCase(), centro.id])
+      );
+      const funcionCodeToId = new Map(
+        funcionesGasto.map((funcion) => [funcion.codigo.trim().toUpperCase(), funcion.id])
+      );
+
+      let created = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const [index, row] of rows.entries()) {
+        const codigo = (row.codigo || "").trim().toUpperCase();
+        const nombre = (row.nombre || "").trim();
+        const unidad = (row.unidad || "UND").trim().toUpperCase();
+        const codigoGrupo = (row.codigogrupo || "").trim().toUpperCase();
+        const codigoSubgrupo = (row.codigosubgrupo || "").trim().toUpperCase();
+        const codigoCentro = (row.codigocentrocosto || "").trim().toUpperCase();
+        const codigoFuncion = (row.codigofunciongasto || "").trim().toUpperCase();
+        const eppRaw = (row.esepp || "").trim().toLowerCase();
+        const esEpp = ["1", "si", "sí", "true", "x"].includes(eppRaw);
+        const rowLabel = `Fila ${index + 2}`;
+
+        if (
+          !codigo ||
+          !nombre ||
+          !codigoGrupo ||
+          !codigoSubgrupo ||
+          !codigoCentro ||
+          !codigoFuncion
+        ) {
+          failed += 1;
+          errors.push(`${rowLabel}: faltan campos obligatorios.`);
+          continue;
+        }
+
+        const grupoIdValue = groupCodeToId.get(codigoGrupo);
+        if (!grupoIdValue) {
+          failed += 1;
+          errors.push(`${rowLabel}: no existe el grupo ${codigoGrupo}.`);
+          continue;
+        }
+
+        const subgrupoIdValue = subgroupByKeyToId.get(`${codigoGrupo}::${codigoSubgrupo}`);
+        if (!subgrupoIdValue) {
+          failed += 1;
+          errors.push(
+            `${rowLabel}: no existe el subgrupo ${codigoSubgrupo} para el grupo ${codigoGrupo}.`
+          );
+          continue;
+        }
+
+        const centroCostoIdValue = centroCodeToId.get(codigoCentro);
+        const funcionGastoIdValue = funcionCodeToId.get(codigoFuncion);
+        if (!centroCostoIdValue || !funcionGastoIdValue) {
+          failed += 1;
+          errors.push(`${rowLabel}: centro o funcion de gasto no existen.`);
+          continue;
+        }
+
+        try {
+          await createProductoMutation.mutateAsync({
+            codigo,
+            nombre,
+            unidad,
+            grupoId: grupoIdValue,
+            subgrupoId: subgrupoIdValue,
+            centroCostoId: centroCostoIdValue,
+            funcionGastoId: funcionGastoIdValue,
+            esEpp
+          });
+          created += 1;
+        } catch (error) {
+          const message = normalizeError(error, "No se pudo crear el producto.");
+          if (message.toLowerCase().includes("ya existe")) {
+            skipped += 1;
+          } else {
+            failed += 1;
+            errors.push(`${rowLabel}: ${message}`);
+          }
+        }
+      }
+
+      showSuccess(
+        `Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`
+      );
+      if (errors.length) {
+        showError(errors.slice(0, 3).join(" | "));
+      }
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo procesar el archivo de productos."));
+    } finally {
+      setIsImporting(false);
+    }
+  }
+  function handleAssignCuenta(productId: number) {
+    const selected = rowCuentaSelection[productId];
+    const parsedCuentaId = selected ? Number(selected) : null;
+    updateProductoMutation.mutate(
+      {
+        id: productId,
+        payload: { cuentaId: parsedCuentaId }
+      },
+      {
+        onSuccess: () => showSuccess("Cuenta contable asignada correctamente."),
+        onError: (error) =>
+          showError(normalizeError(error, "No se pudo asignar la cuenta al producto."))
+      }
+    );
+  }
+  console.log(products);
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
+        <div className="mb-4">
+          <SubrouteBackButton />
+        </div>
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-[var(--color-tertiary)]/16 p-2.5 text-[var(--color-tertiary)]">
@@ -246,12 +504,38 @@ export function ProductsPage() {
             <div>
               <h1 className="page-title font-headline text-3xl font-extrabold">Productos</h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-                Registra productos por grupo y subgrupo. Si falta categoria, creala en la ventana emergente.
+                Registra productos por grupo y subgrupo con su centro de costo y funcion de gasto
+                para generar su cuenta contable automaticamente.
               </p>
             </div>
           </div>
 
           <div className="page-toolbar flex items-center gap-3">
+            <button
+              type="button"
+              onClick={openImportDialog}
+              disabled={isImporting || !canManage}
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-50"
+            >
+              <Upload size={16} />
+              {isImporting ? "Importando..." : "Importar CSV/Excel"}
+            </button>
+            <button
+              type="button"
+              onClick={downloadProductosCsvTemplate}
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              <Download size={16} />
+              Plantilla CSV
+            </button>
+            <button
+              type="button"
+              onClick={downloadProductosExcelTemplate}
+              className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/22"
+            >
+              <FileSpreadsheet size={16} />
+              Plantilla Excel
+            </button>
             <button
               type="button"
               onClick={() => showSuccess("Exportar PDF estara disponible en la siguiente fase.")}
@@ -270,8 +554,15 @@ export function ProductsPage() {
             </button>
           </div>
         </div>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={handleImportProducts}
+          className="hidden"
+        />
 
-        <form className="grid grid-cols-1 gap-3 md:grid-cols-5" onSubmit={applyFilters}>
+        <form className="grid grid-cols-1 gap-3 md:grid-cols-7" onSubmit={applyFilters}>
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
               Buscar
@@ -321,6 +612,40 @@ export function ProductsPage() {
             </select>
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Cuenta contable
+            </label>
+            <select
+              value={cuentaDraft}
+              onChange={(event) => setCuentaDraft(event.target.value)}
+              className={inputClassName}
+              disabled={sinCuentaDraft}
+            >
+              <option value="">Todas</option>
+              {cuentas.map((cuenta) => (
+                <option key={cuenta.id} value={cuenta.id}>
+                  {cuenta.codigoCompleto}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center">
+            <label className="mt-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              <input
+                type="checkbox"
+                checked={sinCuentaDraft}
+                onChange={(event) => {
+                  setSinCuentaDraft(event.target.checked);
+                  if (event.target.checked) setCuentaDraft("");
+                }}
+                className="h-4 w-4 rounded border-[var(--color-outline-variant)] bg-[var(--color-surface-container-highest)]"
+              />
+              Solo sin cuenta
+            </label>
+          </div>
+
           <div className="flex items-end gap-2">
             <button
               type="submit"
@@ -346,124 +671,194 @@ export function ProductsPage() {
         }`}
       >
         {isProductFormOpen ? (
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 transition-all duration-300">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold">{editingProductId ? "Editar producto" : "Crear producto"}</h2>
-            <button
-              type="button"
-              onClick={() => setShowCategoryModal(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/50 px-2.5 py-1.5 text-xs font-semibold text-[var(--color-tertiary)] transition hover:bg-[var(--color-tertiary)]/12"
-            >
-              <Plus size={13} />
-              Nueva categoria
-            </button>
-          </div>
-
-          <form className="space-y-3" onSubmit={onSubmitProduct}>
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                Codigo
-              </label>
-              <input
-                required
-                value={codigo}
-                onChange={(event) => setCodigo(event.target.value.toUpperCase())}
-                className={`${inputClassName} font-mono uppercase tracking-wide`}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                Nombre
-              </label>
-              <input required value={nombre} onChange={(event) => setNombre(event.target.value)} className={inputClassName} />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                Unidad
-              </label>
-              <input
-                required
-                value={unidad}
-                onChange={(event) => setUnidad(event.target.value.toUpperCase())}
-                className={`${inputClassName} font-mono uppercase tracking-wide`}
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                Grupo
-              </label>
-              <select
-                required
-                value={grupoId}
-                onChange={(event) => handleGroupChange(event.target.value)}
-                className={inputClassName}
-              >
-                <option value="">Selecciona grupo</option>
-                {grupos.map((grupo) => (
-                  <option key={grupo.id} value={grupo.id}>
-                    {grupo.codigo} - {grupo.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                Subgrupo
-              </label>
-              <select
-                required
-                value={subgrupoId}
-                onChange={(event) => setSubgrupoId(event.target.value)}
-                className={inputClassName}
-                disabled={!grupoId}
-              >
-                <option value="">Selecciona subgrupo</option>
-                {availableSubgrupos.map((subgrupo) => (
-                  <option key={subgrupo.id} value={subgrupo.id}>
-                    {subgrupo.codigo} - {subgrupo.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-[var(--color-on-surface)]">
-              <input
-                type="checkbox"
-                checked={esEpp}
-                onChange={(event) => setEsEpp(event.target.checked)}
-                className="h-4 w-4 rounded border-[var(--color-outline-variant)] bg-[var(--color-surface-container-highest)]"
-              />
-              Es EPP
-            </label>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="submit"
-                disabled={!canManage || createProductoMutation.isPending || updateProductoMutation.isPending}
-                className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {editingProductId
-                  ? updateProductoMutation.isPending
-                    ? "Actualizando..."
-                    : "Actualizar"
-                  : createProductoMutation.isPending
-                    ? "Guardando..."
-                    : "Guardar"}
-              </button>
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 transition-all duration-300">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold">
+                {editingProductId ? "Editar producto" : "Crear producto"}
+              </h2>
               <button
                 type="button"
-                onClick={resetProductForm}
-                className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+                onClick={() => setShowCategoryModal(true)}
+                className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/50 px-2.5 py-1.5 text-xs font-semibold text-[var(--color-tertiary)] transition hover:bg-[var(--color-tertiary)]/12"
               >
-                Limpiar
+                <Plus size={13} />
+                Nueva categoria
               </button>
             </div>
-          </form>
-        </article>
+
+            <form className="space-y-3" onSubmit={onSubmitProduct}>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Codigo
+                </label>
+                <input
+                  required
+                  value={codigo}
+                  onChange={(event) => setCodigo(event.target.value.toUpperCase())}
+                  className={`${inputClassName} font-mono uppercase tracking-wide`}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Nombre
+                </label>
+                <input
+                  required
+                  value={nombre}
+                  onChange={(event) => setNombre(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Unidad
+                </label>
+                <input
+                  required
+                  value={unidad}
+                  onChange={(event) => setUnidad(event.target.value.toUpperCase())}
+                  className={`${inputClassName} font-mono uppercase tracking-wide`}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Grupo
+                </label>
+                <select
+                  required
+                  value={grupoId}
+                  onChange={(event) => handleGroupChange(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecciona grupo</option>
+                  {grupos.map((grupo) => (
+                    <option key={grupo.id} value={grupo.id}>
+                      {grupo.codigo} - {grupo.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Subgrupo
+                </label>
+                <select
+                  required
+                  value={subgrupoId}
+                  onChange={(event) => setSubgrupoId(event.target.value)}
+                  className={inputClassName}
+                  disabled={!grupoId}
+                >
+                  <option value="">Selecciona subgrupo</option>
+                  {availableSubgrupos.map((subgrupo) => (
+                    <option key={subgrupo.id} value={subgrupo.id}>
+                      {subgrupo.codigo} - {subgrupo.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Buscar cuenta contable existente
+                </label>
+                <input
+                  list="cuentas-contables-list"
+                  value={cuentaAutocomplete}
+                  onChange={(event) => handleCuentaAutocompleteChange(event.target.value)}
+                  className={inputClassName}
+                  placeholder="Ej: CC001-FG001"
+                />
+                <datalist id="cuentas-contables-list">
+                  {cuentas.map((cuenta) => (
+                    <option key={cuenta.id} value={cuenta.codigoCompleto} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+                  Si eliges una cuenta existente, se completan automaticamente centro y funcion.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Centro de costo
+                </label>
+                <select
+                  required
+                  value={centroCostoIdForm}
+                  onChange={(event) => handleCentroCostoChange(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecciona centro de costo</option>
+                  {centrosCosto.map((centro) => (
+                    <option key={centro.id} value={centro.id}>
+                      {centro.codigo} - {centro.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Funcion de gasto
+                </label>
+                <select
+                  required
+                  value={funcionGastoIdForm}
+                  onChange={(event) => handleFuncionGastoChange(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecciona funcion de gasto</option>
+                  {funcionesGasto.map((funcion) => (
+                    <option key={funcion.id} value={funcion.id}>
+                      {funcion.codigo} - {funcion.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-[var(--color-on-surface)]">
+                <input
+                  type="checkbox"
+                  checked={esEpp}
+                  onChange={(event) => setEsEpp(event.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--color-outline-variant)] bg-[var(--color-surface-container-highest)]"
+                />
+                Es EPP
+              </label>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={
+                    !canManage ||
+                    createProductoMutation.isPending ||
+                    updateProductoMutation.isPending
+                  }
+                  className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {editingProductId
+                    ? updateProductoMutation.isPending
+                      ? "Actualizando..."
+                      : "Actualizar"
+                    : createProductoMutation.isPending
+                      ? "Guardando..."
+                      : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetProductForm}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </form>
+          </article>
         ) : null}
 
         <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] shadow-2xl">
@@ -514,6 +909,15 @@ export function ProductsPage() {
                     Unidad
                   </th>
                   <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Stock actual
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    P. Unit (Bs.)
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    P. Prom (Bs.)
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Accion
                   </th>
                 </tr>
@@ -522,7 +926,10 @@ export function ProductsPage() {
               <tbody className="divide-y divide-[var(--color-border-soft)]">
                 {productosQuery.isLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={9}
+                      className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Cargando productos...
                     </td>
                   </tr>
@@ -530,15 +937,23 @@ export function ProductsPage() {
 
                 {!productosQuery.isLoading && products.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={9}
+                      className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       No se encontraron productos con los filtros actuales.
                     </td>
                   </tr>
                 ) : null}
 
                 {products.map((product) => (
-                  <tr key={product.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
-                    <td className="px-4 py-3 font-mono text-xs uppercase tracking-wide">{product.codigo}</td>
+                  <tr
+                    key={product.id}
+                    className="transition hover:bg-[var(--color-surface-container-highest)]"
+                  >
+                    <td className="px-4 py-3 font-mono text-xs uppercase tracking-wide">
+                      {product.codigo}
+                    </td>
                     <td className="px-4 py-3 text-sm capitalize">{product.nombre}</td>
                     <td className="px-4 py-3 text-xs capitalize text-[var(--color-on-surface-variant)]">
                       {product.categoria.parent?.nombre ?? "-"}
@@ -547,15 +962,22 @@ export function ProductsPage() {
                       {product.categoria.nombre}
                     </td>
                     <td className="px-4 py-3 text-xs uppercase">{product.unidad}</td>
+                    <td className="px-4 py-3 text-right text-xs font-semibold">
+                      {product.stock.cantidad}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs">{product.stock.precioUnit}</td>
+                    <td className="px-4 py-3 text-right text-xs">{product.stock.precioProm}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => selectProduct(product)}
-                        className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)] transition hover:bg-[var(--color-tertiary)]/12"
-                      >
-                        <PencilLine size={12} />
-                        Editar
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => selectProduct(product)}
+                          className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)] transition hover:bg-[var(--color-tertiary)]/12"
+                        >
+                          <PencilLine size={12} />
+                          Editar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -578,7 +1000,9 @@ export function ProductsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setPage((current) => (meta && current < meta.totalPages ? current + 1 : current))}
+                onClick={() =>
+                  setPage((current) => (meta && current < meta.totalPages ? current + 1 : current))
+                }
                 disabled={!meta || page >= meta.totalPages}
                 className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)] disabled:opacity-40"
               >
@@ -666,7 +1090,12 @@ export function ProductsPage() {
                 <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                   Nombre
                 </label>
-                <input required value={modalNombre} onChange={(event) => setModalNombre(event.target.value)} className={inputClassName} />
+                <input
+                  required
+                  value={modalNombre}
+                  onChange={(event) => setModalNombre(event.target.value)}
+                  className={inputClassName}
+                />
               </div>
 
               <button

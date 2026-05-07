@@ -18,14 +18,44 @@ const productoStockSchema = z.object({
   precioProm: z.string()
 });
 
+const productoCuentaSchema = z.object({
+  id: z.number().int().positive(),
+  codigoCompleto: z.string().min(1),
+  centroCosto: z
+    .object({
+      id: z.number().int().positive(),
+      codigo: z.string().min(1),
+      nombre: z.string().min(1)
+    })
+    .optional(),
+  funcionGasto: z
+    .object({
+      id: z.number().int().positive(),
+      codigo: z.string().min(1),
+      nombre: z.string().min(1)
+    })
+    .optional(),
+  sector: z
+    .object({
+      id: z.number().int().positive(),
+      codigo: z.string().min(1),
+      nombre: z.string().min(1)
+    })
+    .optional()
+    .nullable()
+    .optional()
+});
+
 export const productoSchema = z.object({
   id: z.number().int().positive(),
   codigo: z.string().min(1),
   nombre: z.string().min(1),
   unidad: z.string().min(1),
   categoriaId: z.number().int().positive(),
+  cuentaId: z.number().int().positive().nullable().optional(),
   esEpp: z.boolean().default(false),
   categoria: productoCategoriaSchema,
+  cuenta: productoCuentaSchema.nullable().optional(),
   stock: productoStockSchema
 });
 
@@ -56,6 +86,9 @@ export const createProductoPayloadSchema = z.object({
   unidad: z.string().trim().min(1, "La unidad es obligatoria."),
   grupoId: z.number().int().positive("Debes elegir un grupo."),
   subgrupoId: z.number().int().positive("Debes elegir un subgrupo."),
+  centroCostoId: z.number().int().positive("Debes elegir un centro de costo."),
+  funcionGastoId: z.number().int().positive("Debes elegir una funcion de gasto."),
+  cuentaId: z.number().int().positive().nullable().optional(),
   esEpp: z.boolean().optional().default(false)
 });
 
@@ -65,6 +98,9 @@ export const updateProductoPayloadSchema = z.object({
   unidad: z.string().trim().min(1).optional(),
   grupoId: z.number().int().positive().optional(),
   subgrupoId: z.number().int().positive().optional(),
+  centroCostoId: z.number().int().positive().optional(),
+  funcionGastoId: z.number().int().positive().optional(),
+  cuentaId: z.number().int().positive().nullable().optional(),
   esEpp: z.boolean().optional()
 });
 
@@ -73,7 +109,9 @@ export const productosQueryParamsSchema = z.object({
   limit: z.number().int().positive().default(10),
   search: z.string().trim().optional(),
   grupoId: z.number().int().positive().optional(),
-  subgrupoId: z.number().int().positive().optional()
+  subgrupoId: z.number().int().positive().optional(),
+  cuentaId: z.number().int().positive().optional(),
+  sinCuenta: z.boolean().optional()
 });
 
 export type Producto = z.infer<typeof productoSchema>;

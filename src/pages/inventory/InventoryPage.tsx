@@ -1,11 +1,14 @@
 import { Link } from "react-router-dom";
 import {
+  Building2,
   Boxes,
-  ClipboardList,
+  Landmark,
   FolderTree,
   HardHat,
   PackageSearch,
   PackageCheck,
+  Layers3,
+  FileBarChart2,
   ReceiptText,
   Settings,
   Truck
@@ -34,25 +37,53 @@ const cards = [
     available: true
   },
   {
+    title: "Stock Actual",
+    description: "Consulta stock detallado por producto y ordena de menor a mayor existencia.",
+    to: "/inventario/stock",
+    icon: Layers3,
+    available: true
+  },
+  {
+    title: "Reportes",
+    description: "Consulta Bin Card y Bin Card Valorado por fecha, producto y paginacion.",
+    to: "/inventario/reportes",
+    icon: FileBarChart2,
+    available: true
+  },
+  {
+    title: "Contabilidad",
+    description: "Administra centros de costo, funciones de gasto y cuentas contables.",
+    to: "/inventario/contabilidad",
+    icon: Landmark,
+    available: true
+  },
+  {
+    title: "Proveedores",
+    description: "Crea y consulta proveedores para abastecimiento y trazabilidad de compras.",
+    to: "/inventario/proveedores",
+    icon: Building2,
+    available: true
+  },
+  {
     title: "Compras",
     description: "Gestiona requisiciones, ordenes y recepcion de abastecimiento.",
-    to: "/compras",
+    to: "/inventario/compras",
     icon: ReceiptText,
-    available: false
+    available: true
   },
   {
     title: "Vales",
     description: "Control de vales de salida para consumo interno y trazabilidad.",
-    to: "/vales",
+    to: "/inventario/vales",
     icon: PackageCheck,
-    available: false
+    available: true
   },
   {
-    title: "Entregas",
-    description: "Seguimiento de entrega de materiales por area y responsable.",
-    to: "/entregas",
+    title: "Movimientos y Entregas",
+    description: "Operacion de entregas por vale y registro de entrega sin vale.",
+    to: "/inventario/entregas",
     icon: Truck,
-    available: false
+    available: true
   },
   {
     title: "EPP",

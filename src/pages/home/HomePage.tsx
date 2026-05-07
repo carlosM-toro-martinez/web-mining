@@ -14,6 +14,7 @@ export function HomePage() {
   const { user, canManageUsers } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const isAlmacenero = user?.role === "ALMACENERO";
+  const isRecepcionista = user?.role === "RECEPCIONISTA";
 
   const items: DashboardItem[] = [
     {
@@ -36,7 +37,7 @@ export function HomePage() {
     }
   ];
 
-  if (isAdmin || isAlmacenero) {
+  if (isAdmin || isAlmacenero || isRecepcionista) {
     items.push({
       title: "Inventario",
       description: "Gestión de categorías, productos y flujos de almacén.",
