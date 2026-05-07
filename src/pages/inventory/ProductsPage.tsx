@@ -1,20 +1,27 @@
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
   FileText,
+  FileSpreadsheet,
   Filter,
   PencilLine,
   Plus,
   Table2,
-  Tags
+  Tags,
+  Upload
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCategoriasTreeQuery,
   useCreateCategoriaMutation
 } from "@/features/categorias-inventario/hooks/useCategoriasInventario";
-import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
+import {
+  useCentrosCostoQuery,
+  useCuentasQuery,
+  useFuncionesGastoQuery
+} from "@/features/contabilidad/hooks/useContabilidad";
 import {
   useCreateProductoMutation,
   useProductosQuery,
@@ -23,6 +30,11 @@ import {
 import type { Producto } from "@/features/productos/model/producto.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
+import {
+  downloadProductosCsvTemplate,
+  downloadProductosExcelTemplate
+} from "@/shared/lib/importTemplates";
+import { normalizeSpreadsheetRow, readSpreadsheetSheets } from "@/shared/lib/spreadsheetImport";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
@@ -35,10 +47,15 @@ function normalizeError(error: unknown, fallbackMessage: string) {
 
 export function ProductsPage() {
   const { user } = useAuth();
-  const canManage = user?.role === "ADMIN" || user?.role === "ALMACENERO";
+  const canManage =
+    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "RECEPCIONISTA";
   const { showError, showSuccess } = useToast();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const categoriasQuery = useCategoriasTreeQuery();
+  const centrosCostoQuery = useCentrosCostoQuery();
+  const funcionesGastoQuery = useFuncionesGastoQuery();
   const cuentasQuery = useCuentasQuery();
   const createCategoriaMutation = useCreateCategoriaMutation();
 
@@ -92,10 +109,11 @@ export function ProductsPage() {
   const [grupoId, setGrupoId] = useState("");
   const [subgrupoId, setSubgrupoId] = useState("");
   const [esEpp, setEsEpp] = useState(false);
-  const [cuentaIdForm, setCuentaIdForm] = useState("");
+  const [centroCostoIdForm, setCentroCostoIdForm] = useState("");
+  const [funcionGastoIdForm, setFuncionGastoIdForm] = useState("");
+  const [cuentaAutocomplete, setCuentaAutocomplete] = useState("");
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
-  const [rowCuentaSelection, setRowCuentaSelection] = useState<Record<number, string>>({});
 
   const availableSubgrupos = grupoId ? (subgruposPorGrupo.get(Number(grupoId)) ?? []) : [];
   const filterSubgrupos = grupoDraft ? (subgruposPorGrupo.get(Number(grupoDraft)) ?? []) : [];
@@ -105,6 +123,8 @@ export function ProductsPage() {
   const [modalCodigo, setModalCodigo] = useState("");
   const [modalNombre, setModalNombre] = useState("");
   const [modalParentId, setModalParentId] = useState("");
+  const centrosCosto = centrosCostoQuery.data?.data ?? [];
+  const funcionesGasto = funcionesGastoQuery.data?.data ?? [];
   const cuentas = cuentasQuery.data?.data ?? [];
 
   const products = productosQuery.data?.data ?? [];
@@ -117,8 +137,49 @@ export function ProductsPage() {
     setGrupoId("");
     setSubgrupoId("");
     setEsEpp(false);
-    setCuentaIdForm("");
+    setCentroCostoIdForm("");
+    setFuncionGastoIdForm("");
+    setCuentaAutocomplete("");
     setEditingProductId(null);
+  }
+
+  function findCuentaByCodigoCompleto(value: string) {
+    return cuentas.find(
+      (cuenta) => cuenta.codigoCompleto.toLowerCase() === value.trim().toLowerCase()
+    );
+  }
+
+  function syncCuentaAutocomplete(nextCentroCostoId: string, nextFuncionGastoId: string) {
+    const centroId = Number(nextCentroCostoId);
+    const funcionId = Number(nextFuncionGastoId);
+
+    if (!centroId || !funcionId) {
+      setCuentaAutocomplete("");
+      return;
+    }
+
+    const matchedCuenta = cuentas.find(
+      (cuenta) => cuenta.centroCostoId === centroId && cuenta.funcionGastoId === funcionId
+    );
+    setCuentaAutocomplete(matchedCuenta?.codigoCompleto ?? "");
+  }
+
+  function handleCuentaAutocompleteChange(value: string) {
+    setCuentaAutocomplete(value);
+    const matchedCuenta = findCuentaByCodigoCompleto(value);
+    if (!matchedCuenta) return;
+    setCentroCostoIdForm(String(matchedCuenta.centroCostoId));
+    setFuncionGastoIdForm(String(matchedCuenta.funcionGastoId));
+  }
+
+  function handleCentroCostoChange(value: string) {
+    setCentroCostoIdForm(value);
+    syncCuentaAutocomplete(value, funcionGastoIdForm);
+  }
+
+  function handleFuncionGastoChange(value: string) {
+    setFuncionGastoIdForm(value);
+    syncCuentaAutocomplete(centroCostoIdForm, value);
   }
 
   function selectProduct(product: Producto) {
@@ -132,7 +193,9 @@ export function ProductsPage() {
     const selectedGrupoId = product.categoria.parent?.id;
     setGrupoId(selectedGrupoId ? String(selectedGrupoId) : "");
     setSubgrupoId(String(product.categoria.id));
-    setCuentaIdForm(product.cuentaId ? String(product.cuentaId) : "");
+    setCentroCostoIdForm(product.cuenta?.centroCosto ? String(product.cuenta.centroCosto.id) : "");
+    setFuncionGastoIdForm(product.cuenta?.funcionGasto ? String(product.cuenta.funcionGasto.id) : "");
+    setCuentaAutocomplete(product.cuenta?.codigoCompleto ?? "");
   }
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
@@ -178,12 +241,13 @@ export function ProductsPage() {
 
     const parsedGrupoId = Number(grupoId);
     const parsedSubgrupoId = Number(subgrupoId);
+    const parsedCentroCostoId = Number(centroCostoIdForm);
+    const parsedFuncionGastoId = Number(funcionGastoIdForm);
 
-    if (!parsedGrupoId || !parsedSubgrupoId) {
-      showError("Debes seleccionar grupo y subgrupo.");
+    if (!parsedGrupoId || !parsedSubgrupoId || !parsedCentroCostoId || !parsedFuncionGastoId) {
+      showError("Debes seleccionar grupo, subgrupo, centro de costo y funcion de gasto.");
       return;
     }
-    const parsedCuentaId = cuentaIdForm ? Number(cuentaIdForm) : undefined;
 
     if (editingProductId) {
       updateProductoMutation.mutate(
@@ -195,7 +259,8 @@ export function ProductsPage() {
             unidad,
             grupoId: parsedGrupoId,
             subgrupoId: parsedSubgrupoId,
-            cuentaId: parsedCuentaId ?? null,
+            centroCostoId: parsedCentroCostoId,
+            funcionGastoId: parsedFuncionGastoId,
             esEpp
           }
         },
@@ -219,7 +284,8 @@ export function ProductsPage() {
         unidad,
         grupoId: parsedGrupoId,
         subgrupoId: parsedSubgrupoId,
-        cuentaId: parsedCuentaId ?? null,
+        centroCostoId: parsedCentroCostoId,
+        funcionGastoId: parsedFuncionGastoId,
         esEpp
       },
       {
@@ -266,22 +332,129 @@ export function ProductsPage() {
     });
   }
 
-  function handleAssignCuenta(productId: number) {
-    const selected = rowCuentaSelection[productId];
-    const parsedCuentaId = selected ? Number(selected) : null;
-    updateProductoMutation.mutate(
-      {
-        id: productId,
-        payload: { cuentaId: parsedCuentaId }
-      },
-      {
-        onSuccess: () => showSuccess("Cuenta contable asignada correctamente."),
-        onError: (error) =>
-          showError(normalizeError(error, "No se pudo asignar la cuenta al producto."))
-      }
-    );
+  function openImportDialog() {
+    importInputRef.current?.click();
   }
-  console.log(products);
+
+  async function handleImportProducts(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!canManage) {
+      showError("No tienes permisos para importar productos.");
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const sheets = await readSpreadsheetSheets(file);
+      const sourceRows = sheets[0]?.rows ?? [];
+      if (!sourceRows.length) {
+        showError("El archivo no tiene filas para importar.");
+        return;
+      }
+
+      const rows = sourceRows.map((row) => normalizeSpreadsheetRow(row));
+
+      const groupCodeToId = new Map<string, number>();
+      const subgroupByKeyToId = new Map<string, number>();
+      for (const group of grupos) {
+        const groupCode = group.codigo.trim().toUpperCase();
+        groupCodeToId.set(groupCode, group.id);
+        for (const sub of group.children) {
+          const subCode = sub.codigo.trim().toUpperCase();
+          subgroupByKeyToId.set(`${groupCode}::${subCode}`, sub.id);
+        }
+      }
+
+      const centroCodeToId = new Map(
+        centrosCosto.map((centro) => [centro.codigo.trim().toUpperCase(), centro.id])
+      );
+      const funcionCodeToId = new Map(
+        funcionesGasto.map((funcion) => [funcion.codigo.trim().toUpperCase(), funcion.id])
+      );
+
+      let created = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const [index, row] of rows.entries()) {
+        const codigo = (row.codigo || "").trim().toUpperCase();
+        const nombre = (row.nombre || "").trim();
+        const unidad = (row.unidad || "UND").trim().toUpperCase();
+        const codigoGrupo = (row.codigogrupo || "").trim().toUpperCase();
+        const codigoSubgrupo = (row.codigosubgrupo || "").trim().toUpperCase();
+        const codigoCentro = (row.codigocentrocosto || "").trim().toUpperCase();
+        const codigoFuncion = (row.codigofunciongasto || "").trim().toUpperCase();
+        const eppRaw = (row.esepp || "").trim().toLowerCase();
+        const esEpp = ["1", "si", "sí", "true", "x"].includes(eppRaw);
+        const rowLabel = `Fila ${index + 2}`;
+
+        if (!codigo || !nombre || !codigoGrupo || !codigoSubgrupo || !codigoCentro || !codigoFuncion) {
+          failed += 1;
+          errors.push(`${rowLabel}: faltan campos obligatorios.`);
+          continue;
+        }
+
+        const grupoIdValue = groupCodeToId.get(codigoGrupo);
+        if (!grupoIdValue) {
+          failed += 1;
+          errors.push(`${rowLabel}: no existe el grupo ${codigoGrupo}.`);
+          continue;
+        }
+
+        const subgrupoIdValue = subgroupByKeyToId.get(`${codigoGrupo}::${codigoSubgrupo}`);
+        if (!subgrupoIdValue) {
+          failed += 1;
+          errors.push(
+            `${rowLabel}: no existe el subgrupo ${codigoSubgrupo} para el grupo ${codigoGrupo}.`
+          );
+          continue;
+        }
+
+        const centroCostoIdValue = centroCodeToId.get(codigoCentro);
+        const funcionGastoIdValue = funcionCodeToId.get(codigoFuncion);
+        if (!centroCostoIdValue || !funcionGastoIdValue) {
+          failed += 1;
+          errors.push(`${rowLabel}: centro o funcion de gasto no existen.`);
+          continue;
+        }
+
+        try {
+          await createProductoMutation.mutateAsync({
+            codigo,
+            nombre,
+            unidad,
+            grupoId: grupoIdValue,
+            subgrupoId: subgrupoIdValue,
+            centroCostoId: centroCostoIdValue,
+            funcionGastoId: funcionGastoIdValue,
+            esEpp
+          });
+          created += 1;
+        } catch (error) {
+          const message = normalizeError(error, "No se pudo crear el producto.");
+          if (message.toLowerCase().includes("ya existe")) {
+            skipped += 1;
+          } else {
+            failed += 1;
+            errors.push(`${rowLabel}: ${message}`);
+          }
+        }
+      }
+
+      showSuccess(`Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`);
+      if (errors.length) {
+        showError(errors.slice(0, 3).join(" | "));
+      }
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo procesar el archivo de productos."));
+    } finally {
+      setIsImporting(false);
+    }
+  }
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -297,13 +470,38 @@ export function ProductsPage() {
             <div>
               <h1 className="page-title font-headline text-3xl font-extrabold">Productos</h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-                Registra productos por grupo y subgrupo. Si falta categoria, creala en la ventana
-                emergente.
+                Registra productos por grupo y subgrupo con su centro de costo y funcion de gasto
+                para generar su cuenta contable automaticamente.
               </p>
             </div>
           </div>
 
           <div className="page-toolbar flex items-center gap-3">
+            <button
+              type="button"
+              onClick={openImportDialog}
+              disabled={isImporting || !canManage}
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-50"
+            >
+              <Upload size={16} />
+              {isImporting ? "Importando..." : "Importar CSV/Excel"}
+            </button>
+            <button
+              type="button"
+              onClick={downloadProductosCsvTemplate}
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              <Download size={16} />
+              Plantilla CSV
+            </button>
+            <button
+              type="button"
+              onClick={downloadProductosExcelTemplate}
+              className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/22"
+            >
+              <FileSpreadsheet size={16} />
+              Plantilla Excel
+            </button>
             <button
               type="button"
               onClick={() => showSuccess("Exportar PDF estara disponible en la siguiente fase.")}
@@ -322,6 +520,13 @@ export function ProductsPage() {
             </button>
           </div>
         </div>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={handleImportProducts}
+          className="hidden"
+        />
 
         <form className="grid grid-cols-1 gap-3 md:grid-cols-7" onSubmit={applyFilters}>
           <div className="md:col-span-2">
@@ -525,17 +730,58 @@ export function ProductsPage() {
 
               <div>
                 <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                  Cuenta contable
+                  Buscar cuenta contable existente
+                </label>
+                <input
+                  list="cuentas-contables-list"
+                  value={cuentaAutocomplete}
+                  onChange={(event) => handleCuentaAutocompleteChange(event.target.value)}
+                  className={inputClassName}
+                  placeholder="Ej: CC001-FG001"
+                />
+                <datalist id="cuentas-contables-list">
+                  {cuentas.map((cuenta) => (
+                    <option key={cuenta.id} value={cuenta.codigoCompleto} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+                  Si eliges una cuenta existente, se completan automaticamente centro y funcion.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Centro de costo
                 </label>
                 <select
-                  value={cuentaIdForm}
-                  onChange={(event) => setCuentaIdForm(event.target.value)}
+                  required
+                  value={centroCostoIdForm}
+                  onChange={(event) => handleCentroCostoChange(event.target.value)}
                   className={inputClassName}
                 >
-                  <option value="">Sin cuenta asignada</option>
-                  {cuentas.map((cuenta) => (
-                    <option key={cuenta.id} value={cuenta.id}>
-                      {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre}
+                  <option value="">Selecciona centro de costo</option>
+                  {centrosCosto.map((centro) => (
+                    <option key={centro.id} value={centro.id}>
+                      {centro.codigo} - {centro.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Funcion de gasto
+                </label>
+                <select
+                  required
+                  value={funcionGastoIdForm}
+                  onChange={(event) => handleFuncionGastoChange(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecciona funcion de gasto</option>
+                  {funcionesGasto.map((funcion) => (
+                    <option key={funcion.id} value={funcion.id}>
+                      {funcion.codigo} - {funcion.nombre}
                     </option>
                   ))}
                 </select>
@@ -629,6 +875,15 @@ export function ProductsPage() {
                     Unidad
                   </th>
                   <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Stock actual
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    P. Unit (Bs.)
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    P. Prom (Bs.)
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Accion
                   </th>
                 </tr>
@@ -638,7 +893,7 @@ export function ProductsPage() {
                 {productosQuery.isLoading ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={9}
                       className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
                     >
                       Cargando productos...
@@ -649,7 +904,7 @@ export function ProductsPage() {
                 {!productosQuery.isLoading && products.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={9}
                       className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
                     >
                       No se encontraron productos con los filtros actuales.
@@ -673,35 +928,17 @@ export function ProductsPage() {
                       {product.categoria.nombre}
                     </td>
                     <td className="px-4 py-3 text-xs uppercase">{product.unidad}</td>
+                    <td className="px-4 py-3 text-right text-xs font-semibold">
+                      {product.stock.cantidad}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs">
+                      {product.stock.precioUnit}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs">
+                      {product.stock.precioProm}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <select
-                          value={
-                            rowCuentaSelection[product.id] ??
-                            (product.cuentaId ? String(product.cuentaId) : "")
-                          }
-                          onChange={(event) =>
-                            setRowCuentaSelection((current) => ({
-                              ...current,
-                              [product.id]: event.target.value
-                            }))
-                          }
-                          className="min-w-[180px] rounded-md border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-2 py-1.5 text-xs text-[var(--color-on-surface)]"
-                        >
-                          <option value="">Sin cuenta</option>
-                          {cuentas.map((cuenta) => (
-                            <option key={cuenta.id} value={cuenta.id}>
-                              {cuenta.codigoCompleto}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => handleAssignCuenta(product.id)}
-                          className="rounded-md border border-[var(--color-primary)]/45 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
-                        >
-                          Asignar
-                        </button>
                         <button
                           type="button"
                           onClick={() => selectProduct(product)}

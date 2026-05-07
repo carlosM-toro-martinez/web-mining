@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Boxes,
   CircleUserRound,
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   FlaskConical,
+  FileBarChart2,
   LayoutDashboard,
-  Map,
+  Layers3,
   Menu,
+  PackageCheck,
+  Building2,
   Search,
+  ShoppingCart,
+  Truck,
   UserPlus,
   RefreshCw
+  ,
+  IdCard
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import minerImage from "@/assets/miner.png";
@@ -27,28 +35,41 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
   // { label: "Mapa", icon: Map, to: "/mapa" },
-  { label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" }
+  { label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" },
+  { label: "Personal", icon: IdCard, to: "/personal" }
 ];
 
 export function AppShell() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, canManageUsers, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isInventoryExpanded, setIsInventoryExpanded] = useState(false);
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
   const isAlmacenero = user?.role === "ALMACENERO";
-  const canSeeInventory = isAlmacenero || isAdmin;
+  const isRecepcionista = user?.role === "RECEPCIONISTA";
+  const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista;
 
-  const displayItems = useMemo(() => {
+  const topNavItems = useMemo(() => {
     const items: NavItem[] = [...baseNavItems];
-    if (canSeeInventory) {
-      items.push({ label: "Inventario", icon: Boxes, to: "/inventario" });
-    }
     if (canManageUsers) {
       items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
     return items;
-  }, [canManageUsers, canSeeInventory]);
+  }, [canManageUsers]);
+
+  const inventoryNavItems = useMemo(() => {
+    if (!canSeeInventoryRoute) return [];
+    return [
+      { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
+      { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
+      { label: "Vales", icon: PackageCheck, to: "/inventario/vales" },
+      { label: "Proveedores", icon: Building2, to: "/inventario/proveedores" },
+      { label: "Stock", icon: Layers3, to: "/inventario/stock" },
+      { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" }
+    ];
+  }, [canSeeInventoryRoute]);
 
   const avatarLabel = useMemo(() => {
     const source = user?.nombre?.trim();
@@ -71,6 +92,25 @@ export function AppShell() {
   useEffect(() => {
     window.localStorage.setItem("ui:sidebar-collapsed", isSidebarCollapsed ? "true" : "false");
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    const persisted = window.localStorage.getItem("ui:inventory-expanded");
+    if (persisted === "true") {
+      setIsInventoryExpanded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("ui:inventory-expanded", isInventoryExpanded ? "true" : "false");
+  }, [isInventoryExpanded]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/inventario")) {
+      setIsInventoryExpanded(true);
+    }
+  }, [location.pathname]);
+
+  const isInventorySectionActive = location.pathname.startsWith("/inventario");
 
   return (
     <div className="app-shell min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
@@ -113,7 +153,7 @@ export function AppShell() {
         </div>
 
         <nav className="flex-1 space-y-1">
-          {displayItems.map((item) => (
+          {topNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -132,6 +172,53 @@ export function AppShell() {
               {isSidebarCollapsed ? null : <span>{item.label}</span>}
             </NavLink>
           ))}
+
+          {inventoryNavItems.length > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsInventoryExpanded((current) => !current)}
+                className={`mt-2 flex w-full items-center py-3 text-sm font-semibold transition-all ${
+                  isSidebarCollapsed ? "justify-center px-2" : "justify-between px-4"
+                } ${
+                  isInventorySectionActive
+                    ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <Boxes size={18} />
+                  {isSidebarCollapsed ? null : <span>Inventario</span>}
+                </span>
+                {isSidebarCollapsed ? null : (
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform ${isInventoryExpanded ? "rotate-180" : ""}`}
+                  />
+                )}
+              </button>
+
+              {isSidebarCollapsed || !isInventoryExpanded
+                ? null
+                : inventoryNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `ml-5 mr-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? "bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                            : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                        }`
+                      }
+                    >
+                      <item.icon size={16} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+            </>
+          ) : null}
         </nav>
 
         <div

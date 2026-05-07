@@ -3,15 +3,18 @@ import {
   createCentroCosto,
   createCuenta,
   createFuncionGasto,
+  createSector,
   createSalidaMovimiento,
   getCentrosCosto,
   getCuentas,
-  getFuncionesGasto
+  getFuncionesGasto,
+  getSectores
 } from "@/features/contabilidad/api/contabilidadApi";
 import type {
   CreateCentroCostoPayload,
   CreateCuentaPayload,
   CreateFuncionGastoPayload,
+  CreateSectorPayload,
   CreateSalidaPayload
 } from "@/features/contabilidad/model/contabilidad.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
@@ -27,6 +30,13 @@ export function useFuncionesGastoQuery() {
   return useQuery({
     queryKey: queryKeys.contabilidad.funcionesGasto(),
     queryFn: getFuncionesGasto
+  });
+}
+
+export function useSectoresQuery() {
+  return useQuery({
+    queryKey: queryKeys.contabilidad.sectores(),
+    queryFn: getSectores
   });
 }
 
@@ -67,6 +77,18 @@ export function useCreateCuentaMutation() {
   return useMutation({
     mutationFn: (payload: CreateCuentaPayload) => createCuenta(payload),
     onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useCreateSectorMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateSectorPayload) => createSector(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.sectores() });
       await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
     }
   });
