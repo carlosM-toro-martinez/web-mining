@@ -22,6 +22,7 @@ import { MapPage } from "@/pages/map/MapPage";
 import { ExploracionesPage } from "@/pages/exploraciones/ExploracionesPage";
 import { ExploracionesReportesPage } from "@/pages/exploraciones/ExploracionesReportesPage";
 import { ExploracionesElementosPage } from "@/pages/exploraciones/ExploracionesElementosPage";
+import { ExploracionesDataRoomPage } from "@/pages/exploraciones/ExploracionesDataRoomPage";
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
@@ -45,6 +46,31 @@ export function AppRouter() {
           <Route path="/" element={<HomePage />} />
           <Route path="/mapa" element={<MapPage />} />
           <Route path="/exploraciones" element={<ExploracionesPage />} />
+          <Route
+            path="/exploraciones-data-room"
+            element={<Navigate to="/exploraciones-data-room/projects" replace />}
+          />
+          <Route path="/exploraciones-data-room/projects" element={<ExploracionesDataRoomPage />} />
+          <Route
+            path="/exploraciones-data-room/projects/:projectId"
+            element={<ExploracionesDataRoomPage />}
+          />
+          <Route
+            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId"
+            element={<ExploracionesDataRoomPage />}
+          />
+          <Route
+            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId"
+            element={<ExploracionesDataRoomPage />}
+          />
+          <Route
+            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId"
+            element={<ExploracionesDataRoomPage />}
+          />
+          <Route
+            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId/assays/:assayId"
+            element={<ExploracionesDataRoomPage />}
+          />
           <Route path="/personal" element={<EmployeePage />} />
           <Route path="/exploraciones/elementos" element={<ExploracionesElementosPage />} />
           <Route path="/exploraciones/reportes" element={<ExploracionesReportesPage />} />

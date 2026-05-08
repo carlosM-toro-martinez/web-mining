@@ -29,7 +29,9 @@ export const queryKeys = {
     elementosOffline: () => [...queryKeys.exploraciones.all, "elementos-offline"] as const,
     remotas: () => [...queryKeys.exploraciones.all, "remotas"] as const,
     elementos: () => [...queryKeys.exploraciones.all, "elementos"] as const,
-    laboratorios: () => [...queryKeys.exploraciones.all, "laboratorios"] as const
+    laboratorios: () => [...queryKeys.exploraciones.all, "laboratorios"] as const,
+    hierarchy: (params: { search?: string; page?: number; limit?: number }) =>
+      [...queryKeys.exploraciones.all, "hierarchy", params] as const
   },
   auth: {
     all: ["auth"] as const,

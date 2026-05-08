@@ -3,5 +3,21 @@ export const exploracionesEndpoints = {
   muestrasTodas: "/api/exploraciones/muestras-todas",
   muestraById: (id: string) => `/api/exploraciones/muestras/${id}`,
   elementos: "/api/exploraciones/elementos",
-  laboratorios: "/api/exploraciones/laboratorios"
+  laboratorios: "/api/exploraciones/laboratorios",
+  projects: "/api/projects",
+  projectById: (id: number) => `/api/projects/${id}`,
+  zones: "/api/zones",
+  zoneById: (id: number) => `/api/zones/${id}`,
+  drillholes: "/api/drillholes",
+  drillholeById: (id: number) => `/api/drillholes/${id}`,
+  intervals: "/api/intervals",
+  intervalById: (id: number) => `/api/intervals/${id}`,
+  assays: "/api/assays",
+  assayById: (id: number) => `/api/assays/${id}`,
+  lithologies: "/api/lithologies",
+  lithologyById: (id: number) => `/api/lithologies/${id}`,
+  qaqc: "/api/qaqc",
+  qaqcById: (id: number) => `/api/qaqc/${id}`,
+  resources: "/api/resources",
+  resourceById: (id: number) => `/api/resources/${id}`
 } as const;
