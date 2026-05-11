@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Database, Plus, X } from "lucide-react";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ChevronRight, Database, MoonStar, Plus, Sun, X } from "lucide-react";
 import L from "leaflet";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,26 +9,43 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { useTheme } from "@/shared/theme/ThemeProvider";
 import {
   useAssayDetailQuery,
   useAssaysByIntervalQuery,
+  useAssayValuesByAssayQuery,
+  useAlterationsByIntervalQuery,
   useCreateAssayMutation,
+  useCreateAssayValueMutation,
+  useCreateAlterationMutation,
+  useCreateDensityMutation,
   useCreateDrillHoleMutation,
+  useCreateDrillHoleSurveyMutation,
+  useCreateGeologicalStructureMutation,
   useCreateIntervalMutation,
   useCreateLithologyMutation,
+  useCreateMagneticSusceptibilityMutation,
+  useCreateMineralizationMutation,
   useCreateProjectMutation,
   useCreateQaqcMutation,
-  useCreateResourceMutation,
+  useCreateRecoveryMutation,
+  useCreateSignificantInterceptMutation,
   useCreateZoneMutation,
+  useDensitiesByIntervalQuery,
   useDrillHoleDetailQuery,
   useDrillHolesByZoneQuery,
+  useDrillHoleSurveysByDrillHoleQuery,
+  useGeologicalStructuresByIntervalQuery,
   useIntervalDetailQuery,
   useIntervalsByDrillHoleQuery,
   useLithologiesByIntervalQuery,
+  useMagneticSusceptibilitiesByIntervalQuery,
+  useMineralizationsByIntervalQuery,
   useProjectDetailQuery,
   useProjectsQuery,
   useQaqcByAssayQuery,
-  useResourcesByProjectQuery,
+  useRecoveriesByIntervalQuery,
+  useSignificantInterceptsByZoneQuery,
   useZoneDetailQuery,
   useZonesByProjectQuery
 } from "@/features/exploraciones/hooks/useExploracionMinera";
@@ -44,7 +61,15 @@ type ModalType =
   | "assay"
   | "lithology"
   | "qaqc"
-  | "resource";
+  | "significantIntercept"
+  | "drillHoleSurvey"
+  | "assayValue"
+  | "alteration"
+  | "mineralization"
+  | "geologicalStructure"
+  | "recovery"
+  | "density"
+  | "magneticSusceptibility";
 
 function parseId(value?: string) {
   if (!value) return undefined;
@@ -52,7 +77,13 @@ function parseId(value?: string) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function pathFor(projectId: number, zoneId?: number, drillHoleId?: number, intervalId?: number, assayId?: number) {
+function pathFor(
+  projectId: number,
+  zoneId?: number,
+  drillHoleId?: number,
+  intervalId?: number,
+  assayId?: number
+) {
   if (!zoneId) return `/exploraciones-data-room/projects/${projectId}`;
   if (!drillHoleId) return `/exploraciones-data-room/projects/${projectId}/zones/${zoneId}`;
   if (!intervalId) {
@@ -69,15 +100,29 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow
 });
+const mapMarkerIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [30, 48],
+  iconAnchor: [15, 48],
+  popupAnchor: [0, -42],
+  shadowSize: [46, 46]
+});
 
 const DEFAULT_PROJECT_MAP_LAT = Number(import.meta.env.VITE_PROJECT_MAP_LAT ?? -16.5);
 const DEFAULT_PROJECT_MAP_LNG = Number(import.meta.env.VITE_PROJECT_MAP_LNG ?? -68.15);
+const EXPLORACIONES_INTRO_VIDEO_URL =
+  import.meta.env.VITE_EXPLORACIONES_INTRO_VIDEO_URL ?? "/media/exploraciones-intro.mp4";
 
 export function ExploracionesDataRoomPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
+  const { mode, setMode } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const canManage = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const isAdmin = user?.role === "ADMIN";
   const params = useParams();
   const projectId = parseId(params.projectId);
   const zoneId = parseId(params.zoneId);
@@ -98,7 +143,15 @@ export function ExploracionesDataRoomPage() {
   const lithologiesQuery = useLithologiesByIntervalQuery(intervalId);
   const assayDetail = useAssayDetailQuery(assayId);
   const qaqcQuery = useQaqcByAssayQuery(assayId);
-  const resourcesQuery = useResourcesByProjectQuery(projectId);
+  const significantInterceptsByZoneQuery = useSignificantInterceptsByZoneQuery(zoneId);
+  const drillHoleSurveysQuery = useDrillHoleSurveysByDrillHoleQuery(drillHoleId);
+  const assayValuesQuery = useAssayValuesByAssayQuery(assayId);
+  const alterationsQuery = useAlterationsByIntervalQuery(intervalId);
+  const mineralizationsQuery = useMineralizationsByIntervalQuery(intervalId);
+  const geologicalStructuresQuery = useGeologicalStructuresByIntervalQuery(intervalId);
+  const recoveriesQuery = useRecoveriesByIntervalQuery(intervalId);
+  const densitiesQuery = useDensitiesByIntervalQuery(intervalId);
+  const magneticSusceptibilitiesQuery = useMagneticSusceptibilitiesByIntervalQuery(intervalId);
 
   const createProject = useCreateProjectMutation();
   const createZone = useCreateZoneMutation();
@@ -107,10 +160,30 @@ export function ExploracionesDataRoomPage() {
   const createAssay = useCreateAssayMutation();
   const createLithology = useCreateLithologyMutation();
   const createQaqc = useCreateQaqcMutation();
-  const createResource = useCreateResourceMutation();
+  const createSignificantIntercept = useCreateSignificantInterceptMutation();
+  const createDrillHoleSurvey = useCreateDrillHoleSurveyMutation();
+  const createAssayValue = useCreateAssayValueMutation();
+  const createAlteration = useCreateAlterationMutation();
+  const createMineralization = useCreateMineralizationMutation();
+  const createGeologicalStructure = useCreateGeologicalStructureMutation();
+  const createRecovery = useCreateRecoveryMutation();
+  const createDensity = useCreateDensityMutation();
+  const createMagneticSusceptibility = useCreateMagneticSusceptibilityMutation();
   const intervalsRef = useRef<HTMLDivElement | null>(null);
   const assaysRef = useRef<HTMLDivElement | null>(null);
   const qaqcRef = useRef<HTMLDivElement | null>(null);
+  const isLanding = location.pathname === "/exploraciones-data-room";
+  const availableProjects = projectsQuery.data?.data ?? [];
+  const preferredDrillProject =
+    availableProjects.find((project) => project.id === 1) ?? availableProjects[0];
+
+  useEffect(() => {
+    if (!isLanding && !projectId && projectsQuery.data?.data?.length) {
+      const preferredProject =
+        projectsQuery.data.data.find((project) => project.id === 1) ?? projectsQuery.data.data[0];
+      navigate(pathFor(preferredProject.id), { replace: true });
+    }
+  }, [isLanding, navigate, projectId, projectsQuery.data]);
 
   useEffect(() => {
     if (drillHoleId && intervalsRef.current) {
@@ -144,7 +217,15 @@ export function ExploracionesDataRoomPage() {
       assayDetail.isLoading ||
       lithologiesQuery.isLoading ||
       qaqcQuery.isLoading ||
-      resourcesQuery.isLoading,
+      significantInterceptsByZoneQuery.isLoading ||
+      drillHoleSurveysQuery.isLoading ||
+      assayValuesQuery.isLoading ||
+      alterationsQuery.isLoading ||
+      mineralizationsQuery.isLoading ||
+      geologicalStructuresQuery.isLoading ||
+      recoveriesQuery.isLoading ||
+      densitiesQuery.isLoading ||
+      magneticSusceptibilitiesQuery.isLoading,
     [
       projectsQuery.isLoading,
       projectDetail.isLoading,
@@ -158,7 +239,15 @@ export function ExploracionesDataRoomPage() {
       assayDetail.isLoading,
       lithologiesQuery.isLoading,
       qaqcQuery.isLoading,
-      resourcesQuery.isLoading
+      significantInterceptsByZoneQuery.isLoading,
+      drillHoleSurveysQuery.isLoading,
+      assayValuesQuery.isLoading,
+      alterationsQuery.isLoading,
+      mineralizationsQuery.isLoading,
+      geologicalStructuresQuery.isLoading,
+      recoveriesQuery.isLoading,
+      densitiesQuery.isLoading,
+      magneticSusceptibilitiesQuery.isLoading
     ]
   );
 
@@ -174,16 +263,22 @@ export function ExploracionesDataRoomPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
           >
             <ArrowLeft size={14} />
-            Atrás
+            Back
           </button>
           <div className="flex flex-wrap items-center gap-1 text-xs text-[var(--color-on-surface-variant)]">
-            <Link className="text-[var(--color-primary)] hover:underline" to="/exploraciones-data-room">
+            <Link
+              className="text-[var(--color-primary)] hover:underline"
+              to="/exploraciones-data-room"
+            >
               Exploraciones Data Room
             </Link>
             {projectId ? (
               <>
                 <ChevronRight size={12} />
-                <Link className="text-[var(--color-primary)] hover:underline" to={pathFor(projectId)}>
+                <Link
+                  className="text-[var(--color-primary)] hover:underline"
+                  to={pathFor(projectId)}
+                >
                   {projectDetail.data?.name ?? `Project #${projectId}`}
                 </Link>
               </>
@@ -191,7 +286,10 @@ export function ExploracionesDataRoomPage() {
             {zoneId ? (
               <>
                 <ChevronRight size={12} />
-                <Link className="text-[var(--color-primary)] hover:underline" to={pathFor(projectId as number, zoneId)}>
+                <Link
+                  className="text-[var(--color-primary)] hover:underline"
+                  to={pathFor(projectId as number, zoneId)}
+                >
                   {zoneDetail.data?.name ?? `Zone #${zoneId}`}
                 </Link>
               </>
@@ -225,18 +323,44 @@ export function ExploracionesDataRoomPage() {
               </>
             ) : null}
           </div>
+          <div className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-1">
+            <button
+              type="button"
+              onClick={() => setMode("light")}
+              className={`inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                mode === "light"
+                  ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
+                  : "text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]"
+              }`}
+            >
+              <Sun size={12} />
+              Light
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("dark")}
+              className={`inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                mode === "dark"
+                  ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
+                  : "text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]"
+              }`}
+            >
+              <MoonStar size={12} />
+              Dark
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Database size={20} className="text-[var(--color-primary)]" />
             <div>
-              <h1 className="text-2xl font-extrabold">Exploraciones Data Room</h1>
-              <p className="text-sm text-[var(--color-on-surface-variant)]">
+              <h1 className="text-2xl font-extrabold">Exploration Data Room</h1>
+              {/* <p className="text-sm text-[var(--color-on-surface-variant)]">
                 Project → Zone → DrillHole → Interval → Assay (QAQC/Lithology/Resource).
-              </p>
+              </p> */}
             </div>
           </div>
-          <div className="grid w-full max-w-[520px] grid-cols-1 gap-2 md:grid-cols-2">
+          {/* <div className="grid w-full max-w-[520px] grid-cols-1 gap-2 md:grid-cols-2">
             <select
               className={inputClassName}
               value={projectId ?? ""}
@@ -246,10 +370,10 @@ export function ExploracionesDataRoomPage() {
                 navigate(pathFor(nextId));
               }}
             >
-              <option value="">Elegir project...</option>
+              <option value="">Choose project...</option>
               {(projectsQuery.data?.data ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.location ?? "s/ubicación"})
+                  {p.name} ({p.location ?? "n/a"})
                 </option>
               ))}
             </select>
@@ -263,36 +387,105 @@ export function ExploracionesDataRoomPage() {
                 navigate(pathFor(projectId, nextZone));
               }}
             >
-              <option value="">Elegir zone...</option>
+              <option value="">Choose zone...</option>
               {(zonesQuery.data?.data ?? []).map((z) => (
                 <option key={z.id} value={z.id}>
                   {z.name}
                 </option>
               ))}
             </select>
-          </div>
+          </div> */}
         </div>
       </header>
 
-      {isLoading ? <section className="rounded-xl bg-[var(--color-surface-container-low)] p-4">Cargando...</section> : null}
+      {isLoading ? (
+        <section className="rounded-xl bg-[var(--color-surface-container-low)] p-4">
+          Loading...
+        </section>
+      ) : null}
 
-      {!projectId ? (
+      {isLanding ? (
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-3">
+          <article className="md:col-span-3 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4">
+            <p className="mb-2 text-sm font-semibold">Intro Video</p>
+            <video
+              key={EXPLORACIONES_INTRO_VIDEO_URL}
+              className="h-auto max-h-[420px] w-full rounded-lg border border-[var(--color-border-soft)] bg-black object-contain"
+              controls
+              preload="metadata"
+            >
+              <source src={EXPLORACIONES_INTRO_VIDEO_URL} type="video/mp4" />
+            </video>
+            <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
+              Source: <code>{EXPLORACIONES_INTRO_VIDEO_URL}</code>
+            </p>
+          </article>
+          <button
+            type="button"
+            onClick={() =>
+              preferredDrillProject
+                ? navigate(`/exploraciones-data-room/projects/${preferredDrillProject.id}`)
+                : navigate("/exploraciones-data-room/projects")
+            }
+            className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-left transition hover:border-[var(--color-primary)]"
+          >
+            <p className="text-lg font-bold">Taladros</p>
+            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+              {preferredDrillProject
+                ? "Enter the drilling data room."
+                : "No drilling project yet. Click to create the first one."}
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/exploraciones-data-room/surface")}
+            className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-left transition hover:border-[var(--color-primary)]"
+          >
+            <p className="text-lg font-bold">Surface</p>
+            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+              Enter the surface exploration data room.
+            </p>
+          </button>
+          <button
+            type="button"
+            className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-left opacity-75"
+          >
+            <p className="text-lg font-bold">Geochemistry</p>
+            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+              Geochemistry module (coming soon).
+            </p>
+          </button>
+          {isAdmin ? (
+            <Link
+              to="/exploraciones-data-room/forms"
+              className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-left transition hover:border-[var(--color-primary)]"
+            >
+              <p className="text-lg font-bold">Forms</p>
+              <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+                Admin forms hub for Drillholes and Surface, including bulk upload.
+              </p>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!isLanding && !projectId ? (
         <div className="mx-auto max-w-5xl">
           <Card
             title="Projects"
-            action={<AddBtn label="Agregar Project" onClick={() => setModal("project")} />}
+            action={<AddBtn label="Add Project" onClick={() => setModal("project")} />}
           >
             <SimpleTable
-              headers={["ID", "Nombre", "Ubicación", "Acción"]}
+              headers={["ID", "Name", "Location", "Action"]}
               rows={(projectsQuery.data?.data ?? []).map((p) => [
                 String(p.id),
                 p.name,
                 p.location ?? "-",
                 <Link key={p.id} className="text-[var(--color-primary)]" to={pathFor(p.id)}>
-                  Abrir
+                  Open
                 </Link>
               ])}
-              empty="Sin proyectos."
+              empty="No projects."
             />
           </Card>
         </div>
@@ -303,30 +496,38 @@ export function ExploracionesDataRoomPage() {
           <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4">
             <h2 className="text-xl font-bold">{projectDetail.data?.name ?? "Project"}</h2>
             <p className="text-sm text-[var(--color-on-surface-variant)]">
-              {projectDetail.data?.location ?? "Sin ubicación"}
+              {projectDetail.data?.location ?? "No location"}
             </p>
           </header>
           <Card
-            title="Zonas del Project"
-            action={<AddBtn label="Agregar Zone" onClick={() => setModal("zone")} />}
+            title="Project Zones"
+            description={`Zones defined for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
+            action={<AddBtn label="Add Zone" onClick={() => setModal("zone")} />}
           >
             <SimpleTable
-              headers={["Zone", "Descripción", "Acción"]}
+              headers={["Zone", "Description", "Action"]}
               rows={(zonesQuery.data?.data ?? []).map((z) => [
                 z.name,
                 z.description ?? "-",
-                <Link key={z.id} className="text-[var(--color-primary)]" to={pathFor(projectId, z.id)}>
-                  Ver DrillHoles
+                <Link
+                  key={z.id}
+                  className="text-[var(--color-primary)]"
+                  to={pathFor(projectId, z.id)}
+                >
+                  View Drillholes
                 </Link>
               ])}
-              empty="Sin zonas."
+              empty="No zones."
             />
           </Card>
-          <Card title="Mapa del Project">
+          <Card
+            title="Map"
+            description={`Geospatial overview for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
+          >
             <ProjectResourceMap
               latitude={DEFAULT_PROJECT_MAP_LAT}
               longitude={DEFAULT_PROJECT_MAP_LNG}
-              resources={resourcesQuery.data?.data ?? []}
+              resources={[]}
             />
           </Card>
         </div>
@@ -337,21 +538,130 @@ export function ExploracionesDataRoomPage() {
           <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4">
             <h2 className="text-xl font-bold">{projectDetail.data?.name ?? "Project"}</h2>
             <p className="text-sm text-[var(--color-on-surface-variant)]">
-              {projectDetail.data?.location ?? "Sin ubicación"}
+              {projectDetail.data?.location ?? "No location"}
             </p>
             <p className="mt-2 text-sm">
-              <strong>Zona:</strong> {zoneDetail.data?.name ?? "-"} · {zoneDetail.data?.description ?? "Sin descripción"}
+              <strong>Zone:</strong> {zoneDetail.data?.name ?? "-"} ·{" "}
+              {zoneDetail.data?.description ?? "No description"}
             </p>
           </header>
           <div className="animate-[fadeIn_.28s_ease-out]">
             {!drillHoleId ? (
               <div className="space-y-4">
                 <Card
-                  title="DrillHoles de la Zone"
-                  action={<AddBtn label="Agregar DrillHole" onClick={() => setModal("drillhole")} />}
+                  title="Significant Intercepts"
+                  description={`Significant intercepts registered for zone ${zoneDetail.data?.name ?? `#${zoneId}`}.`}
+                  action={
+                    <AddBtn
+                      label="Add Significant Intercept"
+                      onClick={() => setModal("significantIntercept")}
+                    />
+                  }
+                >
+                  <div className="overflow-x-auto rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]">
+                    <table className="w-full border-collapse text-left">
+                      <thead>
+                        <tr>
+                          {[
+                            "Hole",
+                            "Incl.",
+                            "From",
+                            "To",
+                            "Width",
+                            "True Width",
+                            "Au g/t",
+                            "Cu %",
+                            "Ag g/t",
+                            "Comments"
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              className="bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(significantInterceptsByZoneQuery.data?.data ?? []).length ? (
+                          (significantInterceptsByZoneQuery.data?.data ?? []).map((si) => (
+                            <tr
+                              key={si.id}
+                              className="border-t border-[var(--color-border-soft)] transition hover:bg-[var(--color-surface-container-highest)]"
+                            >
+                              <td className="px-3 py-2 text-sm font-semibold">
+                                <Link
+                                  className="text-[var(--color-primary)] hover:underline"
+                                  to={pathFor(projectId, zoneId, si.drillHoleId)}
+                                >
+                                  {si.drillHole?.name ?? `Drillhole #${si.drillHoleId}`}
+                                </Link>
+                              </td>
+                              <td className="px-3 py-2 text-sm">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-xs font-bold ${si.isIncluding ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-500/20 text-slate-300"}`}
+                                >
+                                  {si.isIncluding ? "YES" : "NO"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 font-mono text-sm text-cyan-300">
+                                {si.fromDepth}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-sm text-cyan-300">
+                                {si.toDepth}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-sm font-bold text-amber-300">
+                                {si.width}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-sm">{si.trueWidth ?? "-"}</td>
+                              <td className="px-3 py-2 font-mono text-sm font-bold text-yellow-300">
+                                {si.au ?? "-"}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-sm font-bold text-orange-300">
+                                {si.cu ?? "-"}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-sm font-bold text-lime-300">
+                                {si.ag ?? "-"}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-[var(--color-on-surface-variant)]">
+                                {si.comments ?? "-"}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td
+                              colSpan={10}
+                              className="px-3 py-4 text-sm text-[var(--color-on-surface-variant)]"
+                            >
+                              No significant intercepts.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+                <Card
+                  title="Drillholes"
+                  description={`Drillholes registered for zone ${zoneDetail.data?.name ?? `#${zoneId}`}.`}
+                  action={<AddBtn label="Add Drillhole" onClick={() => setModal("drillhole")} />}
                 >
                   <SimpleTable
-                    headers={["Nombre", "Tipo", "East", "North", "Elevation", "Depth", "Azimuth", "Dip", "Campaign", "Year", "Acción"]}
+                    headers={[
+                      "Hole",
+                      "Type",
+                      "East",
+                      "North",
+                      "Elevation",
+                      "Depth",
+                      "Azimuth",
+                      "Dip",
+                      "Campaign",
+                      "Year",
+                      "Action"
+                    ]}
                     rows={(drillHolesQuery.data?.data ?? []).map((d) => [
                       d.name,
                       d.type,
@@ -363,27 +673,15 @@ export function ExploracionesDataRoomPage() {
                       d.dip === null ? "-" : String(d.dip),
                       d.campaign ?? "-",
                       d.year === null ? "-" : String(d.year),
-                      <Link key={d.id} className="text-[var(--color-primary)]" to={pathFor(projectId, zoneId, d.id)}>
-                        Ver Intervals
+                      <Link
+                        key={d.id}
+                        className="text-[var(--color-primary)]"
+                        to={pathFor(projectId, zoneId, d.id)}
+                      >
+                        View Intervals
                       </Link>
                     ])}
-                    empty="Sin drillholes en esta zone."
-                  />
-                </Card>
-                <Card title="Resources del Project" action={<AddBtn label="Agregar Resource" onClick={() => setModal("resource")} />}>
-                  <SimpleTable
-                    headers={["Type", "Category", "Cutoff", "Tonnes", "Au", "Cu", "Ag", "CuEq"]}
-                    rows={(resourcesQuery.data?.data ?? []).map((r) => [
-                      r.type,
-                      r.category,
-                      String(r.cutoff),
-                      String(r.tonnes),
-                      String(r.au),
-                      String(r.cu),
-                      String(r.ag),
-                      String(r.cuEq)
-                    ])}
-                    empty="Sin resources."
+                    empty="No drillholes in this zone."
                   />
                 </Card>
               </div>
@@ -392,23 +690,45 @@ export function ExploracionesDataRoomPage() {
             {drillHoleId && !intervalId ? (
               <div ref={intervalsRef}>
                 <Card
-                  title={`Intervals de ${drillHoleDetail.data?.name ?? `DrillHole #${drillHoleId}`}`}
-                  action={<AddBtn label="Agregar Interval" onClick={() => setModal("interval")} />}
+                  title="Intervals"
+                  description={`Intervals logged for drillhole ${drillHoleDetail.data?.name ?? `#${drillHoleId}`}.`}
+                  action={<AddBtn label="Add Interval" onClick={() => setModal("interval")} />}
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
-                    Estás viendo los intervals del drillhole seleccionado.
+                    You are viewing intervals for the selected drillhole.
                   </div>
                   <SimpleTable
-                    headers={["ID", "From", "To", "Acción"]}
+                    headers={["ID", "From", "To", "Action"]}
                     rows={(intervalsQuery.data?.data ?? []).map((i) => [
                       String(i.id),
                       String(i.fromDepth),
                       String(i.toDepth),
-                      <Link key={i.id} className="text-[var(--color-primary)]" to={pathFor(projectId, zoneId, drillHoleId, i.id)}>
-                        Ver Assays
+                      <Link
+                        key={i.id}
+                        className="text-[var(--color-primary)]"
+                        to={pathFor(projectId, zoneId, drillHoleId, i.id)}
+                      >
+                        View Assays
                       </Link>
                     ])}
-                    empty="Este drillhole no tiene intervals todavía."
+                    empty="This drillhole has no intervals yet."
+                  />
+                </Card>
+                <div className="mt-3" />
+                <Card
+                  title="Drillhole Surveys"
+                  description={`Survey measurements for drillhole ${drillHoleDetail.data?.name ?? `#${drillHoleId}`}.`}
+                  action={<AddBtn label="Add Survey" onClick={() => setModal("drillHoleSurvey")} />}
+                >
+                  <SimpleTable
+                    headers={["ID", "Depth", "Azimuth", "Dip"]}
+                    rows={(drillHoleSurveysQuery.data?.data ?? []).map((s) => [
+                      String(s.id),
+                      String(s.depth),
+                      String(s.azimuth),
+                      String(s.dip)
+                    ])}
+                    empty="No surveys."
                   />
                 </Card>
               </div>
@@ -417,19 +737,20 @@ export function ExploracionesDataRoomPage() {
             {drillHoleId && intervalId && !assayId ? (
               <div ref={assaysRef}>
                 <Card
-                  title={`Assays y Lithologies de Interval #${intervalId}`}
+                  title="Assays and Lithologies"
+                  description={`Assay and lithology records for interval #${intervalId}.`}
                   action={
                     <div className="flex gap-2">
-                      <AddBtn label="Agregar Assay" onClick={() => setModal("assay")} />
-                      <AddBtn label="Agregar Lithology" onClick={() => setModal("lithology")} />
+                      <AddBtn label="Add Assay" onClick={() => setModal("assay")} />
+                      <AddBtn label="Add Lithology" onClick={() => setModal("lithology")} />
                     </div>
                   }
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
-                    Estás viendo el detalle del interval seleccionado.
+                    You are viewing details for the selected interval.
                   </div>
                   <SimpleTable
-                    headers={["ID", "Method", "Au", "Cu", "Ag", "Lab", "Acción"]}
+                    headers={["ID", "Method", "Au", "Cu", "Ag", "Lab", "Action"]}
                     rows={(assaysQuery.data?.data ?? []).map((a) => [
                       String(a.id),
                       a.assayMethod,
@@ -437,11 +758,15 @@ export function ExploracionesDataRoomPage() {
                       String(a.cu),
                       String(a.ag),
                       a.laboratory ?? "-",
-                      <Link key={a.id} className="text-[var(--color-primary)]" to={pathFor(projectId, zoneId, drillHoleId, intervalId, a.id)}>
-                        Ver QAQC
+                      <Link
+                        key={a.id}
+                        className="text-[var(--color-primary)]"
+                        to={pathFor(projectId, zoneId, drillHoleId, intervalId, a.id)}
+                      >
+                        View QAQC
                       </Link>
                     ])}
-                    empty="Sin assays."
+                    empty="No assays."
                   />
                   <div className="mt-3" />
                   <SimpleTable
@@ -453,27 +778,171 @@ export function ExploracionesDataRoomPage() {
                       l.mineralization ?? "-",
                       l.comments ?? "-"
                     ])}
-                    empty="Sin lithologies."
+                    empty="No lithologies."
                   />
+                  <div className="mt-3" />
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                    <Card
+                      title="Alterations"
+                      description={`Alteration logs for interval #${intervalId}.`}
+                      action={
+                        <AddBtn label="Add Alteration" onClick={() => setModal("alteration")} />
+                      }
+                    >
+                      <SimpleTable
+                        headers={["ID", "Type", "Intensity", "Description", "Comments"]}
+                        rows={(alterationsQuery.data?.data ?? []).map((a) => [
+                          String(a.id),
+                          a.type,
+                          a.intensity === null ? "-" : String(a.intensity),
+                          a.description ?? "-",
+                          a.comments ?? "-"
+                        ])}
+                        empty="No alterations."
+                      />
+                    </Card>
+                    <Card
+                      title="Mineralizations"
+                      description={`Mineralization logs for interval #${intervalId}.`}
+                      action={
+                        <AddBtn
+                          label="Add Mineralization"
+                          onClick={() => setModal("mineralization")}
+                        />
+                      }
+                    >
+                      <SimpleTable
+                        headers={["ID", "Mineral", "Percentage", "Style", "Habit"]}
+                        rows={(mineralizationsQuery.data?.data ?? []).map((m) => [
+                          String(m.id),
+                          m.mineral,
+                          m.percentage === null ? "-" : String(m.percentage),
+                          m.style ?? "-",
+                          m.habit ?? "-"
+                        ])}
+                        empty="No mineralizations."
+                      />
+                    </Card>
+                    <Card
+                      title="Geological Structures"
+                      description={`Structural records for interval #${intervalId}.`}
+                      action={
+                        <AddBtn
+                          label="Add Structure"
+                          onClick={() => setModal("geologicalStructure")}
+                        />
+                      }
+                    >
+                      <SimpleTable
+                        headers={["ID", "Type", "Angle", "Width", "Orientation"]}
+                        rows={(geologicalStructuresQuery.data?.data ?? []).map((g) => [
+                          String(g.id),
+                          g.structureType,
+                          g.angle === null ? "-" : String(g.angle),
+                          g.width === null ? "-" : String(g.width),
+                          g.orientation ?? "-"
+                        ])}
+                        empty="No geological structures."
+                      />
+                    </Card>
+                    <Card
+                      title="Recoveries"
+                      description={`Core recovery metrics for interval #${intervalId}.`}
+                      action={<AddBtn label="Add Recovery" onClick={() => setModal("recovery")} />}
+                    >
+                      <SimpleTable
+                        headers={["ID", "Recovery %", "RQD %", "Core Loss", "Comments"]}
+                        rows={(recoveriesQuery.data?.data ?? []).map((r) => [
+                          String(r.id),
+                          r.recoveryPercent === null ? "-" : String(r.recoveryPercent),
+                          r.rqdPercent === null ? "-" : String(r.rqdPercent),
+                          r.coreLoss === null ? "-" : String(r.coreLoss),
+                          r.comments ?? "-"
+                        ])}
+                        empty="No recoveries."
+                      />
+                    </Card>
+                    <Card
+                      title="Densities"
+                      description={`Density measurements for interval #${intervalId}.`}
+                      action={<AddBtn label="Add Density" onClick={() => setModal("density")} />}
+                    >
+                      <SimpleTable
+                        headers={["ID", "Specific Gravity", "Method", "Dry Density", "Wet Density"]}
+                        rows={(densitiesQuery.data?.data ?? []).map((d) => [
+                          String(d.id),
+                          String(d.specificGravity),
+                          d.method ?? "-",
+                          d.dryDensity === null ? "-" : String(d.dryDensity),
+                          d.wetDensity === null ? "-" : String(d.wetDensity)
+                        ])}
+                        empty="No densities."
+                      />
+                    </Card>
+                    <Card
+                      title="Magnetic Susceptibilities"
+                      description={`Magnetic susceptibility readings for interval #${intervalId}.`}
+                      action={
+                        <AddBtn
+                          label="Add Magnetic"
+                          onClick={() => setModal("magneticSusceptibility")}
+                        />
+                      }
+                    >
+                      <SimpleTable
+                        headers={["ID", "Value", "Unit", "Instrument", "Comments"]}
+                        rows={(magneticSusceptibilitiesQuery.data?.data ?? []).map((m) => [
+                          String(m.id),
+                          String(m.value),
+                          m.unit ?? "-",
+                          m.instrument ?? "-",
+                          m.comments ?? "-"
+                        ])}
+                        empty="No magnetic susceptibilities."
+                      />
+                    </Card>
+                  </div>
                 </Card>
               </div>
             ) : null}
 
             {drillHoleId && intervalId && assayId ? (
               <div ref={qaqcRef}>
-                <Card title={`QAQC de Assay #${assayId}`} action={<AddBtn label="Agregar QAQC" onClick={() => setModal("qaqc")} />}>
+                <Card
+                  title="QAQC"
+                  description={`Quality control records for assay #${assayId}.`}
+                  action={<AddBtn label="Add QAQC" onClick={() => setModal("qaqc")} />}
+                >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
-                    Estás viendo los QAQC del assay seleccionado.
+                    You are viewing QAQC records for the selected assay.
                   </div>
                   <SimpleTable
                     headers={["ID", "Type", "Passed", "Notes"]}
                     rows={(qaqcQuery.data?.data ?? []).map((q) => [
                       String(q.id),
                       q.type,
-                      q.passed ? "Sí" : "No",
+                      q.passed ? "Yes" : "No",
                       q.notes ?? "-"
                     ])}
-                    empty="Sin QAQC."
+                    empty="No QAQC records."
+                  />
+                </Card>
+                <div className="mt-3" />
+                <Card
+                  title="Assay Values"
+                  description={`Element values reported for assay #${assayId}.`}
+                  action={<AddBtn label="Add Assay Value" onClick={() => setModal("assayValue")} />}
+                >
+                  <SimpleTable
+                    headers={["ID", "Element", "Value", "Unit", "Detection Limit"]}
+                    rows={(assayValuesQuery.data?.data ?? []).map((v) => [
+                      String(v.id),
+                      v.element,
+                      String(v.value),
+                      v.unit ?? "-",
+                      v.detectionLimit === null ? "-" : String(v.detectionLimit)
+                    ])}
+                    empty="No assay values."
                   />
                 </Card>
               </div>
@@ -486,6 +955,7 @@ export function ExploracionesDataRoomPage() {
         <CreateModal
           type={modal}
           context={{ projectId, zoneId, drillHoleId, intervalId, assayId }}
+          drillHoles={drillHolesQuery.data?.data ?? []}
           onClose={() => setModal(null)}
           onSubmit={async (payload) => {
             try {
@@ -496,11 +966,24 @@ export function ExploracionesDataRoomPage() {
               if (modal === "assay") await createAssay.mutateAsync(payload as any);
               if (modal === "lithology") await createLithology.mutateAsync(payload as any);
               if (modal === "qaqc") await createQaqc.mutateAsync(payload as any);
-              if (modal === "resource") await createResource.mutateAsync(payload as any);
-              showSuccess("Registro creado correctamente.");
+              if (modal === "significantIntercept")
+                await createSignificantIntercept.mutateAsync(payload as any);
+              if (modal === "drillHoleSurvey")
+                await createDrillHoleSurvey.mutateAsync(payload as any);
+              if (modal === "assayValue") await createAssayValue.mutateAsync(payload as any);
+              if (modal === "alteration") await createAlteration.mutateAsync(payload as any);
+              if (modal === "mineralization")
+                await createMineralization.mutateAsync(payload as any);
+              if (modal === "geologicalStructure")
+                await createGeologicalStructure.mutateAsync(payload as any);
+              if (modal === "recovery") await createRecovery.mutateAsync(payload as any);
+              if (modal === "density") await createDensity.mutateAsync(payload as any);
+              if (modal === "magneticSusceptibility")
+                await createMagneticSusceptibility.mutateAsync(payload as any);
+              showSuccess("Record created successfully.");
               setModal(null);
             } catch (error) {
-              showError(error instanceof Error ? error.message : "No se pudo crear el registro.");
+              showError(error instanceof Error ? error.message : "Could not create the record.");
             }
           }}
         />
@@ -531,23 +1014,41 @@ function ProjectResourceMap({
 
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
-      <MapContainer center={[latitude, longitude]} zoom={9} style={{ height: "340px", width: "100%" }}>
+      <MapContainer
+        center={[latitude, longitude]}
+        zoom={13}
+        style={{ height: "300px", width: "500px" }}
+      >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={[latitude, longitude]}>
-          <Popup>
+
+        <Marker
+          position={[latitude, longitude]}
+          icon={mapMarkerIcon}
+          eventHandlers={{
+            add: (e) => {
+              e.target.openPopup();
+            }
+          }}
+        >
+          <Popup autoClose={false} closeOnClick={false}>
             <div className="space-y-1 text-xs">
-              <p><strong>RESOURCE</strong></p>
-              <p>Registros: {resources.length}</p>
-              <p>Tonnes total: {totalTonnes.toFixed(2)}</p>
+              <h4 className="font-bold text-center">LIPEÑA</h4>
+
+              <p>Description: Sud Lipez</p>
+
+              <p>Ubication: {`${latitude} ${longitude}`}</p>
+
               {resources.slice(0, 3).map((resource, idx) => (
                 <p key={`${resource.type}-${resource.category}-${idx}`}>
-                  {resource.type}/{resource.category} · Au {resource.au} · Cu {resource.cu} · CuEq {resource.cuEq}
+                  {resource.type}/{resource.category} · Au {resource.au} · Cu {resource.cu} · CuEq{" "}
+                  {resource.cuEq}
                 </p>
               ))}
-              {resources.length > 3 ? <p>... y {resources.length - 3} más</p> : null}
+
+              {resources.length > 3 ? <p>... and {resources.length - 3} more</p> : null}
             </div>
           </Popup>
         </Marker>
@@ -558,17 +1059,35 @@ function ProjectResourceMap({
 
 function AddBtn({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold">
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
+    >
       <Plus size={13} /> {label}
     </button>
   );
 }
 
-function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Card({
+  title,
+  description,
+  action,
+  children
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-bold">{title}</h2>
+        <div>
+          <h2 className="text-lg font-bold">{title}</h2>
+          {description ? (
+            <p className="text-xs text-[var(--color-on-surface-variant)]">{description}</p>
+          ) : null}
+        </div>
         {action}
       </div>
       {children}
@@ -579,11 +1098,19 @@ function Card({ title, action, children }: { title: string; action?: React.React
 function CreateModal({
   type,
   context,
+  drillHoles,
   onClose,
   onSubmit
 }: {
   type: ModalType;
-  context: { projectId?: number; zoneId?: number; drillHoleId?: number; intervalId?: number; assayId?: number };
+  context: {
+    projectId?: number;
+    zoneId?: number;
+    drillHoleId?: number;
+    intervalId?: number;
+    assayId?: number;
+  };
+  drillHoles: Array<{ id: number; name: string }>;
   onClose: () => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
@@ -601,7 +1128,7 @@ function CreateModal({
   function requireNumber(key: string, label: string) {
     const parsed = toNumber(key);
     if (parsed === undefined) {
-      setValidationError(`${label} debe ser un número válido.`);
+      setValidationError(`${label} must be a valid number.`);
       return null;
     }
     return parsed;
@@ -611,29 +1138,37 @@ function CreateModal({
     setValidationError(null);
     if (type === "project") {
       if (!t("name")) {
-        setValidationError("Nombre del proyecto es obligatorio.");
+        setValidationError("Project name is required.");
         return;
       }
-      return onSubmit({ name: t("name"), description: t("description") || undefined, location: t("location") || undefined });
+      return onSubmit({
+        name: t("name"),
+        description: t("description") || undefined,
+        location: t("location") || undefined
+      });
     }
     if (type === "zone") {
       if (!context.projectId) {
-        setValidationError("No hay project seleccionado.");
+        setValidationError("No project selected.");
         return;
       }
       if (!t("name")) {
-        setValidationError("Nombre de la zona es obligatorio.");
+        setValidationError("Zone name is required.");
         return;
       }
-      return onSubmit({ projectId: context.projectId, name: t("name"), description: t("description") || undefined });
+      return onSubmit({
+        projectId: context.projectId,
+        name: t("name"),
+        description: t("description") || undefined
+      });
     }
     if (type === "drillhole") {
       if (!context.projectId || !context.zoneId) {
-        setValidationError("Debes estar dentro de un project y una zone.");
+        setValidationError("You must be inside a project and a zone.");
         return;
       }
       if (!t("name")) {
-        setValidationError("Nombre del drillhole es obligatorio.");
+        setValidationError("Drillhole name is required.");
         return;
       }
       const east = requireNumber("east", "East");
@@ -657,7 +1192,7 @@ function CreateModal({
     }
     if (type === "interval") {
       if (!context.drillHoleId) {
-        setValidationError("No hay drillhole seleccionado.");
+        setValidationError("No drillhole selected.");
         return;
       }
       const fromDepth = requireNumber("fromDepth", "From depth");
@@ -667,116 +1202,737 @@ function CreateModal({
     }
     if (type === "assay") {
       if (!context.intervalId) {
-        setValidationError("No hay interval seleccionado.");
+        setValidationError("No interval selected.");
         return;
       }
       const au = requireNumber("au", "Au");
       const cu = requireNumber("cu", "Cu");
       const ag = requireNumber("ag", "Ag");
       if (au === null || cu === null || ag === null) return;
-      return onSubmit({ intervalId: context.intervalId, au, cu, ag, assayMethod: t("assayMethod") || "AAS", laboratory: t("laboratory") || undefined });
+      return onSubmit({
+        intervalId: context.intervalId,
+        au,
+        cu,
+        ag,
+        assayMethod: t("assayMethod") || "AAS",
+        laboratory: t("laboratory") || undefined
+      });
     }
-    if (type === "lithology") return onSubmit({ intervalId: context.intervalId, rockType: t("rockType") || undefined, alteration: t("alteration") || undefined, mineralization: t("mineralization") || undefined, comments: t("comments") || undefined });
-    if (type === "qaqc") return onSubmit({ assayId: context.assayId, type: t("qaqcType") || "BLANK", passed: (t("passed") || "true") === "true", notes: t("notes") || undefined });
-    if (!context.projectId) {
-      setValidationError("No hay project seleccionado.");
-      return;
+    if (type === "lithology")
+      return onSubmit({
+        intervalId: context.intervalId,
+        rockType: t("rockType") || undefined,
+        alteration: t("alteration") || undefined,
+        mineralization: t("mineralization") || undefined,
+        comments: t("comments") || undefined
+      });
+    if (type === "qaqc")
+      return onSubmit({
+        assayId: context.assayId,
+        type: t("qaqcType") || "BLANK",
+        passed: (t("passed") || "true") === "true",
+        notes: t("notes") || undefined
+      });
+    if (type === "drillHoleSurvey") {
+      if (!context.drillHoleId) {
+        setValidationError("No drillhole selected.");
+        return;
+      }
+      const depth = requireNumber("depth", "Depth");
+      const azimuth = requireNumber("azimuth", "Azimuth");
+      const dip = requireNumber("dip", "Dip");
+      if (depth === null || azimuth === null || dip === null) return;
+      return onSubmit({ drillHoleId: context.drillHoleId, depth, azimuth, dip });
     }
-    const cutoff = requireNumber("cutoff", "Cutoff");
-    const tonnes = requireNumber("tonnes", "Tonnes");
-    const au = requireNumber("au", "Au");
-    const cu = requireNumber("cu", "Cu");
-    const ag = requireNumber("ag", "Ag");
-    const cuEq = requireNumber("cuEq", "CuEq");
-    if (
-      cutoff === null ||
-      tonnes === null ||
-      au === null ||
-      cu === null ||
-      ag === null ||
-      cuEq === null
-    ) {
-      return;
+    if (type === "assayValue") {
+      if (!context.assayId) {
+        setValidationError("No assay selected.");
+        return;
+      }
+      if (!t("element")) {
+        setValidationError("Element is required.");
+        return;
+      }
+      const value = requireNumber("value", "Value");
+      if (value === null) return;
+      return onSubmit({
+        assayId: context.assayId,
+        element: t("element"),
+        value,
+        unit: t("unit") || undefined,
+        detectionLimit: toNumber("detectionLimit")
+      });
     }
-    return onSubmit({ projectId: context.projectId, type: t("resourceType") || "OPEN_PIT", category: t("resourceCategory") || "MEASURED", cutoff, tonnes, au, cu, ag, cuEq, description: t("description") || undefined });
+    if (type === "alteration") {
+      if (!context.intervalId) {
+        setValidationError("No interval selected.");
+        return;
+      }
+      if (!t("alterationType")) {
+        setValidationError("Type is required.");
+        return;
+      }
+      return onSubmit({
+        intervalId: context.intervalId,
+        type: t("alterationType"),
+        intensity: toNumber("intensity"),
+        description: t("description") || undefined,
+        comments: t("comments") || undefined
+      });
+    }
+    if (type === "mineralization") {
+      if (!context.intervalId) {
+        setValidationError("No interval selected.");
+        return;
+      }
+      if (!t("mineral")) {
+        setValidationError("Mineral is required.");
+        return;
+      }
+      return onSubmit({
+        intervalId: context.intervalId,
+        mineral: t("mineral"),
+        percentage: toNumber("percentage"),
+        style: t("style") || undefined,
+        habit: t("habit") || undefined,
+        description: t("description") || undefined,
+        comments: t("comments") || undefined
+      });
+    }
+    if (type === "geologicalStructure") {
+      if (!context.intervalId) {
+        setValidationError("No interval selected.");
+        return;
+      }
+      if (!t("structureType")) {
+        setValidationError("Structure type is required.");
+        return;
+      }
+      return onSubmit({
+        intervalId: context.intervalId,
+        structureType: t("structureType"),
+        angle: toNumber("angle"),
+        width: toNumber("width"),
+        orientation: t("orientation") || undefined,
+        description: t("description") || undefined,
+        comments: t("comments") || undefined
+      });
+    }
+    if (type === "recovery") {
+      if (!context.intervalId) {
+        setValidationError("No interval selected.");
+        return;
+      }
+      return onSubmit({
+        intervalId: context.intervalId,
+        recoveryPercent: toNumber("recoveryPercent"),
+        rqdPercent: toNumber("rqdPercent"),
+        coreLoss: toNumber("coreLoss"),
+        comments: t("comments") || undefined
+      });
+    }
+    if (type === "density") {
+      if (!context.intervalId) {
+        setValidationError("No interval selected.");
+        return;
+      }
+      const specificGravity = requireNumber("specificGravity", "Specific gravity");
+      if (specificGravity === null) return;
+      return onSubmit({
+        intervalId: context.intervalId,
+        specificGravity,
+        method: t("method") || undefined,
+        dryDensity: toNumber("dryDensity"),
+        wetDensity: toNumber("wetDensity"),
+        comments: t("comments") || undefined
+      });
+    }
+    if (type === "magneticSusceptibility") {
+      if (!context.intervalId) {
+        setValidationError("No interval selected.");
+        return;
+      }
+      const value = requireNumber("value", "Value");
+      if (value === null) return;
+      return onSubmit({
+        intervalId: context.intervalId,
+        value,
+        unit: t("unit") || undefined,
+        instrument: t("instrument") || undefined,
+        comments: t("comments") || undefined
+      });
+    }
+    if (type === "significantIntercept") {
+      if (!context.zoneId) {
+        setValidationError("No zone selected.");
+        return;
+      }
+      const drillHoleId = requireNumber("drillHoleId", "Drillhole");
+      const fromDepth = requireNumber("fromDepth", "From depth");
+      const toDepth = requireNumber("toDepth", "To depth");
+      const width = requireNumber("width", "Width");
+      if (drillHoleId === null || fromDepth === null || toDepth === null || width === null) return;
+      return onSubmit({
+        drillHoleId,
+        isIncluding: (t("isIncluding") || "false") === "true",
+        fromDepth,
+        toDepth,
+        width,
+        trueWidth: toNumber("trueWidth"),
+        au: toNumber("au"),
+        cu: toNumber("cu"),
+        ag: toNumber("ag"),
+        comments: t("comments") || undefined
+      });
+    }
+    setValidationError("Unsupported form type.");
+    return;
   }
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-4">
       <div className="w-full max-w-2xl rounded-xl bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">Crear {type}</h3>
-          <button onClick={onClose}><X size={16} /></button>
+          <h3 className="text-lg font-bold">Create {type}</h3>
+          <button onClick={onClose}>
+            <X size={16} />
+          </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
           {type === "project" ? (
             <>
-              <input className={inputClassName} placeholder="Nombre del proyecto" onChange={(e) => set("name", e.target.value)} />
-              <input className={inputClassName} placeholder="Ubicación (opcional)" onChange={(e) => set("location", e.target.value)} />
-              <input className={`${inputClassName} col-span-2`} placeholder="Descripción (opcional)" onChange={(e) => set("description", e.target.value)} />
+              <input
+                className={inputClassName}
+                placeholder="Project name"
+                onChange={(e) => set("name", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Location (optional)"
+                onChange={(e) => set("location", e.target.value)}
+              />
+              <input
+                className={`${inputClassName} col-span-2`}
+                placeholder="Description (optional)"
+                onChange={(e) => set("description", e.target.value)}
+              />
             </>
           ) : null}
           {type === "zone" ? (
             <>
-              <input className={inputClassName} placeholder="Nombre de la zona" onChange={(e) => set("name", e.target.value)} />
-              <input className={inputClassName} placeholder="Descripción (opcional)" onChange={(e) => set("description", e.target.value)} />
+              <input
+                className={inputClassName}
+                placeholder="Zone name"
+                onChange={(e) => set("name", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Description (optional)"
+                onChange={(e) => set("description", e.target.value)}
+              />
             </>
           ) : null}
           {type === "drillhole" ? (
             <>
-              <input className={inputClassName} placeholder="Nombre del drillhole" onChange={(e) => set("name", e.target.value)} />
-              <select className={inputClassName} onChange={(e) => set("type", e.target.value)} defaultValue="DDH"><option>DDH</option><option>RC</option><option>AC</option><option>OTHER</option></select>
-              <input type="number" step="any" className={inputClassName} placeholder="East (ej: 503210.1254)" onChange={(e) => set("east", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="North (ej: 7712450.2231)" onChange={(e) => set("north", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Depth (ej: 220.5)" onChange={(e) => set("depth", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Elevation (opcional)" onChange={(e) => set("elevation", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Azimuth (opcional)" onChange={(e) => set("azimuth", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Dip (opcional)" onChange={(e) => set("dip", e.target.value)} />
-              <input className={inputClassName} placeholder="Campaign (opcional)" onChange={(e) => set("campaign", e.target.value)} />
-              <input type="number" step="1" className={inputClassName} placeholder="Year (opcional)" onChange={(e) => set("year", e.target.value)} />
+              <input
+                className={inputClassName}
+                placeholder="Drillhole name"
+                onChange={(e) => set("name", e.target.value)}
+              />
+              <select
+                className={inputClassName}
+                onChange={(e) => set("type", e.target.value)}
+                defaultValue="DDH"
+              >
+                <option>DDH</option>
+                <option>RC</option>
+                <option>AC</option>
+                <option>OTHER</option>
+              </select>
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="East (ej: 503210.1254)"
+                onChange={(e) => set("east", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="North (ej: 7712450.2231)"
+                onChange={(e) => set("north", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Depth (ej: 220.5)"
+                onChange={(e) => set("depth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Elevation (optional)"
+                onChange={(e) => set("elevation", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Azimuth (optional)"
+                onChange={(e) => set("azimuth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Dip (optional)"
+                onChange={(e) => set("dip", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Campaign (optional)"
+                onChange={(e) => set("campaign", e.target.value)}
+              />
+              <input
+                type="number"
+                step="1"
+                className={inputClassName}
+                placeholder="Year (optional)"
+                onChange={(e) => set("year", e.target.value)}
+              />
             </>
           ) : null}
           {type === "interval" ? (
             <>
-              <input type="number" step="any" className={inputClassName} placeholder="From depth (ej: 0)" onChange={(e) => set("fromDepth", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="To depth (ej: 25)" onChange={(e) => set("toDepth", e.target.value)} />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="From depth (ej: 0)"
+                onChange={(e) => set("fromDepth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="To depth (ej: 25)"
+                onChange={(e) => set("toDepth", e.target.value)}
+              />
             </>
           ) : null}
           {type === "assay" ? (
             <>
-              <input type="number" step="any" className={inputClassName} placeholder="Au (ej: 0.35)" onChange={(e) => set("au", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Cu (ej: 0.12)" onChange={(e) => set("cu", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Ag (ej: 4.8)" onChange={(e) => set("ag", e.target.value)} />
-              <select className={inputClassName} onChange={(e) => set("assayMethod", e.target.value)} defaultValue="AAS"><option>AAS</option><option>ICP</option><option>XRF</option><option>OTHER</option></select>
-              <input className={`${inputClassName} col-span-2`} placeholder="Laboratorio (opcional)" onChange={(e) => set("laboratory", e.target.value)} />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Au (ej: 0.35)"
+                onChange={(e) => set("au", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Cu (ej: 0.12)"
+                onChange={(e) => set("cu", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Ag (ej: 4.8)"
+                onChange={(e) => set("ag", e.target.value)}
+              />
+              <select
+                className={inputClassName}
+                onChange={(e) => set("assayMethod", e.target.value)}
+                defaultValue="AAS"
+              >
+                <option>AAS</option>
+                <option>ICP</option>
+                <option>XRF</option>
+                <option>OTHER</option>
+              </select>
+              <input
+                className={`${inputClassName} col-span-2`}
+                placeholder="Laboratorio (optional)"
+                onChange={(e) => set("laboratory", e.target.value)}
+              />
             </>
           ) : null}
           {type === "lithology" ? (
             <>
-              <input className={inputClassName} placeholder="Rock type (opcional)" onChange={(e) => set("rockType", e.target.value)} />
-              <input className={inputClassName} placeholder="Alteration (opcional)" onChange={(e) => set("alteration", e.target.value)} />
-              <input className={inputClassName} placeholder="Mineralization (opcional)" onChange={(e) => set("mineralization", e.target.value)} />
-              <input className={inputClassName} placeholder="Comments (opcional)" onChange={(e) => set("comments", e.target.value)} />
+              <input
+                className={inputClassName}
+                placeholder="Rock type (optional)"
+                onChange={(e) => set("rockType", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Alteration (optional)"
+                onChange={(e) => set("alteration", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Mineralization (optional)"
+                onChange={(e) => set("mineralization", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
             </>
           ) : null}
           {type === "qaqc" ? (
             <>
-              <select className={inputClassName} onChange={(e) => set("qaqcType", e.target.value)} defaultValue="BLANK"><option>BLANK</option><option>DUPLICATE</option><option>STANDARD</option></select>
-              <select className={inputClassName} onChange={(e) => set("passed", e.target.value)} defaultValue="true"><option value="true">Passed: Sí</option><option value="false">Passed: No</option></select>
-              <input className={`${inputClassName} col-span-2`} placeholder="Notes (opcional)" onChange={(e) => set("notes", e.target.value)} />
+              <select
+                className={inputClassName}
+                onChange={(e) => set("qaqcType", e.target.value)}
+                defaultValue="BLANK"
+              >
+                <option>BLANK</option>
+                <option>DUPLICATE</option>
+                <option>STANDARD</option>
+              </select>
+              <select
+                className={inputClassName}
+                onChange={(e) => set("passed", e.target.value)}
+                defaultValue="true"
+              >
+                <option value="true">Passed: Yes</option>
+                <option value="false">Passed: No</option>
+              </select>
+              <input
+                className={`${inputClassName} col-span-2`}
+                placeholder="Notes (optional)"
+                onChange={(e) => set("notes", e.target.value)}
+              />
             </>
           ) : null}
-          {type === "resource" ? (
+          {type === "significantIntercept" ? (
             <>
-              <select className={inputClassName} onChange={(e) => set("resourceType", e.target.value)} defaultValue="OPEN_PIT"><option>OPEN_PIT</option><option>UNDERGROUND</option></select>
-              <select className={inputClassName} onChange={(e) => set("resourceCategory", e.target.value)} defaultValue="MEASURED"><option>MEASURED</option><option>INDICATED</option><option>INFERRED</option></select>
-              <input type="number" step="any" className={inputClassName} placeholder="Cutoff" onChange={(e) => set("cutoff", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Tonnes" onChange={(e) => set("tonnes", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Au" onChange={(e) => set("au", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Cu" onChange={(e) => set("cu", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="Ag" onChange={(e) => set("ag", e.target.value)} />
-              <input type="number" step="any" className={inputClassName} placeholder="CuEq" onChange={(e) => set("cuEq", e.target.value)} />
-              <input className={`${inputClassName} col-span-2`} placeholder="Descripción (opcional)" onChange={(e) => set("description", e.target.value)} />
+              <select
+                className={inputClassName}
+                defaultValue=""
+                onChange={(e) => set("drillHoleId", e.target.value)}
+              >
+                <option value="">Select hole...</option>
+                {drillHoles.map((hole) => (
+                  <option key={hole.id} value={hole.id}>
+                    {hole.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={inputClassName}
+                onChange={(e) => set("isIncluding", e.target.value)}
+                defaultValue="false"
+              >
+                <option value="false">Including: No</option>
+                <option value="true">Including: Yes</option>
+              </select>
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="From depth"
+                onChange={(e) => set("fromDepth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="To depth"
+                onChange={(e) => set("toDepth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Width"
+                onChange={(e) => set("width", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="True width (optional)"
+                onChange={(e) => set("trueWidth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Au g/t (optional)"
+                onChange={(e) => set("au", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Cu % (optional)"
+                onChange={(e) => set("cu", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Ag g/t (optional)"
+                onChange={(e) => set("ag", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "drillHoleSurvey" ? (
+            <>
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Depth"
+                onChange={(e) => set("depth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Azimuth"
+                onChange={(e) => set("azimuth", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={`${inputClassName} col-span-2`}
+                placeholder="Dip"
+                onChange={(e) => set("dip", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "assayValue" ? (
+            <>
+              <input
+                className={inputClassName}
+                placeholder="Element (ej: Zn)"
+                onChange={(e) => set("element", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Value"
+                onChange={(e) => set("value", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Unit (optional)"
+                onChange={(e) => set("unit", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Detection limit (optional)"
+                onChange={(e) => set("detectionLimit", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "alteration" ? (
+            <>
+              <input
+                className={inputClassName}
+                placeholder="Type"
+                onChange={(e) => set("alterationType", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Intensity (optional)"
+                onChange={(e) => set("intensity", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Description (optional)"
+                onChange={(e) => set("description", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "mineralization" ? (
+            <>
+              <input
+                className={inputClassName}
+                placeholder="Mineral"
+                onChange={(e) => set("mineral", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Percentage (optional)"
+                onChange={(e) => set("percentage", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Style (optional)"
+                onChange={(e) => set("style", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Habit (optional)"
+                onChange={(e) => set("habit", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Description (optional)"
+                onChange={(e) => set("description", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "geologicalStructure" ? (
+            <>
+              <input
+                className={inputClassName}
+                placeholder="Structure type"
+                onChange={(e) => set("structureType", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Angle (optional)"
+                onChange={(e) => set("angle", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Width (optional)"
+                onChange={(e) => set("width", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Orientation (optional)"
+                onChange={(e) => set("orientation", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Description (optional)"
+                onChange={(e) => set("description", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "recovery" ? (
+            <>
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Recovery % (optional)"
+                onChange={(e) => set("recoveryPercent", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="RQD % (optional)"
+                onChange={(e) => set("rqdPercent", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Core loss (optional)"
+                onChange={(e) => set("coreLoss", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "density" ? (
+            <>
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Specific gravity"
+                onChange={(e) => set("specificGravity", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Method (optional)"
+                onChange={(e) => set("method", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Dry density (optional)"
+                onChange={(e) => set("dryDensity", e.target.value)}
+              />
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Wet density (optional)"
+                onChange={(e) => set("wetDensity", e.target.value)}
+              />
+              <input
+                className={`${inputClassName} col-span-2`}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
+            </>
+          ) : null}
+          {type === "magneticSusceptibility" ? (
+            <>
+              <input
+                type="number"
+                step="any"
+                className={inputClassName}
+                placeholder="Value"
+                onChange={(e) => set("value", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Unit (optional)"
+                onChange={(e) => set("unit", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Instrument (optional)"
+                onChange={(e) => set("instrument", e.target.value)}
+              />
+              <input
+                className={inputClassName}
+                placeholder="Comments (optional)"
+                onChange={(e) => set("comments", e.target.value)}
+              />
             </>
           ) : null}
         </div>
@@ -784,35 +1940,70 @@ function CreateModal({
           <p className="mt-3 text-sm text-[var(--color-error)]">{validationError}</p>
         ) : null}
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-sm">Cancelar</button>
-          <button onClick={() => void submit()} className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-[var(--color-on-primary)]">Crear</button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void submit()}
+            className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-[var(--color-on-primary)]"
+          >
+            Create
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function SimpleTable({ headers, rows, empty }: { headers: string[]; rows: Array<Array<string | React.ReactNode>>; empty: string; }) {
+function SimpleTable({
+  headers,
+  rows,
+  empty
+}: {
+  headers: string[];
+  rows: Array<Array<string | React.ReactNode>>;
+  empty: string;
+}) {
   return (
     <div className="table-scroll overflow-x-auto rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] shadow-sm">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr>
             {headers.map((header) => (
-              <th key={header} className="bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">{header}</th>
+              <th
+                key={header}
+                className="bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]"
+              >
+                {header}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.length ? rows.map((row, idx) => (
-            <tr key={idx} className={`border-t border-[var(--color-border-soft)] transition hover:bg-[var(--color-surface-container-highest)] ${idx % 2 === 0 ? "bg-transparent" : "bg-[var(--color-surface-container)]/45"}`}>
-              {row.map((col, i) => (
-                <td key={i} className="px-3 py-2 text-sm">{col}</td>
-              ))}
-            </tr>
-          )) : (
+          {rows.length ? (
+            rows.map((row, idx) => (
+              <tr
+                key={idx}
+                className={`border-t border-[var(--color-border-soft)] transition hover:bg-[var(--color-surface-container-highest)] ${idx % 2 === 0 ? "bg-transparent" : "bg-[var(--color-surface-container)]/45"}`}
+              >
+                {row.map((col, i) => (
+                  <td key={i} className="px-3 py-2 text-sm">
+                    {col}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
             <tr>
-              <td colSpan={headers.length} className="px-3 py-4 text-sm text-[var(--color-on-surface-variant)]">{empty}</td>
+              <td
+                colSpan={headers.length}
+                className="px-3 py-4 text-sm text-[var(--color-on-surface-variant)]"
+              >
+                {empty}
+              </td>
             </tr>
           )}
         </tbody>

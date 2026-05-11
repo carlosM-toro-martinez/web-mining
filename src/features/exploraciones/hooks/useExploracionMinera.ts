@@ -1,53 +1,98 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import {
+  createAlteration,
   createAssay,
+  createAssayValue,
+  createDensity,
   createDrillHole,
+  createDrillHoleSurvey,
+  createGeologicalStructure,
   createInterval,
   createLithology,
+  createMagneticSusceptibility,
+  createMineralization,
   createProject,
   createQaqc,
+  createRecovery,
   createResource,
+  createSignificantIntercept,
   createZone,
   getAssayById,
   getAssays,
+  getAssayValues,
+  getAlterations,
+  getDensities,
   getDrillHoleById,
   getDrillHoles,
+  getDrillHoleSurveys,
   getExplorationHierarchy,
+  getGeologicalStructures,
   getIntervalById,
   getIntervals,
   getLithologies,
+  getMagneticSusceptibilities,
+  getMineralizations,
   getProjectById,
   getProjects,
   getQaqc,
+  getRecoveries,
   getResources,
+  getSignificantIntercepts,
   getZoneById,
   getZones,
+  updateAlteration,
   updateAssay,
+  updateAssayValue,
+  updateDensity,
   updateDrillHole,
+  updateDrillHoleSurvey,
+  updateGeologicalStructure,
   updateInterval,
   updateLithology,
+  updateMagneticSusceptibility,
+  updateMineralization,
   updateProject,
   updateQaqc,
+  updateRecovery,
   updateResource,
+  updateSignificantIntercept,
   updateZone
 } from "@/features/exploraciones/api/exploracionMineraApi";
 import type {
+  CreateAlterationPayload,
   CreateAssayPayload,
+  CreateAssayValuePayload,
+  CreateDensityPayload,
   CreateDrillHolePayload,
+  CreateDrillHoleSurveyPayload,
+  CreateGeologicalStructurePayload,
   CreateIntervalPayload,
   CreateLithologyPayload,
+  CreateMagneticSusceptibilityPayload,
+  CreateMineralizationPayload,
   CreateProjectPayload,
   CreateQaqcPayload,
+  CreateRecoveryPayload,
   CreateResourcePayload,
+  CreateSignificantInterceptPayload,
   CreateZonePayload,
+  UpdateAlterationPayload,
   UpdateAssayPayload,
+  UpdateAssayValuePayload,
+  UpdateDensityPayload,
   UpdateDrillHolePayload,
+  UpdateDrillHoleSurveyPayload,
+  UpdateGeologicalStructurePayload,
   UpdateIntervalPayload,
   UpdateLithologyPayload,
+  UpdateMagneticSusceptibilityPayload,
+  UpdateMineralizationPayload,
   UpdateProjectPayload,
   UpdateQaqcPayload,
+  UpdateRecoveryPayload,
   UpdateResourcePayload,
+  UpdateSignificantInterceptPayload,
   UpdateZonePayload
 } from "@/features/exploraciones/model/exploracionMinera.schema";
 
@@ -66,7 +111,16 @@ export function useExplorationHierarchyQuery(params: { search?: string; page?: n
           assays: [],
           lithologies: [],
           qaqc: [],
-          resources: []
+          resources: [],
+          drillHoleSurveys: [],
+          assayValues: [],
+          alterations: [],
+          mineralizations: [],
+          geologicalStructures: [],
+          recoveries: [],
+          densities: [],
+          magneticSusceptibilities: [],
+          significantIntercepts: []
         };
       }
     },
@@ -187,6 +241,96 @@ export function useResourcesByProjectQuery(projectId?: number) {
     queryKey: [...queryKeys.exploraciones.all, "resources", projectId],
     queryFn: () => getResources({ projectId, page: 1, limit: 100 }),
     enabled: Boolean(projectId),
+    retry: false
+  });
+}
+
+export function useSignificantInterceptsByZoneQuery(zoneId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "significant-intercepts", "zone", zoneId],
+    queryFn: () => getSignificantIntercepts({ zoneId, page: 1, limit: 100 }),
+    enabled: Boolean(zoneId),
+    retry: false
+  });
+}
+
+export function useSignificantInterceptsByDrillHoleQuery(drillHoleId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "significant-intercepts", "drillhole", drillHoleId],
+    queryFn: () => getSignificantIntercepts({ drillHoleId, page: 1, limit: 100 }),
+    enabled: Boolean(drillHoleId),
+    retry: false
+  });
+}
+
+export function useDrillHoleSurveysByDrillHoleQuery(drillHoleId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "drill-hole-surveys", drillHoleId],
+    queryFn: () => getDrillHoleSurveys({ drillHoleId, page: 1, limit: 100 }),
+    enabled: Boolean(drillHoleId),
+    retry: false
+  });
+}
+
+export function useAssayValuesByAssayQuery(assayId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "assay-values", assayId],
+    queryFn: () => getAssayValues({ assayId, page: 1, limit: 100 }),
+    enabled: Boolean(assayId),
+    retry: false
+  });
+}
+
+export function useAlterationsByIntervalQuery(intervalId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "alterations", intervalId],
+    queryFn: () => getAlterations({ intervalId, page: 1, limit: 100 }),
+    enabled: Boolean(intervalId),
+    retry: false
+  });
+}
+
+export function useMineralizationsByIntervalQuery(intervalId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "mineralizations", intervalId],
+    queryFn: () => getMineralizations({ intervalId, page: 1, limit: 100 }),
+    enabled: Boolean(intervalId),
+    retry: false
+  });
+}
+
+export function useGeologicalStructuresByIntervalQuery(intervalId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "geological-structures", intervalId],
+    queryFn: () => getGeologicalStructures({ intervalId, page: 1, limit: 100 }),
+    enabled: Boolean(intervalId),
+    retry: false
+  });
+}
+
+export function useRecoveriesByIntervalQuery(intervalId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "recoveries", intervalId],
+    queryFn: () => getRecoveries({ intervalId, page: 1, limit: 100 }),
+    enabled: Boolean(intervalId),
+    retry: false
+  });
+}
+
+export function useDensitiesByIntervalQuery(intervalId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "densities", intervalId],
+    queryFn: () => getDensities({ intervalId, page: 1, limit: 100 }),
+    enabled: Boolean(intervalId),
+    retry: false
+  });
+}
+
+export function useMagneticSusceptibilitiesByIntervalQuery(intervalId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.exploraciones.all, "magnetic-susceptibilities", intervalId],
+    queryFn: () => getMagneticSusceptibilities({ intervalId, page: 1, limit: 100 }),
+    enabled: Boolean(intervalId),
     retry: false
   });
 }
@@ -327,6 +471,159 @@ export function useUpdateResourceMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: UpdateResourcePayload }) =>
       updateResource(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateSignificantInterceptMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateSignificantInterceptPayload) => createSignificantIntercept(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateSignificantInterceptMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateSignificantInterceptPayload }) =>
+      updateSignificantIntercept(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateDrillHoleSurveyMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateDrillHoleSurveyPayload) => createDrillHoleSurvey(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateDrillHoleSurveyMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateDrillHoleSurveyPayload }) =>
+      updateDrillHoleSurvey(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateAssayValueMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateAssayValuePayload) => createAssayValue(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateAssayValueMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateAssayValuePayload }) =>
+      updateAssayValue(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateAlterationMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateAlterationPayload) => createAlteration(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateAlterationMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateAlterationPayload }) =>
+      updateAlteration(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateMineralizationMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateMineralizationPayload) => createMineralization(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateMineralizationMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateMineralizationPayload }) =>
+      updateMineralization(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateGeologicalStructureMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateGeologicalStructurePayload) => createGeologicalStructure(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateGeologicalStructureMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateGeologicalStructurePayload }) =>
+      updateGeologicalStructure(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateRecoveryMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateRecoveryPayload) => createRecovery(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateRecoveryMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateRecoveryPayload }) =>
+      updateRecovery(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateDensityMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateDensityPayload) => createDensity(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateDensityMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateDensityPayload }) =>
+      updateDensity(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useCreateMagneticSusceptibilityMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: (payload: CreateMagneticSusceptibilityPayload) => createMagneticSusceptibility(payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useUpdateMagneticSusceptibilityMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateMagneticSusceptibilityPayload }) =>
+      updateMagneticSusceptibility(id, payload),
     onSuccess: invalidate
   });
 }
