@@ -9,6 +9,7 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import introVideoDefault from "@/assets/images/VIDEO DE PRESENTACION.mp4";
 import modelGifDefault from "@/assets/images/modelgiff.gif";
+import modelGifDef2ault from "@/assets/images/modelgiff2.gif";
 import drillMediaFallback01 from "@/assets/images/GEOQUIMICO_GENERAL.jpg";
 import drillMediaFallback02 from "@/assets/images/PLANO DE ESTRUCTURAS.jpg";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -119,14 +120,20 @@ const DEFAULT_PROJECT_MAP_LNG = Number(import.meta.env.VITE_PROJECT_MAP_LNG ?? -
 const EXPLORACIONES_INTRO_VIDEO_URL =
   import.meta.env.VITE_EXPLORACIONES_INTRO_VIDEO_URL ?? introVideoDefault;
 const DRILLHOLES_MEDIA_SCHEME = {
-  default: ["modelgiff.gif", "GEOQUIMICO_GENERAL.jpg", "PLANO DE ESTRUCTURAS.jpg"],
+  default: [
+    "modelgiff.gif",
+    "modelgiff2.gif",
+    "GEOQUIMICO_GENERAL.jpg",
+    "PLANO DE ESTRUCTURAS.jpg"
+  ],
   byProjectId: {} as Record<number, string[]>,
   byZoneId: {} as Record<number, string[]>
 } as const;
 const DRILLHOLES_MEDIA_BY_NAME: Record<string, string> = {
   "modelgiff.gif": modelGifDefault,
   "GEOQUIMICO_GENERAL.jpg": drillMediaFallback01,
-  "PLANO DE ESTRUCTURAS.jpg": drillMediaFallback02
+  "PLANO DE ESTRUCTURAS.jpg": drillMediaFallback02,
+  "modelgiff2.gif": modelGifDef2ault
 };
 
 export function ExploracionesDataRoomPage() {
@@ -651,7 +658,11 @@ export function ExploracionesDataRoomPage() {
         <div className="mx-auto max-w-5xl">
           <Card
             title="Projects"
-            action={canManage ? <AddBtn label="Add Project" onClick={() => setModal("project")} /> : undefined}
+            action={
+              canManage ? (
+                <AddBtn label="Add Project" onClick={() => setModal("project")} />
+              ) : undefined
+            }
           >
             <SimpleTable
               headers={["ID", "Name", "Location", "Action"]}
@@ -680,7 +691,9 @@ export function ExploracionesDataRoomPage() {
           <Card
             title="Project Zones"
             description={`Zones defined for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
-            action={canManage ? <AddBtn label="Add Zone" onClick={() => setModal("zone")} /> : undefined}
+            action={
+              canManage ? <AddBtn label="Add Zone" onClick={() => setModal("zone")} /> : undefined
+            }
           >
             <SimpleTable
               headers={["Zone", "Description", "Action"]}
@@ -740,7 +753,9 @@ export function ExploracionesDataRoomPage() {
                   <div className="mt-3 flex items-center justify-between">
                     <button
                       onClick={() =>
-                        setMediaSlide((s) => (s - 1 + drillholesMedia.length) % drillholesMedia.length)
+                        setMediaSlide(
+                          (s) => (s - 1 + drillholesMedia.length) % drillholesMedia.length
+                        )
                       }
                       className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
                     >
@@ -874,7 +889,11 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Drillholes"
                   description={`Drillholes registered for zone ${zoneDetail.data?.name ?? `#${zoneId}`}.`}
-                  action={canManage ? <AddBtn label="Add Drillhole" onClick={() => setModal("drillhole")} /> : undefined}
+                  action={
+                    canManage ? (
+                      <AddBtn label="Add Drillhole" onClick={() => setModal("drillhole")} />
+                    ) : undefined
+                  }
                 >
                   <SimpleTable
                     headers={[
@@ -920,7 +939,11 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Intervals"
                   description={`Intervals logged for drillhole ${drillHoleDetail.data?.name ?? `#${drillHoleId}`}.`}
-                  action={canManage ? <AddBtn label="Add Interval" onClick={() => setModal("interval")} /> : undefined}
+                  action={
+                    canManage ? (
+                      <AddBtn label="Add Interval" onClick={() => setModal("interval")} />
+                    ) : undefined
+                  }
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
                     You are viewing intervals for the selected drillhole.
@@ -946,7 +969,11 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Drillhole Surveys"
                   description={`Survey measurements for drillhole ${drillHoleDetail.data?.name ?? `#${drillHoleId}`}.`}
-                  action={canManage ? <AddBtn label="Add Survey" onClick={() => setModal("drillHoleSurvey")} /> : undefined}
+                  action={
+                    canManage ? (
+                      <AddBtn label="Add Survey" onClick={() => setModal("drillHoleSurvey")} />
+                    ) : undefined
+                  }
                 >
                   <SimpleTable
                     headers={["ID", "Depth", "Azimuth", "Dip"]}
@@ -1012,131 +1039,159 @@ export function ExploracionesDataRoomPage() {
                   />
                   <div className="mt-3" />
                   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                    <Card
-                      title="Alterations"
-                      description={`Alteration logs for interval #${intervalId}.`}
-                      action={
-                        canManage ? <AddBtn label="Add Alteration" onClick={() => setModal("alteration")} /> : undefined
-                      }
-                    >
-                      <SimpleTable
-                        headers={["ID", "Type", "Intensity", "Description", "Comments"]}
-                        rows={(alterationsQuery.data?.data ?? []).map((a) => [
-                          String(a.id),
-                          a.type,
-                          a.intensity === null ? "-" : String(a.intensity),
-                          a.description ?? "-",
-                          a.comments ?? "-"
-                        ])}
-                        empty="No alterations."
-                      />
-                    </Card>
-                    <Card
-                      title="Mineralizations"
-                      description={`Mineralization logs for interval #${intervalId}.`}
-                      action={
-                        canManage ? (
-                          <AddBtn
-                            label="Add Mineralization"
-                            onClick={() => setModal("mineralization")}
-                          />
-                        ) : undefined
-                      }
-                    >
-                      <SimpleTable
-                        headers={["ID", "Mineral", "Percentage", "Style", "Habit"]}
-                        rows={(mineralizationsQuery.data?.data ?? []).map((m) => [
-                          String(m.id),
-                          m.mineral,
-                          m.percentage === null ? "-" : String(m.percentage),
-                          m.style ?? "-",
-                          m.habit ?? "-"
-                        ])}
-                        empty="No mineralizations."
-                      />
-                    </Card>
-                    <Card
-                      title="Geological Structures"
-                      description={`Structural records for interval #${intervalId}.`}
-                      action={
-                        canManage ? (
-                          <AddBtn
-                            label="Add Structure"
-                            onClick={() => setModal("geologicalStructure")}
-                          />
-                        ) : undefined
-                      }
-                    >
-                      <SimpleTable
-                        headers={["ID", "Type", "Angle", "Width", "Orientation"]}
-                        rows={(geologicalStructuresQuery.data?.data ?? []).map((g) => [
-                          String(g.id),
-                          g.structureType,
-                          g.angle === null ? "-" : String(g.angle),
-                          g.width === null ? "-" : String(g.width),
-                          g.orientation ?? "-"
-                        ])}
-                        empty="No geological structures."
-                      />
-                    </Card>
-                    <Card
-                      title="Recoveries"
-                      description={`Core recovery metrics for interval #${intervalId}.`}
-                      action={canManage ? <AddBtn label="Add Recovery" onClick={() => setModal("recovery")} /> : undefined}
-                    >
-                      <SimpleTable
-                        headers={["ID", "Recovery %", "RQD %", "Core Loss", "Comments"]}
-                        rows={(recoveriesQuery.data?.data ?? []).map((r) => [
-                          String(r.id),
-                          r.recoveryPercent === null ? "-" : String(r.recoveryPercent),
-                          r.rqdPercent === null ? "-" : String(r.rqdPercent),
-                          r.coreLoss === null ? "-" : String(r.coreLoss),
-                          r.comments ?? "-"
-                        ])}
-                        empty="No recoveries."
-                      />
-                    </Card>
-                    <Card
-                      title="Densities"
-                      description={`Density measurements for interval #${intervalId}.`}
-                      action={canManage ? <AddBtn label="Add Density" onClick={() => setModal("density")} /> : undefined}
-                    >
-                      <SimpleTable
-                        headers={["ID", "Specific Gravity", "Method", "Dry Density", "Wet Density"]}
-                        rows={(densitiesQuery.data?.data ?? []).map((d) => [
-                          String(d.id),
-                          String(d.specificGravity),
-                          d.method ?? "-",
-                          d.dryDensity === null ? "-" : String(d.dryDensity),
-                          d.wetDensity === null ? "-" : String(d.wetDensity)
-                        ])}
-                        empty="No densities."
-                      />
-                    </Card>
-                    <Card
-                      title="Magnetic Susceptibilities"
-                      description={`Magnetic susceptibility readings for interval #${intervalId}.`}
-                      action={
-                        canManage ? (
-                          <AddBtn
-                            label="Add Magnetic"
-                            onClick={() => setModal("magneticSusceptibility")}
-                          />
-                        ) : undefined
-                      }
-                    >
-                      <SimpleTable
-                        headers={["ID", "Value", "Unit", "Instrument", "Comments"]}
-                        rows={(magneticSusceptibilitiesQuery.data?.data ?? []).map((m) => [
-                          String(m.id),
-                          String(m.value),
-                          m.unit ?? "-",
-                          m.instrument ?? "-",
-                          m.comments ?? "-"
-                        ])}
-                        empty="No magnetic susceptibilities."
-                      />
-                    </Card>
+                    {(alterationsQuery.data?.data ?? []).length > 0 ? (
+                      <Card
+                        title="Alterations"
+                        description={`Alteration logs for interval #${intervalId}.`}
+                        action={
+                          canManage ? (
+                            <AddBtn label="Add Alteration" onClick={() => setModal("alteration")} />
+                          ) : undefined
+                        }
+                      >
+                        <SimpleTable
+                          headers={["ID", "Type", "Intensity", "Description", "Comments"]}
+                          rows={(alterationsQuery.data?.data ?? []).map((a) => [
+                            String(a.id),
+                            a.type,
+                            a.intensity === null ? "-" : String(a.intensity),
+                            a.description ?? "-",
+                            a.comments ?? "-"
+                          ])}
+                          empty="No alterations."
+                        />
+                      </Card>
+                    ) : null}
+                    {(mineralizationsQuery.data?.data ?? []).length > 0 ? (
+                      <Card
+                        title="Mineralizations"
+                        description={`Mineralization logs for interval #${intervalId}.`}
+                        action={
+                          canManage ? (
+                            <AddBtn
+                              label="Add Mineralization"
+                              onClick={() => setModal("mineralization")}
+                            />
+                          ) : undefined
+                        }
+                      >
+                        <SimpleTable
+                          headers={["ID", "Mineral", "Percentage", "Style", "Habit"]}
+                          rows={(mineralizationsQuery.data?.data ?? []).map((m) => [
+                            String(m.id),
+                            m.mineral,
+                            m.percentage === null ? "-" : String(m.percentage),
+                            m.style ?? "-",
+                            m.habit ?? "-"
+                          ])}
+                          empty="No mineralizations."
+                        />
+                      </Card>
+                    ) : null}
+                    {(geologicalStructuresQuery.data?.data ?? []).length > 0 ? (
+                      <Card
+                        title="Geological Structures"
+                        description={`Structural records for interval #${intervalId}.`}
+                        action={
+                          canManage ? (
+                            <AddBtn
+                              label="Add Structure"
+                              onClick={() => setModal("geologicalStructure")}
+                            />
+                          ) : undefined
+                        }
+                      >
+                        <SimpleTable
+                          headers={["ID", "Type", "Angle", "Width", "Orientation"]}
+                          rows={(geologicalStructuresQuery.data?.data ?? []).map((g) => [
+                            String(g.id),
+                            g.structureType,
+                            g.angle === null ? "-" : String(g.angle),
+                            g.width === null ? "-" : String(g.width),
+                            g.orientation ?? "-"
+                          ])}
+                          empty="No geological structures."
+                        />
+                      </Card>
+                    ) : null}
+                    {(recoveriesQuery.data?.data ?? []).length > 0 ? (
+                      <Card
+                        title="Recoveries"
+                        description={`Core recovery metrics for interval #${intervalId}.`}
+                        action={
+                          canManage ? (
+                            <AddBtn label="Add Recovery" onClick={() => setModal("recovery")} />
+                          ) : undefined
+                        }
+                      >
+                        <SimpleTable
+                          headers={["ID", "Recovery %", "RQD %", "Core Loss", "Comments"]}
+                          rows={(recoveriesQuery.data?.data ?? []).map((r) => [
+                            String(r.id),
+                            r.recoveryPercent === null ? "-" : String(r.recoveryPercent),
+                            r.rqdPercent === null ? "-" : String(r.rqdPercent),
+                            r.coreLoss === null ? "-" : String(r.coreLoss),
+                            r.comments ?? "-"
+                          ])}
+                          empty="No recoveries."
+                        />
+                      </Card>
+                    ) : null}
+                    {(densitiesQuery.data?.data ?? []).length > 0 ? (
+                      <Card
+                        title="Densities"
+                        description={`Density measurements for interval #${intervalId}.`}
+                        action={
+                          canManage ? (
+                            <AddBtn label="Add Density" onClick={() => setModal("density")} />
+                          ) : undefined
+                        }
+                      >
+                        <SimpleTable
+                          headers={[
+                            "ID",
+                            "Specific Gravity",
+                            "Method",
+                            "Dry Density",
+                            "Wet Density"
+                          ]}
+                          rows={(densitiesQuery.data?.data ?? []).map((d) => [
+                            String(d.id),
+                            String(d.specificGravity),
+                            d.method ?? "-",
+                            d.dryDensity === null ? "-" : String(d.dryDensity),
+                            d.wetDensity === null ? "-" : String(d.wetDensity)
+                          ])}
+                          empty="No densities."
+                        />
+                      </Card>
+                    ) : null}
+                    {(magneticSusceptibilitiesQuery.data?.data ?? []).length > 0 ? (
+                      <Card
+                        title="Magnetic Susceptibilities"
+                        description={`Magnetic susceptibility readings for interval #${intervalId}.`}
+                        action={
+                          canManage ? (
+                            <AddBtn
+                              label="Add Magnetic"
+                              onClick={() => setModal("magneticSusceptibility")}
+                            />
+                          ) : undefined
+                        }
+                      >
+                        <SimpleTable
+                          headers={["ID", "Value", "Unit", "Instrument", "Comments"]}
+                          rows={(magneticSusceptibilitiesQuery.data?.data ?? []).map((m) => [
+                            String(m.id),
+                            String(m.value),
+                            m.unit ?? "-",
+                            m.instrument ?? "-",
+                            m.comments ?? "-"
+                          ])}
+                          empty="No magnetic susceptibilities."
+                        />
+                      </Card>
+                    ) : null}
                   </div>
                 </Card>
               </div>
@@ -1144,10 +1199,14 @@ export function ExploracionesDataRoomPage() {
 
             {drillHoleId && intervalId && assayId ? (
               <div ref={qaqcRef}>
-                <Card
+                {/* <Card
                   title="QAQC"
                   description={`Quality control records for assay #${assayId}.`}
-                  action={canManage ? <AddBtn label="Add QAQC" onClick={() => setModal("qaqc")} /> : undefined}
+                  action={
+                    canManage ? (
+                      <AddBtn label="Add QAQC" onClick={() => setModal("qaqc")} />
+                    ) : undefined
+                  }
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
                     You are viewing QAQC records for the selected assay.
@@ -1162,12 +1221,16 @@ export function ExploracionesDataRoomPage() {
                     ])}
                     empty="No QAQC records."
                   />
-                </Card>
+                </Card> */}
                 <div className="mt-3" />
                 <Card
                   title="Assay Values"
                   description={`Element values reported for assay #${assayId}.`}
-                  action={canManage ? <AddBtn label="Add Assay Value" onClick={() => setModal("assayValue")} /> : undefined}
+                  action={
+                    canManage ? (
+                      <AddBtn label="Add Assay Value" onClick={() => setModal("assayValue")} />
+                    ) : undefined
+                  }
                 >
                   <SimpleTable
                     headers={["ID", "Element", "Value", "Unit", "Detection Limit"]}
