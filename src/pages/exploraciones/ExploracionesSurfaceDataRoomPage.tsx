@@ -127,6 +127,7 @@ export function ExploracionesSurfaceDataRoomPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const canManage = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const canView = canManage || user?.role === "VISITANTE";
   const { areaId, levelId, laborId, sampleId } = useParams();
   const [modal, setModal] = useState<ModalType | null>(null);
   const [slide, setSlide] = useState(0);
@@ -327,7 +328,7 @@ export function ExploracionesSurfaceDataRoomPage() {
     setPan({ x: 0, y: 0 });
   };
 
-  if (!canManage) return <Navigate to="/perfil" replace />;
+  if (!canView) return <Navigate to="/perfil" replace />;
 
   return (
     <section className="space-y-4 text-[var(--color-on-surface)]">
@@ -364,11 +365,13 @@ export function ExploracionesSurfaceDataRoomPage() {
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-bold">Hierarchy</h2>
-          <div className="flex flex-wrap gap-2">
-            <AddBtn label="Add Area" onClick={() => setModal("area")} />
-            {areaId ? <AddBtn label="Add Level" onClick={() => setModal("level")} /> : null}
-            {laborId ? <AddBtn label="Add Sample" onClick={() => setModal("sample")} /> : null}
-          </div>
+          {canManage ? (
+            <div className="flex flex-wrap gap-2">
+              <AddBtn label="Add Area" onClick={() => setModal("area")} />
+              {areaId ? <AddBtn label="Add Level" onClick={() => setModal("level")} /> : null}
+              {laborId ? <AddBtn label="Add Sample" onClick={() => setModal("sample")} /> : null}
+            </div>
+          ) : null}
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <MiniList
@@ -454,7 +457,7 @@ export function ExploracionesSurfaceDataRoomPage() {
                   <option value={5}>5 rows</option>
                   <option value={10}>10 rows</option>
                 </select>
-                {laborId ? <AddBtn label="Add Sample" onClick={() => setModal("sample")} /> : null}
+                {canManage && laborId ? <AddBtn label="Add Sample" onClick={() => setModal("sample")} /> : null}
               </div>
             </div>
             <div className="min-h-[240px]">
@@ -547,13 +550,15 @@ export function ExploracionesSurfaceDataRoomPage() {
           <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-bold">Results Panel</h3>
-              <div className="flex flex-wrap gap-2">
-                <AddBtn label="Laboratory" onClick={() => setModal("laboratory")} />
-                <AddBtn label="Sample-Lab" onClick={() => setModal("sampleLaboratory")} />
-                <AddBtn label="Element" onClick={() => setModal("element")} />
-                <AddBtn label="Result" onClick={() => setModal("result")} />
-                <AddBtn label="QAQC" onClick={() => setModal("qaqc")} />
-              </div>
+              {canManage ? (
+                <div className="flex flex-wrap gap-2">
+                  <AddBtn label="Laboratory" onClick={() => setModal("laboratory")} />
+                  <AddBtn label="Sample-Lab" onClick={() => setModal("sampleLaboratory")} />
+                  <AddBtn label="Element" onClick={() => setModal("element")} />
+                  <AddBtn label="Result" onClick={() => setModal("result")} />
+                  <AddBtn label="QAQC" onClick={() => setModal("qaqc")} />
+                </div>
+              ) : null}
             </div>
             <div className="space-y-3">
               <Table
@@ -679,7 +684,7 @@ export function ExploracionesSurfaceDataRoomPage() {
         </div>
       ) : null}
 
-      {modal ? (
+      {canManage && modal ? (
         <SurfaceCreateModal
           type={modal}
           areaId={areaId}

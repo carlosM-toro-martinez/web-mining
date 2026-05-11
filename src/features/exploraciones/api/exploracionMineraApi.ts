@@ -121,6 +121,12 @@ interface PaginatedResult<T> {
   };
 }
 
+interface MiningExcelImportPayload {
+  file: File;
+  projectName: string;
+  defaultZoneName?: string;
+}
+
 function normalizeListResponse<T>(raw: unknown, parser: (value: unknown) => T): PaginatedResult<T> {
   const root = raw && typeof raw === "object" && "data" in raw ? (raw as { data: unknown }).data : raw;
 
@@ -587,6 +593,38 @@ export async function updateMagneticSusceptibility(
     updateMagneticSusceptibilityPayloadSchema.parse(payload)
   );
   return normalizeDetailResponse(response.data, (item) => magneticSusceptibilitySchema.parse(item));
+}
+
+function normalizeImportResponse(raw: unknown) {
+  if (raw && typeof raw === "object" && "data" in raw) {
+    const inner = (raw as { data?: unknown }).data;
+    if (inner && typeof inner === "object") return inner as Record<string, unknown>;
+  }
+  return (raw ?? {}) as Record<string, unknown>;
+}
+
+export async function validateMiningExcelImport(payload: MiningExcelImportPayload) {
+  const formData = new FormData();
+  formData.append("file", payload.file);
+  formData.append("projectName", payload.projectName);
+  if (payload.defaultZoneName) formData.append("defaultZoneName", payload.defaultZoneName);
+
+  const response = await httpClient.post(apiEndpoints.exploraciones.miningExcelValidate, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return normalizeImportResponse(response.data);
+}
+
+export async function executeMiningExcelImport(payload: MiningExcelImportPayload) {
+  const formData = new FormData();
+  formData.append("file", payload.file);
+  formData.append("projectName", payload.projectName);
+  if (payload.defaultZoneName) formData.append("defaultZoneName", payload.defaultZoneName);
+
+  const response = await httpClient.post(apiEndpoints.exploraciones.miningExcelExecute, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return normalizeImportResponse(response.data);
 }
 
 export async function getSignificantIntercepts(params: {

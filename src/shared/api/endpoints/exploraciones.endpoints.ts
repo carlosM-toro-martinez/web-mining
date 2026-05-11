@@ -57,5 +57,7 @@ export const exploracionesEndpoints = {
   sampleResults: "/api/surface-exploration/sample-results",
   sampleResultById: (id: string) => `/api/surface-exploration/sample-results/${id}`,
   sampleQaqc: "/api/surface-exploration/sample-qaqc",
-  sampleQaqcById: (id: string) => `/api/surface-exploration/sample-qaqc/${id}`
+  sampleQaqcById: (id: string) => `/api/surface-exploration/sample-qaqc/${id}`,
+  miningExcelValidate: "/api/imports/mining-excel/validate",
+  miningExcelExecute: "/api/imports/mining-excel/execute"
 } as const;

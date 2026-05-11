@@ -9,7 +9,9 @@ import {
   useCreateDrillHoleMutation,
   useCreateIntervalMutation,
   useCreateProjectMutation,
-  useCreateZoneMutation
+  useCreateZoneMutation,
+  useExecuteMiningExcelImportMutation,
+  useValidateMiningExcelImportMutation
 } from "@/features/exploraciones/hooks/useExploracionMinera";
 import {
   useCreateMiningAreaMutation,
@@ -32,6 +34,11 @@ export function ExploracionesFormsPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [drillImporting, setDrillImporting] = useState<"validate" | "execute" | null>(null);
+  const [drillImportFile, setDrillImportFile] = useState<File | null>(null);
+  const [drillProjectName, setDrillProjectName] = useState("LIP");
+  const [drillDefaultZoneName, setDrillDefaultZoneName] = useState("General");
+  const [drillImportResponse, setDrillImportResponse] = useState<Record<string, any> | null>(null);
 
   const canAdmin = user?.role === "ADMIN";
   if (!canAdmin) return <Navigate to="/perfil" replace />;
@@ -41,6 +48,8 @@ export function ExploracionesFormsPage() {
   const createDrillHole = useCreateDrillHoleMutation();
   const createInterval = useCreateIntervalMutation();
   const createAssay = useCreateAssayMutation();
+  const validateMiningExcelImport = useValidateMiningExcelImportMutation();
+  const executeMiningExcelImport = useExecuteMiningExcelImportMutation();
 
   const createMiningArea = useCreateMiningAreaMutation();
   const createMiningLevel = useCreateMiningLevelMutation();
@@ -271,6 +280,37 @@ export function ExploracionesFormsPage() {
     }
   };
 
+  const runDrillImport = async (mode: "validate" | "execute") => {
+    if (!drillImportFile) {
+      showError("Please select an Excel file first.");
+      return;
+    }
+    if (!drillProjectName.trim()) {
+      showError("Project name is required.");
+      return;
+    }
+    try {
+      setDrillImporting(mode);
+      const payload = {
+        file: drillImportFile,
+        projectName: drillProjectName.trim(),
+        defaultZoneName: drillDefaultZoneName.trim() || undefined
+      };
+      const result =
+        mode === "validate"
+          ? await validateMiningExcelImport.mutateAsync(payload)
+          : await executeMiningExcelImport.mutateAsync(payload);
+      setDrillImportResponse(result as Record<string, any>);
+      showSuccess(mode === "validate" ? "Validation completed." : "Import executed successfully.");
+    } catch (error: any) {
+      const data = error?.response?.data;
+      if (data && typeof data === "object") setDrillImportResponse(data);
+      showError(error?.message ?? "Drillholes Excel import failed.");
+    } finally {
+      setDrillImporting(null);
+    }
+  };
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -282,6 +322,63 @@ export function ExploracionesFormsPage() {
           <Link to="/exploraciones-data-room" className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs font-semibold">Back to Data Room</Link>
         </div>
       </header>
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-3 text-lg font-bold">Drillholes Excel Import (Validate / Execute)</h2>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <input
+            className={field}
+            placeholder="projectName (required)"
+            value={drillProjectName}
+            onChange={(e) => setDrillProjectName(e.target.value)}
+          />
+          <input
+            className={field}
+            placeholder="defaultZoneName (optional)"
+            value={drillDefaultZoneName}
+            onChange={(e) => setDrillDefaultZoneName(e.target.value)}
+          />
+          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-sm font-semibold">
+            <Upload size={14} /> {drillImportFile ? drillImportFile.name : "Select Excel"}
+            <input
+              type="file"
+              accept=".xls,.xlsx"
+              className="hidden"
+              onChange={(e) => setDrillImportFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => void runDrillImport("validate")}
+            disabled={!drillImportFile || drillImporting !== null}
+            className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            Validate Only
+          </button>
+          <button
+            onClick={() => void runDrillImport("execute")}
+            disabled={!drillImportFile || drillImporting !== null}
+            className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            Execute Import
+          </button>
+          {drillImporting ? (
+            <span className="text-sm text-[var(--color-on-surface-variant)]">
+              Processing: {drillImporting}...
+            </span>
+          ) : null}
+        </div>
+        {drillImportResponse ? (
+          <div className="mt-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
+            <p className="text-sm font-semibold">Import Response</p>
+            <pre className="mt-2 max-h-72 overflow-auto text-xs">{JSON.stringify(drillImportResponse, null, 2)}</pre>
+          </div>
+        ) : null}
+        <p className="mt-3 text-xs text-[var(--color-on-surface-variant)]">
+          Flow: 1) Validate first. 2) Execute with the same file and fields if validation passes.
+        </p>
+      </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-3 text-lg font-bold">Surface Bulk Upload (CSV/XLSX)</h2>

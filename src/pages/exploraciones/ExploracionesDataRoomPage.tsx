@@ -7,6 +7,10 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import introVideoDefault from "@/assets/images/VIDEO DE PRESENTACION.mp4";
+import modelGifDefault from "@/assets/images/modelgiff.gif";
+import drillMediaFallback01 from "@/assets/images/GEOQUIMICO_GENERAL.jpg";
+import drillMediaFallback02 from "@/assets/images/PLANO DE ESTRUCTURAS.jpg";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { useTheme } from "@/shared/theme/ThemeProvider";
@@ -113,7 +117,17 @@ const mapMarkerIcon = L.icon({
 const DEFAULT_PROJECT_MAP_LAT = Number(import.meta.env.VITE_PROJECT_MAP_LAT ?? -16.5);
 const DEFAULT_PROJECT_MAP_LNG = Number(import.meta.env.VITE_PROJECT_MAP_LNG ?? -68.15);
 const EXPLORACIONES_INTRO_VIDEO_URL =
-  import.meta.env.VITE_EXPLORACIONES_INTRO_VIDEO_URL ?? "/media/exploraciones-intro.mp4";
+  import.meta.env.VITE_EXPLORACIONES_INTRO_VIDEO_URL ?? introVideoDefault;
+const DRILLHOLES_MEDIA_SCHEME = {
+  default: ["modelgiff.gif", "GEOQUIMICO_GENERAL.jpg", "PLANO DE ESTRUCTURAS.jpg"],
+  byProjectId: {} as Record<number, string[]>,
+  byZoneId: {} as Record<number, string[]>
+} as const;
+const DRILLHOLES_MEDIA_BY_NAME: Record<string, string> = {
+  "modelgiff.gif": modelGifDefault,
+  "GEOQUIMICO_GENERAL.jpg": drillMediaFallback01,
+  "PLANO DE ESTRUCTURAS.jpg": drillMediaFallback02
+};
 
 export function ExploracionesDataRoomPage() {
   const { user } = useAuth();
@@ -122,6 +136,8 @@ export function ExploracionesDataRoomPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const canManage = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const canView = canManage || user?.role === "VISITANTE";
+  const isVisitante = user?.role === "VISITANTE";
   const isAdmin = user?.role === "ADMIN";
   const params = useParams();
   const projectId = parseId(params.projectId);
@@ -131,6 +147,13 @@ export function ExploracionesDataRoomPage() {
   const assayId = parseId(params.assayId);
 
   const [modal, setModal] = useState<ModalType | null>(null);
+  const [showIntroVideo, setShowIntroVideo] = useState(false);
+  const [mediaSlide, setMediaSlide] = useState(0);
+  const [mediaFullScreen, setMediaFullScreen] = useState(false);
+  const [mediaZoom, setMediaZoom] = useState(1);
+  const [mediaPan, setMediaPan] = useState({ x: 0, y: 0 });
+  const [mediaDragging, setMediaDragging] = useState(false);
+  const [mediaDragStart, setMediaDragStart] = useState({ x: 0, y: 0 });
   const projectsQuery = useProjectsQuery({ page: 1, limit: 100 });
   const projectDetail = useProjectDetailQuery(projectId);
   const zonesQuery = useZonesByProjectQuery(projectId);
@@ -176,6 +199,20 @@ export function ExploracionesDataRoomPage() {
   const availableProjects = projectsQuery.data?.data ?? [];
   const preferredDrillProject =
     availableProjects.find((project) => project.id === 1) ?? availableProjects[0];
+  const drillholesMedia = useMemo(() => {
+    const resolve = (names: readonly string[]) =>
+      names.map((n) => DRILLHOLES_MEDIA_BY_NAME[n]).filter((src): src is string => Boolean(src));
+    if (zoneId && DRILLHOLES_MEDIA_SCHEME.byZoneId[zoneId]?.length) {
+      const list = resolve(DRILLHOLES_MEDIA_SCHEME.byZoneId[zoneId]);
+      if (list.length) return list;
+    }
+    if (projectId && DRILLHOLES_MEDIA_SCHEME.byProjectId[projectId]?.length) {
+      const list = resolve(DRILLHOLES_MEDIA_SCHEME.byProjectId[projectId]);
+      if (list.length) return list;
+    }
+    const fallback = resolve(DRILLHOLES_MEDIA_SCHEME.default);
+    return fallback.length ? fallback : [modelGifDefault];
+  }, [projectId, zoneId]);
 
   useEffect(() => {
     if (!isLanding && !projectId && projectsQuery.data?.data?.length) {
@@ -202,6 +239,17 @@ export function ExploracionesDataRoomPage() {
       qaqcRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [assayId]);
+  useEffect(() => {
+    setMediaSlide(0);
+    setMediaZoom(1);
+    setMediaPan({ x: 0, y: 0 });
+  }, [projectId, zoneId, drillholesMedia]);
+
+  const clampMediaZoom = (value: number) => Math.min(6, Math.max(1, value));
+  const resetMediaView = () => {
+    setMediaZoom(1);
+    setMediaPan({ x: 0, y: 0 });
+  };
 
   const isLoading = useMemo(
     () =>
@@ -251,7 +299,7 @@ export function ExploracionesDataRoomPage() {
     ]
   );
 
-  if (!canManage) return <Navigate to="/perfil" replace />;
+  if (!canView) return <Navigate to="/perfil" replace />;
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -407,18 +455,36 @@ export function ExploracionesDataRoomPage() {
       {isLanding ? (
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-3">
           <article className="md:col-span-3 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4">
-            <p className="mb-2 text-sm font-semibold">Intro Video</p>
-            <video
-              key={EXPLORACIONES_INTRO_VIDEO_URL}
-              className="h-auto max-h-[420px] w-full rounded-lg border border-[var(--color-border-soft)] bg-black object-contain"
-              controls
-              preload="metadata"
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Corporate Overview</p>
+                <p className="text-xs text-[var(--color-on-surface-variant)]">
+                  Click to open and play in large view.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIntroVideo(true)}
+                className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
+              >
+                Open Video
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowIntroVideo(true)}
+              className="mt-3 w-full overflow-hidden rounded-lg border border-[var(--color-border-soft)] bg-black"
             >
-              <source src={EXPLORACIONES_INTRO_VIDEO_URL} type="video/mp4" />
-            </video>
-            <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
-              Source: <code>{EXPLORACIONES_INTRO_VIDEO_URL}</code>
-            </p>
+              <video
+                key={EXPLORACIONES_INTRO_VIDEO_URL}
+                className="h-[160px] w-full object-cover opacity-90"
+                muted
+                playsInline
+                preload="metadata"
+              >
+                <source src={EXPLORACIONES_INTRO_VIDEO_URL} type="video/mp4" />
+              </video>
+            </button>
           </article>
           <button
             type="button"
@@ -446,15 +512,17 @@ export function ExploracionesDataRoomPage() {
               Enter the surface exploration data room.
             </p>
           </button>
-          <button
-            type="button"
-            className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-left opacity-75"
-          >
-            <p className="text-lg font-bold">Geochemistry</p>
-            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-              Geochemistry module (coming soon).
-            </p>
-          </button>
+          {!isVisitante ? (
+            <button
+              type="button"
+              className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-left opacity-75"
+            >
+              <p className="text-lg font-bold">Geochemistry</p>
+              <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+                Geochemistry module (coming soon).
+              </p>
+            </button>
+          ) : null}
           {isAdmin ? (
             <Link
               to="/exploraciones-data-room/forms"
@@ -469,11 +537,121 @@ export function ExploracionesDataRoomPage() {
         </div>
       ) : null}
 
+      {showIntroVideo ? (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/85 p-4">
+          <button
+            type="button"
+            onClick={() => setShowIntroVideo(false)}
+            className="absolute right-6 top-6 rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold text-white"
+          >
+            Close
+          </button>
+          <video
+            key={`${EXPLORACIONES_INTRO_VIDEO_URL}-fullscreen`}
+            className="max-h-[90vh] w-auto max-w-[92vw] rounded-xl border border-white/20 bg-black"
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+          >
+            <source src={EXPLORACIONES_INTRO_VIDEO_URL} type="video/mp4" />
+          </video>
+        </div>
+      ) : null}
+
+      {mediaFullScreen ? (
+        <div
+          className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 p-4"
+          onMouseMove={(e) => {
+            if (!mediaDragging) return;
+            setMediaPan({
+              x: e.clientX - mediaDragStart.x,
+              y: e.clientY - mediaDragStart.y
+            });
+          }}
+          onMouseUp={() => setMediaDragging(false)}
+          onMouseLeave={() => setMediaDragging(false)}
+        >
+          <button
+            onClick={() => setMediaFullScreen(false)}
+            className="absolute right-6 top-6 rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold text-white"
+          >
+            Close
+          </button>
+          <div className="absolute left-6 top-6 flex items-center gap-2">
+            <button
+              onClick={() => setMediaZoom((z) => clampMediaZoom(z - 0.25))}
+              className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Zoom -
+            </button>
+            <button
+              onClick={() => setMediaZoom((z) => clampMediaZoom(z + 0.25))}
+              className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Zoom +
+            </button>
+            <button
+              onClick={resetMediaView}
+              className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Reset
+            </button>
+            <span className="rounded-lg border border-white/20 px-2 py-1 text-xs text-white/90">
+              {Math.round(mediaZoom * 100)}%
+            </span>
+          </div>
+          <button
+            onClick={() =>
+              setMediaSlide((s) => (s - 1 + drillholesMedia.length) % drillholesMedia.length)
+            }
+            className="absolute left-4 rounded-lg border border-white/30 px-3 py-2 text-sm font-semibold text-white"
+          >
+            Prev
+          </button>
+          <div
+            className="max-h-[90vh] max-w-[90vw] overflow-hidden rounded-xl"
+            onWheel={(e) => {
+              e.preventDefault();
+              const direction = e.deltaY > 0 ? -0.12 : 0.12;
+              setMediaZoom((z) => clampMediaZoom(z + direction));
+            }}
+            onDoubleClick={resetMediaView}
+          >
+            <img
+              src={drillholesMedia[mediaSlide]}
+              alt={`Drillholes media fullscreen ${mediaSlide + 1}`}
+              draggable={false}
+              onMouseDown={(e) => {
+                if (mediaZoom <= 1) return;
+                setMediaDragging(true);
+                setMediaDragStart({
+                  x: e.clientX - mediaPan.x,
+                  y: e.clientY - mediaPan.y
+                });
+              }}
+              className={`max-h-[90vh] max-w-[90vw] select-none object-contain ${mediaZoom > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"}`}
+              style={{
+                transform: `translate(${mediaPan.x}px, ${mediaPan.y}px) scale(${mediaZoom})`,
+                transformOrigin: "center center",
+                transition: mediaDragging ? "none" : "transform 120ms ease"
+              }}
+            />
+          </div>
+          <button
+            onClick={() => setMediaSlide((s) => (s + 1) % drillholesMedia.length)}
+            className="absolute right-4 rounded-lg border border-white/30 px-3 py-2 text-sm font-semibold text-white"
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
+
       {!isLanding && !projectId ? (
         <div className="mx-auto max-w-5xl">
           <Card
             title="Projects"
-            action={<AddBtn label="Add Project" onClick={() => setModal("project")} />}
+            action={canManage ? <AddBtn label="Add Project" onClick={() => setModal("project")} /> : undefined}
           >
             <SimpleTable
               headers={["ID", "Name", "Location", "Action"]}
@@ -502,7 +680,7 @@ export function ExploracionesDataRoomPage() {
           <Card
             title="Project Zones"
             description={`Zones defined for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
-            action={<AddBtn label="Add Zone" onClick={() => setModal("zone")} />}
+            action={canManage ? <AddBtn label="Add Zone" onClick={() => setModal("zone")} /> : undefined}
           >
             <SimpleTable
               headers={["Zone", "Description", "Action"]}
@@ -549,13 +727,63 @@ export function ExploracionesDataRoomPage() {
             {!drillHoleId ? (
               <div className="space-y-4">
                 <Card
+                  title="Drillholes Media Viewer"
+                  description="Model/image preview for the current drillholes context."
+                >
+                  <div className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-black">
+                    <img
+                      src={drillholesMedia[mediaSlide]}
+                      alt={`Drillholes media ${mediaSlide + 1}`}
+                      className="h-[320px] w-full object-contain"
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <button
+                      onClick={() =>
+                        setMediaSlide((s) => (s - 1 + drillholesMedia.length) % drillholesMedia.length)
+                      }
+                      className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
+                    >
+                      Prev
+                    </button>
+                    <div className="flex gap-2">
+                      {drillholesMedia.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setMediaSlide(i)}
+                          className={`h-2.5 w-2.5 rounded-full ${i === mediaSlide ? "bg-[var(--color-primary)]" : "bg-[var(--color-border-soft)]"}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setMediaFullScreen(true)}
+                        className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Fullscreen
+                      </button>
+                      <button
+                        onClick={() => setMediaSlide((s) => (s + 1) % drillholesMedia.length)}
+                        className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
+                    Add more images or gifs in <code>DRILLHOLES_MEDIA_SCHEME</code> (this file).
+                  </p>
+                </Card>
+                <Card
                   title="Significant Intercepts"
                   description={`Significant intercepts registered for zone ${zoneDetail.data?.name ?? `#${zoneId}`}.`}
                   action={
-                    <AddBtn
-                      label="Add Significant Intercept"
-                      onClick={() => setModal("significantIntercept")}
-                    />
+                    canManage ? (
+                      <AddBtn
+                        label="Add Significant Intercept"
+                        onClick={() => setModal("significantIntercept")}
+                      />
+                    ) : undefined
                   }
                 >
                   <div className="overflow-x-auto rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]">
@@ -646,7 +874,7 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Drillholes"
                   description={`Drillholes registered for zone ${zoneDetail.data?.name ?? `#${zoneId}`}.`}
-                  action={<AddBtn label="Add Drillhole" onClick={() => setModal("drillhole")} />}
+                  action={canManage ? <AddBtn label="Add Drillhole" onClick={() => setModal("drillhole")} /> : undefined}
                 >
                   <SimpleTable
                     headers={[
@@ -692,7 +920,7 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Intervals"
                   description={`Intervals logged for drillhole ${drillHoleDetail.data?.name ?? `#${drillHoleId}`}.`}
-                  action={<AddBtn label="Add Interval" onClick={() => setModal("interval")} />}
+                  action={canManage ? <AddBtn label="Add Interval" onClick={() => setModal("interval")} /> : undefined}
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
                     You are viewing intervals for the selected drillhole.
@@ -718,7 +946,7 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Drillhole Surveys"
                   description={`Survey measurements for drillhole ${drillHoleDetail.data?.name ?? `#${drillHoleId}`}.`}
-                  action={<AddBtn label="Add Survey" onClick={() => setModal("drillHoleSurvey")} />}
+                  action={canManage ? <AddBtn label="Add Survey" onClick={() => setModal("drillHoleSurvey")} /> : undefined}
                 >
                   <SimpleTable
                     headers={["ID", "Depth", "Azimuth", "Dip"]}
@@ -740,10 +968,12 @@ export function ExploracionesDataRoomPage() {
                   title="Assays and Lithologies"
                   description={`Assay and lithology records for interval #${intervalId}.`}
                   action={
-                    <div className="flex gap-2">
-                      <AddBtn label="Add Assay" onClick={() => setModal("assay")} />
-                      <AddBtn label="Add Lithology" onClick={() => setModal("lithology")} />
-                    </div>
+                    canManage ? (
+                      <div className="flex gap-2">
+                        <AddBtn label="Add Assay" onClick={() => setModal("assay")} />
+                        <AddBtn label="Add Lithology" onClick={() => setModal("lithology")} />
+                      </div>
+                    ) : undefined
                   }
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
@@ -786,7 +1016,7 @@ export function ExploracionesDataRoomPage() {
                       title="Alterations"
                       description={`Alteration logs for interval #${intervalId}.`}
                       action={
-                        <AddBtn label="Add Alteration" onClick={() => setModal("alteration")} />
+                        canManage ? <AddBtn label="Add Alteration" onClick={() => setModal("alteration")} /> : undefined
                       }
                     >
                       <SimpleTable
@@ -805,10 +1035,12 @@ export function ExploracionesDataRoomPage() {
                       title="Mineralizations"
                       description={`Mineralization logs for interval #${intervalId}.`}
                       action={
-                        <AddBtn
-                          label="Add Mineralization"
-                          onClick={() => setModal("mineralization")}
-                        />
+                        canManage ? (
+                          <AddBtn
+                            label="Add Mineralization"
+                            onClick={() => setModal("mineralization")}
+                          />
+                        ) : undefined
                       }
                     >
                       <SimpleTable
@@ -827,10 +1059,12 @@ export function ExploracionesDataRoomPage() {
                       title="Geological Structures"
                       description={`Structural records for interval #${intervalId}.`}
                       action={
-                        <AddBtn
-                          label="Add Structure"
-                          onClick={() => setModal("geologicalStructure")}
-                        />
+                        canManage ? (
+                          <AddBtn
+                            label="Add Structure"
+                            onClick={() => setModal("geologicalStructure")}
+                          />
+                        ) : undefined
                       }
                     >
                       <SimpleTable
@@ -848,7 +1082,7 @@ export function ExploracionesDataRoomPage() {
                     <Card
                       title="Recoveries"
                       description={`Core recovery metrics for interval #${intervalId}.`}
-                      action={<AddBtn label="Add Recovery" onClick={() => setModal("recovery")} />}
+                      action={canManage ? <AddBtn label="Add Recovery" onClick={() => setModal("recovery")} /> : undefined}
                     >
                       <SimpleTable
                         headers={["ID", "Recovery %", "RQD %", "Core Loss", "Comments"]}
@@ -865,7 +1099,7 @@ export function ExploracionesDataRoomPage() {
                     <Card
                       title="Densities"
                       description={`Density measurements for interval #${intervalId}.`}
-                      action={<AddBtn label="Add Density" onClick={() => setModal("density")} />}
+                      action={canManage ? <AddBtn label="Add Density" onClick={() => setModal("density")} /> : undefined}
                     >
                       <SimpleTable
                         headers={["ID", "Specific Gravity", "Method", "Dry Density", "Wet Density"]}
@@ -883,10 +1117,12 @@ export function ExploracionesDataRoomPage() {
                       title="Magnetic Susceptibilities"
                       description={`Magnetic susceptibility readings for interval #${intervalId}.`}
                       action={
-                        <AddBtn
-                          label="Add Magnetic"
-                          onClick={() => setModal("magneticSusceptibility")}
-                        />
+                        canManage ? (
+                          <AddBtn
+                            label="Add Magnetic"
+                            onClick={() => setModal("magneticSusceptibility")}
+                          />
+                        ) : undefined
                       }
                     >
                       <SimpleTable
@@ -911,7 +1147,7 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="QAQC"
                   description={`Quality control records for assay #${assayId}.`}
-                  action={<AddBtn label="Add QAQC" onClick={() => setModal("qaqc")} />}
+                  action={canManage ? <AddBtn label="Add QAQC" onClick={() => setModal("qaqc")} /> : undefined}
                 >
                   <div className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
                     You are viewing QAQC records for the selected assay.
@@ -931,7 +1167,7 @@ export function ExploracionesDataRoomPage() {
                 <Card
                   title="Assay Values"
                   description={`Element values reported for assay #${assayId}.`}
-                  action={<AddBtn label="Add Assay Value" onClick={() => setModal("assayValue")} />}
+                  action={canManage ? <AddBtn label="Add Assay Value" onClick={() => setModal("assayValue")} /> : undefined}
                 >
                   <SimpleTable
                     headers={["ID", "Element", "Value", "Unit", "Detection Limit"]}
@@ -951,7 +1187,7 @@ export function ExploracionesDataRoomPage() {
         </div>
       ) : null}
 
-      {modal ? (
+      {canManage && modal ? (
         <CreateModal
           type={modal}
           context={{ projectId, zoneId, drillHoleId, intervalId, assayId }}

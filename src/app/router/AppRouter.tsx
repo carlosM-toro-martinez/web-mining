@@ -31,6 +31,7 @@ import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
 import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
 import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 const IS_EXPLORACIONES_DOMAIN =
   typeof window !== "undefined" &&
@@ -38,6 +39,9 @@ const IS_EXPLORACIONES_DOMAIN =
     window.location.hostname === "www.minmartesrl.com");
 
 export function AppRouter() {
+  const { user, isAuthenticated } = useAuth();
+  const isVisitante = user?.role === "VISITANTE";
+
   if (IS_EXPLORACIONES_DOMAIN) {
     return (
       <Routes>
@@ -72,6 +76,35 @@ export function AppRouter() {
     );
   }
 
+  if (isAuthenticated && isVisitante) {
+    return (
+      <Routes>
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Navigate to="/exploraciones-data-room" replace />} />
+          <Route path="/exploraciones-data-room" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/projects" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/projects/:projectId" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId/assays/:assayId" element={<ExploracionesDataRoomPage />} />
+          <Route path="/exploraciones-data-room/surface" element={<ExploracionesSurfaceDataRoomPage />} />
+          <Route path="/exploraciones-data-room/surface/areas/:areaId" element={<ExploracionesSurfaceDataRoomPage />} />
+          <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId" element={<ExploracionesSurfaceDataRoomPage />} />
+          <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId/labors/:laborId" element={<ExploracionesSurfaceDataRoomPage />} />
+          <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId/labors/:laborId/samples/:sampleId" element={<ExploracionesSurfaceDataRoomPage />} />
+          <Route path="*" element={<Navigate to="/exploraciones-data-room" replace />} />
+        </Route>
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
       <Route element={<PublicOnlyRoute />}>
@@ -83,40 +116,26 @@ export function AppRouter() {
       </Route>
 
       <Route element={<ProtectedRoute />}>
+        <Route path="/exploraciones-data-room" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/projects" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/projects/:projectId" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId/assays/:assayId" element={<ExploracionesDataRoomPage />} />
+        <Route path="/exploraciones-data-room/surface" element={<ExploracionesSurfaceDataRoomPage />} />
+        <Route path="/exploraciones-data-room/surface/areas/:areaId" element={<ExploracionesSurfaceDataRoomPage />} />
+        <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId" element={<ExploracionesSurfaceDataRoomPage />} />
+        <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId/labors/:laborId" element={<ExploracionesSurfaceDataRoomPage />} />
+        <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId/labors/:laborId/samples/:sampleId" element={<ExploracionesSurfaceDataRoomPage />} />
+        <Route element={<AdminRoute />}>
+          <Route path="/exploraciones-data-room/forms" element={<ExploracionesFormsPage />} />
+        </Route>
+
         <Route element={<AppShell />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/mapa" element={<MapPage />} />
           <Route path="/exploraciones" element={<ExploracionesPage />} />
-          <Route
-            path="/exploraciones-data-room"
-            element={<ExploracionesDataRoomPage />}
-          />
-          <Route path="/exploraciones-data-room/projects" element={<ExploracionesDataRoomPage />} />
-          <Route
-            path="/exploraciones-data-room/projects/:projectId"
-            element={<ExploracionesDataRoomPage />}
-          />
-          <Route
-            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId"
-            element={<ExploracionesDataRoomPage />}
-          />
-          <Route
-            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId"
-            element={<ExploracionesDataRoomPage />}
-          />
-          <Route
-            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId"
-            element={<ExploracionesDataRoomPage />}
-          />
-          <Route
-            path="/exploraciones-data-room/projects/:projectId/zones/:zoneId/drillholes/:drillHoleId/intervals/:intervalId/assays/:assayId"
-            element={<ExploracionesDataRoomPage />}
-          />
-          <Route path="/exploraciones-data-room/surface" element={<ExploracionesSurfaceDataRoomPage />} />
-          <Route path="/exploraciones-data-room/surface/areas/:areaId" element={<ExploracionesSurfaceDataRoomPage />} />
-          <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId" element={<ExploracionesSurfaceDataRoomPage />} />
-          <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId/labors/:laborId" element={<ExploracionesSurfaceDataRoomPage />} />
-          <Route path="/exploraciones-data-room/surface/areas/:areaId/levels/:levelId/labors/:laborId/samples/:sampleId" element={<ExploracionesSurfaceDataRoomPage />} />
           <Route path="/personal" element={<EmployeePage />} />
           <Route path="/exploraciones/elementos" element={<ExploracionesElementosPage />} />
           <Route path="/exploraciones/reportes" element={<ExploracionesReportesPage />} />
@@ -153,7 +172,6 @@ export function AppRouter() {
           <Route element={<AdminRoute />}>
             <Route path="/trabajadores" element={<RegisterUserPage />} />
             <Route path="/usuarios/nuevo" element={<Navigate to="/trabajadores" replace />} />
-            <Route path="/exploraciones-data-room/forms" element={<ExploracionesFormsPage />} />
           </Route>
 
           <Route path="/404" element={<NotFoundPage />} />

@@ -18,6 +18,7 @@ import {
   createResource,
   createSignificantIntercept,
   createZone,
+  executeMiningExcelImport,
   getAssayById,
   getAssays,
   getAssayValues,
@@ -41,6 +42,7 @@ import {
   getSignificantIntercepts,
   getZoneById,
   getZones,
+  validateMiningExcelImport,
   updateAlteration,
   updateAssay,
   updateAssayValue,
@@ -624,6 +626,20 @@ export function useUpdateMagneticSusceptibilityMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: UpdateMagneticSusceptibilityPayload }) =>
       updateMagneticSusceptibility(id, payload),
+    onSuccess: invalidate
+  });
+}
+
+export function useValidateMiningExcelImportMutation() {
+  return useMutation({
+    mutationFn: validateMiningExcelImport
+  });
+}
+
+export function useExecuteMiningExcelImportMutation() {
+  const invalidate = useInvalidateExplorationHierarchy();
+  return useMutation({
+    mutationFn: executeMiningExcelImport,
     onSuccess: invalidate
   });
 }

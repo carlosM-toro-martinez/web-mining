@@ -5,7 +5,8 @@ export const roleSchema = z.enum([
   "ALMACENERO",
   "RECEPCIONISTA",
   "SUPERINTENDENTE",
-  "TRABAJADOR"
+  "TRABAJADOR",
+  "VISITANTE"
 ]);
 
 export const authUserSchema = z.object({
