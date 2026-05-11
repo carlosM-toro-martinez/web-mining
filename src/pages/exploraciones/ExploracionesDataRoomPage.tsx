@@ -8,10 +8,10 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import introVideoDefault from "@/assets/images/VIDEO DE PRESENTACION.mp4";
-import modelGifDefault from "@/assets/images/modelgiff.gif";
-import modelGifDef2ault from "@/assets/images/modelgiff2.gif";
-import drillMediaFallback01 from "@/assets/images/GEOQUIMICO_GENERAL.jpg";
-import drillMediaFallback02 from "@/assets/images/PLANO DE ESTRUCTURAS.jpg";
+import modelGifDefault from "@/assets/images/1MODELO.gif";
+import modelGifDef2ault from "@/assets/images/2MODELO_.gif";
+import drillMediaFallback01 from "@/assets/images/GENERAL_1PLATA.jpg";
+import drillMediaFallback02 from "@/assets/images/GENERAL_2COBRE.jpg";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { useTheme } from "@/shared/theme/ThemeProvider";
@@ -121,19 +121,19 @@ const EXPLORACIONES_INTRO_VIDEO_URL =
   import.meta.env.VITE_EXPLORACIONES_INTRO_VIDEO_URL ?? introVideoDefault;
 const DRILLHOLES_MEDIA_SCHEME = {
   default: [
-    "modelgiff.gif",
-    "modelgiff2.gif",
-    "GEOQUIMICO_GENERAL.jpg",
-    "PLANO DE ESTRUCTURAS.jpg"
+    "1MODELO.gif",
+    "2MODELO_.gif",
+    "GENERAL_1PLATA.jpg",
+    "GENERAL_2COBRE.jpg"
   ],
   byProjectId: {} as Record<number, string[]>,
   byZoneId: {} as Record<number, string[]>
 } as const;
 const DRILLHOLES_MEDIA_BY_NAME: Record<string, string> = {
-  "modelgiff.gif": modelGifDefault,
-  "GEOQUIMICO_GENERAL.jpg": drillMediaFallback01,
-  "PLANO DE ESTRUCTURAS.jpg": drillMediaFallback02,
-  "modelgiff2.gif": modelGifDef2ault
+  "1MODELO.gif": modelGifDefault,
+  "2MODELO_.gif": modelGifDef2ault,
+  "GENERAL_1PLATA.jpg": drillMediaFallback01,
+  "GENERAL_2COBRE.jpg": drillMediaFallback02
 };
 
 export function ExploracionesDataRoomPage() {
@@ -688,39 +688,44 @@ export function ExploracionesDataRoomPage() {
               {projectDetail.data?.location ?? "No location"}
             </p>
           </header>
-          <Card
-            title="Project Zones"
-            description={`Zones defined for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
-            action={
-              canManage ? <AddBtn label="Add Zone" onClick={() => setModal("zone")} /> : undefined
-            }
-          >
-            <SimpleTable
-              headers={["Zone", "Description", "Action"]}
-              rows={(zonesQuery.data?.data ?? []).map((z) => [
-                z.name,
-                z.description ?? "-",
-                <Link
-                  key={z.id}
-                  className="text-[var(--color-primary)]"
-                  to={pathFor(projectId, z.id)}
-                >
-                  View Drillholes
-                </Link>
-              ])}
-              empty="No zones."
-            />
-          </Card>
-          <Card
-            title="Map"
-            description={`Geospatial overview for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
-          >
-            <ProjectResourceMap
-              latitude={DEFAULT_PROJECT_MAP_LAT}
-              longitude={DEFAULT_PROJECT_MAP_LNG}
-              resources={[]}
-            />
-          </Card>
+          <div className="grid gap-4 xl:grid-cols-9">
+            <div className="xl:col-span-6">
+              <Card
+                title="Project Zones"
+                description={`Zones defined for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
+                action={
+                  canManage ? <AddBtn label="Add Zone" onClick={() => setModal("zone")} /> : undefined
+                }
+              >
+                <SimpleTable
+                  headers={["Zone", "Action"]}
+                  rows={(zonesQuery.data?.data ?? []).map((z) => [
+                    z.name,
+                    <Link
+                      key={z.id}
+                      className="text-[var(--color-primary)]"
+                      to={pathFor(projectId, z.id)}
+                    >
+                      View Drillholes
+                    </Link>
+                  ])}
+                  empty="No zones."
+                />
+              </Card>
+            </div>
+            <div className="xl:col-span-3">
+              <Card
+                title="Map"
+                description={`Geospatial overview for project ${projectDetail.data?.name ?? `#${projectId}`}.`}
+              >
+                <ProjectResourceMap
+                  latitude={DEFAULT_PROJECT_MAP_LAT}
+                  longitude={DEFAULT_PROJECT_MAP_LNG}
+                  resources={[]}
+                />
+              </Card>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -1316,7 +1321,7 @@ function ProjectResourceMap({
       <MapContainer
         center={[latitude, longitude]}
         zoom={13}
-        style={{ height: "300px", width: "500px" }}
+        style={{ height: "420px", width: "100%" }}
       >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"

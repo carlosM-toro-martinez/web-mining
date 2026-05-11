@@ -1,24 +1,36 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Layers, Plus, X } from "lucide-react";
-import imgAcadAgN0 from "@/assets/images/ACAD-nivel 0 OFICIAL GEOQUIMICO AG-Model_page-0001.jpg";
-import imgAcadCuN0 from "@/assets/images/ACAD-nivel 0 OFICIAL GEOQUIMICO CU-Modelo_page-0001.jpg";
-import imgGeoCentralAg from "@/assets/images/GEOQUIMICO_CENTRAL_PLATA.jpg";
-import imgGeoCobre from "@/assets/images/GEOQUIMICO_COBRE.jpg";
-import imgGeoGeneral from "@/assets/images/GEOQUIMICO_GENERAL.jpg";
-import imgGeoGeneralCu from "@/assets/images/GEOQUIMICO_GENERAL_COBRE.jpg";
-import imgGeoCuLipena from "@/assets/images/GEOQUIMICO_LIPEÑA_COBRE_page-0001.jpg";
-import imgGeoLipena from "@/assets/images/GEOQUIMICO_LIPEÑA_page-0001.jpg";
-import imgGeoMosa from "@/assets/images/GEOQUIMICO_MOSA.jpg";
-import imgMapGeoN40 from "@/assets/images/MAPEO GEOLOGICO N-40_page-0001.jpg";
-import imgMuestreoAg from "@/assets/images/MUESTREO DE Ag.jpg";
-import imgMuestreoAu from "@/assets/images/MUESTREO DE Au.jpg";
-import imgMuestreoCu from "@/assets/images/MUESTREO DE Cu.jpg";
-import imgStructN0 from "@/assets/images/Nivel 0 mapeo ESTRUCTURAS MINERALIZADAS_page-0001.jpg";
-import imgPlanoEstructuras from "@/assets/images/PLANO DE ESTRUCTURAS.jpg";
-import imgPlanoAgN40 from "@/assets/images/PLANO GEOQUIMICO N-40 Ag_page-0001.jpg";
-import imgPlanoCuN40 from "@/assets/images/PLANO GEOQUIMICO N-40 CU_page-0001.jpg";
-import imgExtra01 from "@/assets/images/1778439714268-9e0fd1f6-7558-4c58-a69e-c0c6db4e41ac_1.jpg";
+import imgGeneralPlata from "@/assets/images/GENERAL_1PLATA.jpg";
+import imgGeneralCobre from "@/assets/images/GENERAL_2COBRE.jpg";
+import imgCentralPlata from "@/assets/images/CENTRAL_1PLATA.jpg";
+import imgCentralCobre from "@/assets/images/CENTRAL_2COBRE.jpg";
+import imgCentralPorvenir0Estructuras from "@/assets/images/CENTRAL_NIVEL_PORVENIR_0ESTRUCTURAS.jpg";
+import imgCentralPorvenir1Plata from "@/assets/images/CENTRAL_NIVEL_PORVENIR_1PLATA.jpg";
+import imgCentralPorvenir2Cobre from "@/assets/images/CENTRAL_NIVEL_PORVENIR_2COBRE.jpg";
+import imgCentralPorvenir3Oro from "@/assets/images/CENTRAL_NIVEL_PORVENIR_3ORO.jpg";
+import imgLipenaPlata from "@/assets/images/LIPEÑA_1PLATA.jpg";
+import imgLipenaCobre from "@/assets/images/LIPEÑA_2COBRE.jpg";
+import imgLipenaNivel00Estructuras from "@/assets/images/LIPEÑA_NIVEL0_0ESTRUCTURAS.jpg";
+import imgLipenaNivel0Cobre from "@/assets/images/LIPEÑA_NIVEL0_COBRE.jpg";
+import imgLipenaNivel0Plata from "@/assets/images/LIPEÑA_NIVEL0_PLATA.jpg";
+import imgLipenaNivel400Estructuras from "@/assets/images/LIPEÑA_NIVEL40_0ESTRUCTURAS.jpg";
+import imgLipenaNivel401Plata from "@/assets/images/LIPEÑA_NIVEL40_1PLATA.jpg";
+import imgLipenaNivel40Cobre from "@/assets/images/LIPEÑA_NIVEL40_COBRE.jpg";
+import imgMosaPlata from "@/assets/images/MOSA_1PLATA.jpg";
+import imgMosaCobre from "@/assets/images/MOSA_2COBRE.jpg";
+import imgMosaGaleria4Estructuras from "@/assets/images/MOSA_GALERIA_ABANDONADA_4ESTRUCTURAS.jpg";
+import imgMosaEsperanza0Estructuras from "@/assets/images/MOSA_NIVEL_ESPERANZA_0ESTRUCTURAS.jpg";
+import imgMosaEsperanza1Plata from "@/assets/images/MOSA_NIVEL_ESPERANZA_1PLATA.jpg";
+import imgMosaEsperanza2Cobre from "@/assets/images/MOSA_NIVEL_ESPERANZA_2COBRE.jpg";
+import imgMosaEsperanza3Oro from "@/assets/images/MOSA_NIVEL_ESPERANZA_3ORO.jpg";
+import imgMosaLuz0Estructuras from "@/assets/images/MOSA_NIVEL_LUZ_0ESTRUCTURAS.jpg";
+import imgMosaLuz1Plata from "@/assets/images/MOSA_NIVEL_LUZ_1PLATA.jpg";
+import imgMosaLuz2Cobre from "@/assets/images/MOSA_NIVEL_LUZ_2COBRE.jpg";
+import imgGeneric0001 from "@/assets/images/0001.jpg";
+import imgGeneric0002 from "@/assets/images/0002.jpg";
+import imgModelo1 from "@/assets/images/1MODELO.gif";
+import imgModelo2 from "@/assets/images/2MODELO_.gif";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCreateMiningAreaMutation,
@@ -63,51 +75,66 @@ type ModalType =
 
 // Editable image scheme: update this object when new maps/models are added.
 const SURFACE_IMAGE_SCHEME = {
-  default: ["GEOQUIMICO_GENERAL.jpg"],
+  // 1) GENERAL al inicio
+  default: ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg", "0001.jpg", "0002.jpg", "1MODELO.gif", "2MODELO_.gif"],
   byAreaId: {
-    // Ayda
-    "640d7ed2-66b6-4ca6-85df-8b113205e256": ["GEOQUIMICO_GENERAL.jpg", "GEOQUIMICO_COBRE.jpg"],
+    // 2) Imagenes por area (solo nombre de area) al inicio de cada area
+    "640d7ed2-66b6-4ca6-85df-8b113205e256": ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg"],
+    "f7259e26-68ac-4190-9299-fc5bae8f6131": ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg"],
+    "365d677a-63ec-42c8-ac51-43d8323bb9e7": ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg"],
     // Central
-    "b9e1f191-8ac8-46aa-9f47-fbf3bc301025": ["GEOQUIMICO_CENTRAL_PLATA.jpg", "GEOQUIMICO_GENERAL_COBRE.jpg", "GEOQUIMICO_COBRE.jpg"],
-    // El Progreso
-    "f7259e26-68ac-4190-9299-fc5bae8f6131": ["GEOQUIMICO_GENERAL.jpg", "GEOQUIMICO_COBRE.jpg"],
-    // Horizonte
-    "365d677a-63ec-42c8-ac51-43d8323bb9e7": ["GEOQUIMICO_GENERAL.jpg", "PLANO DE ESTRUCTURAS.jpg"],
+    "b9e1f191-8ac8-46aa-9f47-fbf3bc301025": ["CENTRAL_1PLATA.jpg", "CENTRAL_2COBRE.jpg"],
     // Lipeña
     "2e802037-351e-40a1-a219-d097eebba799": [
-      "GEOQUIMICO_LIPEÑA_page-0001.jpg",
-      "GEOQUIMICO_LIPEÑA_COBRE_page-0001.jpg",
-      "PLANO DE ESTRUCTURAS.jpg"
+      "LIPEÑA_1PLATA.jpg",
+      "LIPEÑA_2COBRE.jpg"
     ],
     // Mosa
-    "ba3aca6c-0545-4e82-82fd-2a62108cd939": ["GEOQUIMICO_MOSA.jpg", "GEOQUIMICO_GENERAL.jpg", "1778439714268-9e0fd1f6-7558-4c58-a69e-c0c6db4e41ac_1.jpg"]
+    "ba3aca6c-0545-4e82-82fd-2a62108cd939": ["MOSA_1PLATA.jpg", "MOSA_2COBRE.jpg", "MOSA_GALERIA_ABANDONADA_4ESTRUCTURAS.jpg"]
   } as Record<string, string[]>,
   byLevelId: {
-    // Lipeña - Cuadro
+    // 3) Niveles: primero los que inician con 0
+    // Central - Porvenir
+    "607e931a-00e2-4ebc-bf0b-383ec0f5701c": [
+      "CENTRAL_NIVEL_PORVENIR_0ESTRUCTURAS.jpg",
+      "CENTRAL_NIVEL_PORVENIR_1PLATA.jpg",
+      "CENTRAL_NIVEL_PORVENIR_2COBRE.jpg",
+      "CENTRAL_NIVEL_PORVENIR_3ORO.jpg"
+    ],
+    // Lipeña - Cuadro (sin set específico, usa de área)
     "39c57d4b-2c42-4f81-9948-6e40a7bdf431": [
-      "GEOQUIMICO_LIPEÑA_page-0001.jpg",
-      "GEOQUIMICO_LIPEÑA_COBRE_page-0001.jpg"
+      "LIPEÑA_1PLATA.jpg",
+      "LIPEÑA_2COBRE.jpg"
     ],
     // Lipeña - Nivel 0
     "baaf5c29-50ab-4e5f-887d-ccd119e36b23": [
-      "ACAD-nivel 0 OFICIAL GEOQUIMICO AG-Model_page-0001.jpg",
-      "ACAD-nivel 0 OFICIAL GEOQUIMICO CU-Modelo_page-0001.jpg",
-      "Nivel 0 mapeo ESTRUCTURAS MINERALIZADAS_page-0001.jpg"
+      "LIPEÑA_NIVEL0_0ESTRUCTURAS.jpg",
+      "LIPEÑA_NIVEL0_PLATA.jpg",
+      "LIPEÑA_NIVEL0_COBRE.jpg"
     ],
     // Lipeña - Nivel 40
     "83e3f378-9e92-4da5-a18a-f9da29249e87": [
-      "MAPEO GEOLOGICO N-40_page-0001.jpg",
-      "PLANO GEOQUIMICO N-40 Ag_page-0001.jpg",
-      "PLANO GEOQUIMICO N-40 CU_page-0001.jpg",
-      "MUESTREO DE Ag.jpg",
-      "MUESTREO DE Cu.jpg",
-      "MUESTREO DE Au.jpg"
+      "LIPEÑA_NIVEL40_0ESTRUCTURAS.jpg",
+      "LIPEÑA_NIVEL40_1PLATA.jpg",
+      "LIPEÑA_NIVEL40_COBRE.jpg"
     ],
-    // Lipeña - Nivel 80
+    // Lipeña - Nivel 80 (fallback temporal)
     "a78257c0-cef5-4dbe-a73b-fb44131e976e": [
-      "PLANO DE ESTRUCTURAS.jpg",
-      "MUESTREO DE Ag.jpg",
-      "MUESTREO DE Cu.jpg"
+      "LIPEÑA_1PLATA.jpg",
+      "LIPEÑA_2COBRE.jpg"
+    ],
+    // Mosa - Esperanza
+    "3498ff83-6b74-4f7b-a260-9cd3da8c5269": [
+      "MOSA_NIVEL_ESPERANZA_0ESTRUCTURAS.jpg",
+      "MOSA_NIVEL_ESPERANZA_1PLATA.jpg",
+      "MOSA_NIVEL_ESPERANZA_2COBRE.jpg",
+      "MOSA_NIVEL_ESPERANZA_3ORO.jpg"
+    ],
+    // Mosa - Luz
+    "3bfc25a5-daa4-4597-93d2-d66d3b0f42f1": [
+      "MOSA_NIVEL_LUZ_0ESTRUCTURAS.jpg",
+      "MOSA_NIVEL_LUZ_1PLATA.jpg",
+      "MOSA_NIVEL_LUZ_2COBRE.jpg"
     ]
   } as Record<string, string[]>
 };
@@ -218,45 +245,69 @@ export function ExploracionesSurfaceDataRoomPage() {
   }, [elements.data]);
   const modelImages = useMemo(() => {
     const allImages = [
-      imgGeoGeneral,
-      imgGeoGeneralCu,
-      imgGeoCentralAg,
-      imgGeoCobre,
-      imgGeoMosa,
-      imgExtra01,
-      imgAcadAgN0,
-      imgAcadCuN0,
-      imgGeoCuLipena,
-      imgGeoLipena,
-      imgMapGeoN40,
-      imgStructN0,
-      imgPlanoEstructuras,
-      imgMuestreoAg,
-      imgMuestreoAu,
-      imgMuestreoCu,
-      imgPlanoAgN40,
-      imgPlanoCuN40
+      imgGeneralPlata,
+      imgGeneralCobre,
+      imgGeneric0001,
+      imgGeneric0002,
+      imgCentralPlata,
+      imgCentralCobre,
+      imgCentralPorvenir0Estructuras,
+      imgCentralPorvenir1Plata,
+      imgCentralPorvenir2Cobre,
+      imgCentralPorvenir3Oro,
+      imgLipenaPlata,
+      imgLipenaCobre,
+      imgLipenaNivel00Estructuras,
+      imgLipenaNivel0Plata,
+      imgLipenaNivel0Cobre,
+      imgLipenaNivel400Estructuras,
+      imgLipenaNivel401Plata,
+      imgLipenaNivel40Cobre,
+      imgMosaPlata,
+      imgMosaCobre,
+      imgMosaGaleria4Estructuras,
+      imgMosaEsperanza0Estructuras,
+      imgMosaEsperanza1Plata,
+      imgMosaEsperanza2Cobre,
+      imgMosaEsperanza3Oro,
+      imgMosaLuz0Estructuras,
+      imgMosaLuz1Plata,
+      imgMosaLuz2Cobre,
+      imgModelo1,
+      imgModelo2
     ];
 
     const imageByName: Record<string, string> = {
-      "1778439714268-9e0fd1f6-7558-4c58-a69e-c0c6db4e41ac_1.jpg": imgExtra01,
-      "GEOQUIMICO_COBRE.jpg": imgGeoCobre,
-      "GEOQUIMICO_GENERAL.jpg": imgGeoGeneral,
-      "GEOQUIMICO_GENERAL_COBRE.jpg": imgGeoGeneralCu,
-      "GEOQUIMICO_CENTRAL_PLATA.jpg": imgGeoCentralAg,
-      "GEOQUIMICO_MOSA.jpg": imgGeoMosa,
-      "GEOQUIMICO_LIPEÑA_page-0001.jpg": imgGeoLipena,
-      "GEOQUIMICO_LIPEÑA_COBRE_page-0001.jpg": imgGeoCuLipena,
-      "ACAD-nivel 0 OFICIAL GEOQUIMICO AG-Model_page-0001.jpg": imgAcadAgN0,
-      "ACAD-nivel 0 OFICIAL GEOQUIMICO CU-Modelo_page-0001.jpg": imgAcadCuN0,
-      "Nivel 0 mapeo ESTRUCTURAS MINERALIZADAS_page-0001.jpg": imgStructN0,
-      "MAPEO GEOLOGICO N-40_page-0001.jpg": imgMapGeoN40,
-      "PLANO GEOQUIMICO N-40 Ag_page-0001.jpg": imgPlanoAgN40,
-      "PLANO GEOQUIMICO N-40 CU_page-0001.jpg": imgPlanoCuN40,
-      "PLANO DE ESTRUCTURAS.jpg": imgPlanoEstructuras,
-      "MUESTREO DE Ag.jpg": imgMuestreoAg,
-      "MUESTREO DE Au.jpg": imgMuestreoAu,
-      "MUESTREO DE Cu.jpg": imgMuestreoCu
+      "GENERAL_1PLATA.jpg": imgGeneralPlata,
+      "GENERAL_2COBRE.jpg": imgGeneralCobre,
+      "0001.jpg": imgGeneric0001,
+      "0002.jpg": imgGeneric0002,
+      "CENTRAL_1PLATA.jpg": imgCentralPlata,
+      "CENTRAL_2COBRE.jpg": imgCentralCobre,
+      "CENTRAL_NIVEL_PORVENIR_0ESTRUCTURAS.jpg": imgCentralPorvenir0Estructuras,
+      "CENTRAL_NIVEL_PORVENIR_1PLATA.jpg": imgCentralPorvenir1Plata,
+      "CENTRAL_NIVEL_PORVENIR_2COBRE.jpg": imgCentralPorvenir2Cobre,
+      "CENTRAL_NIVEL_PORVENIR_3ORO.jpg": imgCentralPorvenir3Oro,
+      "LIPEÑA_1PLATA.jpg": imgLipenaPlata,
+      "LIPEÑA_2COBRE.jpg": imgLipenaCobre,
+      "LIPEÑA_NIVEL0_0ESTRUCTURAS.jpg": imgLipenaNivel00Estructuras,
+      "LIPEÑA_NIVEL0_PLATA.jpg": imgLipenaNivel0Plata,
+      "LIPEÑA_NIVEL0_COBRE.jpg": imgLipenaNivel0Cobre,
+      "LIPEÑA_NIVEL40_0ESTRUCTURAS.jpg": imgLipenaNivel400Estructuras,
+      "LIPEÑA_NIVEL40_1PLATA.jpg": imgLipenaNivel401Plata,
+      "LIPEÑA_NIVEL40_COBRE.jpg": imgLipenaNivel40Cobre,
+      "MOSA_1PLATA.jpg": imgMosaPlata,
+      "MOSA_2COBRE.jpg": imgMosaCobre,
+      "MOSA_GALERIA_ABANDONADA_4ESTRUCTURAS.jpg": imgMosaGaleria4Estructuras,
+      "MOSA_NIVEL_ESPERANZA_0ESTRUCTURAS.jpg": imgMosaEsperanza0Estructuras,
+      "MOSA_NIVEL_ESPERANZA_1PLATA.jpg": imgMosaEsperanza1Plata,
+      "MOSA_NIVEL_ESPERANZA_2COBRE.jpg": imgMosaEsperanza2Cobre,
+      "MOSA_NIVEL_ESPERANZA_3ORO.jpg": imgMosaEsperanza3Oro,
+      "MOSA_NIVEL_LUZ_0ESTRUCTURAS.jpg": imgMosaLuz0Estructuras,
+      "MOSA_NIVEL_LUZ_1PLATA.jpg": imgMosaLuz1Plata,
+      "MOSA_NIVEL_LUZ_2COBRE.jpg": imgMosaLuz2Cobre,
+      "1MODELO.gif": imgModelo1,
+      "2MODELO_.gif": imgModelo2
     };
 
     const resolve = (names: string[]) =>
