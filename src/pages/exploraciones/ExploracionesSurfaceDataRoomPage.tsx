@@ -3,6 +3,8 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Layers, Plus, X } from "lucide-react";
 import imgGeneralPlata from "@/assets/images/GENERAL_1PLATA.jpg";
 import imgGeneralCobre from "@/assets/images/GENERAL_2COBRE.jpg";
+import imgAydaProyeccion1 from "@/assets/images/AYDA_PROYECCION1.jpg";
+import imgAydaProyeccion2 from "@/assets/images/AYDA_PROYECCION2.jpg";
 import imgCentralPlata from "@/assets/images/CENTRAL_1PLATA.jpg";
 import imgCentralCobre from "@/assets/images/CENTRAL_2COBRE.jpg";
 import imgCentralPorvenir0Estructuras from "@/assets/images/CENTRAL_NIVEL_PORVENIR_0ESTRUCTURAS.jpg";
@@ -27,8 +29,6 @@ import imgMosaEsperanza3Oro from "@/assets/images/MOSA_NIVEL_ESPERANZA_3ORO.jpg"
 import imgMosaLuz0Estructuras from "@/assets/images/MOSA_NIVEL_LUZ_0ESTRUCTURAS.jpg";
 import imgMosaLuz1Plata from "@/assets/images/MOSA_NIVEL_LUZ_1PLATA.jpg";
 import imgMosaLuz2Cobre from "@/assets/images/MOSA_NIVEL_LUZ_2COBRE.jpg";
-import imgGeneric0001 from "@/assets/images/0001.jpg";
-import imgGeneric0002 from "@/assets/images/0002.jpg";
 import imgModelo1 from "@/assets/images/1MODELO.gif";
 import imgModelo2 from "@/assets/images/2MODELO_.gif";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -76,10 +76,10 @@ type ModalType =
 // Editable image scheme: update this object when new maps/models are added.
 const SURFACE_IMAGE_SCHEME = {
   // 1) GENERAL al inicio
-  default: ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg", "0001.jpg", "0002.jpg", "1MODELO.gif", "2MODELO_.gif"],
+  default: ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg", "1MODELO.gif", "2MODELO_.gif"],
   byAreaId: {
     // 2) Imagenes por area (solo nombre de area) al inicio de cada area
-    "640d7ed2-66b6-4ca6-85df-8b113205e256": ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg"],
+    "640d7ed2-66b6-4ca6-85df-8b113205e256": ["AYDA_PROYECCION1.jpg", "AYDA_PROYECCION2.jpg"],
     "f7259e26-68ac-4190-9299-fc5bae8f6131": ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg"],
     "365d677a-63ec-42c8-ac51-43d8323bb9e7": ["GENERAL_1PLATA.jpg", "GENERAL_2COBRE.jpg"],
     // Central
@@ -247,8 +247,8 @@ export function ExploracionesSurfaceDataRoomPage() {
     const allImages = [
       imgGeneralPlata,
       imgGeneralCobre,
-      imgGeneric0001,
-      imgGeneric0002,
+      imgAydaProyeccion1,
+      imgAydaProyeccion2,
       imgCentralPlata,
       imgCentralCobre,
       imgCentralPorvenir0Estructuras,
@@ -280,8 +280,8 @@ export function ExploracionesSurfaceDataRoomPage() {
     const imageByName: Record<string, string> = {
       "GENERAL_1PLATA.jpg": imgGeneralPlata,
       "GENERAL_2COBRE.jpg": imgGeneralCobre,
-      "0001.jpg": imgGeneric0001,
-      "0002.jpg": imgGeneric0002,
+      "AYDA_PROYECCION1.jpg": imgAydaProyeccion1,
+      "AYDA_PROYECCION2.jpg": imgAydaProyeccion2,
       "CENTRAL_1PLATA.jpg": imgCentralPlata,
       "CENTRAL_2COBRE.jpg": imgCentralCobre,
       "CENTRAL_NIVEL_PORVENIR_0ESTRUCTURAS.jpg": imgCentralPorvenir0Estructuras,
