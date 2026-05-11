@@ -17,7 +17,11 @@ const roleOptions: AuthRole[] = [
   "ALMACENERO",
   "RECEPCIONISTA",
   "SUPERINTENDENTE",
-  "TRABAJADOR"
+  "TRABAJADOR",
+  "VISITANTE",
+  "GEOLOGOADMIN",
+  "GEOLOGO",
+  "ADMINISTRADOR"
 ];
 
 interface EditFormState {
@@ -236,11 +240,7 @@ export function RegisterUserPage() {
             >
               Limpiar
             </button>
-            <button
-              type="submit"
-              disabled={isCreating}
-              className={authPrimaryButtonClassName}
-            >
+            <button type="submit" disabled={isCreating} className={authPrimaryButtonClassName}>
               {isCreating ? "Creando..." : "Crear trabajador"}
             </button>
           </div>
@@ -450,9 +450,7 @@ export function RegisterUserPage() {
                   value={editUser.activo ? "activo" : "inactivo"}
                   onChange={(event) =>
                     setEditUser((current) =>
-                      current
-                        ? { ...current, activo: event.target.value === "activo" }
-                        : current
+                      current ? { ...current, activo: event.target.value === "activo" } : current
                     )
                   }
                   className={authInputClassName}
