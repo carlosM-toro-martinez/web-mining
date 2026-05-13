@@ -137,7 +137,7 @@ const DRILLHOLES_MEDIA_BY_NAME: Record<string, string> = {
 };
 
 export function ExploracionesDataRoomPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { showError, showSuccess } = useToast();
   const { mode, setMode } = useTheme();
   const navigate = useNavigate();
@@ -404,6 +404,16 @@ export function ExploracionesDataRoomPage() {
               Dark
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              navigate("/login", { replace: true });
+            }}
+            className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+          >
+            Cerrar sesión
+          </button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

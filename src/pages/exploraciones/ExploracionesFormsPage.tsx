@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Upload, Download, Plus } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -31,7 +31,8 @@ function sleep(ms: number) {
 }
 
 export function ExploracionesFormsPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const { showError, showSuccess } = useToast();
   const [uploading, setUploading] = useState(false);
   const [drillImporting, setDrillImporting] = useState<"validate" | "execute" | null>(null);
@@ -319,7 +320,19 @@ export function ExploracionesFormsPage() {
             <h1 className="text-2xl font-extrabold">Exploration Forms (Admin)</h1>
             <p className="text-sm text-[var(--color-on-surface-variant)]">Ordered forms for Drillholes and Surface modules.</p>
           </div>
-          <Link to="/exploraciones-data-room" className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs font-semibold">Back to Data Room</Link>
+          <div className="flex items-center gap-2">
+            <Link to="/exploraciones-data-room" className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs font-semibold">Back to Data Room</Link>
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                navigate("/login", { replace: true });
+              }}
+              className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </header>
 

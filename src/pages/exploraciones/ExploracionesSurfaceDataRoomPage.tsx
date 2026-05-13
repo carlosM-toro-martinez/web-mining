@@ -151,7 +151,7 @@ function getSampleTopNumericValue(sample: any): number {
 }
 
 export function ExploracionesSurfaceDataRoomPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const canManage = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
   const canView = canManage || user?.role === "VISITANTE";
@@ -385,12 +385,24 @@ export function ExploracionesSurfaceDataRoomPage() {
     <section className="space-y-4 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-3 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
-          >
-            <ArrowLeft size={14} /> Back
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                navigate("/login", { replace: true });
+              }}
+              className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              Cerrar sesión
+            </button>
+          </div>
           <div className="flex items-center gap-1 text-xs text-[var(--color-on-surface-variant)]">
             <Link
               to="/exploraciones-data-room"

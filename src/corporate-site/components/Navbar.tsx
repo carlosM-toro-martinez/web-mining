@@ -1,8 +1,11 @@
 import { Menu, Mountain, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/features/auth/context/AuthContext';
 
 export default function Navbar() {
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollYRef = useRef(0);
@@ -63,12 +66,25 @@ export default function Navbar() {
                 {item.label}
               </a>
             ))}
-            <Link
-              to="/login"
-              className="px-6 py-2.5 bg-[#0a4d68] hover:bg-[#083d54] text-white rounded-lg transition-all duration-300 font-medium"
-            >
-              Log In
-            </Link>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/login", { replace: true });
+                }}
+                className="px-6 py-2.5 bg-[#0a4d68] hover:bg-[#083d54] text-white rounded-lg transition-all duration-300 font-medium"
+              >
+                Cerrar sesión
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="px-6 py-2.5 bg-[#0a4d68] hover:bg-[#083d54] text-white rounded-lg transition-all duration-300 font-medium"
+              >
+                Log In
+              </Link>
+            )}
           </div>
 
           <button
@@ -93,12 +109,26 @@ export default function Navbar() {
                 {item.label}
               </a>
             ))}
-            <Link
-              to="/login"
-              className="block w-full px-6 py-2.5 bg-[#0a4d68] hover:bg-[#083d54] text-white rounded-lg transition-all duration-300 font-medium text-center"
-            >
-              Log In
-            </Link>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/login", { replace: true });
+                  setIsOpen(false);
+                }}
+                className="block w-full px-6 py-2.5 bg-[#0a4d68] hover:bg-[#083d54] text-white rounded-lg transition-all duration-300 font-medium text-center"
+              >
+                Cerrar sesión
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="block w-full px-6 py-2.5 bg-[#0a4d68] hover:bg-[#083d54] text-white rounded-lg transition-all duration-300 font-medium text-center"
+              >
+                Log In
+              </Link>
+            )}
           </div>
         </div>
       )}
