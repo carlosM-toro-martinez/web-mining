@@ -32,17 +32,32 @@ import { AdminRoute } from "@/app/router/guards/AdminRoute";
 import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
 import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
 import { useAuth } from "@/features/auth/context/AuthContext";
-
-const IS_EXPLORACIONES_DOMAIN =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "minmartesrl.com" ||
-    window.location.hostname === "www.minmartesrl.com");
+import { CorporateLandingPage } from "@/pages/corporate/CorporateLandingPage";
+import { isCorporatePreviewDomain } from "@/app/router/domainConfig";
 
 export function AppRouter() {
   const { user, isAuthenticated } = useAuth();
   const isVisitante = user?.role === "VISITANTE";
+  const isExploracionesDomainRequest =
+    typeof window !== "undefined" && isCorporatePreviewDomain(window.location.hostname);
 
-  if (IS_EXPLORACIONES_DOMAIN) {
+  if (isExploracionesDomainRequest && !isAuthenticated) {
+    return (
+      <Routes>
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+        </Route>
+
+        <Route path="/" element={<CorporateLandingPage />} />
+        <Route path="/exploraciones-data-room" element={<CorporateLandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+
+  if (isExploracionesDomainRequest && isVisitante) {
     return (
       <Routes>
         <Route element={<PublicOnlyRoute />}>
