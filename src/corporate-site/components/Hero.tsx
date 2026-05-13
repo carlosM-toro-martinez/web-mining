@@ -1,18 +1,13 @@
-import { ArrowRight, TrendingUp } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import campamentoLaLipena from '@/assets/images/imagesCorp/CAMPAMENTO LA LIPEÑA.jpeg';
-import trabajoInteriorMina from '@/assets/images/imagesCorp/TRABAJO INTERIOR MINA.jpeg';
-import nevadoNocturno from '@/assets/images/imagesCorp/NEVADO NOCTURNO.jpeg';
-import imagen1 from '@/assets/images/imagesCorp/Imagen1.jpg';
+import { ArrowRight, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import campamentoLaLipena from "@/assets/images/imagesCorp/CAMPAMENTO LA LIPEÑA.jpeg";
+import personalMiner from "@/assets/images/imagesCorp/personal minero nivel0.jpg";
+import nevadoNocturno from "@/assets/images/imagesCorp/NEVADO NOCTURNO.jpeg";
+import imagen1 from "@/assets/images/imagesCorp/area tecnica.jpg";
 
 export default function Hero() {
-  const heroImages = [
-    campamentoLaLipena,
-    trabajoInteriorMina,
-    nevadoNocturno,
-    imagen1
-  ];
+  const heroImages = [campamentoLaLipena, personalMiner, nevadoNocturno, imagen1];
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
@@ -30,12 +25,13 @@ export default function Hero() {
           <div
             key={imageUrl}
             className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
-              index === activeImageIndex ? 'opacity-100' : 'opacity-0'
+              index === activeImageIndex ? "opacity-100" : "opacity-0"
             }`}
             style={{ backgroundImage: `url(${imageUrl})` }}
           />
         ))}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0d2230]/94 via-[#1a3549]/90 to-[#0d2230]/94"></div>
+        <div className="absolute inset-0 bg-black/45"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#091924]/96 via-[#152c3d]/92 to-[#091924]/96"></div>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 text-center">
@@ -74,12 +70,15 @@ export default function Hero() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 max-w-4xl mx-auto">
           {[
-            { value: '2', label: 'Main Areas' },
-            { value: 'Sud Lipez', label: 'Project Location' },
-            { value: 'Cu + Au', label: 'Strategic Focus' },
-            { value: 'Private', label: 'Bolivian Capital' }
+            { value: "2", label: "Main Areas" },
+            { value: "Sud Lipez", label: "Project Location" },
+            { value: "Cu + Au", label: "Strategic Focus" },
+            { value: "Private", label: "Bolivian Capital" }
           ].map((stat, idx) => (
-            <div key={idx} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-6">
+            <div
+              key={idx}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-6"
+            >
               <div className="text-3xl md:text-4xl font-bold text-[#d4a574] mb-2">{stat.value}</div>
               <div className="text-sm text-white/80">{stat.label}</div>
             </div>
@@ -94,7 +93,9 @@ export default function Hero() {
               aria-label={`Hero image ${index + 1}`}
               onClick={() => setActiveImageIndex(index)}
               className={`h-2.5 rounded-full transition-all ${
-                index === activeImageIndex ? 'w-8 bg-[#d4a574]' : 'w-2.5 bg-white/40 hover:bg-white/70'
+                index === activeImageIndex
+                  ? "w-8 bg-[#d4a574]"
+                  : "w-2.5 bg-white/40 hover:bg-white/70"
               }`}
             />
           ))}

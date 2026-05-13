@@ -1,6 +1,7 @@
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import About from "./components/About";
+import PresentationDocument from "./components/PresentationDocument";
 import Operations from "./components/Operations";
 import Investment from "./components/Investment";
 import Sustainability from "./components/Sustainability";
@@ -13,6 +14,7 @@ export function CorporateSitePage() {
       <Navbar />
       <Hero />
       <About />
+      <PresentationDocument />
       {/* <Operations /> */}
       <Investment />
       {/* <Sustainability /> */}

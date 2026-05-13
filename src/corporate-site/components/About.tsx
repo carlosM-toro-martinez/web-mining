@@ -1,5 +1,6 @@
 import { Award, Globe, Shield, Users } from "lucide-react";
 import newMina from "../../assets/images/imagesCorp/NUEVA BOCAMINA.jpeg";
+import presentationVideo from "@/assets/images/VIDEO DE PRESENTACION.mp4";
 
 export default function About() {
   const features = [
@@ -58,6 +59,31 @@ export default function About() {
               excellence, regional development, and respectful coexistence with neighboring
               communities and the natural environment.
             </p>
+
+            <div className="mt-8 max-w-xl rounded-2xl border border-[#d7e1ea] bg-white p-5 shadow-lg">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0a4d68]">
+                    Corporate Media
+                  </p>
+                  <h3 className="mt-1 text-lg font-bold text-[#0f1419]">Presentation Video</h3>
+                </div>
+                <span className="rounded-full bg-[#0a4d68]/10 px-3 py-1 text-xs font-medium text-[#0a4d68]">
+                  Official
+                </span>
+              </div>
+              <div className="overflow-hidden rounded-xl border border-[#d9e2eb] bg-[#0b1620]">
+                <video
+                  className="h-full w-full"
+                  controls
+                  preload="metadata"
+                  playsInline
+                >
+                  <source src={presentationVideo} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
           </div>
 
           <div className="relative rounded-2xl overflow-hidden shadow-2xl">

@@ -1,20 +1,46 @@
 import { Menu, Mountain, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
 
   const navItems = [
     { label: 'About', href: '#about' },
+    { label: 'Presentation', href: '#presentation-doc' },
     { label: 'Operations', href: '#operations' },
     { label: 'Vision & Mission', href: '#investment' },
     { label: 'Values', href: '#sustainability' },
     { label: 'Contact', href: '#contact' }
   ];
 
+  useEffect(() => {
+    const onScroll = () => {
+      const currentScrollY = window.scrollY;
+      const isScrollingDown = currentScrollY > lastScrollYRef.current;
+      const crossedTop = currentScrollY < 80;
+
+      if (crossedTop || !isScrollingDown) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[#e2e8f0] shadow-sm">
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 border-b border-[#e2e8f0] bg-white/95 shadow-sm backdrop-blur-sm transition-transform duration-500 ease-out ${
+        isVisible ? 'translate-y-0' : '-translate-y-full'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-20">
           <div className="flex items-center gap-3">
