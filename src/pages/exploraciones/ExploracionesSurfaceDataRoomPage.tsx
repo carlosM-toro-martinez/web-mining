@@ -32,6 +32,7 @@ import imgMosaLuz2Cobre from "@/assets/images/MOSA_NIVEL_LUZ_2COBRE.jpg";
 import imgModelo1 from "@/assets/images/1MODELO.gif";
 import imgModelo2 from "@/assets/images/2MODELO_.gif";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { getPostLogoutPath } from "@/app/router/domainConfig";
 import {
   useCreateMiningAreaMutation,
   useCreateMiningLaborMutation,
@@ -396,7 +397,7 @@ export function ExploracionesSurfaceDataRoomPage() {
               type="button"
               onClick={() => {
                 logout();
-                navigate("/login", { replace: true });
+                navigate(getPostLogoutPath(window.location.hostname), { replace: true });
               }}
               className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
             >

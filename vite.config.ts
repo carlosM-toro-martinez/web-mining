@@ -107,15 +107,6 @@ export default defineConfig({
               cacheName: "mock-api-cache",
               networkTimeoutSeconds: 3
             }
-          },
-          {
-            urlPattern: ({ request }) =>
-              request.mode === "navigate",
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "pages-cache",
-              networkTimeoutSeconds: 5
-            }
           }
         ]
       }

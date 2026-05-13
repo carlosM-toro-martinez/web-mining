@@ -14,3 +14,7 @@ export function isCorporatePreviewDomain(hostname: string) {
   }
   return false;
 }
+
+export function getPostLogoutPath(hostname: string) {
+  return isExploracionesDomain(hostname) ? "/" : "/login";
+}

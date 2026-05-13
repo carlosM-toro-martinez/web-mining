@@ -8,7 +8,18 @@ import "@/styles/screens.css";
 import "@/styles/theme.css";
 import "leaflet/dist/leaflet.css";
 
-registerSW({ immediate: true });
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    updateSW(true);
+  },
+  onRegisteredSW(_, registration) {
+    if (!registration) return;
+    window.setInterval(() => {
+      void registration.update();
+    }, 60_000);
+  }
+});
 setAppFavicon(minerImage);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

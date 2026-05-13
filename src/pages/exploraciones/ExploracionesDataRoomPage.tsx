@@ -15,6 +15,7 @@ import drillMediaFallback02 from "@/assets/images/GENERAL_2COBRE.jpg";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { useTheme } from "@/shared/theme/ThemeProvider";
+import { getPostLogoutPath } from "@/app/router/domainConfig";
 import {
   useAssayDetailQuery,
   useAssaysByIntervalQuery,
@@ -408,7 +409,7 @@ export function ExploracionesDataRoomPage() {
             type="button"
             onClick={() => {
               logout();
-              navigate("/login", { replace: true });
+              navigate(getPostLogoutPath(window.location.hostname), { replace: true });
             }}
             className="rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
           >

@@ -4,6 +4,7 @@ import { Upload, Download, Plus } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { getPostLogoutPath } from "@/app/router/domainConfig";
 import {
   useCreateAssayMutation,
   useCreateDrillHoleMutation,
@@ -326,7 +327,7 @@ export function ExploracionesFormsPage() {
               type="button"
               onClick={() => {
                 logout();
-                navigate("/login", { replace: true });
+                navigate(getPostLogoutPath(window.location.hostname), { replace: true });
               }}
               className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
             >

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import minerImage from "@/assets/miner.png";
+import { getPostLogoutPath } from "@/app/router/domainConfig";
 
 interface NavItem {
   label: string;
@@ -324,7 +325,7 @@ export function AppShell() {
             type="button"
             onClick={() => {
               logout();
-              navigate("/login", { replace: true });
+              navigate(getPostLogoutPath(window.location.hostname), { replace: true });
             }}
             className="app-shell__logout-btn rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
           >
