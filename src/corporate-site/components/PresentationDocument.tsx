@@ -1,5 +1,5 @@
 import { Download, ExternalLink, FileText } from "lucide-react";
-const presentationDeck = "/docs/Lipena_Presentation_PRELIMINAR.pdf";
+import presentationDeck from "@/assets/docs/Lipena_Presentation_PRELIMINAR.pdf";
 
 export default function PresentationDocument() {
   return (
@@ -47,7 +47,7 @@ export default function PresentationDocument() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-[#0f1419]">Presentation Format</h3>
-                  <p className="mt-1 text-sm text-[#5f7387]">Microsoft PowerPoint (.pptx)</p>
+                  <p className="mt-1 text-sm text-[#5f7387]">Portable Document Format (.pdf)</p>
                 </div>
               </div>
               <div className="mt-5 rounded-xl border border-[#cfdae6] bg-white/80 p-4 text-sm text-[#4f6478]">
