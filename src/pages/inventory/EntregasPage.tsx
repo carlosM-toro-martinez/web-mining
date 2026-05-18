@@ -8,6 +8,8 @@ import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import {
   useAprobarValeMutation,
   useEntregarValeMutation,
+  useHistorialSolicitanteQuery,
+  useRechazarValeMutation,
   useValesQuery,
   useValeQuery
 } from "@/features/vales/hooks/useVales";
@@ -59,8 +61,8 @@ export function EntregasPage() {
   const { showError, showSuccess } = useToast();
 
   const usersQuery = useUsersListQuery();
-  const valesQuery = useValesQuery();
   const aprobarValeMutation = useAprobarValeMutation();
+  const rechazarValeMutation = useRechazarValeMutation();
   const entregarValeMutation = useEntregarValeMutation();
 
   const productosQuery = useProductosQuery({ page: 1, limit: 300, search: "" });
@@ -75,6 +77,23 @@ export function EntregasPage() {
   const [cantidadesEntregadas, setCantidadesEntregadas] = useState<Record<string, string>>({});
   const [manualModalOpen, setManualModalOpen] = useState(false);
 
+  const estadoApiFilter = useMemo(() => {
+    if (estadoListado === "CON_COMPLETADOS") return "COMPLETADO";
+    if (estadoListado === "ACTIVOS") return undefined;
+    return undefined;
+  }, [estadoListado]);
+  const solicitanteFilterId = solicitanteFilter ? Number(solicitanteFilter) : undefined;
+  const valesQuery = useValesQuery({
+    page: valesPage,
+    limit: 8,
+    estado: estadoApiFilter,
+    solicitanteId: solicitanteFilterId
+  });
+  const historialSolicitanteQuery = useHistorialSolicitanteQuery(
+    canApprove && solicitanteFilterId ? solicitanteFilterId : null,
+    1,
+    10
+  );
   const valeQuery = useValeQuery(valeIdActivo);
   const vale = valeQuery.data?.data;
   const usuarios = usersQuery.data?.data ?? [];
@@ -88,7 +107,6 @@ export function EntregasPage() {
   const [salidaUsuarioEntregaId, setSalidaUsuarioEntregaId] = useState(user?.id ? String(user.id) : "");
   const [salidaUsuarioRecibidoId, setSalidaUsuarioRecibidoId] = useState("");
 
-  const valesPageSize = 8;
   const valesOrdenados = useMemo(
     () =>
       [...vales].sort((a, b) => {
@@ -117,11 +135,8 @@ export function EntregasPage() {
     [estadoListado, solicitanteFilter, valesOrdenados]
   );
 
-  const totalValesPages = Math.max(1, Math.ceil(valesFiltrados.length / valesPageSize));
-  const valesPaginados = useMemo(() => {
-    const start = (valesPage - 1) * valesPageSize;
-    return valesFiltrados.slice(start, start + valesPageSize);
-  }, [valesFiltrados, valesPage]);
+  const totalValesPages = Math.max(1, valesQuery.data?.meta?.totalPages ?? 1);
+  const valesPaginados = valesFiltrados;
 
   const solicitantesConVales = useMemo(
     () =>
@@ -243,6 +258,17 @@ export function EntregasPage() {
       {
         onSuccess: () => showSuccess("Vale aprobado correctamente."),
         onError: (error) => showError(normalizeError(error, "No se pudo aprobar el vale."))
+      }
+    );
+  }
+
+  function handleRechazarVale() {
+    if (!vale || !user?.id) return;
+    rechazarValeMutation.mutate(
+      { id: vale.id, superintendenteId: user.id },
+      {
+        onSuccess: () => showSuccess("Vale rechazado correctamente."),
+        onError: (error) => showError(normalizeError(error, "No se pudo rechazar el vale."))
       }
     );
   }
@@ -586,16 +612,28 @@ export function EntregasPage() {
               })}
             </div>
 
-            {canApprove && vale.estado === "PENDIENTE" ? (
-              <button
-                type="button"
-                onClick={handleAprobarVale}
-                disabled={aprobarValeMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-tertiary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-tertiary)] disabled:opacity-60"
-              >
-                <CheckCircle2 size={14} />
-                {aprobarValeMutation.isPending ? "Aprobando..." : "Aprobar vale"}
-              </button>
+            {canApprove && (vale.estado === "PENDIENTE" || vale.estado === "APROBADO") ? (
+              <div className="flex flex-wrap gap-2">
+                {vale.estado === "PENDIENTE" ? (
+                  <button
+                    type="button"
+                    onClick={handleAprobarVale}
+                    disabled={aprobarValeMutation.isPending}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-tertiary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-tertiary)] disabled:opacity-60"
+                  >
+                    <CheckCircle2 size={14} />
+                    {aprobarValeMutation.isPending ? "Aprobando..." : "Aprobar vale"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleRechazarVale}
+                  disabled={rechazarValeMutation.isPending}
+                  className="rounded-lg border border-[var(--color-error)]/45 px-4 py-2 text-sm font-semibold text-[var(--color-error)] disabled:opacity-60"
+                >
+                  {rechazarValeMutation.isPending ? "Rechazando..." : "Rechazar vale"}
+                </button>
+              </div>
             ) : null}
 
             {canDeliver && isEstadoEntregable(vale.estado) ? (
@@ -664,6 +702,20 @@ export function EntregasPage() {
           </p>
         )}
       </article>
+      {canApprove && solicitanteFilterId ? (
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+          <h2 className="mb-3 text-lg font-bold">Historial del solicitante</h2>
+          {historialSolicitanteQuery.isLoading ? <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando historial...</p> : null}
+          {(historialSolicitanteQuery.data?.data ?? []).length === 0 ? <p className="text-sm text-[var(--color-on-surface-variant)]">Sin historial para este solicitante.</p> : null}
+          {(historialSolicitanteQuery.data?.data ?? []).map((histVale) => (
+            <div key={histVale.id} className="mb-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 text-xs">
+              <p className="font-semibold">{histVale.id}</p>
+              <p>Estado: {histVale.estado}</p>
+              <p>Fecha: {histVale.createdAt ? new Date(histVale.createdAt).toLocaleString() : "-"}</p>
+            </div>
+          ))}
+        </article>
+      ) : null}
 
       {manualModalOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">

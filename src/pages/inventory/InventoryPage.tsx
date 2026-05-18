@@ -10,8 +10,11 @@ import {
   Layers3,
   FileBarChart2,
   ReceiptText,
+  ClipboardList,
   Settings,
   Truck
+  ,
+  UploadCloud
 } from "lucide-react";
 
 const cards = [
@@ -72,6 +75,13 @@ const cards = [
     available: true
   },
   {
+    title: "Pedidos",
+    description: "Ordenes de compra a proveedor para seguimiento hasta su cierre.",
+    to: "/inventario/pedidos",
+    icon: ClipboardList,
+    available: true
+  },
+  {
     title: "Vales",
     description: "Control de vales de salida para consumo interno y trazabilidad.",
     to: "/inventario/vales",
@@ -83,6 +93,13 @@ const cards = [
     description: "Operacion de entregas por vale y registro de entrega sin vale.",
     to: "/inventario/entregas",
     icon: Truck,
+    available: true
+  },
+  {
+    title: "Importación",
+    description: "Carga catálogo Excel, stock inicial y saldos mensuales históricos.",
+    to: "/inventario/importacion",
+    icon: UploadCloud,
     available: true
   },
   {

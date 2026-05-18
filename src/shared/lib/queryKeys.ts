@@ -46,8 +46,11 @@ export const queryKeys = {
   },
   vales: {
     all: ["vales"] as const,
-    list: () => [...queryKeys.vales.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.vales.all, "detail", id] as const
+    list: (params?: { estado?: string; solicitanteId?: number; page?: number; limit?: number }) =>
+      [...queryKeys.vales.all, "list", params ?? {}] as const,
+    detail: (id: string) => [...queryKeys.vales.all, "detail", id] as const,
+    historialSolicitante: (userId: number, page: number, limit: number) =>
+      [...queryKeys.vales.all, "historial-solicitante", userId, page, limit] as const
   },
   compras: {
     all: ["compras"] as const,
@@ -83,7 +86,37 @@ export const queryKeys = {
         fecha?: string;
       },
       fetchAll: boolean
-    ) => [...queryKeys.reportes.all, "bin-card-valorado", params, fetchAll] as const
+    ) => [...queryKeys.reportes.all, "bin-card-valorado", params, fetchAll] as const,
+    stock: (params: { page: number; limit: number; categoriaId?: number }, fetchAll: boolean) =>
+      [...queryKeys.reportes.all, "stock", params, fetchAll] as const,
+    vales: (
+      params: {
+        page: number;
+        limit: number;
+        estado?: string;
+        solicitanteId?: number;
+        fechaInicio?: string;
+        fechaFin?: string;
+      },
+      fetchAll: boolean
+    ) => [...queryKeys.reportes.all, "vales", params, fetchAll] as const,
+    compras: (
+      params: {
+        page: number;
+        limit: number;
+        estado?: string;
+        proveedorId?: number;
+        fechaInicio?: string;
+        fechaFin?: string;
+      },
+      fetchAll: boolean
+    ) => [...queryKeys.reportes.all, "compras", params, fetchAll] as const
+  },
+  pedidos: {
+    all: ["pedidos"] as const,
+    list: (params: { estado?: string; proveedorId?: number; page: number; limit: number }) =>
+      [...queryKeys.pedidos.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.pedidos.all, "detail", id] as const
   },
   movimientos: {
     all: ["movimientos"] as const

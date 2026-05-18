@@ -4,7 +4,12 @@ import { normalizeApiError } from "@/shared/api/core/apiError";
 import { getStoredAuthSession, setStoredAuthSession } from "@/features/auth/lib/authSessionStorage";
 import { getAuthToken, setAuthToken } from "@/shared/lib/authToken";
 
-const resolvedBaseUrl = env.VITE_API_BASE_URL || "http://localhost:3000";
+function normalizeBaseUrl(raw: string) {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed.slice(0, -4) : trimmed;
+}
+
+const resolvedBaseUrl = normalizeBaseUrl(env.VITE_API_BASE_URL || "http://localhost:3000");
 
 export const httpClient = axios.create({
   baseURL: resolvedBaseUrl,

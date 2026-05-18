@@ -38,7 +38,11 @@ export function ValesPage() {
 
   const productosQuery = useProductosQuery({ page: 1, limit: 200, search: "" });
   const createValeMutation = useCreateValeMutation();
-  const valesQuery = useValesQuery();
+  const valesQuery = useValesQuery({
+    solicitanteId: user?.id ? Number(user.id) : undefined,
+    page: 1,
+    limit: 200
+  });
 
   const [draftItems, setDraftItems] = useState<ValeDraftItem[]>([
     { id: 1, productoId: "", cantidadSolicitada: "1" }

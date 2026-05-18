@@ -4,13 +4,16 @@ import {
   aprobarVale,
   createVale,
   entregarVale,
+  getValesBySolicitante,
   getValeById,
-  getVales
+  getVales,
+  rechazarVale
 } from "@/features/vales/api/valesApi";
 import type {
   AprobarValePayload,
   CreateValePayload,
-  EntregarValePayload
+  EntregarValePayload,
+  ValesListParams
 } from "@/features/vales/model/vales.schema";
 
 export function useValeQuery(id: string) {
@@ -22,10 +25,18 @@ export function useValeQuery(id: string) {
   });
 }
 
-export function useValesQuery() {
+export function useValesQuery(params?: ValesListParams) {
   return useQuery({
-    queryKey: queryKeys.vales.list(),
-    queryFn: getVales
+    queryKey: queryKeys.vales.list(params),
+    queryFn: () => getVales(params)
+  });
+}
+
+export function useHistorialSolicitanteQuery(userId: number | null, page = 1, limit = 10) {
+  return useQuery({
+    queryKey: userId ? queryKeys.vales.historialSolicitante(userId, page, limit) : queryKeys.vales.all,
+    queryFn: () => getValesBySolicitante(userId as number, page, limit),
+    enabled: typeof userId === "number" && userId > 0
   });
 }
 
@@ -35,7 +46,7 @@ export function useCreateValeMutation() {
     mutationFn: (payload: CreateValePayload) => createVale(payload),
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.list() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
       await queryClient.setQueryData(queryKeys.vales.detail(response.data.id), response);
     }
@@ -49,6 +60,7 @@ export function useAprobarValeMutation() {
       aprobarVale(id, payload),
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.list() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
       await queryClient.setQueryData(queryKeys.vales.detail(response.data.id), response);
     }
   });
@@ -61,11 +73,25 @@ export function useEntregarValeMutation() {
       entregarVale(id, payload),
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.list() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
       await queryClient.setQueryData(queryKeys.vales.detail(response.data.vale.id), {
         success: true,
         data: response.data.vale
       });
+    }
+  });
+}
+
+export function useRechazarValeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, superintendenteId }: { id: string; superintendenteId: number }) =>
+      rechazarVale(id, superintendenteId),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
+      await queryClient.setQueryData(queryKeys.vales.detail(response.data.id), response);
     }
   });
 }

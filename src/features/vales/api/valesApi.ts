@@ -5,11 +5,14 @@ import {
   createValePayloadSchema,
   entregarValePayloadSchema,
   entregarValeResponseSchema,
+  historialSolicitanteResponseSchema,
+  valesListParamsSchema,
   valesListResponseSchema,
   valeResponseSchema,
   type AprobarValePayload,
   type CreateValePayload,
-  type EntregarValePayload
+  type EntregarValePayload,
+  type ValesListParams
 } from "@/features/vales/model/vales.schema";
 
 export async function createVale(payload: CreateValePayload) {
@@ -28,10 +31,27 @@ export async function getValeById(id: string) {
   });
 }
 
-export async function getVales() {
+function cleanParams(params?: ValesListParams) {
+  if (!params) return undefined;
+  const parsed = valesListParamsSchema.parse(params);
+  return Object.fromEntries(
+    Object.entries(parsed).filter(([, value]) => value !== undefined && value !== "")
+  );
+}
+
+export async function getVales(params?: ValesListParams) {
   return getRequest({
     url: apiEndpoints.vales.base,
+    config: { params: cleanParams(params) },
     schema: valesListResponseSchema
+  });
+}
+
+export async function getValesBySolicitante(userId: number, page = 1, limit = 10) {
+  return getRequest({
+    url: apiEndpoints.vales.historialSolicitante(userId),
+    config: { params: { page, limit } },
+    schema: historialSolicitanteResponseSchema
   });
 }
 
@@ -50,5 +70,13 @@ export async function entregarVale(id: string, payload: EntregarValePayload) {
     url: apiEndpoints.vales.entregar(id),
     body,
     schema: entregarValeResponseSchema
+  });
+}
+
+export async function rechazarVale(id: string, superintendenteId?: number) {
+  return patchRequest({
+    url: apiEndpoints.vales.rechazar(id),
+    body: superintendenteId ? { superintendenteId } : {},
+    schema: valeResponseSchema
   });
 }

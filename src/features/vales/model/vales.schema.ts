@@ -14,6 +14,8 @@ export const valeUsuarioSchema = z.object({
 const valeProductoStockSchema = z
   .object({
     cantidad: decimalSchema,
+    cantidadReservada: decimalSchema,
+    cantidadDisponible: decimalSchema,
     precioUnit: decimalSchema
   })
   .optional();
@@ -66,33 +68,61 @@ export const valeMovimientoSchema = z.object({
   createdAt: z.string().optional().nullable()
 });
 
-const valeDataSchema = z.union([
-  valeSchema,
-  z.object({
-    vale: valeSchema
-  })
-]).transform((value) => ("vale" in value ? value.vale : value));
-
-export const valeResponseSchema = z.object({
-  success: z.boolean().optional().default(true),
-  data: valeDataSchema
-});
-
-export const valesListResponseSchema = z.object({
-  success: z.boolean().optional().default(true),
-  data: z
-    .union([
-      z.array(valeSchema),
-      z.object({
-        vales: z.array(valeSchema).optional(),
-        rows: z.array(valeSchema).optional()
-      })
-    ])
-    .transform((value) => {
-      if (Array.isArray(value)) return value;
-      return value.vales ?? value.rows ?? [];
+const valeDataSchema = z
+  .union([
+    valeSchema,
+    z.object({
+      vale: valeSchema
     })
+  ])
+  .transform((value) => ("vale" in value ? value.vale : value));
+
+export const valeResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    data: valeDataSchema
+  })
+  .or(
+    valeSchema.transform((value) => ({
+      success: true,
+      data: value
+    }))
+  );
+
+const listMetaSchema = z.object({
+  page: numberLikeSchema.int().positive(),
+  limit: numberLikeSchema.int().positive(),
+  total: numberLikeSchema.int().nonnegative(),
+  totalPages: numberLikeSchema.int().positive()
 });
+
+export const valesListResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    data: z
+      .union([
+        z.array(valeSchema),
+        z.object({
+          vales: z.array(valeSchema).optional(),
+          rows: z.array(valeSchema).optional()
+        })
+      ])
+      .transform((value) => {
+        if (Array.isArray(value)) return value;
+        return value.vales ?? value.rows ?? [];
+      }),
+    meta: listMetaSchema.optional()
+  })
+  .or(
+    z.object({
+      vales: z.array(valeSchema),
+      meta: listMetaSchema.optional()
+    }).transform((value) => ({
+      success: true,
+      data: value.vales,
+      meta: value.meta
+    }))
+  );
 
 export const entregarValeResponseSchema = z.object({
   success: z.boolean().optional().default(true),
@@ -133,6 +163,15 @@ export const entregarValePayloadSchema = z.object({
   cantidadesEntregadas: z.record(z.string(), numberLikeSchema.min(0))
 });
 
+export const valesListParamsSchema = z.object({
+  estado: z.string().trim().optional(),
+  solicitanteId: numberLikeSchema.int().positive().optional(),
+  page: numberLikeSchema.int().positive().optional(),
+  limit: numberLikeSchema.int().positive().optional()
+});
+
+export const historialSolicitanteResponseSchema = valesListResponseSchema;
+
 export type ValeEstado = z.infer<typeof valeEstadoSchema>;
 export type Vale = z.infer<typeof valeSchema>;
 export type ValeItem = z.infer<typeof valeItemSchema>;
@@ -140,3 +179,4 @@ export type ValeMovimiento = z.infer<typeof valeMovimientoSchema>;
 export type CreateValePayload = z.infer<typeof createValePayloadSchema>;
 export type AprobarValePayload = z.infer<typeof aprobarValePayloadSchema>;
 export type EntregarValePayload = z.infer<typeof entregarValePayloadSchema>;
+export type ValesListParams = z.infer<typeof valesListParamsSchema>;

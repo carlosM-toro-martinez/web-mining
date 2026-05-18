@@ -56,7 +56,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const refreshAccessToken = async () => {
-    if (!session?.refreshToken) {
+    const currentRefreshToken = session?.refreshToken;
+    if (!currentRefreshToken) {
       applySession(null);
       return;
     }
@@ -67,10 +68,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     refreshPromiseRef.current = (async () => {
       try {
-        const response = await refreshSession({ refreshToken: session.refreshToken });
+        const response = await refreshSession({ refreshToken: currentRefreshToken });
         applySession({
           accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken ?? session.refreshToken,
+          refreshToken: response.data.refreshToken ?? currentRefreshToken,
           user: session.user
         });
       } catch {

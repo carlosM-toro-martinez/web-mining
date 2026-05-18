@@ -14,9 +14,16 @@ import {
 
 function cleanParams(params: ProductosQueryParams) {
   const parsed = productosQueryParamsSchema.parse(params);
-  return Object.fromEntries(
+  const cleaned = Object.fromEntries(
     Object.entries(parsed).filter(([, value]) => value !== undefined && value !== "")
   );
+  if (typeof parsed.search === "string" && parsed.search.trim().length > 0) {
+    return {
+      ...cleaned,
+      q: parsed.search.trim()
+    };
+  }
+  return cleaned;
 }
 
 export async function getProductos(params: ProductosQueryParams) {

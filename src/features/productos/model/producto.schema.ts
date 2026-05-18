@@ -1,21 +1,26 @@
 import { z } from "zod";
 
+const decimalLikeSchema = z.union([z.string(), z.number()]).transform((value) => String(value));
+
 const productoCategoriaSchema = z.object({
   id: z.number().int().positive(),
-  nombre: z.string().min(1),
+  nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)"),
+  codigo: z.string().optional().nullable(),
   parent: z
     .object({
       id: z.number().int().positive(),
-      nombre: z.string().min(1)
+      nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)")
     })
     .nullable()
     .optional()
 });
 
 const productoStockSchema = z.object({
-  cantidad: z.string(),
-  precioUnit: z.string(),
-  precioProm: z.string()
+  cantidad: decimalLikeSchema,
+  cantidadReservada: decimalLikeSchema.optional(),
+  cantidadDisponible: decimalLikeSchema.optional(),
+  precioUnit: decimalLikeSchema,
+  precioProm: decimalLikeSchema
 });
 
 const productoCuentaSchema = z.object({
@@ -54,26 +59,61 @@ export const productoSchema = z.object({
   categoriaId: z.number().int().positive(),
   cuentaId: z.number().int().positive().nullable().optional(),
   esEpp: z.boolean().default(false),
-  categoria: productoCategoriaSchema,
+  categoria: productoCategoriaSchema.nullable().optional(),
   cuenta: productoCuentaSchema.nullable().optional(),
   stock: productoStockSchema
 });
 
-export const productosListResponseSchema = z.object({
-  success: z.boolean(),
-  data: z.array(productoSchema),
-  meta: z.object({
-    page: z.number().int().positive(),
-    limit: z.number().int().positive(),
-    total: z.number().int().nonnegative(),
-    totalPages: z.number().int().positive()
-  })
+const productosMetaSchema = z.object({
+  page: z.number().int().positive(),
+  limit: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive()
 });
 
-export const productoResponseSchema = z.object({
-  success: z.boolean(),
-  data: productoSchema
-});
+export const productosListResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    data: z.array(productoSchema),
+    meta: productosMetaSchema
+  })
+  .or(
+    z.object({
+      success: z.boolean().optional(),
+      productos: z.array(productoSchema),
+      meta: productosMetaSchema
+    }).transform((value) => ({
+      success: value.success ?? true,
+      data: value.productos,
+      meta: value.meta
+    }))
+  )
+  .or(
+    z.object({
+      success: z.boolean().optional(),
+      data: z.object({
+        productos: z.array(productoSchema).optional(),
+        rows: z.array(productoSchema).optional()
+      }),
+      meta: productosMetaSchema
+    }).transform((value) => ({
+      success: value.success ?? true,
+      data: value.data.productos ?? value.data.rows ?? [],
+      meta: value.meta
+    }))
+  );
+
+export const productoResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    data: productoSchema
+  })
+  .or(
+    productoSchema.transform((value) => ({
+      success: true,
+      data: value
+    }))
+  );
 
 export const productoDeleteResponseSchema = z.object({
   success: z.boolean(),

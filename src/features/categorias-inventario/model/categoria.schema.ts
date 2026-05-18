@@ -29,10 +29,18 @@ export const categoriaTreeNodeSchema: z.ZodType<{
     parentId?: number | null;
     children?: unknown[];
   }>;
-}> = categoriaBaseSchema
-  .extend({
+}> = z
+  .object({
+    id: z.number().int().positive(),
+    codigo: z.string().min(1),
+    nombre: z.string().optional().nullable(),
+    parentId: z.number().int().positive().nullable().optional(),
     children: z.array(
-      categoriaBaseSchema.extend({
+      z.object({
+        id: z.number().int().positive(),
+        codigo: z.string().min(1),
+        nombre: z.string().optional().nullable(),
+        parentId: z.number().int().positive().nullable().optional(),
         children: z.array(z.unknown()).optional()
       })
     )
@@ -40,12 +48,12 @@ export const categoriaTreeNodeSchema: z.ZodType<{
   .transform((node) => ({
     id: node.id,
     codigo: node.codigo,
-    nombre: node.nombre,
+    nombre: node.nombre?.trim() || "(Sin nombre)",
     parentId: node.parentId ?? null,
     children: node.children.map((child) => ({
       id: child.id,
       codigo: child.codigo,
-      nombre: child.nombre,
+      nombre: child.nombre?.trim() || "(Sin nombre)",
       parentId: child.parentId ?? null
     }))
   }));

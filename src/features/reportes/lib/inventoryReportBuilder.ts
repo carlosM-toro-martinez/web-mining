@@ -75,8 +75,9 @@ function enrichItems(items: BinCardValoradoItem[], productos: Producto[]) {
       ? productsByName.get(normalize(item.productoNombre))
       : undefined;
 
-    const group = producto?.categoria.parent ?? producto?.categoria ?? null;
-    const subgroup = producto?.categoria ?? null;
+    const categoria = producto?.categoria ?? null;
+    const group = categoria?.parent ?? categoria ?? null;
+    const subgroup = categoria;
 
     return {
       ...item,

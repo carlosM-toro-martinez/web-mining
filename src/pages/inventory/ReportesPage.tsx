@@ -9,7 +9,13 @@ import {
   ListFilter
 } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useBinCardQuery, useBinCardValoradoQuery } from "@/features/reportes/hooks/useReportes";
+import {
+  useBinCardQuery,
+  useBinCardValoradoQuery,
+  useComprasReportQuery,
+  useStockReportQuery,
+  useValesReportQuery
+} from "@/features/reportes/hooks/useReportes";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import {
   buildInventoryReportDefinition,
@@ -31,6 +37,7 @@ const inputClassName =
 type DateMode = "none" | "specific" | "range";
 type DataMode = "paged" | "all";
 type LegacyReportType = "bin-card" | "bin-card-valorado";
+type ApiReportType = "stock-actual" | "vales-resumen" | "compras-resumen";
 
 const LEGACY_REPORTS: Array<{ type: LegacyReportType; title: string; description: string }> = [
   {
@@ -48,6 +55,9 @@ const LEGACY_REPORTS: Array<{ type: LegacyReportType; title: string; description
 function isLegacyReportType(value: string | undefined): value is LegacyReportType {
   return value === "bin-card" || value === "bin-card-valorado";
 }
+function isApiReportType(value: string | undefined): value is ApiReportType {
+  return value === "stock-actual" || value === "vales-resumen" || value === "compras-resumen";
+}
 
 function formatLegacyCellValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
@@ -60,8 +70,9 @@ export function ReportesPage() {
 
   const isLegacyType = isLegacyReportType(tipo);
   const isAdminType = isInventoryReportType(tipo);
+  const isApiType = isApiReportType(tipo);
 
-  if (!isLegacyType && !isAdminType) {
+  if (!isLegacyType && !isAdminType && !isApiType) {
     return <Navigate to="/inventario/reportes/bin-card" replace />;
   }
 
@@ -119,6 +130,18 @@ export function ReportesPage() {
     params,
     dataMode === "all",
     (isLegacyType && tipo === "bin-card-valorado") || isAdminType
+  );
+  const stockQuery = useStockReportQuery(
+    { page, limit, categoriaId: undefined },
+    isApiType && tipo === "stock-actual"
+  );
+  const valesResumenQuery = useValesReportQuery(
+    { page, limit, estado: undefined, solicitanteId: productoId ? Number(productoId) : undefined, fechaInicio, fechaFin },
+    isApiType && tipo === "vales-resumen"
+  );
+  const comprasResumenQuery = useComprasReportQuery(
+    { page, limit, estado: undefined, proveedorId: productoId ? Number(productoId) : undefined, fechaInicio, fechaFin },
+    isApiType && tipo === "compras-resumen"
   );
 
   const legacyActiveQuery = tipo === "bin-card" ? binCardQuery : binCardValoradoQuery;
@@ -219,7 +242,7 @@ export function ReportesPage() {
     }
   }
 
-  const currentQuery = isLegacyType ? legacyActiveQuery : binCardValoradoQuery;
+  const currentQuery = isLegacyType ? legacyActiveQuery : isAdminType ? binCardValoradoQuery : tipo === "stock-actual" ? stockQuery : tipo === "vales-resumen" ? valesResumenQuery : comprasResumenQuery;
   const currentMeta = currentQuery.data?.meta;
 
   return (
@@ -262,6 +285,25 @@ export function ReportesPage() {
             </button>
           ))}
           {INVENTORY_REPORTS.map((report) => (
+            <button
+              key={report.type}
+              type="button"
+              onClick={() => navigate(`/inventario/reportes/${report.type}`)}
+              className={`rounded-lg border px-3 py-3 text-left transition ${
+                report.type === tipo
+                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/12"
+                  : "border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] hover:border-[var(--color-primary)]"
+              }`}
+            >
+              <p className="text-sm font-bold">{report.title}</p>
+              <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">{report.description}</p>
+            </button>
+          ))}
+          {[
+            { type: "stock-actual", title: "Stock Actual", description: "Stock con reservado, disponible y valor total." },
+            { type: "vales-resumen", title: "Resumen De Vales", description: "Vales filtrables por estado, solicitante y fechas." },
+            { type: "compras-resumen", title: "Resumen De Compras", description: "Compras filtrables por estado, proveedor y fechas." }
+          ].map((report) => (
             <button
               key={report.type}
               type="button"
@@ -542,6 +584,43 @@ export function ReportesPage() {
                       {item.referencia ?? "-"} {item.referenciaId ? `(${item.referenciaId})` : ""}
                     </td>
                   </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : isApiType ? (
+          <div className="table-scroll overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr>
+                  {tipo === "stock-actual" ? (
+                    <>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Codigo</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Producto</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Stock</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Reservado</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Disponible</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Valor Total</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">ID</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Principal</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {tipo === "stock-actual" ? (stockQuery.data?.data ?? []).map((item) => (
+                  <tr key={`${item.productoId}`}>
+                    <td className="px-3 py-2 text-xs">{item.codigo ?? "-"}</td><td className="px-3 py-2 text-xs">{item.nombre ?? "-"}</td><td className="px-3 py-2 text-right text-xs">{item.cantidad}</td><td className="px-3 py-2 text-right text-xs">{item.cantidadReservada}</td><td className="px-3 py-2 text-right text-xs">{item.cantidadDisponible}</td><td className="px-3 py-2 text-right text-xs">{item.valorTotal}</td>
+                  </tr>
+                )) : tipo === "vales-resumen" ? (valesResumenQuery.data?.data ?? []).map((item) => (
+                  <tr key={item.id}><td className="px-3 py-2 text-xs">{item.id}</td><td className="px-3 py-2 text-xs">{item.estado}</td><td className="px-3 py-2 text-xs">{item.solicitante?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}</td></tr>
+                )) : (comprasResumenQuery.data?.data ?? []).map((item) => (
+                  <tr key={item.id}><td className="px-3 py-2 text-xs">{item.id}</td><td className="px-3 py-2 text-xs">{item.estado}</td><td className="px-3 py-2 text-xs">{item.proveedor?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}</td></tr>
                 ))}
               </tbody>
             </table>

@@ -14,7 +14,7 @@ export function useLoginMutation() {
     onSuccess: (response) => {
       auth.login({
         accessToken: response.data.accessToken,
-        refreshToken: response.data.refreshToken,
+        refreshToken: response.data.refreshToken ?? response.data.accessToken,
         user: response.data.user
       });
     }

@@ -193,9 +193,9 @@ export function ProductsPage() {
     setUnidad(product.unidad);
     setEsEpp(product.esEpp);
 
-    const selectedGrupoId = product.categoria.parent?.id;
+    const selectedGrupoId = product.categoria?.parent?.id;
     setGrupoId(selectedGrupoId ? String(selectedGrupoId) : "");
-    setSubgrupoId(String(product.categoria.id));
+    setSubgrupoId(product.categoria?.id ? String(product.categoria.id) : "");
     setCentroCostoIdForm(product.cuenta?.centroCosto ? String(product.cuenta.centroCosto.id) : "");
     setFuncionGastoIdForm(
       product.cuenta?.funcionGasto ? String(product.cuenta.funcionGasto.id) : ""
@@ -488,8 +488,6 @@ export function ProductsPage() {
       }
     );
   }
-  console.log(products);
-
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -956,10 +954,10 @@ export function ProductsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm capitalize">{product.nombre}</td>
                     <td className="px-4 py-3 text-xs capitalize text-[var(--color-on-surface-variant)]">
-                      {product.categoria.parent?.nombre ?? "-"}
+                      {product.categoria?.parent?.nombre ?? "-"}
                     </td>
                     <td className="px-4 py-3 text-xs capitalize text-[var(--color-on-surface-variant)]">
-                      {product.categoria.nombre}
+                      {product.categoria?.nombre ?? "(Sin categoría)"}
                     </td>
                     <td className="px-4 py-3 text-xs uppercase">{product.unidad}</td>
                     <td className="px-4 py-3 text-right text-xs font-semibold">

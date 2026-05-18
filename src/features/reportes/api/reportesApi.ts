@@ -3,16 +3,33 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   binCardResponseSchema,
   binCardValoradoResponseSchema,
+  comprasReportQueryParamsSchema,
+  comprasReportResponseSchema,
+  stockReportQueryParamsSchema,
+  stockReportResponseSchema,
+  valesReportQueryParamsSchema,
+  valesReportResponseSchema,
   type BinCardItem,
   type BinCardResponse,
   type BinCardValoradoItem,
   type BinCardValoradoResponse,
   reportesQueryParamsSchema,
   type ReportesQueryParams
+  ,
+  type ComprasReportQueryParams,
+  type StockReportQueryParams,
+  type ValesReportQueryParams
 } from "@/features/reportes/model/reportes.schema";
 
 function cleanParams(params: ReportesQueryParams) {
   const parsed = reportesQueryParamsSchema.parse(params);
+  return Object.fromEntries(
+    Object.entries(parsed).filter(([, value]) => value !== undefined && value !== "")
+  );
+}
+
+function cleanSimpleParams<T extends object>(params: T, parse: (payload: T) => T) {
+  const parsed = parse(params);
   return Object.fromEntries(
     Object.entries(parsed).filter(([, value]) => value !== undefined && value !== "")
   );
@@ -68,4 +85,28 @@ export async function getBinCard(params: ReportesQueryParams, fetchAll: boolean)
 export async function getBinCardValorado(params: ReportesQueryParams, fetchAll: boolean) {
   if (!fetchAll) return getBinCardValoradoPage(params);
   return fetchAllPages<BinCardValoradoItem>(params, getBinCardValoradoPage);
+}
+
+export async function getStockReport(params: StockReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.stock,
+    config: { params: cleanSimpleParams(params, stockReportQueryParamsSchema.parse) },
+    schema: stockReportResponseSchema
+  });
+}
+
+export async function getValesReport(params: ValesReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.vales,
+    config: { params: cleanSimpleParams(params, valesReportQueryParamsSchema.parse) },
+    schema: valesReportResponseSchema
+  });
+}
+
+export async function getComprasReport(params: ComprasReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.compras,
+    config: { params: cleanSimpleParams(params, comprasReportQueryParamsSchema.parse) },
+    schema: comprasReportResponseSchema
+  });
 }

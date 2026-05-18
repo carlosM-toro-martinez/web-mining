@@ -8,3 +8,5 @@ npm-debug.log*
 !.env.example
 dev-dist
 Mining Company App
+INVENTARIO_FLUJOS.md
+FRONTEND_GUIDE.md

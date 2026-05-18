@@ -10,6 +10,7 @@ import {
   ChevronRight,
   FlaskConical,
   FileBarChart2,
+  UploadCloud,
   LayoutDashboard,
   Layers3,
   Menu,
@@ -17,6 +18,7 @@ import {
   Building2,
   Search,
   ShoppingCart,
+  ClipboardList,
   Truck,
   UserPlus,
   RefreshCw
@@ -72,10 +74,13 @@ export function AppShell() {
     return [
       { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
       { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
+      { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos" },
       { label: "Vales", icon: PackageCheck, to: "/inventario/vales" },
       { label: "Proveedores", icon: Building2, to: "/inventario/proveedores" },
       { label: "Stock", icon: Layers3, to: "/inventario/stock" },
       { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" }
+      ,
+      { label: "Importación", icon: UploadCloud, to: "/inventario/importacion" }
     ];
   }, [canSeeInventoryRoute]);
 

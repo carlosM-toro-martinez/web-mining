@@ -10,6 +10,8 @@ import { movimientosEndpoints } from "@/shared/api/endpoints/movimientos.endpoin
 import { comprasEndpoints } from "@/shared/api/endpoints/compras.endpoints";
 import { proveedoresEndpoints } from "@/shared/api/endpoints/proveedores.endpoints";
 import { reportesEndpoints } from "@/shared/api/endpoints/reportes.endpoints";
+import { pedidosEndpoints } from "@/shared/api/endpoints/pedidos.endpoints";
+import { inventarioImportEndpoints } from "@/shared/api/endpoints/inventarioImport.endpoints";
 
 export const apiEndpoints = {
   auth: authEndpoints,
@@ -23,5 +25,7 @@ export const apiEndpoints = {
   movimientos: movimientosEndpoints,
   compras: comprasEndpoints,
   proveedores: proveedoresEndpoints,
-  reportes: reportesEndpoints
+  reportes: reportesEndpoints,
+  pedidos: pedidosEndpoints,
+  inventarioImport: inventarioImportEndpoints
 } as const;

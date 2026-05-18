@@ -13,6 +13,8 @@ import { ComprasPage } from "@/pages/inventory/ComprasPage";
 import { ProveedoresPage } from "@/pages/inventory/ProveedoresPage";
 import { StockActualPage } from "@/pages/inventory/StockActualPage";
 import { ReportesPage } from "@/pages/inventory/ReportesPage";
+import { PedidosPage } from "@/pages/inventory/PedidosPage";
+import { InventarioImportPage } from "@/pages/inventory/InventarioImportPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -162,6 +164,8 @@ export function AppRouter() {
             <Route path="/inventario" element={<InventoryPage />} />
             <Route path="/inventario/vales" element={<ValesPage />} />
             <Route path="/inventario/compras" element={<ComprasPage />} />
+            <Route path="/inventario/pedidos" element={<PedidosPage />} />
+            <Route path="/inventario/importacion" element={<InventarioImportPage />} />
             <Route path="/inventario/categorias" element={<CategoriesPage />} />
             <Route path="/inventario/productos" element={<ProductsPage />} />
             <Route path="/inventario/stock" element={<StockActualPage />} />

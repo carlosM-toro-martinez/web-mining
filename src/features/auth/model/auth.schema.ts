@@ -4,10 +4,14 @@ export const roleSchema = z.enum([
   "ADMIN",
   "ADMINISTRADOR",
   "ALMACENERO",
+  "CONTADOR",
   "GEOLOGO",
   "GEOLOGOADMIN",
+  "LABORATORISTA",
   "RECEPCIONISTA",
+  "SOLICITANTE",
   "SUPERINTENDENTE",
+  "TOPOGRAFO",
   "TRABAJADOR",
   "VISITANTE"
 ]);
@@ -25,14 +29,32 @@ export const loginPayloadSchema = z.object({
   password: z.string().min(1)
 });
 
-export const loginResponseSchema = z.object({
-  success: z.boolean(),
-  data: z.object({
-    accessToken: z.string().min(1),
-    refreshToken: z.string().min(1),
-    user: authUserSchema
-  })
-});
+export const loginResponseSchema = z
+  .union([
+    z.object({
+      success: z.boolean().optional(),
+      data: z.object({
+        accessToken: z.string().min(1),
+        refreshToken: z.string().min(1).optional(),
+        user: authUserSchema
+      })
+    }),
+    z.object({
+      token: z.string().min(1),
+      user: authUserSchema
+    })
+  ])
+  .transform((value) => {
+    if ("data" in value) return value;
+    return {
+      success: true,
+      data: {
+        accessToken: value.token,
+        refreshToken: value.token,
+        user: value.user
+      }
+    };
+  });
 
 export const refreshPayloadSchema = z.object({
   refreshToken: z.string().min(1)
@@ -129,7 +151,7 @@ export const resetPasswordResponseSchema = genericMessageResponseSchema;
 
 export const authSessionSchema = z.object({
   accessToken: z.string().min(1),
-  refreshToken: z.string().min(1),
+  refreshToken: z.string().min(1).optional(),
   user: authUserSchema
 });
 
