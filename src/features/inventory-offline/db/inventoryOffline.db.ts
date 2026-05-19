@@ -4,7 +4,8 @@ export type InventoryOfflineOperationType =
   | "CREATE_COMPRA"
   | "RECIBIR_COMPRA"
   | "CREATE_VALE"
-  | "ENTREGAR_VALE";
+  | "ENTREGAR_VALE"
+  | "CREATE_AND_ENTREGAR_VALE";
 
 export interface InventoryOfflineOperation {
   id: number;
@@ -27,4 +28,3 @@ class InventoryOfflineDb extends Dexie {
 }
 
 export const inventoryOfflineDb = new InventoryOfflineDb();
-

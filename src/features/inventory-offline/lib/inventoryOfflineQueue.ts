@@ -57,6 +57,13 @@ export async function syncPendingInventoryOperations() {
         } else if (operation.operationType === "ENTREGAR_VALE") {
           const parsed = payload as { id: string; payload: Parameters<typeof entregarVale>[1] };
           await entregarVale(parsed.id, parsed.payload);
+        } else if (operation.operationType === "CREATE_AND_ENTREGAR_VALE") {
+          const parsed = payload as Parameters<typeof createVale>[0];
+          const created = await createVale(parsed);
+          const cantidadesEntregadas = Object.fromEntries(
+            (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
+          );
+          await entregarVale(created.data.id, { cantidadesEntregadas });
         }
 
         await inventoryOfflineDb.operations.delete(operation.id);
@@ -109,4 +116,3 @@ export function startInventoryOfflineSync() {
     }
   };
 }
-

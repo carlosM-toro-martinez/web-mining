@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { PackageCheck, Plus, Search } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useRegisterMutation } from "@/features/auth/hooks/useRegisterMutation";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
@@ -22,6 +23,8 @@ import {
   useValesQuery
 } from "@/features/vales/hooks/useVales";
 import { ApiError } from "@/shared/api/core/apiError";
+import { enqueueInventoryOperation } from "@/features/inventory-offline/lib/inventoryOfflineQueue";
+import { applyOptimisticStockAdjustments } from "@/features/inventory-offline/lib/stockOptimistic";
 import {
   useInventoryOfflinePendingCount,
   useSyncInventoryOfflineMutation
@@ -58,11 +61,12 @@ function estadoValeClassName(estado: string) {
 export function ValesPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
+  const queryClient = useQueryClient();
   const canUseFlow =
     user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE" || user?.role === "ALMACENERO";
 
   const usersQuery = useUsersListQuery();
-  const productosQuery = useProductosQuery({ page: 1, limit: 500, search: "" });
+  const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const cuentasQuery = useCuentasQuery();
   const centrosCostoQuery = useCentrosCostoQuery();
   const funcionesGastoQuery = useFuncionesGastoQuery();
@@ -120,7 +124,7 @@ export function ValesPage() {
     () =>
       productos.map((producto) => ({
         id: String(producto.id),
-        label: `${producto.codigo} - ${producto.nombre} (${producto.unidad}) - stock: ${producto.stock.cantidad}`,
+        label: `${producto.codigo} - ${producto.nombre} (${producto.unidad}) - stock: ${producto.stock?.cantidad ?? "0"}`,
         searchText: `${producto.codigo} ${producto.nombre} ${producto.unidad}`
       })),
     [productos]
@@ -308,6 +312,11 @@ export function ValesPage() {
     });
   }
 
+  function isCuentaContableMissingError(error: unknown) {
+    const message = normalizeError(error, "").toLowerCase();
+    return message.includes("cuenta contable");
+  }
+
   async function handleCreateAndDeliverVale(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const solicitanteId = Number(solicitanteCreateId);
@@ -335,31 +344,59 @@ export function ValesPage() {
       return;
     }
 
+    const createPayload = {
+      solicitanteId,
+      items: parsedItems.map((item) => ({
+        productoId: item.productoId,
+        cantidadSolicitada: item.cantidadSolicitada
+      }))
+    };
+
+    const stockAdjustments = parsedItems.map((item) => ({
+      productoId: item.productoId,
+      deltaCantidad: -item.cantidadSolicitada
+    }));
+
     try {
-      for (const item of parsedItems) {
-        await ensureProductoCuenta(item.productoId, item.cuentaId);
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        applyOptimisticStockAdjustments(stockAdjustments);
+        await enqueueInventoryOperation("CREATE_AND_ENTREGAR_VALE", createPayload);
+        await queryClient.invalidateQueries({ queryKey: ["inventory-offline"] });
+        await queryClient.invalidateQueries({ queryKey: ["productos"] });
+        showSuccess("Vale encolado offline. Se creará y entregará automáticamente al reconectar.");
+        setSolicitanteCreateId("");
+        setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }]);
+        setNextDraftItemId(2);
+        return;
       }
 
-      const created = await createValeMutation.mutateAsync({
-        solicitanteId,
-        items: parsedItems.map((item) => ({
-          productoId: item.productoId,
-          cantidadSolicitada: item.cantidadSolicitada
-        }))
-      });
+      const created = await createValeMutation.mutateAsync(createPayload);
 
       const cantidadesEntregadas = Object.fromEntries(
         (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
       );
 
-      const delivered = await entregarValeMutation.mutateAsync({
-        id: created.data.id,
-        payload: { cantidadesEntregadas },
-        stockAdjustments: parsedItems.map((item) => ({
-          productoId: item.productoId,
-          deltaCantidad: -item.cantidadSolicitada
-        }))
-      });
+      let delivered;
+      try {
+        delivered = await entregarValeMutation.mutateAsync({
+          id: created.data.id,
+          payload: { cantidadesEntregadas },
+          stockAdjustments
+        });
+      } catch (error) {
+        if (!isCuentaContableMissingError(error)) {
+          throw error;
+        }
+        const uniquePairs = Array.from(
+          new Map(parsedItems.map((item) => [`${item.productoId}:${item.cuentaId}`, item])).values()
+        );
+        await Promise.all(uniquePairs.map((item) => ensureProductoCuenta(item.productoId, item.cuentaId)));
+        delivered = await entregarValeMutation.mutateAsync({
+          id: created.data.id,
+          payload: { cantidadesEntregadas },
+          stockAdjustments
+        });
+      }
 
       showSuccess(`Vale ${delivered.data.vale.id} creado y entregado automáticamente.`);
       setSolicitanteCreateId("");
@@ -429,6 +466,7 @@ export function ValesPage() {
             options={solicitantesOptions}
             placeholder="Selecciona solicitante"
             className={inputClassName}
+            maxVisibleOptions={30}
           />
           <input
             value={historialProductoFilter}
@@ -505,6 +543,7 @@ export function ValesPage() {
                 options={usuarioOptions}
                 placeholder="Buscar por nombre o código"
                 className={inputClassName}
+                maxVisibleOptions={30}
               />
               <button
                 type="button"
@@ -527,6 +566,7 @@ export function ValesPage() {
                 options={productoOptions}
                 placeholder={`Producto #${index + 1}`}
                 className={inputClassName}
+                maxVisibleOptions={60}
               />
               <input
                 required
@@ -650,6 +690,7 @@ export function ValesPage() {
                 options={centroCostoOptions}
                 placeholder="Centro de costo (código o nombre)"
                 className={inputClassName}
+                maxVisibleOptions={30}
               />
               <AutocompleteSelect
                 value={funcionGastoCreateId}
@@ -657,6 +698,7 @@ export function ValesPage() {
                 options={funcionGastoOptions}
                 placeholder="Función de gasto (código o nombre)"
                 className={inputClassName}
+                maxVisibleOptions={30}
               />
               <AutocompleteSelect
                 value={sectorCreateId}
@@ -664,6 +706,7 @@ export function ValesPage() {
                 options={sectorOptions}
                 placeholder="Área / Sector (código o nombre)"
                 className={inputClassName}
+                maxVisibleOptions={30}
               />
               <div className="flex justify-end gap-2">
                 <button

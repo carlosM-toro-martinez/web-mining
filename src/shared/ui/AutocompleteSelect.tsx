@@ -23,7 +23,7 @@ export function AutocompleteSelect({
   placeholder = "Buscar...",
   disabled = false,
   className = "",
-  maxVisibleOptions = 8
+  maxVisibleOptions = 20
 }: AutocompleteSelectProps) {
   const selectedOption = useMemo(
     () => options.find((option) => option.id === value),
@@ -57,7 +57,7 @@ export function AutocompleteSelect({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
-          window.setTimeout(() => setOpen(false), 120);
+          window.setTimeout(() => setOpen(false), 180);
         }}
         placeholder={placeholder}
         disabled={disabled}
@@ -74,6 +74,9 @@ export function AutocompleteSelect({
               <button
                 key={option.id}
                 type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                }}
                 onClick={() => {
                   onChange(option.id);
                   setQuery(option.label);
