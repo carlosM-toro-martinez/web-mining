@@ -172,6 +172,47 @@ export const valesListParamsSchema = z.object({
 
 export const historialSolicitanteResponseSchema = valesListResponseSchema;
 
+export const resumenSolicitantesResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.array(
+    z.object({
+      usuario: z.object({
+        id: numberLikeSchema.int().positive(),
+        nombre: z.string().optional().nullable(),
+        email: z.string().optional().nullable(),
+        role: z.string().optional().nullable()
+      }),
+      totalVales: numberLikeSchema.int().nonnegative(),
+      ultimaFecha: z.string().optional().nullable()
+    })
+  )
+});
+
+export const productosPorUsuarioResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    usuario: z.object({
+      id: numberLikeSchema.int().positive(),
+      nombre: z.string().optional().nullable(),
+      email: z.string().optional().nullable(),
+      role: z.string().optional().nullable()
+    }),
+    productos: z.array(
+      z.object({
+        productoId: numberLikeSchema.int().positive(),
+        nombre: z.string().optional().nullable(),
+        codigo: z.string().optional().nullable(),
+        unidad: z.string().optional().nullable(),
+        vecessolicitado: numberLikeSchema.int().nonnegative(),
+        cantidadTotal: numberLikeSchema.nonnegative(),
+        ultimaFecha: z.string().optional().nullable(),
+        ultimoValeId: z.union([z.string(), numberLikeSchema]).optional().nullable().transform((v) => (v == null ? null : String(v))),
+        ultimoEstado: z.string().optional().nullable()
+      })
+    )
+  })
+});
+
 export type ValeEstado = z.infer<typeof valeEstadoSchema>;
 export type Vale = z.infer<typeof valeSchema>;
 export type ValeItem = z.infer<typeof valeItemSchema>;

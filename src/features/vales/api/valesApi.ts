@@ -6,6 +6,8 @@ import {
   entregarValePayloadSchema,
   entregarValeResponseSchema,
   historialSolicitanteResponseSchema,
+  productosPorUsuarioResponseSchema,
+  resumenSolicitantesResponseSchema,
   valesListParamsSchema,
   valesListResponseSchema,
   valeResponseSchema,
@@ -70,6 +72,20 @@ export async function entregarVale(id: string, payload: EntregarValePayload) {
     url: apiEndpoints.vales.entregar(id),
     body,
     schema: entregarValeResponseSchema
+  });
+}
+
+export async function getResumenSolicitantes() {
+  return getRequest({
+    url: apiEndpoints.vales.resumenSolicitantes,
+    schema: resumenSolicitantesResponseSchema
+  });
+}
+
+export async function getProductosPorUsuario(userId: number) {
+  return getRequest({
+    url: apiEndpoints.vales.productosPorUsuario(userId),
+    schema: productosPorUsuarioResponseSchema
   });
 }
 

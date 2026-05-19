@@ -4,6 +4,8 @@ import {
   aprobarVale,
   createVale,
   entregarVale,
+  getProductosPorUsuario,
+  getResumenSolicitantes,
   getValesBySolicitante,
   getValeById,
   getVales,
@@ -37,6 +39,22 @@ export function useHistorialSolicitanteQuery(userId: number | null, page = 1, li
     queryKey: userId ? queryKeys.vales.historialSolicitante(userId, page, limit) : queryKeys.vales.all,
     queryFn: () => getValesBySolicitante(userId as number, page, limit),
     enabled: typeof userId === "number" && userId > 0
+  });
+}
+
+export function useResumenSolicitantesQuery(enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.vales.all, "resumen-solicitantes"],
+    queryFn: () => getResumenSolicitantes(),
+    enabled
+  });
+}
+
+export function useProductosPorUsuarioQuery(userId: number | null, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.vales.all, "productos-por-usuario", userId ?? "none"],
+    queryFn: () => getProductosPorUsuario(userId as number),
+    enabled: enabled && typeof userId === "number" && userId > 0
   });
 }
 

@@ -21,8 +21,7 @@ import {
   ClipboardList,
   Truck,
   UserPlus,
-  RefreshCw
-  ,
+  RefreshCw,
   IdCard
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -52,7 +51,8 @@ export function AppShell() {
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
   const isAlmacenero = user?.role === "ALMACENERO";
   const isRecepcionista = user?.role === "RECEPCIONISTA";
-  const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista;
+  const isSuperintendente = user?.role === "SUPERINTENDENTE";
+  const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
 
   const topNavItems = useMemo(() => {
     const items: NavItem[] = [...baseNavItems];
@@ -72,14 +72,13 @@ export function AppShell() {
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventoryRoute) return [];
     return [
-      { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
+      // { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
       { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
       { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos" },
       { label: "Vales", icon: PackageCheck, to: "/inventario/vales" },
       { label: "Proveedores", icon: Building2, to: "/inventario/proveedores" },
       { label: "Stock", icon: Layers3, to: "/inventario/stock" },
-      { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" }
-      ,
+      { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },
       { label: "Importación", icon: UploadCloud, to: "/inventario/importacion" }
     ];
   }, [canSeeInventoryRoute]);

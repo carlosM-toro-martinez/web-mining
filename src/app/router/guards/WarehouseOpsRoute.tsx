@@ -5,7 +5,10 @@ export function WarehouseOpsRoute() {
   const { user } = useAuth();
 
   const canAccess =
-    user?.role === "ALMACENERO" || user?.role === "ADMIN" || user?.role === "RECEPCIONISTA";
+    user?.role === "ALMACENERO" ||
+    user?.role === "ADMIN" ||
+    user?.role === "RECEPCIONISTA" ||
+    user?.role === "SUPERINTENDENTE";
 
   if (!canAccess) {
     return <Navigate to="/perfil" replace />;

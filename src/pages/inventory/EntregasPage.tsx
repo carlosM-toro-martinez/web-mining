@@ -1,15 +1,16 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Plus, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, PackageCheck, Plus, Search, X } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
 import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
 import { useCreateSalidaManualMutation } from "@/features/movimientos/hooks/useMovimientos";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import {
-  useAprobarValeMutation,
+  useCreateValeMutation,
   useEntregarValeMutation,
   useHistorialSolicitanteQuery,
-  useRechazarValeMutation,
+  useProductosPorUsuarioQuery,
+  useResumenSolicitantesQuery,
   useValesQuery,
   useValeQuery
 } from "@/features/vales/hooks/useVales";
@@ -24,13 +25,19 @@ const inputClassName =
 
 type EstadoListado = "ACTIVOS" | "TODOS" | "CON_COMPLETADOS";
 
+interface ValeDraftItem {
+  id: number;
+  productoId: string;
+  cantidadSolicitada: string;
+}
+
 function normalizeError(error: unknown, fallbackMessage: string) {
   if (error instanceof ApiError) return error.message;
   return fallbackMessage;
 }
 
 function isEstadoEntregable(estado: Vale["estado"]) {
-  return estado === "APROBADO" || estado === "PARCIAL";
+  return estado === "PENDIENTE" || estado === "APROBADO" || estado === "PARCIAL";
 }
 
 function estadoValeClassName(estado: string) {
@@ -61,9 +68,9 @@ export function EntregasPage() {
   const { showError, showSuccess } = useToast();
 
   const usersQuery = useUsersListQuery();
-  const aprobarValeMutation = useAprobarValeMutation();
-  const rechazarValeMutation = useRechazarValeMutation();
+  const createValeMutation = useCreateValeMutation();
   const entregarValeMutation = useEntregarValeMutation();
+  const resumenSolicitantesQuery = useResumenSolicitantesQuery(canApprove || canDeliver);
 
   const productosQuery = useProductosQuery({ page: 1, limit: 300, search: "" });
   const cuentasQuery = useCuentasQuery();
@@ -74,8 +81,14 @@ export function EntregasPage() {
   const [valesPage, setValesPage] = useState(1);
   const [valeIdInput, setValeIdInput] = useState("");
   const [valeIdActivo, setValeIdActivo] = useState("");
+  const [solicitanteCreateId, setSolicitanteCreateId] = useState("");
+  const [draftItems, setDraftItems] = useState<ValeDraftItem[]>([
+    { id: 1, productoId: "", cantidadSolicitada: "1" }
+  ]);
+  const [nextDraftItemId, setNextDraftItemId] = useState(2);
   const [cantidadesEntregadas, setCantidadesEntregadas] = useState<Record<string, string>>({});
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [productoHistorialFilter, setProductoHistorialFilter] = useState("");
 
   const estadoApiFilter = useMemo(() => {
     if (estadoListado === "CON_COMPLETADOS") return "COMPLETADO";
@@ -94,6 +107,10 @@ export function EntregasPage() {
     1,
     10
   );
+  const productosPorUsuarioQuery = useProductosPorUsuarioQuery(
+    canApprove && solicitanteFilterId ? solicitanteFilterId : null,
+    canApprove
+  );
   const valeQuery = useValeQuery(valeIdActivo);
   const vale = valeQuery.data?.data;
   const usuarios = usersQuery.data?.data ?? [];
@@ -104,7 +121,9 @@ export function EntregasPage() {
   const [salidaProductoId, setSalidaProductoId] = useState("");
   const [salidaCantidad, setSalidaCantidad] = useState("1");
   const [salidaCuentaId, setSalidaCuentaId] = useState("");
-  const [salidaUsuarioEntregaId, setSalidaUsuarioEntregaId] = useState(user?.id ? String(user.id) : "");
+  const [salidaUsuarioEntregaId, setSalidaUsuarioEntregaId] = useState(
+    user?.id ? String(user.id) : ""
+  );
   const [salidaUsuarioRecibidoId, setSalidaUsuarioRecibidoId] = useState("");
 
   const valesOrdenados = useMemo(
@@ -220,6 +239,29 @@ export function EntregasPage() {
       })),
     [usuarios]
   );
+  const solicitanteCreateOptions = useMemo(
+    () =>
+      usuarios
+        .filter(
+          (usuarioItem) =>
+            usuarioItem.role === "TRABAJADOR" || usuarioItem.role === "SUPERINTENDENTE"
+        )
+        .map((usuarioItem) => ({
+          id: String(usuarioItem.id),
+          label: `${usuarioItem.nombre} (${usuarioItem.role})`,
+          searchText: `${usuarioItem.nombre} ${usuarioItem.role} ${usuarioItem.email ?? ""} ${usuarioItem.id}`
+        })),
+    [usuarios]
+  );
+
+  const productosHistoricosFiltrados = useMemo(() => {
+    const rows = productosPorUsuarioQuery.data?.data.productos ?? [];
+    const q = productoHistorialFilter.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((item) =>
+      `${item.codigo ?? ""} ${item.nombre ?? ""} ${item.unidad ?? ""}`.toLowerCase().includes(q)
+    );
+  }, [productosPorUsuarioQuery.data?.data.productos, productoHistorialFilter]);
 
   useEffect(() => {
     setValesPage(1);
@@ -241,6 +283,67 @@ export function EntregasPage() {
     setCantidadesEntregadas(values);
   }, [vale]);
 
+  function addDraftItem() {
+    setDraftItems((current) => [
+      ...current,
+      { id: nextDraftItemId, productoId: "", cantidadSolicitada: "1" }
+    ]);
+    setNextDraftItemId((current) => current + 1);
+  }
+
+  function updateDraftItem(id: number, patch: Partial<ValeDraftItem>) {
+    setDraftItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
+  }
+
+  function removeDraftItem(id: number) {
+    setDraftItems((current) =>
+      current.length <= 1 ? current : current.filter((item) => item.id !== id)
+    );
+  }
+
+  async function handleCreateAndDeliverVale(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const solicitanteId = Number(solicitanteCreateId);
+    if (!solicitanteId) {
+      showError("Debes seleccionar el trabajador solicitante.");
+      return;
+    }
+
+    const items = draftItems.map((item) => ({
+      productoId: Number(item.productoId),
+      cantidadSolicitada: Number(item.cantidadSolicitada)
+    }));
+    if (
+      items.some(
+        (item) => !item.productoId || !item.cantidadSolicitada || item.cantidadSolicitada <= 0
+      )
+    ) {
+      showError("Completa producto y cantidad válida en todos los ítems.");
+      return;
+    }
+
+    try {
+      const created = await createValeMutation.mutateAsync({ solicitanteId, items });
+      const cantidadesEntregadasPayload = Object.fromEntries(
+        (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
+      );
+      const delivered = await entregarValeMutation.mutateAsync({
+        id: created.data.id,
+        payload: { cantidadesEntregadas: cantidadesEntregadasPayload }
+      });
+      showSuccess(`Vale ${delivered.data.vale.id} registrado y entregado automáticamente.`);
+      setSolicitanteCreateId("");
+      setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1" }]);
+      setNextDraftItemId(2);
+      setValeIdInput(delivered.data.vale.id);
+      setValeIdActivo(delivered.data.vale.id);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo registrar y entregar el vale automáticamente."));
+    }
+  }
+
   function handleBuscarVale(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = valeIdInput.trim();
@@ -249,28 +352,6 @@ export function EntregasPage() {
       return;
     }
     setValeIdActivo(trimmed);
-  }
-
-  function handleAprobarVale() {
-    if (!vale || !user?.id) return;
-    aprobarValeMutation.mutate(
-      { id: vale.id, payload: { superintendenteId: user.id } },
-      {
-        onSuccess: () => showSuccess("Vale aprobado correctamente."),
-        onError: (error) => showError(normalizeError(error, "No se pudo aprobar el vale."))
-      }
-    );
-  }
-
-  function handleRechazarVale() {
-    if (!vale || !user?.id) return;
-    rechazarValeMutation.mutate(
-      { id: vale.id, superintendenteId: user.id },
-      {
-        onSuccess: () => showSuccess("Vale rechazado correctamente."),
-        onError: (error) => showError(normalizeError(error, "No se pudo rechazar el vale."))
-      }
-    );
   }
 
   function handleEntregarVale(event: FormEvent<HTMLFormElement>) {
@@ -391,7 +472,7 @@ export function EntregasPage() {
             <div>
               <h1 className="font-headline text-3xl font-extrabold">Entregas de almacen</h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-                Lista operativa de vales para aprobar y entregar material.
+                Vale físico aprobado fuera del sistema, registro en sistema y descuento inmediato.
               </p>
             </div>
           </div>
@@ -405,6 +486,81 @@ export function EntregasPage() {
           </button>
         </div>
       </header>
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-4 text-lg font-bold">
+          Registro de vale físico (crea + entrega inmediata)
+        </h2>
+        <p className="mb-3 text-sm text-[var(--color-on-surface-variant)]">
+          Flujo operativo: revisado y firmado físicamente por superintendente. En sistema se
+          registra y entrega al instante.
+        </p>
+        <form className="space-y-3" onSubmit={handleCreateAndDeliverVale}>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Trabajador solicitante
+            </label>
+            <AutocompleteSelect
+              value={solicitanteCreateId}
+              onChange={setSolicitanteCreateId}
+              options={solicitanteCreateOptions}
+              placeholder="Buscar por nombre o código (ID)"
+              className={inputClassName}
+            />
+          </div>
+          {draftItems.map((item, index) => (
+            <div
+              key={item.id}
+              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_140px_auto]"
+            >
+              <AutocompleteSelect
+                value={item.productoId}
+                onChange={(nextValue) => updateDraftItem(item.id, { productoId: nextValue })}
+                options={productoOptions}
+                placeholder={`Producto #${index + 1}`}
+                className={inputClassName}
+              />
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={item.cantidadSolicitada}
+                onChange={(event) =>
+                  updateDraftItem(item.id, { cantidadSolicitada: event.target.value })
+                }
+                className={inputClassName}
+                placeholder="Cantidad"
+              />
+              <button
+                type="button"
+                onClick={() => removeDraftItem(item.id)}
+                className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+              >
+                Quitar
+              </button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={addDraftItem}
+              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+            >
+              Agregar item
+            </button>
+            <button
+              type="submit"
+              disabled={createValeMutation.isPending || entregarValeMutation.isPending}
+              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+            >
+              {createValeMutation.isPending || entregarValeMutation.isPending
+                ? "Procesando..."
+                : "Registrar y entregar vale"}
+            </button>
+          </div>
+        </form>
+      </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 text-lg font-bold">Vales para entrega</h2>
@@ -470,7 +626,10 @@ export function EntregasPage() {
               </thead>
               <tbody className="divide-y divide-[var(--color-border-soft)]">
                 {valesPaginados.map((valeItem) => (
-                  <tr key={valeItem.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+                  <tr
+                    key={valeItem.id}
+                    className="transition hover:bg-[var(--color-surface-container-highest)]"
+                  >
                     <td className="px-3 py-2 text-xs">
                       <span
                         className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(valeItem.estado)}`}
@@ -578,7 +737,10 @@ export function EntregasPage() {
                 Items solicitados
               </h3>
               {vale.items.map((item) => {
-                const pendiente = Math.max(item.cantidadSolicitada - (item.cantidadEntregada ?? 0), 0);
+                const pendiente = Math.max(
+                  item.cantidadSolicitada - (item.cantidadEntregada ?? 0),
+                  0
+                );
                 return (
                   <div
                     key={item.id}
@@ -612,27 +774,9 @@ export function EntregasPage() {
               })}
             </div>
 
-            {canApprove && (vale.estado === "PENDIENTE" || vale.estado === "APROBADO") ? (
-              <div className="flex flex-wrap gap-2">
-                {vale.estado === "PENDIENTE" ? (
-                  <button
-                    type="button"
-                    onClick={handleAprobarVale}
-                    disabled={aprobarValeMutation.isPending}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-tertiary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-tertiary)] disabled:opacity-60"
-                  >
-                    <CheckCircle2 size={14} />
-                    {aprobarValeMutation.isPending ? "Aprobando..." : "Aprobar vale"}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={handleRechazarVale}
-                  disabled={rechazarValeMutation.isPending}
-                  className="rounded-lg border border-[var(--color-error)]/45 px-4 py-2 text-sm font-semibold text-[var(--color-error)] disabled:opacity-60"
-                >
-                  {rechazarValeMutation.isPending ? "Rechazando..." : "Rechazar vale"}
-                </button>
+            {canApprove ? (
+              <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                La aprobación del vale se realiza físicamente fuera del sistema.
               </div>
             ) : null}
 
@@ -642,7 +786,10 @@ export function EntregasPage() {
                   Entrega por item
                 </h3>
                 {vale.items.map((item) => {
-                  const pendiente = Math.max(item.cantidadSolicitada - (item.cantidadEntregada ?? 0), 0);
+                  const pendiente = Math.max(
+                    item.cantidadSolicitada - (item.cantidadEntregada ?? 0),
+                    0
+                  );
                   const stockDisponible = Number(item.producto?.stock?.cantidad ?? 0);
                   const stock = Number.isFinite(stockDisponible) ? stockDisponible : 0;
                   return (
@@ -655,8 +802,8 @@ export function EntregasPage() {
                           {item.producto?.nombre ?? `Producto #${item.productoId}`}
                         </p>
                         <p className="text-xs text-[var(--color-on-surface-variant)]">
-                          Solicitado: {item.cantidadSolicitada} | Entregado: {item.cantidadEntregada ?? 0} |
-                          Pendiente: {pendiente} | Stock: {stock}
+                          Solicitado: {item.cantidadSolicitada} | Entregado:{" "}
+                          {item.cantidadEntregada ?? 0} | Pendiente: {pendiente} | Stock: {stock}
                         </p>
                       </div>
                       <input
@@ -687,7 +834,9 @@ export function EntregasPage() {
                 <button
                   type="submit"
                   disabled={
-                    entregarValeMutation.isPending || !entregaControl.hasPositive || entregaControl.hasError
+                    entregarValeMutation.isPending ||
+                    !entregaControl.hasPositive ||
+                    entregaControl.hasError
                   }
                   className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
                 >
@@ -698,22 +847,83 @@ export function EntregasPage() {
           </div>
         ) : (
           <p className="text-sm text-[var(--color-on-surface-variant)]">
-            Busca un vale por ID para aprobarlo o registrarle una entrega.
+            Busca un vale por ID para registrarle una entrega y descontar stock.
           </p>
         )}
       </article>
       {canApprove && solicitanteFilterId ? (
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-3 text-lg font-bold">Historial del solicitante</h2>
-          {historialSolicitanteQuery.isLoading ? <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando historial...</p> : null}
-          {(historialSolicitanteQuery.data?.data ?? []).length === 0 ? <p className="text-sm text-[var(--color-on-surface-variant)]">Sin historial para este solicitante.</p> : null}
-          {(historialSolicitanteQuery.data?.data ?? []).map((histVale) => (
-            <div key={histVale.id} className="mb-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 text-xs">
-              <p className="font-semibold">{histVale.id}</p>
-              <p>Estado: {histVale.estado}</p>
-              <p>Fecha: {histVale.createdAt ? new Date(histVale.createdAt).toLocaleString() : "-"}</p>
-            </div>
-          ))}
+          <h2 className="mb-3 text-lg font-bold">Historial por solicitante y producto</h2>
+          {resumenSolicitantesQuery.isLoading ? (
+            <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando resumen...</p>
+          ) : null}
+          {historialSolicitanteQuery.isLoading ? (
+            <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando historial...</p>
+          ) : null}
+          <div className="mb-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 text-xs">
+            {(() => {
+              const selected = (resumenSolicitantesQuery.data?.data ?? []).find(
+                (item) => item.usuario.id === solicitanteFilterId
+              );
+              if (!selected) return "Selecciona un solicitante para ver su resumen.";
+              return `${selected.usuario.nombre ?? "-"} | vales: ${selected.totalVales} | última fecha: ${selected.ultimaFecha ? new Date(selected.ultimaFecha).toLocaleString() : "-"}`;
+            })()}
+          </div>
+          <input
+            value={productoHistorialFilter}
+            onChange={(event) => setProductoHistorialFilter(event.target.value)}
+            className={inputClassName}
+            placeholder="Filtrar por producto/código"
+          />
+          <div className="mt-3 table-scroll overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Producto
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Veces
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Cantidad total
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Última vez
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Último estado
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {productosHistoricosFiltrados.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                    >
+                      Sin productos para el filtro actual.
+                    </td>
+                  </tr>
+                ) : (
+                  productosHistoricosFiltrados.map((item) => (
+                    <tr key={`${item.productoId}-${item.ultimoValeId ?? "na"}`}>
+                      <td className="px-3 py-2 text-xs">
+                        {item.codigo ?? "-"} - {item.nombre ?? "-"}
+                      </td>
+                      <td className="px-3 py-2 text-xs">{item.vecessolicitado}</td>
+                      <td className="px-3 py-2 text-xs">{item.cantidadTotal}</td>
+                      <td className="px-3 py-2 text-xs">
+                        {item.ultimaFecha ? new Date(item.ultimaFecha).toLocaleString() : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-xs">{item.ultimoEstado ?? "-"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </article>
       ) : null}
 
@@ -777,7 +987,8 @@ export function EntregasPage() {
                   <option value="">Selecciona cuenta</option>
                   {cuentas.map((cuenta) => (
                     <option key={cuenta.id} value={cuenta.id}>
-                      {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre} / {cuenta.funcionGasto.nombre}
+                      {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre} /{" "}
+                      {cuenta.funcionGasto.nombre}
                     </option>
                   ))}
                 </select>

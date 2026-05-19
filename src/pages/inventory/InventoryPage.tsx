@@ -12,8 +12,7 @@ import {
   ReceiptText,
   ClipboardList,
   Settings,
-  Truck
-  ,
+  Truck,
   UploadCloud
 } from "lucide-react";
 
@@ -88,13 +87,13 @@ const cards = [
     icon: PackageCheck,
     available: true
   },
-  {
-    title: "Movimientos y Entregas",
-    description: "Operacion de entregas por vale y registro de entrega sin vale.",
-    to: "/inventario/entregas",
-    icon: Truck,
-    available: true
-  },
+  // {
+  //   title: "Movimientos y Entregas",
+  //   description: "Operacion de entregas por vale y registro de entrega sin vale.",
+  //   to: "/inventario/entregas",
+  //   icon: Truck,
+  //   available: true
+  // },
   {
     title: "Importación",
     description: "Carga catálogo Excel, stock inicial y saldos mensuales históricos.",

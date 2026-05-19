@@ -1,8 +1,19 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, PackageCheck, Plus, Search } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { PackageCheck, Plus, Search } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { useProductosQuery } from "@/features/productos/hooks/useProductos";
-import { useCreateValeMutation, useValeQuery, useValesQuery } from "@/features/vales/hooks/useVales";
+import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
+import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
+import {
+  useProductosQuery,
+  useUpdateProductoMutation
+} from "@/features/productos/hooks/useProductos";
+import {
+  useCreateValeMutation,
+  useEntregarValeMutation,
+  useProductosPorUsuarioQuery,
+  useResumenSolicitantesQuery,
+  useValesQuery
+} from "@/features/vales/hooks/useVales";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -15,6 +26,7 @@ interface ValeDraftItem {
   id: number;
   productoId: string;
   cantidadSolicitada: string;
+  cuentaId: string;
 }
 
 function normalizeError(error: unknown, fallbackMessage: string) {
@@ -35,47 +47,46 @@ function estadoValeClassName(estado: string) {
 export function ValesPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
+  const canUseFlow =
+    user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE" || user?.role === "ALMACENERO";
 
-  const productosQuery = useProductosQuery({ page: 1, limit: 200, search: "" });
+  const usersQuery = useUsersListQuery();
+  const productosQuery = useProductosQuery({ page: 1, limit: 500, search: "" });
+  const cuentasQuery = useCuentasQuery();
+  const valesQuery = useValesQuery({ page: 1, limit: 200 });
+  const resumenSolicitantesQuery = useResumenSolicitantesQuery(canUseFlow);
+
   const createValeMutation = useCreateValeMutation();
-  const valesQuery = useValesQuery({
-    solicitanteId: user?.id ? Number(user.id) : undefined,
-    page: 1,
-    limit: 200
-  });
+  const entregarValeMutation = useEntregarValeMutation();
+  const updateProductoMutation = useUpdateProductoMutation();
 
+  const [historialUserId, setHistorialUserId] = useState("");
+  const [historialProductoFilter, setHistorialProductoFilter] = useState("");
+  const [solicitanteCreateId, setSolicitanteCreateId] = useState("");
   const [draftItems, setDraftItems] = useState<ValeDraftItem[]>([
-    { id: 1, productoId: "", cantidadSolicitada: "1" }
+    { id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
   ]);
   const [nextDraftItemId, setNextDraftItemId] = useState(2);
-  const [ultimosVales, setUltimosVales] = useState<string[]>([]);
-  const [valesPage, setValesPage] = useState(1);
-  const [valeIdInput, setValeIdInput] = useState("");
-  const [valeIdActivo, setValeIdActivo] = useState("");
 
-  const valeQuery = useValeQuery(valeIdActivo);
-  const vale = valeQuery.data?.data;
-  const productos = productosQuery.data?.data ?? [];
-  const vales = valesQuery.data?.data ?? [];
-
-  const valesPageSize = 8;
-  const misValesOrdenados = useMemo(
-    () =>
-      [...vales]
-        .filter((valeItem) => String(valeItem.solicitanteId ?? "") === String(user?.id ?? ""))
-        .sort((a, b) => {
-          const left = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const right = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return right - left;
-        }),
-    [user?.id, vales]
+  const productosPorUsuarioQuery = useProductosPorUsuarioQuery(
+    historialUserId ? Number(historialUserId) : null,
+    canUseFlow
   );
 
-  const totalValesPages = Math.max(1, Math.ceil(misValesOrdenados.length / valesPageSize));
-  const valesPaginados = useMemo(() => {
-    const start = (valesPage - 1) * valesPageSize;
-    return misValesOrdenados.slice(start, start + valesPageSize);
-  }, [misValesOrdenados, valesPage]);
+  const usuarios = usersQuery.data?.data ?? [];
+  const productos = productosQuery.data?.data ?? [];
+  const cuentas = cuentasQuery.data?.data ?? [];
+  const vales = valesQuery.data?.data ?? [];
+
+  const usuarioOptions = useMemo(
+    () =>
+      usuarios.map((item) => ({
+        id: String(item.id),
+        label: `${item.nombre} (${item.role})`,
+        searchText: `${item.nombre} ${item.role} ${item.email ?? ""} ${item.id}`
+      })),
+    [usuarios]
+  );
 
   const productoOptions = useMemo(
     () =>
@@ -87,16 +98,39 @@ export function ValesPage() {
     [productos]
   );
 
-  useEffect(() => {
-    if (valesPage > totalValesPages) {
-      setValesPage(totalValesPages);
-    }
-  }, [totalValesPages, valesPage]);
+  const solicitantesOptions = useMemo(
+    () =>
+      (resumenSolicitantesQuery.data?.data ?? []).map((item) => ({
+        id: String(item.usuario.id),
+        label: `${item.usuario.nombre ?? "Sin nombre"} (${item.totalVales} vales)`,
+        searchText: `${item.usuario.nombre ?? ""} ${item.usuario.email ?? ""} ${item.usuario.id}`
+      })),
+    [resumenSolicitantesQuery.data?.data]
+  );
+
+  const productosHistoricosFiltrados = useMemo(() => {
+    const rows = productosPorUsuarioQuery.data?.data.productos ?? [];
+    const q = historialProductoFilter.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((item) =>
+      `${item.codigo ?? ""} ${item.nombre ?? ""} ${item.unidad ?? ""}`.toLowerCase().includes(q)
+    );
+  }, [productosPorUsuarioQuery.data?.data.productos, historialProductoFilter]);
+
+  const valesRecientes = useMemo(
+    () =>
+      [...vales].sort((a, b) => {
+        const left = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const right = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return right - left;
+      }),
+    [vales]
+  );
 
   function addDraftItem() {
     setDraftItems((current) => [
       ...current,
-      { id: nextDraftItemId, productoId: "", cantidadSolicitada: "1" }
+      { id: nextDraftItemId, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
     ]);
     setNextDraftItemId((current) => current + 1);
   }
@@ -108,67 +142,100 @@ export function ValesPage() {
   }
 
   function removeDraftItem(id: number) {
-    setDraftItems((current) => {
-      if (current.length <= 1) return current;
-      return current.filter((item) => item.id !== id);
-    });
-  }
-
-  function handleCreateVale(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!user?.id) {
-      showError("No se detecto un usuario autenticado.");
-      return;
-    }
-
-    const items = draftItems.map((item) => ({
-      productoId: Number(item.productoId),
-      cantidadSolicitada: Number(item.cantidadSolicitada)
-    }));
-
-    if (
-      items.some(
-        (item) => !item.productoId || !item.cantidadSolicitada || item.cantidadSolicitada <= 0
-      )
-    ) {
-      showError("Completa producto y cantidad solicitada valida en todos los items.");
-      return;
-    }
-
-    createValeMutation.mutate(
-      { solicitanteId: Number(user.id), items },
-      {
-        onSuccess: (response) => {
-          const createdId = response.data.id;
-          showSuccess("Vale creado correctamente.");
-          setValeIdInput(createdId);
-          setValeIdActivo(createdId);
-          setUltimosVales((current) =>
-            [createdId, ...current.filter((id) => id !== createdId)].slice(0, 6)
-          );
-          setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1" }]);
-          setNextDraftItemId(2);
-        },
-        onError: (error) => {
-          showError(normalizeError(error, "No se pudo crear el vale."));
-        }
-      }
+    setDraftItems((current) =>
+      current.length <= 1 ? current : current.filter((item) => item.id !== id)
     );
   }
 
-  function handleBuscarVale(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = valeIdInput.trim();
-    if (!trimmed) {
-      showError("Ingresa el ID del vale.");
-      return;
-    }
-    setValeIdActivo(trimmed);
+  function handleDraftProductChange(id: number, productoId: string) {
+    const producto = productos.find((item) => String(item.id) === productoId);
+    updateDraftItem(id, {
+      productoId,
+      cuentaId: producto?.cuentaId ? String(producto.cuentaId) : ""
+    });
   }
 
-  const valeEsMio = vale
-    ? String(vale.solicitanteId ?? "") === String(user?.id ?? "")
-    : true;
+  async function ensureProductoCuenta(productoId: number, cuentaId: number) {
+    const producto = productos.find((item) => item.id === productoId);
+    if (!producto) return;
+    if (producto.cuentaId === cuentaId) return;
+    await updateProductoMutation.mutateAsync({
+      id: productoId,
+      payload: { cuentaId }
+    });
+  }
+
+  async function handleCreateAndDeliverVale(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const solicitanteId = Number(solicitanteCreateId);
+    if (!solicitanteId) {
+      showError("Debes seleccionar el trabajador solicitante.");
+      return;
+    }
+
+    const parsedItems = draftItems.map((item) => ({
+      productoId: Number(item.productoId),
+      cantidadSolicitada: Number(item.cantidadSolicitada),
+      cuentaId: Number(item.cuentaId)
+    }));
+
+    if (
+      parsedItems.some(
+        (item) =>
+          !item.productoId ||
+          !item.cantidadSolicitada ||
+          item.cantidadSolicitada <= 0 ||
+          !item.cuentaId
+      )
+    ) {
+      showError("Completa producto, cantidad y cuenta contable en todos los ítems.");
+      return;
+    }
+
+    try {
+      for (const item of parsedItems) {
+        await ensureProductoCuenta(item.productoId, item.cuentaId);
+      }
+
+      const created = await createValeMutation.mutateAsync({
+        solicitanteId,
+        items: parsedItems.map((item) => ({
+          productoId: item.productoId,
+          cantidadSolicitada: item.cantidadSolicitada
+        }))
+      });
+
+      const cantidadesEntregadas = Object.fromEntries(
+        (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
+      );
+
+      const delivered = await entregarValeMutation.mutateAsync({
+        id: created.data.id,
+        payload: { cantidadesEntregadas }
+      });
+
+      showSuccess(`Vale ${delivered.data.vale.id} creado y entregado automáticamente.`);
+      setSolicitanteCreateId("");
+      setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }]);
+      setNextDraftItemId(2);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo registrar y entregar el vale."));
+    }
+  }
+
+  if (!canUseFlow && user?.role) {
+    return (
+      <section className="space-y-6 text-[var(--color-on-surface)]">
+        <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
+          <SubrouteBackButton />
+          <h1 className="mt-4 font-headline text-3xl font-extrabold">Flujo de vales físicos</h1>
+          <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+            No tienes permisos. Roles permitidos: ADMIN, SUPERINTENDENTE, ALMACENERO.
+          </p>
+        </header>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -181,273 +248,228 @@ export function ValesPage() {
             <PackageCheck size={18} />
           </div>
           <div>
-            <h1 className="font-headline text-3xl font-extrabold">Mis vales de solicitud</h1>
+            <h1 className="font-headline text-3xl font-extrabold">Flujo de vales físicos</h1>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-              Crea y consulta solo los vales que solicitaste como usuario logueado.
+              1) Revisión histórica del solicitante. 2) Aprobación física con firma. 3) Registro y
+              entrega inmediata en sistema.
             </p>
           </div>
         </div>
       </header>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 text-lg font-bold">Mis vales registrados</h2>
-        {valesQuery.isLoading ? (
-          <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando vales...</p>
-        ) : null}
-        {valesQuery.isError ? (
-          <p className="text-sm text-[var(--color-error)]">No se pudo cargar la lista de vales.</p>
-        ) : null}
-        {!valesQuery.isLoading && !valesQuery.isError && misValesOrdenados.length === 0 ? (
-          <p className="text-sm text-[var(--color-on-surface-variant)]">
-            Aun no registraste vales.
-          </p>
-        ) : null}
-
-        {misValesOrdenados.length > 0 ? (
-          <div className="table-scroll overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
+          <Search size={16} className="text-[var(--color-primary)]" />
+          Revisión histórica por solicitante
+        </h2>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <AutocompleteSelect
+            value={historialUserId}
+            onChange={setHistorialUserId}
+            options={solicitantesOptions}
+            placeholder="Selecciona solicitante"
+            className={inputClassName}
+          />
+          <input
+            value={historialProductoFilter}
+            onChange={(event) => setHistorialProductoFilter(event.target.value)}
+            className={inputClassName}
+            placeholder="Filtrar producto/código"
+          />
+        </div>
+        <div className="mt-3 table-scroll overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Producto
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Veces
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Cantidad total
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Última vez
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Último estado
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-border-soft)]">
+              {productosHistoricosFiltrados.length === 0 ? (
                 <tr>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Estado
-                  </th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Fecha
-                  </th>
-                  <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Accion
-                  </th>
+                  <td
+                    colSpan={5}
+                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                  >
+                    Sin datos para el solicitante/filtro.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border-soft)]">
-                {valesPaginados.map((valeItem) => (
-                  <tr key={valeItem.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+              ) : (
+                productosHistoricosFiltrados.map((item) => (
+                  <tr key={`${item.productoId}-${item.ultimoValeId ?? "na"}`}>
                     <td className="px-3 py-2 text-xs">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(valeItem.estado)}`}
-                      >
-                        {valeItem.estado}
-                      </span>
+                      {item.codigo ?? "-"} - {item.nombre ?? "-"}
                     </td>
+                    <td className="px-3 py-2 text-xs">{item.vecessolicitado}</td>
+                    <td className="px-3 py-2 text-xs">{item.cantidadTotal}</td>
                     <td className="px-3 py-2 text-xs">
-                      {valeItem.createdAt ? new Date(valeItem.createdAt).toLocaleString() : "-"}
+                      {item.ultimaFecha ? new Date(item.ultimaFecha).toLocaleString() : "-"}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setValeIdInput(valeItem.id);
-                          setValeIdActivo(valeItem.id);
-                        }}
-                        className="rounded-md border border-[var(--color-primary)]/45 px-2.5 py-1.5 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
-                      >
-                        Abrir
-                      </button>
-                    </td>
+                    <td className="px-3 py-2 text-xs">{item.ultimoEstado ?? "-"}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-[var(--color-on-surface-variant)]">
-                Pagina {valesPage} de {totalValesPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setValesPage((current) => Math.max(1, current - 1))}
-                  disabled={valesPage <= 1}
-                  className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setValesPage((current) => Math.min(totalValesPages, current + 1))}
-                  disabled={valesPage >= totalValesPages}
-                  className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-            <Plus size={16} className="text-[var(--color-primary)]" />
-            Crear vale de solicitud
-          </h2>
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
+          <Plus size={16} className="text-[var(--color-primary)]" />
+          Registro en almacén (crear + entregar inmediato)
+        </h2>
+        <form className="space-y-3" onSubmit={handleCreateAndDeliverVale}>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Trabajador solicitante
+            </label>
+            <AutocompleteSelect
+              value={solicitanteCreateId}
+              onChange={setSolicitanteCreateId}
+              options={usuarioOptions}
+              placeholder="Buscar por nombre o código"
+              className={inputClassName}
+            />
+          </div>
 
-          <form className="space-y-3" onSubmit={handleCreateVale}>
-            {draftItems.map((item, index) => (
-              <div
-                key={item.id}
-                className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_150px_auto]"
+          {draftItems.map((item, index) => (
+            <div
+              key={item.id}
+              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_1fr_auto]"
+            >
+              <AutocompleteSelect
+                value={item.productoId}
+                onChange={(nextValue) => handleDraftProductChange(item.id, nextValue)}
+                options={productoOptions}
+                placeholder={`Producto #${index + 1}`}
+                className={inputClassName}
+              />
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={item.cantidadSolicitada}
+                onChange={(event) =>
+                  updateDraftItem(item.id, { cantidadSolicitada: event.target.value })
+                }
+                className={inputClassName}
+                placeholder="Cantidad"
+              />
+              <select
+                value={item.cuentaId}
+                onChange={(event) => updateDraftItem(item.id, { cuentaId: event.target.value })}
+                className={inputClassName}
               >
-                <AutocompleteSelect
-                  value={item.productoId}
-                  onChange={(nextValue) => updateDraftItem(item.id, { productoId: nextValue })}
-                  options={productoOptions}
-                  placeholder={`Producto #${index + 1}`}
-                  className={inputClassName}
-                />
-                <input
-                  required
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={item.cantidadSolicitada}
-                  onChange={(event) =>
-                    updateDraftItem(item.id, { cantidadSolicitada: event.target.value })
-                  }
-                  className={inputClassName}
-                  placeholder="Cantidad"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeDraftItem(item.id)}
-                  className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-
-            <div className="flex flex-wrap gap-2">
+                <option value="">Cuenta contable</option>
+                {cuentas.map((cuenta) => (
+                  <option key={cuenta.id} value={cuenta.id}>
+                    {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre}/
+                    {cuenta.funcionGasto.nombre}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
-                onClick={addDraftItem}
-                className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+                onClick={() => removeDraftItem(item.id)}
+                className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
               >
-                Agregar item
-              </button>
-              <button
-                type="submit"
-                disabled={createValeMutation.isPending || !user?.id}
-                className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-              >
-                {createValeMutation.isPending ? "Guardando..." : "Crear vale"}
+                Quitar
               </button>
             </div>
-          </form>
-        </article>
+          ))}
 
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-            <Search size={16} className="text-[var(--color-primary)]" />
-            Buscar mi vale
-          </h2>
-
-          <form className="mb-3 flex gap-2" onSubmit={handleBuscarVale}>
-            <input
-              value={valeIdInput}
-              onChange={(event) => setValeIdInput(event.target.value)}
-              className={inputClassName}
-              placeholder="ID del vale"
-            />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={addDraftItem}
+              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+            >
+              Agregar item
+            </button>
             <button
               type="submit"
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)]"
+              disabled={
+                createValeMutation.isPending ||
+                entregarValeMutation.isPending ||
+                updateProductoMutation.isPending
+              }
+              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
             >
-              Buscar
+              {createValeMutation.isPending ||
+              entregarValeMutation.isPending ||
+              updateProductoMutation.isPending
+                ? "Procesando..."
+                : "Registrar y entregar vale"}
             </button>
-          </form>
+          </div>
+        </form>
+      </article>
 
-          {ultimosVales.length > 0 ? (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {ultimosVales.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setValeIdInput(id);
-                    setValeIdActivo(id);
-                  }}
-                  className="rounded-full border border-[var(--color-outline-variant)] px-3 py-1 text-xs text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-                >
-                  {id}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {valeQuery.isLoading ? (
-            <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando vale...</p>
-          ) : null}
-          {valeQuery.isError ? (
-            <p className="text-sm text-[var(--color-error)]">No se pudo cargar el vale solicitado.</p>
-          ) : null}
-          {vale && !valeEsMio ? (
-            <p className="text-sm text-[var(--color-error)]">
-              Este vale no pertenece al usuario actual.
-            </p>
-          ) : null}
-
-          {vale && valeEsMio ? (
-            <div className="space-y-4">
-              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3">
-                <p className="mt-1 text-xs">
-                  Estado:{" "}
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(vale.estado)}`}
-                  >
-                    {vale.estado}
-                  </span>
-                </p>
-                <p className="text-xs text-[var(--color-on-surface-variant)]">
-                  Fecha: {vale.createdAt ? new Date(vale.createdAt).toLocaleString() : "-"}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                  Items solicitados
-                </h3>
-                {vale.items.map((item) => {
-                  const pendiente = Math.max(
-                    item.cantidadSolicitada - (item.cantidadEntregada ?? 0),
-                    0
-                  );
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3"
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-4 text-lg font-bold">Vales recientes</h2>
+        <div className="table-scroll overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Estado
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Solicitante
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Fecha
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-border-soft)]">
+              {valesRecientes.slice(0, 12).map((vale) => (
+                <tr key={vale.id}>
+                  <td className="px-3 py-2 text-xs">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(vale.estado)}`}
                     >
-                      <p className="text-sm font-semibold">
-                        {item.producto?.nombre ?? `Producto #${item.productoId}`}
-                      </p>
-                      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                        <div className="rounded-md bg-[var(--color-surface-container-highest)] px-2 py-2">
-                          <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">
-                            Solicitado
-                          </span>
-                          <span className="font-semibold">{item.cantidadSolicitada}</span>
-                        </div>
-                        <div className="rounded-md bg-[var(--color-surface-container-highest)] px-2 py-2">
-                          <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">
-                            Entregado
-                          </span>
-                          <span className="font-semibold">{item.cantidadEntregada ?? 0}</span>
-                        </div>
-                        <div className="rounded-md bg-[var(--color-surface-container-highest)] px-2 py-2">
-                          <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">
-                            Pendiente
-                          </span>
-                          <span className="font-semibold">{pendiente}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </article>
-      </div>
+                      {vale.estado}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {vale.solicitante?.nombre ?? vale.solicitanteId ?? "-"}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {vale.createdAt ? new Date(vale.createdAt).toLocaleString() : "-"}
+                  </td>
+                </tr>
+              ))}
+              {valesRecientes.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                  >
+                    Sin vales registrados.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </article>
     </section>
   );
 }
