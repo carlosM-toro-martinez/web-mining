@@ -188,28 +188,37 @@ export function AppShell() {
 
           {inventoryNavItems.length > 0 ? (
             <>
-              <button
-                type="button"
-                onClick={() => setIsInventoryExpanded((current) => !current)}
-                className={`mt-2 flex w-full items-center py-3 text-sm font-semibold transition-all ${
-                  isSidebarCollapsed ? "justify-center px-2" : "justify-between px-4"
-                } ${
+              <div
+                className={`mt-2 flex items-center ${
                   isInventorySectionActive
                     ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
                     : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
                 }`}
               >
-                <span className="flex items-center gap-3">
+                <NavLink
+                  to="/inventario"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center py-3 text-sm font-semibold transition-all ${
+                    isSidebarCollapsed ? "w-full justify-center px-2" : "flex-1 gap-3 px-4"
+                  }`}
+                >
                   <Boxes size={18} />
                   {isSidebarCollapsed ? null : <span>Inventario</span>}
-                </span>
+                </NavLink>
                 {isSidebarCollapsed ? null : (
-                  <ChevronDown
-                    size={16}
-                    className={`transition-transform ${isInventoryExpanded ? "rotate-180" : ""}`}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsInventoryExpanded((current) => !current)}
+                    className="px-3 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)]"
+                    aria-label={isInventoryExpanded ? "Contraer inventario" : "Expandir inventario"}
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${isInventoryExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
                 )}
-              </button>
+              </div>
 
               {isSidebarCollapsed || !isInventoryExpanded
                 ? null

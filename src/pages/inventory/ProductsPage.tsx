@@ -1,11 +1,10 @@
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Download,
   FileText,
   FileSpreadsheet,
-  Filter,
   PencilLine,
   Plus,
   Table2,
@@ -68,20 +67,14 @@ export function ProductsPage() {
   const [cuentaDraft, setCuentaDraft] = useState("");
   const [sinCuentaDraft, setSinCuentaDraft] = useState(false);
 
-  const [searchApplied, setSearchApplied] = useState("");
-  const [grupoApplied, setGrupoApplied] = useState<number | undefined>(undefined);
-  const [subgrupoApplied, setSubgrupoApplied] = useState<number | undefined>(undefined);
-  const [cuentaApplied, setCuentaApplied] = useState<number | undefined>(undefined);
-  const [sinCuentaApplied, setSinCuentaApplied] = useState(false);
-
   const productosQuery = useProductosQuery({
-    page,
-    limit,
-    search: searchApplied || undefined,
-    grupoId: grupoApplied,
-    subgrupoId: subgrupoApplied,
-    cuentaId: cuentaApplied,
-    sinCuenta: sinCuentaApplied || undefined
+    page: 1,
+    limit: 5000,
+    search: undefined,
+    grupoId: undefined,
+    subgrupoId: undefined,
+    cuentaId: undefined,
+    sinCuenta: undefined
   });
 
   const createProductoMutation = useCreateProductoMutation();
@@ -130,7 +123,43 @@ export function ProductsPage() {
   const cuentas = cuentasQuery.data?.data ?? [];
 
   const products = productosQuery.data?.data ?? [];
-  const meta = productosQuery.data?.meta;
+
+  const filteredProducts = useMemo(() => {
+    const query = searchDraft.trim().toLowerCase();
+    const grupoIdNumber = grupoDraft ? Number(grupoDraft) : undefined;
+    const subgrupoIdNumber = subgrupoDraft ? Number(subgrupoDraft) : undefined;
+    const cuentaIdNumber = cuentaDraft ? Number(cuentaDraft) : undefined;
+
+    return products.filter((product) => {
+      const matchesSearch =
+        !query ||
+        product.codigo.toLowerCase().includes(query) ||
+        product.nombre.toLowerCase().includes(query);
+      const matchesGrupo = !grupoIdNumber || product.categoria?.parent?.id === grupoIdNumber;
+      const matchesSubgrupo = !subgrupoIdNumber || product.categoria?.id === subgrupoIdNumber;
+      const matchesSinCuenta = !sinCuentaDraft || !product.cuentaId;
+      const matchesCuenta = !cuentaIdNumber || product.cuentaId === cuentaIdNumber;
+      return matchesSearch && matchesGrupo && matchesSubgrupo && matchesSinCuenta && matchesCuenta;
+    });
+  }, [products, searchDraft, grupoDraft, subgrupoDraft, cuentaDraft, sinCuentaDraft]);
+
+  const total = filteredProducts.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    return filteredProducts.slice(start, start + limit);
+  }, [filteredProducts, currentPage, limit]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchDraft, grupoDraft, subgrupoDraft, cuentaDraft, sinCuentaDraft]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   function resetProductForm() {
     setCodigo("");
@@ -204,27 +233,12 @@ export function ProductsPage() {
     setCuentaIdForm(product.cuentaId ? String(product.cuentaId) : "");
   }
 
-  function applyFilters(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPage(1);
-    setSearchApplied(searchDraft.trim());
-    setGrupoApplied(grupoDraft ? Number(grupoDraft) : undefined);
-    setSubgrupoApplied(subgrupoDraft ? Number(subgrupoDraft) : undefined);
-    setCuentaApplied(cuentaDraft ? Number(cuentaDraft) : undefined);
-    setSinCuentaApplied(sinCuentaDraft);
-  }
-
   function handleClearFilters() {
     setSearchDraft("");
     setGrupoDraft("");
     setSubgrupoDraft("");
     setCuentaDraft("");
     setSinCuentaDraft(false);
-    setSearchApplied("");
-    setGrupoApplied(undefined);
-    setSubgrupoApplied(undefined);
-    setCuentaApplied(undefined);
-    setSinCuentaApplied(false);
     setPage(1);
   }
 
@@ -560,7 +574,7 @@ export function ProductsPage() {
           className="hidden"
         />
 
-        <form className="grid grid-cols-1 gap-3 md:grid-cols-7" onSubmit={applyFilters}>
+        <form className="grid grid-cols-1 gap-3 md:grid-cols-7" onSubmit={(event) => event.preventDefault()}>
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
               Buscar
@@ -645,13 +659,6 @@ export function ProductsPage() {
           </div>
 
           <div className="flex items-end gap-2">
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-surface-container-high)] px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-surface-container-highest)]"
-            >
-              <Filter size={15} />
-              Aplicar
-            </button>
             <button
               type="button"
               onClick={handleClearFilters}
@@ -866,7 +873,7 @@ export function ProductsPage() {
                 Lista de productos
               </h2>
               <span className="text-xs text-[var(--color-on-surface-variant)]">
-                {meta ? `${meta.total} registros` : "Sin datos"}
+                {`${total} registros`}
               </span>
             </div>
             <button
@@ -933,7 +940,7 @@ export function ProductsPage() {
                   </tr>
                 ) : null}
 
-                {!productosQuery.isLoading && products.length === 0 ? (
+                {!productosQuery.isLoading && paginatedProducts.length === 0 ? (
                   <tr>
                     <td
                       colSpan={9}
@@ -944,7 +951,7 @@ export function ProductsPage() {
                   </tr>
                 ) : null}
 
-                {products.map((product) => (
+                {paginatedProducts.map((product) => (
                   <tr
                     key={product.id}
                     className="transition hover:bg-[var(--color-surface-container-highest)]"
@@ -985,23 +992,21 @@ export function ProductsPage() {
 
           <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]/55 px-5 py-3">
             <span className="text-xs text-[var(--color-on-surface-variant)]">
-              {meta ? `Pagina ${meta.page} de ${meta.totalPages}` : "-"}
+              {`Pagina ${currentPage} de ${totalPages}`}
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={!meta || page <= 1}
+                disabled={currentPage <= 1}
                 className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)] disabled:opacity-40"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  setPage((current) => (meta && current < meta.totalPages ? current + 1 : current))
-                }
-                disabled={!meta || page >= meta.totalPages}
+                onClick={() => setPage((current) => (current < totalPages ? current + 1 : current))}
+                disabled={currentPage >= totalPages}
                 className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)] disabled:opacity-40"
               >
                 <ChevronRight size={16} />

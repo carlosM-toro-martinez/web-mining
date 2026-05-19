@@ -5,7 +5,10 @@ const inputClassName =
 
 interface EmployeeFormValues {
   nombre: string;
-  deviceUserId: string;
+  documento?: string;
+  cargo?: string;
+  deviceUserId?: string;
+  activo?: boolean;
 }
 
 interface EmployeeFormProps {
@@ -25,21 +28,33 @@ export function EmployeeForm({
 }: EmployeeFormProps) {
   const [nombre, setNombre] = useState(initialValues?.nombre ?? "");
   const [deviceUserId, setDeviceUserId] = useState(initialValues?.deviceUserId ?? "");
+  const [documento, setDocumento] = useState(initialValues?.documento ?? "");
+  const [cargo, setCargo] = useState(initialValues?.cargo ?? "");
+  const [activo, setActivo] = useState(initialValues?.activo ?? true);
 
   useEffect(() => {
     setNombre(initialValues?.nombre ?? "");
     setDeviceUserId(initialValues?.deviceUserId ?? "");
-  }, [initialValues?.nombre, initialValues?.deviceUserId]);
+    setDocumento(initialValues?.documento ?? "");
+    setCargo(initialValues?.cargo ?? "");
+    setActivo(initialValues?.activo ?? true);
+  }, [initialValues?.nombre, initialValues?.deviceUserId, initialValues?.documento, initialValues?.cargo, initialValues?.activo]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSubmit({
       nombre: nombre.trim(),
-      deviceUserId: deviceUserId.trim()
+      documento: documento.trim() || undefined,
+      cargo: cargo.trim() || undefined,
+      deviceUserId: deviceUserId.trim() || undefined,
+      activo
     });
     if (mode === "create") {
       setNombre("");
       setDeviceUserId("");
+      setDocumento("");
+      setCargo("");
+      setActivo(true);
     }
   }
 
@@ -60,16 +75,51 @@ export function EmployeeForm({
 
       <div>
         <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+          Documento
+        </label>
+        <input
+          value={documento}
+          onChange={(event) => setDocumento(event.target.value)}
+          className={inputClassName}
+          placeholder="CI / DNI (opcional)"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+          Cargo
+        </label>
+        <input
+          value={cargo}
+          onChange={(event) => setCargo(event.target.value)}
+          className={inputClassName}
+          placeholder="Cargo (opcional)"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
           Device User ID
         </label>
         <input
-          required
           value={deviceUserId}
           onChange={(event) => setDeviceUserId(event.target.value)}
           className={`${inputClassName} font-mono`}
-          placeholder="Ej: 1001"
+          placeholder="PIN dispositivo (opcional)"
         />
       </div>
+
+      {mode === "edit" ? (
+        <label className="flex items-center gap-2 text-sm text-[var(--color-on-surface)]">
+          <input
+            type="checkbox"
+            checked={activo}
+            onChange={(event) => setActivo(event.target.checked)}
+            className="h-4 w-4 rounded border-[var(--color-outline-variant)] bg-[var(--color-surface-container-highest)]"
+          />
+          Activo
+        </label>
+      ) : null}
 
       <div className="flex flex-wrap gap-2 pt-1">
         <button

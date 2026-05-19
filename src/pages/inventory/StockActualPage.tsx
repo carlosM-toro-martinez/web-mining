@@ -13,26 +13,50 @@ function toNumber(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function StockActualPage() {
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("stock-asc");
 
   const productosQuery = useProductosQuery({
     page: 1,
-    limit: 1000,
-    search: search.trim() || undefined
+    limit: 5000,
+    search: undefined
   });
 
   const productos = productosQuery.data?.data ?? [];
+  const normalizedSearch = normalizeText(search);
+
+  const productosFiltrados = useMemo(() => {
+    if (!normalizedSearch) return productos;
+    return productos.filter((producto) => {
+      const searchable = [
+        normalizeText(producto.codigo),
+        normalizeText(producto.nombre),
+        normalizeText(producto.unidad),
+        normalizeText(producto.categoria?.parent?.nombre),
+        normalizeText(producto.categoria?.nombre)
+      ].join(" ");
+      return searchable.includes(normalizedSearch);
+    });
+  }, [productos, normalizedSearch]);
 
   const productosOrdenados = useMemo(() => {
-    const sorted = [...productos].sort((a, b) => {
+    const sorted = [...productosFiltrados].sort((a, b) => {
       const stockA = toNumber(a.stock.cantidad);
       const stockB = toNumber(b.stock.cantidad);
       return sortMode === "stock-asc" ? stockA - stockB : stockB - stockA;
     });
     return sorted;
-  }, [productos, sortMode]);
+  }, [productosFiltrados, sortMode]);
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">

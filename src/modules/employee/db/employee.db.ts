@@ -1,15 +1,18 @@
 import Dexie, { type EntityTable } from "dexie";
 
-export type EmployeeSyncStatus = "PENDING" | "SYNCED";
+export type EmployeeSyncStatus = "PENDING" | "SYNCED" | "ERROR";
 export type SyncQueueAction = "CREATE" | "UPDATE";
 export type SyncQueueStatus = "PENDING" | "DONE" | "ERROR";
 
 export interface EmployeeRecord {
   id?: number;
-  nombre: string;
-  deviceUserId: string;
-  syncStatus: EmployeeSyncStatus;
   remoteId?: number | string;
+  nombre: string;
+  documento?: string;
+  cargo?: string;
+  deviceUserId?: string;
+  activo: boolean;
+  syncStatus: EmployeeSyncStatus;
   createdAt: string;
   updatedAt: string;
 }
