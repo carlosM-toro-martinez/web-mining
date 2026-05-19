@@ -1,30 +1,47 @@
 import { z } from "zod";
 
-const decimalLikeSchema = z.union([z.string(), z.number()]).transform((value) => String(value));
+const decimalLikeSchema = z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .transform((value) => {
+    if (value === null || value === undefined || value === "") return "0";
+    return String(value);
+  });
 
 const productoCategoriaSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.coerce.number().int().positive(),
   nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)"),
   codigo: z.string().optional().nullable(),
+  parentId: z.coerce.number().int().positive().nullable().optional(),
   parent: z
     .object({
       id: z.number().int().positive(),
+      codigo: z.string().optional().nullable(),
       nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)")
+      ,
+      parentId: z.coerce.number().int().positive().nullable().optional()
     })
     .nullable()
     .optional()
 });
 
-const productoStockSchema = z.object({
-  cantidad: decimalLikeSchema,
-  cantidadReservada: decimalLikeSchema.optional(),
-  cantidadDisponible: decimalLikeSchema.optional(),
-  precioUnit: decimalLikeSchema,
-  precioProm: decimalLikeSchema
-});
+const productoStockSchema = z
+  .object({
+    cantidad: decimalLikeSchema.optional(),
+    cantidadReservada: decimalLikeSchema.optional(),
+    cantidadDisponible: decimalLikeSchema.optional(),
+    precioUnit: decimalLikeSchema.optional(),
+    precioProm: decimalLikeSchema.optional()
+  })
+  .transform((value) => ({
+    cantidad: value.cantidad ?? "0",
+    cantidadReservada: value.cantidadReservada ?? "0",
+    cantidadDisponible: value.cantidadDisponible ?? "0",
+    precioUnit: value.precioUnit ?? "0",
+    precioProm: value.precioProm ?? "0"
+  }));
 
 const productoCuentaSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.coerce.number().int().positive(),
   codigoCompleto: z.string().min(1),
   centroCosto: z
     .object({
@@ -52,16 +69,28 @@ const productoCuentaSchema = z.object({
 });
 
 export const productoSchema = z.object({
-  id: z.number().int().positive(),
-  codigo: z.string().min(1),
-  nombre: z.string().min(1),
-  unidad: z.string().min(1),
-  categoriaId: z.number().int().positive(),
-  cuentaId: z.number().int().positive().nullable().optional(),
-  esEpp: z.boolean().default(false),
+  id: z.coerce.number().int().positive(),
+  codigo: z.string().optional().nullable().transform((value) => value?.trim() || "-"),
+  nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)"),
+  unidad: z.string().optional().nullable().transform((value) => value?.trim() || "UND"),
+  categoriaId: z.coerce.number().int().positive().optional().default(1),
+  cuentaId: z.coerce.number().int().positive().nullable().optional(),
+  esEpp: z.coerce.boolean().optional().default(false),
   categoria: productoCategoriaSchema.nullable().optional(),
   cuenta: productoCuentaSchema.nullable().optional(),
+  cuentaContable: z.unknown().nullable().optional(),
   stock: productoStockSchema
+    .nullable()
+    .optional()
+    .transform((value) =>
+      value ?? {
+        cantidad: "0",
+        cantidadReservada: "0",
+        cantidadDisponible: "0",
+        precioUnit: "0",
+        precioProm: "0"
+      }
+    )
 });
 
 const productosMetaSchema = z.object({
@@ -71,37 +100,77 @@ const productosMetaSchema = z.object({
   totalPages: z.number().int().positive()
 });
 
-export const productosListResponseSchema = z
+const productosListBaseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.array(productoSchema),
+  meta: productosMetaSchema.optional()
+});
+
+const productosListAltSchema = z
   .object({
-    success: z.boolean().optional().default(true),
-    data: z.array(productoSchema),
-    meta: productosMetaSchema
+    success: z.boolean().optional(),
+    productos: z.array(productoSchema),
+    meta: productosMetaSchema.optional()
   })
-  .or(
-    z.object({
+  .transform((value) => ({
+    success: value.success ?? true,
+    data: value.productos,
+    meta: value.meta
+  }));
+
+const productosListWrappedSchema = z
+  .object({
+    success: z.boolean().optional(),
+    data: z.object({
+      productos: z.array(productoSchema).optional(),
+      rows: z.array(productoSchema).optional()
+    }),
+    meta: productosMetaSchema.optional()
+  })
+  .transform((value) => ({
+    success: value.success ?? true,
+    data: value.data.productos ?? value.data.rows ?? [],
+    meta: value.meta
+  }));
+
+const productosListNestedDataSchema = z
+  .object({
+    data: z.object({
       success: z.boolean().optional(),
-      productos: z.array(productoSchema),
-      meta: productosMetaSchema
-    }).transform((value) => ({
+      data: z.array(productoSchema),
+      meta: productosMetaSchema.optional()
+    })
+  })
+  .transform((value) => ({
+    success: value.data.success ?? true,
+    data: value.data.data,
+    meta: value.data.meta
+  }));
+
+export const productosListResponseSchema = z
+  .union([
+    productosListBaseSchema,
+    productosListAltSchema,
+    productosListWrappedSchema,
+    productosListNestedDataSchema
+  ])
+  .transform((value) => {
+    const total = value.data.length;
+    const page = value.meta?.page ?? 1;
+    const limit = value.meta?.limit ?? Math.max(1, total || 10);
+    const totalPages = value.meta?.totalPages ?? Math.max(1, Math.ceil(total / limit));
+
+    return {
       success: value.success ?? true,
-      data: value.productos,
-      meta: value.meta
-    }))
-  )
-  .or(
-    z.object({
-      success: z.boolean().optional(),
-      data: z.object({
-        productos: z.array(productoSchema).optional(),
-        rows: z.array(productoSchema).optional()
-      }),
-      meta: productosMetaSchema
-    }).transform((value) => ({
-      success: value.success ?? true,
-      data: value.data.productos ?? value.data.rows ?? [],
-      meta: value.meta
-    }))
-  );
+      data: value.data,
+      meta: {
+        page,
+        limit,
+        total: value.meta?.total ?? total,
+        totalPages
+      }
+    };
+  });
 
 export const productoResponseSchema = z
   .object({

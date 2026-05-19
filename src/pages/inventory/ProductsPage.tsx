@@ -940,7 +940,18 @@ export function ProductsPage() {
                   </tr>
                 ) : null}
 
-                {!productosQuery.isLoading && paginatedProducts.length === 0 ? (
+                {!productosQuery.isLoading && productosQuery.isError ? (
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="px-4 py-6 text-center text-sm text-[var(--color-danger)]"
+                    >
+                      No se pudo cargar productos. Revisa la respuesta del API/formato.
+                    </td>
+                  </tr>
+                ) : null}
+
+                {!productosQuery.isLoading && !productosQuery.isError && paginatedProducts.length === 0 ? (
                   <tr>
                     <td
                       colSpan={9}

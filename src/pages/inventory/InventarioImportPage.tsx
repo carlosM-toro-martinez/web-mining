@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { FileSpreadsheet, UploadCloud } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
@@ -14,6 +14,7 @@ import {
   useUpsertSaldoMensualItemMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
 import { ApiError } from "@/shared/api/core/apiError";
+import { normalizeSpreadsheetRow, readSpreadsheetSheets } from "@/shared/lib/spreadsheetImport";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -35,6 +36,7 @@ export function InventarioImportPage() {
   const [stockJson, setStockJson] = useState(
     '[\n  { "productoCodigo": "01-01-0001", "cantidad": 2200, "precioUnit": 8.5 }\n]'
   );
+  const [stockExcelFile, setStockExcelFile] = useState<File | null>(null);
   const [saldoAnio, setSaldoAnio] = useState(String(new Date().getFullYear()));
   const [saldoMes, setSaldoMes] = useState(String(new Date().getMonth() + 1));
   const [saldoJson, setSaldoJson] = useState(
@@ -131,6 +133,96 @@ export function InventarioImportPage() {
       );
     } catch {
       showError("JSON inválido en stock inicial.");
+    }
+  }
+
+  async function handleLoadStockFromExcel(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    setStockExcelFile(file);
+    if (!file) return;
+
+    try {
+      const sheets = await readSpreadsheetSheets(file);
+      const sourceRows = sheets.flatMap((sheet) => sheet.rows);
+      if (!sourceRows.length) {
+        showError("El Excel no tiene filas para importar.");
+        return;
+      }
+
+      const groupedByCode = new Map<string, { productoCodigo: string; cantidad: number; precioUnit: number }>();
+
+      const parseDecimal = (raw: unknown) => {
+        if (raw === null || raw === undefined) return 0;
+        const value = String(raw).trim();
+        if (!value) return 0;
+        const normalized = value.replace(/\s/g, "").replace(/,/g, "");
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const extractFromRowByLayout = (sourceRow: Record<string, unknown>) => {
+        const values = Object.values(sourceRow).map((value) =>
+          value === null || value === undefined ? "" : String(value).trim()
+        );
+        const codeIndex = values.findIndex((value) => /^\d{2}-\d{2}-\d{4,}$/.test(value));
+        if (codeIndex < 0) return null;
+
+        const productoCodigo = values[codeIndex].toUpperCase();
+        // En tu formato: codigo | nombre | unidad | cantidad | p.unit | total
+        const cantidad = parseDecimal(values[codeIndex + 3] ?? "");
+        const precioUnit = parseDecimal(values[codeIndex + 4] ?? "");
+
+        return { productoCodigo, cantidad, precioUnit };
+      };
+
+      for (const sourceRow of sourceRows) {
+        const row = normalizeSpreadsheetRow(sourceRow);
+        let productoCodigo = (row.productocodigo || row.codigo || row.codigoproducto || "")
+          .trim()
+          .toUpperCase();
+        let normalizedCantidad = parseDecimal(
+          row.cantidad ?? row.stockinicial ?? row.saldoinicial ?? row.qty ?? row.cant ?? "0"
+        );
+        let normalizedPrecio = parseDecimal(
+          row.preciounit ?? row.punit ?? row.preciounitario ?? row.pu ?? row.precio ?? "0"
+        );
+
+        if (!productoCodigo) {
+          const extracted = extractFromRowByLayout(sourceRow);
+          if (!extracted) continue;
+          productoCodigo = extracted.productoCodigo;
+          normalizedCantidad = extracted.cantidad;
+          normalizedPrecio = extracted.precioUnit;
+        }
+
+        const current = groupedByCode.get(productoCodigo);
+        if (!current) {
+          groupedByCode.set(productoCodigo, {
+            productoCodigo,
+            cantidad: normalizedCantidad,
+            precioUnit: normalizedPrecio
+          });
+          continue;
+        }
+
+        groupedByCode.set(productoCodigo, {
+          productoCodigo,
+          cantidad: current.cantidad + normalizedCantidad,
+          precioUnit: normalizedPrecio > 0 ? normalizedPrecio : current.precioUnit
+        });
+      }
+
+      const items = [...groupedByCode.values()];
+      if (!items.length) {
+        showError("No se encontraron columnas válidas (codigo/cantidad/precioUnit) en el Excel.");
+        return;
+      }
+
+      setStockJson(JSON.stringify(items, null, 2));
+      showSuccess(`Excel procesado: ${items.length} códigos listos para importar.`);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo leer el archivo Excel de stock inicial."));
     }
   }
 
@@ -350,6 +442,18 @@ export function InventarioImportPage() {
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-3 text-lg font-bold">2) Importar stock inicial</h2>
         <form className="space-y-3" onSubmit={handleImportStock}>
+          <div className="space-y-2">
+            <input
+              type="file"
+              accept=".xls,.xlsx,.csv"
+              onChange={handleLoadStockFromExcel}
+              className={inputClassName}
+            />
+            <p className="text-xs text-[var(--color-on-surface-variant)]">
+              Carga Excel/CSV y se genera automáticamente el JSON agrupado por código.
+              {stockExcelFile ? ` Archivo: ${stockExcelFile.name}` : ""}
+            </p>
+          </div>
           <textarea
             value={stockJson}
             onChange={(event) => setStockJson(event.target.value)}
