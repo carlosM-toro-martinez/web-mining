@@ -15,6 +15,7 @@ import { StockActualPage } from "@/pages/inventory/StockActualPage";
 import { ReportesPage } from "@/pages/inventory/ReportesPage";
 import { PedidosPage } from "@/pages/inventory/PedidosPage";
 import { InventarioImportPage } from "@/pages/inventory/InventarioImportPage";
+import { StockInicialEditorPage } from "@/pages/inventory/StockInicialEditorPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -33,6 +34,8 @@ import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
 import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
 import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
+import { PersonalRoute } from "@/app/router/guards/PersonalRoute";
+import { ExploracionesAdminRoute } from "@/app/router/guards/ExploracionesAdminRoute";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { CorporateLandingPage } from "@/pages/corporate/CorporateLandingPage";
 import { isCorporatePreviewDomain } from "@/app/router/domainConfig";
@@ -152,8 +155,12 @@ export function AppRouter() {
         <Route element={<AppShell />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/mapa" element={<MapPage />} />
-          <Route path="/exploraciones" element={<ExploracionesPage />} />
-          <Route path="/personal" element={<EmployeePage />} />
+          <Route element={<ExploracionesAdminRoute />}>
+            <Route path="/exploraciones" element={<ExploracionesPage />} />
+          </Route>
+          <Route element={<PersonalRoute />}>
+            <Route path="/personal" element={<EmployeePage />} />
+          </Route>
           <Route path="/exploraciones/elementos" element={<ExploracionesElementosPage />} />
           <Route path="/exploraciones/reportes" element={<ExploracionesReportesPage />} />
           <Route path="/kardex-valorado" element={<KardexValoradoPage />} />
@@ -166,6 +173,7 @@ export function AppRouter() {
             <Route path="/inventario/compras" element={<ComprasPage />} />
             <Route path="/inventario/pedidos" element={<PedidosPage />} />
             <Route path="/inventario/importacion" element={<InventarioImportPage />} />
+            <Route path="/inventario/stock-inicial-editar" element={<StockInicialEditorPage />} />
             <Route path="/inventario/categorias" element={<CategoriesPage />} />
             <Route path="/inventario/productos" element={<ProductsPage />} />
             <Route path="/inventario/stock" element={<StockActualPage />} />

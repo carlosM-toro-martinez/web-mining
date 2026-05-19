@@ -1,8 +1,15 @@
 import { FormEvent, useMemo, useState } from "react";
 import { PackageCheck, Plus, Search } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { useRegisterMutation } from "@/features/auth/hooks/useRegisterMutation";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
-import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
+import {
+  useCentrosCostoQuery,
+  useCreateCuentaMutation,
+  useCuentasQuery,
+  useFuncionesGastoQuery,
+  useSectoresQuery
+} from "@/features/contabilidad/hooks/useContabilidad";
 import {
   useProductosQuery,
   useUpdateProductoMutation
@@ -53,16 +60,28 @@ export function ValesPage() {
   const usersQuery = useUsersListQuery();
   const productosQuery = useProductosQuery({ page: 1, limit: 500, search: "" });
   const cuentasQuery = useCuentasQuery();
+  const centrosCostoQuery = useCentrosCostoQuery();
+  const funcionesGastoQuery = useFuncionesGastoQuery();
+  const sectoresQuery = useSectoresQuery();
   const valesQuery = useValesQuery({ page: 1, limit: 200 });
   const resumenSolicitantesQuery = useResumenSolicitantesQuery(canUseFlow);
 
   const createValeMutation = useCreateValeMutation();
   const entregarValeMutation = useEntregarValeMutation();
   const updateProductoMutation = useUpdateProductoMutation();
+  const registerMutation = useRegisterMutation();
+  const createCuentaMutation = useCreateCuentaMutation();
 
   const [historialUserId, setHistorialUserId] = useState("");
   const [historialProductoFilter, setHistorialProductoFilter] = useState("");
   const [solicitanteCreateId, setSolicitanteCreateId] = useState("");
+  const [isCreateWorkerModalOpen, setIsCreateWorkerModalOpen] = useState(false);
+  const [newWorkerName, setNewWorkerName] = useState("");
+  const [isCreateCuentaModalOpen, setIsCreateCuentaModalOpen] = useState(false);
+  const [targetDraftItemIdForCuenta, setTargetDraftItemIdForCuenta] = useState<number | null>(null);
+  const [centroCostoCreateId, setCentroCostoCreateId] = useState("");
+  const [funcionGastoCreateId, setFuncionGastoCreateId] = useState("");
+  const [sectorCreateId, setSectorCreateId] = useState("");
   const [draftItems, setDraftItems] = useState<ValeDraftItem[]>([
     { id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
   ]);
@@ -76,6 +95,9 @@ export function ValesPage() {
   const usuarios = usersQuery.data?.data ?? [];
   const productos = productosQuery.data?.data ?? [];
   const cuentas = cuentasQuery.data?.data ?? [];
+  const centrosCosto = centrosCostoQuery.data?.data ?? [];
+  const funcionesGasto = funcionesGastoQuery.data?.data ?? [];
+  const sectores = sectoresQuery.data?.data ?? [];
   const vales = valesQuery.data?.data ?? [];
 
   const usuarioOptions = useMemo(
@@ -106,6 +128,33 @@ export function ValesPage() {
         searchText: `${item.usuario.nombre ?? ""} ${item.usuario.email ?? ""} ${item.usuario.id}`
       })),
     [resumenSolicitantesQuery.data?.data]
+  );
+  const centroCostoOptions = useMemo(
+    () =>
+      centrosCosto.map((item) => ({
+        id: String(item.id),
+        label: `${item.codigo} - ${item.nombre}`,
+        searchText: `${item.codigo} ${item.nombre}`
+      })),
+    [centrosCosto]
+  );
+  const funcionGastoOptions = useMemo(
+    () =>
+      funcionesGasto.map((item) => ({
+        id: String(item.id),
+        label: `${item.codigo} - ${item.nombre}`,
+        searchText: `${item.codigo} ${item.nombre}`
+      })),
+    [funcionesGasto]
+  );
+  const sectorOptions = useMemo(
+    () =>
+      sectores.map((item) => ({
+        id: String(item.id),
+        label: `${item.codigo} - ${item.nombre}`,
+        searchText: `${item.codigo} ${item.nombre}`
+      })),
+    [sectores]
   );
 
   const productosHistoricosFiltrados = useMemo(() => {
@@ -153,6 +202,94 @@ export function ValesPage() {
       productoId,
       cuentaId: producto?.cuentaId ? String(producto.cuentaId) : ""
     });
+  }
+
+  function buildRandomCredentials() {
+    const seed = `${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
+    const email = `trabajador.${seed}@marte.local`;
+    const password = `Tm!${seed}Aa9`;
+    return { email, password };
+  }
+
+  function handleCreateWorkerQuick(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nombre = newWorkerName.trim();
+    if (nombre.length < 2) {
+      showError("Ingresa al menos 2 caracteres para el nombre.");
+      return;
+    }
+
+    const { email, password } = buildRandomCredentials();
+    registerMutation.mutate(
+      {
+        nombre,
+        email,
+        password,
+        role: "TRABAJADOR"
+      },
+      {
+        onSuccess: (response) => {
+          const createdId = response.data?.id;
+          if (createdId) {
+            setSolicitanteCreateId(String(createdId));
+          }
+          setNewWorkerName("");
+          setIsCreateWorkerModalOpen(false);
+          showSuccess(`Trabajador creado: ${response.data.nombre}`);
+        },
+        onError: (error) => {
+          showError(normalizeError(error, "No se pudo crear el trabajador."));
+        }
+      }
+    );
+  }
+
+  function openCreateCuentaModal(draftItemId: number) {
+    setTargetDraftItemIdForCuenta(draftItemId);
+    setCentroCostoCreateId("");
+    setFuncionGastoCreateId("");
+    setSectorCreateId("");
+    setIsCreateCuentaModalOpen(true);
+  }
+
+  function closeCreateCuentaModal() {
+    setIsCreateCuentaModalOpen(false);
+    setTargetDraftItemIdForCuenta(null);
+    setCentroCostoCreateId("");
+    setFuncionGastoCreateId("");
+    setSectorCreateId("");
+  }
+
+  function buildCuentaCodigoCompleto(centroId: number, funcionId: number, sectorId: number) {
+    const centro = centrosCosto.find((item) => item.id === centroId);
+    const funcion = funcionesGasto.find((item) => item.id === funcionId);
+    const sector = sectores.find((item) => item.id === sectorId);
+    return `${centro?.codigo ?? centroId}-${funcion?.codigo ?? funcionId}-${sector?.codigo ?? sectorId}`;
+  }
+
+  function handleCreateCuentaQuick(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const centroCostoId = Number(centroCostoCreateId);
+    const funcionGastoId = Number(funcionGastoCreateId);
+    const sectorId = Number(sectorCreateId);
+    if (!centroCostoId || !funcionGastoId || !sectorId) {
+      showError("Selecciona centro de costo, función de gasto y área/sector.");
+      return;
+    }
+    const codigoCompleto = buildCuentaCodigoCompleto(centroCostoId, funcionGastoId, sectorId);
+    createCuentaMutation.mutate(
+      { codigoCompleto, centroCostoId, funcionGastoId, sectorId },
+      {
+        onSuccess: (response) => {
+          if (targetDraftItemIdForCuenta !== null) {
+            updateDraftItem(targetDraftItemIdForCuenta, { cuentaId: String(response.data.id) });
+          }
+          showSuccess("Cuenta contable creada y seleccionada.");
+          closeCreateCuentaModal();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo crear la cuenta contable."))
+      }
+    );
   }
 
   async function ensureProductoCuenta(productoId: number, cuentaId: number) {
@@ -338,19 +475,28 @@ export function ValesPage() {
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
               Trabajador solicitante
             </label>
-            <AutocompleteSelect
-              value={solicitanteCreateId}
-              onChange={setSolicitanteCreateId}
-              options={usuarioOptions}
-              placeholder="Buscar por nombre o código"
-              className={inputClassName}
-            />
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+              <AutocompleteSelect
+                value={solicitanteCreateId}
+                onChange={setSolicitanteCreateId}
+                options={usuarioOptions}
+                placeholder="Buscar por nombre o código"
+                className={inputClassName}
+              />
+              <button
+                type="button"
+                onClick={() => setIsCreateWorkerModalOpen(true)}
+                className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              >
+                Nuevo trabajador
+              </button>
+            </div>
           </div>
 
           {draftItems.map((item, index) => (
             <div
               key={item.id}
-              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_1fr_auto]"
+              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_1fr_auto_auto]"
             >
               <AutocompleteSelect
                 value={item.productoId}
@@ -384,6 +530,13 @@ export function ValesPage() {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => openCreateCuentaModal(item.id)}
+                className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              >
+                Nueva cuenta
+              </button>
               <button
                 type="button"
                 onClick={() => removeDraftItem(item.id)}
@@ -420,6 +573,95 @@ export function ValesPage() {
           </div>
         </form>
       </article>
+
+      {isCreateWorkerModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h3 className="text-lg font-bold">Crear trabajador rápido</h3>
+            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+              Solo ingresa nombre y presiona Enter.
+            </p>
+            <form className="mt-3 space-y-3" onSubmit={handleCreateWorkerQuick}>
+              <input
+                autoFocus
+                value={newWorkerName}
+                onChange={(event) => setNewWorkerName(event.target.value)}
+                className={inputClassName}
+                placeholder="Nombre completo"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateWorkerModalOpen(false);
+                    setNewWorkerName("");
+                  }}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={registerMutation.isPending}
+                  className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)]"
+                >
+                  {registerMutation.isPending ? "Creando..." : "Crear"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreateCuentaModalOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h3 className="text-lg font-bold">Crear cuenta contable rápida</h3>
+            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+              Selecciona centro de costo, función de gasto y área/sector.
+            </p>
+            <form className="mt-3 space-y-3" onSubmit={handleCreateCuentaQuick}>
+              <AutocompleteSelect
+                value={centroCostoCreateId}
+                onChange={setCentroCostoCreateId}
+                options={centroCostoOptions}
+                placeholder="Centro de costo (código o nombre)"
+                className={inputClassName}
+              />
+              <AutocompleteSelect
+                value={funcionGastoCreateId}
+                onChange={setFuncionGastoCreateId}
+                options={funcionGastoOptions}
+                placeholder="Función de gasto (código o nombre)"
+                className={inputClassName}
+              />
+              <AutocompleteSelect
+                value={sectorCreateId}
+                onChange={setSectorCreateId}
+                options={sectorOptions}
+                placeholder="Área / Sector (código o nombre)"
+                className={inputClassName}
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeCreateCuentaModal}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={createCuentaMutation.isPending}
+                  className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)]"
+                >
+                  {createCuentaMutation.isPending ? "Creando..." : "Crear y seleccionar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 text-lg font-bold">Vales recientes</h2>

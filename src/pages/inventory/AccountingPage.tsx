@@ -53,7 +53,9 @@ function includesText(value: string | undefined, search: string) {
 export function AccountingPage() {
   const { showError, showSuccess } = useToast();
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const importFuncionesInputRef = useRef<HTMLInputElement | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingFunciones, setIsImportingFunciones] = useState(false);
 
   const centrosQuery = useCentrosCostoQuery();
   const funcionesQuery = useFuncionesGastoQuery();
@@ -200,7 +202,8 @@ export function AccountingPage() {
           setFuncionCodigo("");
           setFuncionNombre("");
         },
-        onError: (error) => showError(normalizeError(error, "No se pudo crear la funcion de gasto."))
+        onError: (error) =>
+          showError(normalizeError(error, "No se pudo crear la funcion de gasto."))
       }
     );
   }
@@ -283,6 +286,10 @@ export function AccountingPage() {
     importInputRef.current?.click();
   }
 
+  function openImportFuncionesDialog() {
+    importFuncionesInputRef.current?.click();
+  }
+
   async function handleImportAccounting(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -296,10 +303,18 @@ export function AccountingPage() {
         return;
       }
 
-      const centroMapByCode = new Map(centros.map((item) => [item.codigo.trim().toUpperCase(), item.id]));
-      const funcionMapByCode = new Map(funciones.map((item) => [item.codigo.trim().toUpperCase(), item.id]));
-      const sectorMapByCode = new Map(sectores.map((item) => [item.codigo.trim().toUpperCase(), item.id]));
-      const cuentaMapByCode = new Map(cuentas.map((item) => [item.codigoCompleto.trim().toUpperCase(), item.id]));
+      const centroMapByCode = new Map(
+        centros.map((item) => [item.codigo.trim().toUpperCase(), item.id])
+      );
+      const funcionMapByCode = new Map(
+        funciones.map((item) => [item.codigo.trim().toUpperCase(), item.id])
+      );
+      const sectorMapByCode = new Map(
+        sectores.map((item) => [item.codigo.trim().toUpperCase(), item.id])
+      );
+      const cuentaMapByCode = new Map(
+        cuentas.map((item) => [item.codigoCompleto.trim().toUpperCase(), item.id])
+      );
 
       let createdCentros = 0;
       let createdFunciones = 0;
@@ -315,7 +330,10 @@ export function AccountingPage() {
         const existing = centroMapByCode.get(code);
         if (existing) return existing;
         if (!nombre.trim()) throw new Error(`${rowLabel}: nombre de centro obligatorio.`);
-        const response = await createCentroMutation.mutateAsync({ codigo: code, nombre: nombre.trim() });
+        const response = await createCentroMutation.mutateAsync({
+          codigo: code,
+          nombre: nombre.trim()
+        });
         centroMapByCode.set(code, response.data.id);
         createdCentros += 1;
         return response.data.id;
@@ -327,7 +345,10 @@ export function AccountingPage() {
         const existing = funcionMapByCode.get(code);
         if (existing) return existing;
         if (!nombre.trim()) throw new Error(`${rowLabel}: nombre de funcion obligatorio.`);
-        const response = await createFuncionMutation.mutateAsync({ codigo: code, nombre: nombre.trim() });
+        const response = await createFuncionMutation.mutateAsync({
+          codigo: code,
+          nombre: nombre.trim()
+        });
         funcionMapByCode.set(code, response.data.id);
         createdFunciones += 1;
         return response.data.id;
@@ -339,7 +360,10 @@ export function AccountingPage() {
         const existing = sectorMapByCode.get(code);
         if (existing) return existing;
         if (!nombre.trim()) throw new Error(`${rowLabel}: nombre de sector obligatorio.`);
-        const response = await createSectorMutation.mutateAsync({ codigo: code, nombre: nombre.trim() });
+        const response = await createSectorMutation.mutateAsync({
+          codigo: code,
+          nombre: nombre.trim()
+        });
         sectorMapByCode.set(code, response.data.id);
         createdSectores += 1;
         return response.data.id;
@@ -354,10 +378,14 @@ export function AccountingPage() {
       }) => {
         const centroId = centroMapByCode.get(payload.centroCode);
         const funcionId = funcionMapByCode.get(payload.funcionCode);
-        if (!centroId || !funcionId) throw new Error(`${payload.rowLabel}: centro o funcion inexistente.`);
+        if (!centroId || !funcionId)
+          throw new Error(`${payload.rowLabel}: centro o funcion inexistente.`);
 
-        const codigoCuenta =
-          (payload.codigoCuenta || `${payload.centroCode}-${payload.funcionCode}`).trim().toUpperCase();
+        const codigoCuenta = (
+          payload.codigoCuenta || `${payload.centroCode}-${payload.funcionCode}`
+        )
+          .trim()
+          .toUpperCase();
 
         if (cuentaMapByCode.has(codigoCuenta)) {
           skipped += 1;
@@ -452,7 +480,9 @@ export function AccountingPage() {
 
           if (!centroCode || !funcionCode) {
             failed += 1;
-            errors.push(`${rowLabel}: codigo_centro_costo y codigo_funcion_gasto son obligatorios.`);
+            errors.push(
+              `${rowLabel}: codigo_centro_costo y codigo_funcion_gasto son obligatorios.`
+            );
             continue;
           }
 
@@ -483,7 +513,9 @@ export function AccountingPage() {
 
           if (!centroCode || !funcionCode) {
             failed += 1;
-            errors.push(`${rowLabel}: codigo_centro_costo y codigo_funcion_gasto son obligatorios.`);
+            errors.push(
+              `${rowLabel}: codigo_centro_costo y codigo_funcion_gasto son obligatorios.`
+            );
             continue;
           }
 
@@ -516,6 +548,89 @@ export function AccountingPage() {
       showError(normalizeError(error, "No se pudo procesar el archivo de contabilidad."));
     } finally {
       setIsImporting(false);
+    }
+  }
+
+  async function handleImportFuncionesGasto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      setIsImportingFunciones(true);
+      const sheets = await readSpreadsheetSheets(file);
+      const rows = sheets.flatMap((sheet) => sheet.rows).map((row) => normalizeSpreadsheetRow(row));
+      if (!rows.length) {
+        showError("El archivo no tiene filas para importar.");
+        return;
+      }
+
+      const funcionMapByCode = new Map(
+        funciones.map((item) => [item.codigo.trim().toUpperCase(), item.id])
+      );
+
+      let created = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const [index, row] of rows.entries()) {
+        const rowLabel = `Fila ${index + 2}`;
+        const codigo = (
+          row.codigofunciongasto ||
+          row.codigofgasto ||
+          row.codigofuncion ||
+          row.codigo ||
+          ""
+        )
+          .trim()
+          .toUpperCase();
+        const nombre = (
+          row.nombrefunciongasto ||
+          row.nombrefgasto ||
+          row.funciongasto ||
+          row.nombrefuncion ||
+          row.nombre ||
+          row.descripcion ||
+          ""
+        ).trim();
+
+        if (!codigo) {
+          skipped += 1;
+          continue;
+        }
+
+        if (funcionMapByCode.has(codigo)) {
+          skipped += 1;
+          continue;
+        }
+
+        if (!nombre) {
+          failed += 1;
+          errors.push(`${rowLabel}: nombre de función de gasto vacío para código ${codigo}.`);
+          continue;
+        }
+
+        try {
+          const response = await createFuncionMutation.mutateAsync({ codigo, nombre });
+          funcionMapByCode.set(codigo, response.data.id);
+          created += 1;
+        } catch (error) {
+          failed += 1;
+          errors.push(normalizeError(error, `${rowLabel}: no se pudo crear ${codigo}.`));
+        }
+      }
+
+      showSuccess(
+        `Importación de función de gasto completada. Creadas: ${created}, Omitidas: ${skipped}, Errores: ${failed}.`
+      );
+      if (errors.length) {
+        showError(errors.slice(0, 3).join(" | "));
+      }
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo procesar el archivo de función de gasto."));
+    } finally {
+      setIsImportingFunciones(false);
     }
   }
 
@@ -664,6 +779,16 @@ export function AccountingPage() {
               {createFuncionMutation.isPending ? "Guardando..." : "Guardar funcion"}
             </button>
           </form>
+          <button
+            type="button"
+            onClick={openImportFuncionesDialog}
+            disabled={isImportingFunciones}
+            className="mt-3 w-full rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-50"
+          >
+            {isImportingFunciones
+              ? "Importando función de gasto..."
+              : "Importar función de gasto CSV/Excel"}
+          </button>
           <div className="relative mt-4">
             <Search
               size={14}
@@ -743,15 +868,33 @@ export function AccountingPage() {
         </article>
       </div>
 
+      <input
+        ref={importFuncionesInputRef}
+        type="file"
+        accept=".csv,.xlsx,.xls"
+        className="hidden"
+        onChange={handleImportFuncionesGasto}
+      />
+
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
           <Calculator size={16} className="text-[var(--color-primary)]" />
           Crear cuenta contable
         </h2>
-        <form className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5" onSubmit={handleCreateCuenta}>
+        <form
+          className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5"
+          onSubmit={handleCreateCuenta}
+        >
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Centro de costo</label>
-            <select required value={cuentaCentroId} onChange={(event) => handleCentroChange(event.target.value)} className={inputClassName}>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Centro de costo
+            </label>
+            <select
+              required
+              value={cuentaCentroId}
+              onChange={(event) => handleCentroChange(event.target.value)}
+              className={inputClassName}
+            >
               <option value="">Selecciona centro</option>
               {centros.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -761,8 +904,15 @@ export function AccountingPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Funcion de gasto</label>
-            <select required value={cuentaFuncionId} onChange={(event) => handleFuncionChange(event.target.value)} className={inputClassName}>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Funcion de gasto
+            </label>
+            <select
+              required
+              value={cuentaFuncionId}
+              onChange={(event) => handleFuncionChange(event.target.value)}
+              className={inputClassName}
+            >
               <option value="">Selecciona funcion</option>
               {funciones.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -772,8 +922,14 @@ export function AccountingPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Area / Sector</label>
-            <select value={cuentaSectorId} onChange={(event) => setCuentaSectorId(event.target.value)} className={inputClassName}>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Area / Sector
+            </label>
+            <select
+              value={cuentaSectorId}
+              onChange={(event) => setCuentaSectorId(event.target.value)}
+              className={inputClassName}
+            >
               <option value="">Sin sector</option>
               {sectores.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -783,7 +939,9 @@ export function AccountingPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Codigo completo</label>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Codigo completo
+            </label>
             <input
               required
               value={cuentaCodigoCompleto}
@@ -827,16 +985,29 @@ export function AccountingPage() {
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 bg-[var(--color-surface-container-highest)]">
               <tr>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Codigo</th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Centro</th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Funcion</th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Sector</th>
-                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Movimientos</th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Codigo
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Centro
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Funcion
+                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Sector
+                </th>
+                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Movimientos
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {cuentasFiltered.map((cuenta) => (
-                <tr key={cuenta.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+                <tr
+                  key={cuenta.id}
+                  className="transition hover:bg-[var(--color-surface-container-highest)]"
+                >
                   <td className="px-3 py-2 font-mono text-xs uppercase">{cuenta.codigoCompleto}</td>
                   <td className="px-3 py-2 text-sm">
                     {cuenta.centroCosto.codigo} - {cuenta.centroCosto.nombre}
@@ -845,14 +1016,21 @@ export function AccountingPage() {
                     {cuenta.funcionGasto.codigo} - {cuenta.funcionGasto.nombre}
                   </td>
                   <td className="px-3 py-2 text-sm">
-                    {cuenta.sector ? `${cuenta.sector.codigo} - ${cuenta.sector.nombre}` : "Sin sector"}
+                    {cuenta.sector
+                      ? `${cuenta.sector.codigo} - ${cuenta.sector.nombre}`
+                      : "Sin sector"}
                   </td>
-                  <td className="px-3 py-2 text-right text-xs">{cuenta._count?.movimientos ?? 0}</td>
+                  <td className="px-3 py-2 text-right text-xs">
+                    {cuenta._count?.movimientos ?? 0}
+                  </td>
                 </tr>
               ))}
               {!cuentasFiltered.length ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                  <td
+                    colSpan={5}
+                    className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
+                  >
                     No hay cuentas para el filtro actual.
                   </td>
                 </tr>
@@ -862,7 +1040,7 @@ export function AccountingPage() {
         </div>
       </article>
 
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+      {/* <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
           <ReceiptText size={16} className="text-[var(--color-primary)]" />
           Registrar salida con cuenta contable
@@ -932,7 +1110,7 @@ export function AccountingPage() {
             </button>
           </div>
         </form>
-      </article>
+      </article> */}
     </section>
   );
 }

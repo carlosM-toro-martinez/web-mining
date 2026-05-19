@@ -1,11 +1,12 @@
-import { FormEvent, useMemo, useState } from "react";
-import { Building2, Search, UserPlus } from "lucide-react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
+import { Building2, Search, Upload, UserPlus } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCreateProveedorMutation,
   useProveedoresQuery
 } from "@/features/proveedores/hooks/useProveedores";
 import { ApiError } from "@/shared/api/core/apiError";
+import { normalizeSpreadsheetRow, readSpreadsheetSheets } from "@/shared/lib/spreadsheetImport";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -21,6 +22,8 @@ export function ProveedoresPage() {
   const { user } = useAuth();
   const canManage = user?.role === "ADMIN" || user?.role === "ALMACENERO";
   const { showError, showSuccess } = useToast();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [search, setSearch] = useState("");
   const [nombre, setNombre] = useState("");
@@ -76,6 +79,83 @@ export function ProveedoresPage() {
       },
       onError: (error) => showError(normalizeError(error, "No se pudo crear el proveedor."))
     });
+  }
+
+  function openImportDialog() {
+    importInputRef.current?.click();
+  }
+
+  async function handleImportProveedores(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!canManage) {
+      showError("No tienes permisos para importar proveedores.");
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const sheets = await readSpreadsheetSheets(file);
+      const rows = sheets.flatMap((sheet) => sheet.rows).map((row) => normalizeSpreadsheetRow(row));
+      if (!rows.length) {
+        showError("El archivo no tiene filas para importar.");
+        return;
+      }
+
+      const existingByName = new Set(
+        proveedores.map((item) => item.nombre.trim().toUpperCase())
+      );
+
+      let created = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const [index, row] of rows.entries()) {
+        const rowLabel = `Fila ${index + 2}`;
+        const nombreRow = (row.nombre || row.proveedor || row.proveedornombre || "").trim();
+        const lugarRow = (row.lugar || row.ciudad || row.ubicacion || row.direccion || "").trim();
+        const contactoRow = (row.contacto || row.telefono || row.celular || row.personacontacto || "").trim();
+        const razonSocialRow = (row.razonsocial || row.razon || "").trim();
+        const nitRow = (row.nit || row.nitci || "").trim();
+
+        if (!nombreRow || !lugarRow) {
+          skipped += 1;
+          continue;
+        }
+
+        const normalizedName = nombreRow.toUpperCase();
+        if (existingByName.has(normalizedName)) {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          await createProveedorMutation.mutateAsync({
+            nombre: nombreRow,
+            lugar: lugarRow,
+            contacto: contactoRow || undefined,
+            razonSocial: razonSocialRow || undefined,
+            nit: nitRow || undefined
+          });
+          existingByName.add(normalizedName);
+          created += 1;
+        } catch (error) {
+          failed += 1;
+          errors.push(normalizeError(error, `${rowLabel}: no se pudo crear proveedor.`));
+        }
+      }
+
+      showSuccess(`Importación completada. Creados: ${created}, Omitidos: ${skipped}, Errores: ${failed}.`);
+      if (errors.length) {
+        showError(errors.slice(0, 3).join(" | "));
+      }
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo procesar el archivo de proveedores."));
+    } finally {
+      setIsImporting(false);
+    }
   }
 
   return (
@@ -150,6 +230,22 @@ export function ProveedoresPage() {
               {createProveedorMutation.isPending ? "Guardando..." : "Crear proveedor"}
             </button>
           </form>
+          <button
+            type="button"
+            onClick={openImportDialog}
+            disabled={!canManage || isImporting}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60"
+          >
+            <Upload size={14} />
+            {isImporting ? "Importando..." : "Importar proveedores CSV/Excel"}
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={handleImportProveedores}
+            className="hidden"
+          />
         </article>
 
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">

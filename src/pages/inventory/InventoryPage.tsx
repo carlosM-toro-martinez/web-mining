@@ -13,7 +13,8 @@ import {
   ClipboardList,
   Settings,
   Truck,
-  UploadCloud
+  UploadCloud,
+  PencilLine
 } from "lucide-react";
 
 const cards = [
@@ -99,6 +100,13 @@ const cards = [
     description: "Carga catálogo Excel, stock inicial y saldos mensuales históricos.",
     to: "/inventario/importacion",
     icon: UploadCloud,
+    available: true
+  },
+  {
+    title: "Editar stock inicial",
+    description: "Carga y edita stock inicial uno por uno con JSON automático.",
+    to: "/inventario/stock-inicial-editar",
+    icon: PencilLine,
     available: true
   },
   {

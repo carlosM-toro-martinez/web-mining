@@ -22,7 +22,8 @@ import {
   Truck,
   UserPlus,
   RefreshCw,
-  IdCard
+  IdCard,
+  PencilLine
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import minerImage from "@/assets/miner.png";
@@ -33,13 +34,6 @@ interface NavItem {
   icon: LucideIcon;
   to: string;
 }
-
-const baseNavItems: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/" },
-  // { label: "Mapa", icon: Map, to: "/mapa" },
-  { label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" },
-  { label: "Personal", icon: IdCard, to: "/personal" }
-];
 
 export function AppShell() {
   const location = useLocation();
@@ -52,10 +46,17 @@ export function AppShell() {
   const isAlmacenero = user?.role === "ALMACENERO";
   const isRecepcionista = user?.role === "RECEPCIONISTA";
   const isSuperintendente = user?.role === "SUPERINTENDENTE";
+  const isAdministrador = user?.role === "ADMINISTRADOR";
   const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
 
   const topNavItems = useMemo(() => {
-    const items: NavItem[] = [...baseNavItems];
+    const items: NavItem[] = [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }];
+    if (isAdmin) {
+      items.push({ label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" });
+    }
+    if (isAdmin || isAdministrador || isSuperintendente) {
+      items.push({ label: "Personal", icon: IdCard, to: "/personal" });
+    }
     if (canManageUsers) {
       items.push({
         label: "Exploraciones Data Room",
@@ -67,7 +68,7 @@ export function AppShell() {
       items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
     return items;
-  }, [canManageUsers]);
+  }, [canManageUsers, isAdmin, isAdministrador, isSuperintendente]);
 
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventoryRoute) return [];
@@ -80,6 +81,8 @@ export function AppShell() {
       { label: "Stock", icon: Layers3, to: "/inventario/stock" },
       { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },
       { label: "Importación", icon: UploadCloud, to: "/inventario/importacion" }
+      ,
+      { label: "Editar stock inicial", icon: PencilLine, to: "/inventario/stock-inicial-editar" }
     ];
   }, [canSeeInventoryRoute]);
 
