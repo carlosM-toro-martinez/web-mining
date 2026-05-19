@@ -64,6 +64,11 @@ function formatLegacyCellValue(value: unknown) {
   return String(value);
 }
 
+function isSaldoInicialReferencia(referencia: unknown) {
+  if (typeof referencia !== "string") return false;
+  return referencia.trim().toUpperCase() === "SALDO_INICIAL";
+}
+
 export function ReportesPage() {
   const { tipo } = useParams();
   const navigate = useNavigate();
@@ -125,10 +130,11 @@ export function ReportesPage() {
     [dateMode, fecha, fechaFin, fechaInicio, limit, page, productoId]
   );
 
-  const binCardQuery = useBinCardQuery(params, dataMode === "all", isLegacyType && tipo === "bin-card");
+  const shouldFetchAllLegacy = isLegacyType;
+  const binCardQuery = useBinCardQuery(params, dataMode === "all" || shouldFetchAllLegacy, isLegacyType && tipo === "bin-card");
   const binCardValoradoQuery = useBinCardValoradoQuery(
     params,
-    dataMode === "all",
+    dataMode === "all" || shouldFetchAllLegacy || isAdminType,
     (isLegacyType && tipo === "bin-card-valorado") || isAdminType
   );
   const stockQuery = useStockReportQuery(
@@ -147,17 +153,35 @@ export function ReportesPage() {
   const legacyActiveQuery = tipo === "bin-card" ? binCardQuery : binCardValoradoQuery;
   const legacyItems = useMemo(
     () =>
-      [...(legacyActiveQuery.data?.items ?? [])].sort(
-        (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
-      ),
+      [...(legacyActiveQuery.data?.items ?? [])]
+        .filter((item) => !isSaldoInicialReferencia(item.referencia))
+        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()),
     [legacyActiveQuery.data?.items]
   );
 
+  const pagedLegacyItems = useMemo(() => {
+    if (dataMode === "all") return legacyItems;
+    const start = (page - 1) * limit;
+    return legacyItems.slice(start, start + limit);
+  }, [dataMode, legacyItems, limit, page]);
+
+  const legacyMeta = useMemo(() => {
+    const total = legacyItems.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    return {
+      page: safePage,
+      limit,
+      total,
+      totalPages
+    };
+  }, [legacyItems.length, limit, page]);
+
   const valorizadoItems = useMemo(
     () =>
-      [...(binCardValoradoQuery.data?.items ?? [])].sort(
-        (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
-      ),
+      [...(binCardValoradoQuery.data?.items ?? [])]
+        .filter((item) => !isSaldoInicialReferencia(item.referencia))
+        .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()),
     [binCardValoradoQuery.data?.items]
   );
 
@@ -215,7 +239,7 @@ export function ReportesPage() {
     if (isLegacyType) {
       exportLegacyBinCardExcel({
         tab: tipo,
-        items: legacyItems,
+        items: dataMode === "all" ? legacyItems : pagedLegacyItems,
         productLabel: selectedProductLabel,
         dateFilterLabel: selectedDateLabel
       });
@@ -229,7 +253,7 @@ export function ReportesPage() {
       if (isLegacyType) {
         exportLegacyBinCardPdf({
           tab: tipo,
-          items: legacyItems,
+          items: dataMode === "all" ? legacyItems : pagedLegacyItems,
           productLabel: selectedProductLabel,
           dateFilterLabel: selectedDateLabel
         });
@@ -243,7 +267,7 @@ export function ReportesPage() {
   }
 
   const currentQuery = isLegacyType ? legacyActiveQuery : isAdminType ? binCardValoradoQuery : tipo === "stock-actual" ? stockQuery : tipo === "vales-resumen" ? valesResumenQuery : comprasResumenQuery;
-  const currentMeta = currentQuery.data?.meta;
+  const currentMeta = isLegacyType ? legacyMeta : currentQuery.data?.meta;
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -532,7 +556,7 @@ export function ReportesPage() {
                     </td>
                   </tr>
                 ) : null}
-                {!legacyActiveQuery.isLoading && legacyItems.length === 0 ? (
+                {!legacyActiveQuery.isLoading && (dataMode === "all" ? legacyItems : pagedLegacyItems).length === 0 ? (
                   <tr>
                     <td
                       colSpan={tipo === "bin-card-valorado" ? 12 : 8}
@@ -542,7 +566,7 @@ export function ReportesPage() {
                     </td>
                   </tr>
                 ) : null}
-                {legacyItems.map((item) => (
+                {(dataMode === "all" ? legacyItems : pagedLegacyItems).map((item) => (
                   <tr
                     key={item.id}
                     className="transition hover:bg-[var(--color-surface-container-highest)]"

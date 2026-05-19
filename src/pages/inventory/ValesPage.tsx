@@ -22,6 +22,10 @@ import {
   useValesQuery
 } from "@/features/vales/hooks/useVales";
 import { ApiError } from "@/shared/api/core/apiError";
+import {
+  useInventoryOfflinePendingCount,
+  useSyncInventoryOfflineMutation
+} from "@/features/inventory-offline/hooks/useInventoryOffline";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -71,6 +75,8 @@ export function ValesPage() {
   const updateProductoMutation = useUpdateProductoMutation();
   const registerMutation = useRegisterMutation();
   const createCuentaMutation = useCreateCuentaMutation();
+  const pendingOfflineQuery = useInventoryOfflinePendingCount();
+  const syncOfflineMutation = useSyncInventoryOfflineMutation();
 
   const [historialUserId, setHistorialUserId] = useState("");
   const [historialProductoFilter, setHistorialProductoFilter] = useState("");
@@ -348,7 +354,11 @@ export function ValesPage() {
 
       const delivered = await entregarValeMutation.mutateAsync({
         id: created.data.id,
-        payload: { cantidadesEntregadas }
+        payload: { cantidadesEntregadas },
+        stockAdjustments: parsedItems.map((item) => ({
+          productoId: item.productoId,
+          deltaCantidad: -item.cantidadSolicitada
+        }))
       });
 
       showSuccess(`Vale ${delivered.data.vale.id} creado y entregado automáticamente.`);
@@ -390,6 +400,19 @@ export function ValesPage() {
               1) Revisión histórica del solicitante. 2) Aprobación física con firma. 3) Registro y
               entrega inmediata en sistema.
             </p>
+            <button
+              type="button"
+              onClick={() =>
+                syncOfflineMutation.mutate(undefined, {
+                  onSuccess: () => showSuccess("Sincronización offline ejecutada."),
+                  onError: () => showError("No se pudo ejecutar la sincronización offline.")
+                })
+              }
+              disabled={syncOfflineMutation.isPending}
+              className="mt-3 rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              Reintentar sync ({pendingOfflineQuery.data ?? 0})
+            </button>
           </div>
         </div>
       </header>

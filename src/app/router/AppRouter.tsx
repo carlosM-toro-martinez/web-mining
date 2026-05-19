@@ -16,6 +16,7 @@ import { ReportesPage } from "@/pages/inventory/ReportesPage";
 import { PedidosPage } from "@/pages/inventory/PedidosPage";
 import { InventarioImportPage } from "@/pages/inventory/InventarioImportPage";
 import { StockInicialEditorPage } from "@/pages/inventory/StockInicialEditorPage";
+import { InventoryOfflineMonitorPage } from "@/pages/inventory/InventoryOfflineMonitorPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
@@ -191,6 +192,9 @@ export function AppRouter() {
               />
             </Route>
             <Route path="/inventario/contabilidad" element={<AccountingPage />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/inventario/offline-monitor" element={<InventoryOfflineMonitorPage />} />
+            </Route>
           </Route>
           <Route path="/entregas" element={<Navigate to="/inventario/entregas" replace />} />
           <Route path="/epp" element={<NotFoundPage />} />

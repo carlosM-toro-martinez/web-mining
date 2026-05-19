@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import {
+  enqueueInventoryOperation,
+  isOfflineLikeError
+} from "@/features/inventory-offline/lib/inventoryOfflineQueue";
+import {
+  applyOptimisticStockAdjustments,
+  rollbackOptimisticStockAdjustments
+} from "@/features/inventory-offline/lib/stockOptimistic";
+import {
   aprobarVale,
   createVale,
   entregarVale,
@@ -61,7 +69,39 @@ export function useProductosPorUsuarioQuery(userId: number | null, enabled = tru
 export function useCreateValeMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateValePayload) => createVale(payload),
+    mutationFn: async (payload: CreateValePayload) => {
+      try {
+        return await createVale(payload);
+      } catch (error) {
+        if (!isOfflineLikeError(error)) {
+          throw error;
+        }
+        await enqueueInventoryOperation("CREATE_VALE", payload);
+        const tempId = `offline-vale-${Date.now()}`;
+        return {
+          success: true as const,
+          data: {
+            id: tempId,
+            solicitanteId: payload.solicitanteId ?? null,
+            estado: "PENDIENTE",
+            createdAt: new Date().toISOString(),
+            items: payload.items.map((item, index) => ({
+              id: `${tempId}-item-${index + 1}`,
+              productoId: item.productoId,
+              cantidadSolicitada: item.cantidadSolicitada,
+              cantidadEntregada: 0,
+              producto: null
+            })),
+            solicitante: null,
+            superintendente: null,
+            almacenero: null,
+            superintendenteId: null,
+            aprobadoAt: null,
+            entregadoAt: null
+          }
+        };
+      }
+    },
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
@@ -87,8 +127,52 @@ export function useAprobarValeMutation() {
 export function useEntregarValeMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: EntregarValePayload }) =>
-      entregarVale(id, payload),
+    mutationFn: async ({
+      id,
+      payload
+    }: {
+      id: string;
+      payload: EntregarValePayload;
+      stockAdjustments?: Array<{ productoId: number; deltaCantidad: number }>;
+    }) => {
+      try {
+        return await entregarVale(id, payload);
+      } catch (error) {
+        if (!isOfflineLikeError(error)) {
+          throw error;
+        }
+        await enqueueInventoryOperation("ENTREGAR_VALE", { id, payload });
+        return {
+          success: true as const,
+          data: {
+            vale: {
+              id,
+              estado: "PARCIAL",
+              items: [],
+              solicitanteId: null,
+              solicitante: null,
+              superintendente: null,
+              almacenero: null,
+              superintendenteId: null,
+              createdAt: null,
+              aprobadoAt: null,
+              entregadoAt: null
+            },
+            movimientos: []
+          }
+        };
+      }
+    },
+    onMutate: async (variables) => {
+      if (!variables.stockAdjustments?.length) return { snapshots: [] as Array<[readonly unknown[], unknown]> };
+      const snapshots = applyOptimisticStockAdjustments(variables.stockAdjustments);
+      return { snapshots };
+    },
+    onError: async (_error, _variables, context) => {
+      if (context?.snapshots?.length) {
+        rollbackOptimisticStockAdjustments(context.snapshots);
+      }
+    },
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.list() });
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });

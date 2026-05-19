@@ -26,6 +26,7 @@ import {
   PencilLine
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { useInventoryOfflinePendingCount } from "@/features/inventory-offline/hooks/useInventoryOffline";
 import minerImage from "@/assets/miner.png";
 import { getPostLogoutPath } from "@/app/router/domainConfig";
 
@@ -39,6 +40,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, canManageUsers, logout } = useAuth();
+  const offlinePendingQuery = useInventoryOfflinePendingCount();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isInventoryExpanded, setIsInventoryExpanded] = useState(false);
@@ -72,7 +74,7 @@ export function AppShell() {
 
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventoryRoute) return [];
-    return [
+    const items: NavItem[] = [
       // { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
       { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
       { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos" },
@@ -84,7 +86,11 @@ export function AppShell() {
       ,
       { label: "Editar stock inicial", icon: PencilLine, to: "/inventario/stock-inicial-editar" }
     ];
-  }, [canSeeInventoryRoute]);
+    if (isAdmin) {
+      items.push({ label: "Monitoreo offline", icon: Truck, to: "/inventario/offline-monitor" });
+    }
+    return items;
+  }, [canSeeInventoryRoute, isAdmin]);
 
   const avatarLabel = useMemo(() => {
     const source = user?.nombre?.trim();
@@ -319,6 +325,16 @@ export function AppShell() {
         </div>
 
         <div className="app-shell__header-actions flex items-center gap-2 lg:gap-4">
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => navigate("/inventario/offline-monitor")}
+              className="rounded-lg border border-[var(--color-outline-variant)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+              title="Abrir monitoreo offline"
+            >
+              Offline queue: {offlinePendingQuery.data ?? 0}
+            </button>
+          ) : null}
           <button className="p-2 text-[var(--color-on-surface-variant)] transition-colors hover:text-[var(--color-primary)]">
             <RefreshCw size={18} />
           </button>

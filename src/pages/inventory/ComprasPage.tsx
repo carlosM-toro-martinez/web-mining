@@ -20,6 +20,10 @@ import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { queryKeys } from "@/shared/lib/queryKeys";
+import {
+  useInventoryOfflinePendingCount,
+  useSyncInventoryOfflineMutation
+} from "@/features/inventory-offline/hooks/useInventoryOffline";
 import { normalizeSpreadsheetRow, readSpreadsheetSheets } from "@/shared/lib/spreadsheetImport";
 import {
   downloadComprasCsvTemplate,
@@ -73,6 +77,8 @@ export function ComprasPage() {
   const queryClient = useQueryClient();
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const pendingOfflineQuery = useInventoryOfflinePendingCount();
+  const syncOfflineMutation = useSyncInventoryOfflineMutation();
 
   const productosQuery = useProductosQuery({ page: 1, limit: 300, search: "" });
   const [listPage, setListPage] = useState(1);
@@ -244,7 +250,16 @@ export function ComprasPage() {
     }
 
     recibirCompraMutation.mutate(
-      { id: selectedCompra.id, payload: { cantidadesRecibidas: cantidades } },
+      {
+        id: selectedCompra.id,
+        payload: { cantidadesRecibidas: cantidades },
+        stockAdjustments: selectedCompra.items
+          .map((item) => ({
+            productoId: item.productoId,
+            deltaCantidad: Number(cantidades[item.id] ?? 0)
+          }))
+          .filter((item) => item.deltaCantidad > 0)
+      },
       {
         onSuccess: (response) => {
           showSuccess(
@@ -470,6 +485,19 @@ export function ComprasPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                syncOfflineMutation.mutate(undefined, {
+                  onSuccess: () => showSuccess("Sincronización offline ejecutada."),
+                  onError: () => showError("No se pudo ejecutar la sincronización offline.")
+                })
+              }
+              disabled={syncOfflineMutation.isPending}
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            >
+              Reintentar sync ({pendingOfflineQuery.data ?? 0})
+            </button>
             <button
               type="button"
               onClick={openImportDialog}
