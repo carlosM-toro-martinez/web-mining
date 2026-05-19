@@ -1,8 +1,10 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { employeeDb, type EmployeeRecord } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { queryKeys } from "@/shared/lib/queryKeys";
+import { env } from "@/shared/config/env";
 
 interface EmployeePayload {
   nombre: string;
@@ -159,6 +161,28 @@ export function useEmployees() {
     }
   });
 
+  const importDeviceUsersMutation = useMutation({
+    mutationFn: async () => {
+      await axios.post(
+        env.VITE_BIOMETRIC_SYNC_USERS_URL,
+        {},
+        {
+          timeout: 35_000,
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json"
+          }
+        }
+      );
+      await new Promise((resolve) => setTimeout(resolve, 30_000));
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.employees.all, "device-users"] });
+      await queryClient.invalidateQueries({ queryKey: [...queryKeys.employees.all, "attendance"] });
+    }
+  });
+
   const clearLocalCacheMutation = useMutation({
     mutationFn: async () => {
       await employeeDb.employees.clear();
@@ -237,8 +261,10 @@ export function useEmployees() {
     update: updateMutation.mutateAsync,
     remove: deleteMutation.mutateAsync,
     retrySync: retryMutation.mutateAsync,
+    importDeviceUsers: importDeviceUsersMutation.mutateAsync,
     isSaving: createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
-    isRetrying: retryMutation.isPending
+    isRetrying: retryMutation.isPending,
+    isImportingDeviceUsers: importDeviceUsersMutation.isPending
     ,
     clearLocalCache: clearLocalCacheMutation.mutateAsync,
     isClearingCache: clearLocalCacheMutation.isPending,

@@ -108,6 +108,20 @@ export function EmployeePage() {
     }
   }
 
+  async function handleImportDeviceUsers() {
+    try {
+      showSuccess("Importando usuarios del biométrico... espera ~30 segundos.");
+      await employees.importDeviceUsers();
+      showSuccess("Importación completada. Lista de usuarios del dispositivo actualizada.");
+    } catch (error) {
+      showError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo importar usuarios desde el biométrico."
+      );
+    }
+  }
+
   function downloadEmployeesTemplate() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet([
@@ -271,6 +285,17 @@ export function EmployeePage() {
             >
               <RefreshCw size={16} />
               {employees.isRetrying ? "Reintentando..." : "Reencolar pendientes"}
+            </button>
+            <button
+              type="button"
+              onClick={handleImportDeviceUsers}
+              disabled={employees.isImportingDeviceUsers}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-primary)]/45 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-60"
+            >
+              <RefreshCw size={16} />
+              {employees.isImportingDeviceUsers
+                ? "Importando biométrico..."
+                : "Importar usuarios del biométrico"}
             </button>
             <button
               type="button"
