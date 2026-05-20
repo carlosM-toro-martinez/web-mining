@@ -3,6 +3,8 @@ import { httpClient } from "@/shared/api/core/httpClient";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   importResultSchema,
+  recalcularStockPayloadSchema,
+  recalcularStockResponseSchema,
   reiniciarStockPayloadSchema,
   saldoMensualDeleteResponseSchema,
   saldoMensualItemPatchPayloadSchema,
@@ -14,6 +16,7 @@ import {
   sincronizarStockPayloadSchema,
   stockInicialPayloadSchema,
   type ReiniciarStockPayload,
+  type RecalcularStockPayload,
   type SaldoMensualItemPatchPayload,
   type SaldoMensualItemUpsertPayload,
   type SaldoMensualPayload,
@@ -83,6 +86,14 @@ export async function sincronizarStock(payload?: SincronizarStockPayload) {
     url: apiEndpoints.inventarioImport.sincronizarStock,
     body: sincronizarStockPayloadSchema.parse(payload),
     schema: importResultSchema
+  });
+}
+
+export async function recalcularStock(payload: RecalcularStockPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.recalcularStock,
+    body: recalcularStockPayloadSchema.parse(payload),
+    schema: recalcularStockResponseSchema
   });
 }
 

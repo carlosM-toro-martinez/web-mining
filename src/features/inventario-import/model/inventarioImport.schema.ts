@@ -38,6 +38,12 @@ export const sincronizarStockPayloadSchema = z
   })
   .optional();
 
+export const recalcularStockPayloadSchema = z.object({
+  productoId: numberLikeSchema.int().positive(),
+  stockInicial: numberLikeSchema.nonnegative(),
+  eliminarValeIds: z.array(z.string().min(1)).optional()
+});
+
 export const saldoMensualItemUpsertPayloadSchema = z
   .object({
     productoId: numberLikeSchema.int().positive().optional(),
@@ -112,10 +118,22 @@ export const saldoMensualDeleteResponseSchema = z.object({
   })
 });
 
+export const recalcularStockResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    productoId: numberLikeSchema.int().positive(),
+    stockInicial: numberLikeSchema.nonnegative(),
+    stockFinal: numberLikeSchema.nonnegative(),
+    movimientosRecalculados: numberLikeSchema.int().nonnegative(),
+    valesEliminados: numberLikeSchema.int().nonnegative()
+  })
+});
+
 export type StockInicialPayload = z.infer<typeof stockInicialPayloadSchema>;
 export type SaldoMensualPayload = z.infer<typeof saldoMensualPayloadSchema>;
 export type SaldoMensualQuery = z.infer<typeof saldoMensualQuerySchema>;
 export type ReiniciarStockPayload = z.infer<typeof reiniciarStockPayloadSchema>;
 export type SincronizarStockPayload = z.infer<typeof sincronizarStockPayloadSchema>;
+export type RecalcularStockPayload = z.infer<typeof recalcularStockPayloadSchema>;
 export type SaldoMensualItemUpsertPayload = z.infer<typeof saldoMensualItemUpsertPayloadSchema>;
 export type SaldoMensualItemPatchPayload = z.infer<typeof saldoMensualItemPatchPayloadSchema>;

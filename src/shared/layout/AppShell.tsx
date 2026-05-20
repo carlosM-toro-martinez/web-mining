@@ -16,17 +16,19 @@ import {
   Menu,
   PackageCheck,
   Building2,
-  Search,
   ShoppingCart,
   ClipboardList,
   Truck,
   UserPlus,
   RefreshCw,
   IdCard,
-  PencilLine
+  PencilLine,
+  Moon,
+  Sun
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useInventoryOfflinePendingCount } from "@/features/inventory-offline/hooks/useInventoryOffline";
+import { useTheme } from "@/shared/theme/ThemeProvider";
 import minerImage from "@/assets/miner.png";
 import { getPostLogoutPath } from "@/app/router/domainConfig";
 
@@ -40,6 +42,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, canManageUsers, logout } = useAuth();
+  const { mode, toggleMode } = useTheme();
   const offlinePendingQuery = useInventoryOfflinePendingCount();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -311,17 +314,16 @@ export function AppShell() {
           >
             <Menu size={20} />
           </button>
-          <div className="relative">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-on-surface-variant)]"
-            />
-            <input
-              type="text"
-              placeholder="Buscar reporte..."
-              className="app-shell__search-input w-56 rounded-lg border-none bg-[var(--color-surface-container)] py-2 pl-10 pr-4 text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-on-surface-variant)] focus:ring-1 focus:ring-[var(--color-primary)] lg:w-80"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+            aria-label="Cambiar tema"
+            title={`Cambiar a modo ${mode === "dark" ? "claro" : "oscuro"}`}
+          >
+            {mode === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+            <span className="hidden sm:inline">{mode === "dark" ? "Modo claro" : "Modo oscuro"}</span>
+          </button>
         </div>
 
         <div className="app-shell__header-actions flex items-center gap-2 lg:gap-4">

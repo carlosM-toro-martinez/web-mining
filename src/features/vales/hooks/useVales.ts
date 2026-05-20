@@ -9,9 +9,11 @@ import {
   rollbackOptimisticStockAdjustments
 } from "@/features/inventory-offline/lib/stockOptimistic";
 import {
+  anularVale,
   aprobarVale,
   createVale,
   entregarVale,
+  getAnulacionesVales,
   getProductosPorUsuario,
   getResumenSolicitantes,
   getValesBySolicitante,
@@ -20,6 +22,7 @@ import {
   rechazarVale
 } from "@/features/vales/api/valesApi";
 import type {
+  AnularValePayload,
   AprobarValePayload,
   CreateValePayload,
   EntregarValePayload,
@@ -63,6 +66,14 @@ export function useProductosPorUsuarioQuery(userId: number | null, enabled = tru
     queryKey: [...queryKeys.vales.all, "productos-por-usuario", userId ?? "none"],
     queryFn: () => getProductosPorUsuario(userId as number),
     enabled: enabled && typeof userId === "number" && userId > 0
+  });
+}
+
+export function useAnulacionesValesQuery(enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.vales.all, "anulaciones"],
+    queryFn: () => getAnulacionesVales(),
+    enabled
   });
 }
 
@@ -194,6 +205,22 @@ export function useRechazarValeMutation() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
       await queryClient.setQueryData(queryKeys.vales.detail(response.data.id), response);
+    }
+  });
+}
+
+export function useAnularValeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: AnularValePayload }) =>
+      anularVale(id, payload),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
+      await queryClient.setQueryData(queryKeys.vales.detail(response.data.vale.id), {
+        success: true,
+        data: response.data.vale
+      });
     }
   });
 }

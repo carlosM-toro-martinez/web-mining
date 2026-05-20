@@ -163,6 +163,10 @@ export const entregarValePayloadSchema = z.object({
   cantidadesEntregadas: z.record(z.string(), numberLikeSchema.min(0))
 });
 
+export const anularValePayloadSchema = z.object({
+  motivo: z.string().trim().min(5, "El motivo debe tener al menos 5 caracteres.")
+});
+
 export const valesListParamsSchema = z.object({
   estado: z.string().trim().optional(),
   solicitanteId: numberLikeSchema.int().positive().optional(),
@@ -213,6 +217,37 @@ export const productosPorUsuarioResponseSchema = z.object({
   })
 });
 
+export const anularValeResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    vale: valeSchema,
+    anulacion: z.object({
+      id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+      motivo: z.string(),
+      createdAt: z.string().optional().nullable(),
+      usuario: valeUsuarioSchema.optional().nullable()
+    }),
+    contraAsientos: numberLikeSchema.int().nonnegative().optional().default(0)
+  })
+});
+
+export const anulacionesListResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.array(
+    z.object({
+      id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+      motivo: z.string(),
+      createdAt: z.string().optional().nullable(),
+      usuario: valeUsuarioSchema.optional().nullable(),
+      vale: z.object({
+        id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+        createdAt: z.string().optional().nullable(),
+        solicitante: valeUsuarioSchema.optional().nullable()
+      })
+    })
+  )
+});
+
 export type ValeEstado = z.infer<typeof valeEstadoSchema>;
 export type Vale = z.infer<typeof valeSchema>;
 export type ValeItem = z.infer<typeof valeItemSchema>;
@@ -220,4 +255,5 @@ export type ValeMovimiento = z.infer<typeof valeMovimientoSchema>;
 export type CreateValePayload = z.infer<typeof createValePayloadSchema>;
 export type AprobarValePayload = z.infer<typeof aprobarValePayloadSchema>;
 export type EntregarValePayload = z.infer<typeof entregarValePayloadSchema>;
+export type AnularValePayload = z.infer<typeof anularValePayloadSchema>;
 export type ValesListParams = z.infer<typeof valesListParamsSchema>;

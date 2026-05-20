@@ -4,6 +4,7 @@ import {
   getSaldoMensual,
   getSaldoMensualById,
   importCatalogo,
+  recalcularStock,
   reiniciarStock,
   importSaldoMensual,
   importStockInicial,
@@ -12,6 +13,7 @@ import {
   upsertSaldoMensualItem
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
+  RecalcularStockPayload,
   ReiniciarStockPayload,
   SaldoMensualItemPatchPayload,
   SaldoMensualItemUpsertPayload,
@@ -57,6 +59,12 @@ export function useReiniciarStockMutation() {
 export function useSincronizarStockMutation() {
   return useMutation({
     mutationFn: (payload?: SincronizarStockPayload) => sincronizarStock(payload)
+  });
+}
+
+export function useRecalcularStockMutation() {
+  return useMutation({
+    mutationFn: (payload: RecalcularStockPayload) => recalcularStock(payload)
   });
 }
 

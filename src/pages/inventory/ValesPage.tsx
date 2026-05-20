@@ -16,6 +16,8 @@ import {
   useUpdateProductoMutation
 } from "@/features/productos/hooks/useProductos";
 import {
+  useAnulacionesValesQuery,
+  useAnularValeMutation,
   useCreateValeMutation,
   useEntregarValeMutation,
   useProductosPorUsuarioQuery,
@@ -72,10 +74,12 @@ export function ValesPage() {
   const funcionesGastoQuery = useFuncionesGastoQuery();
   const sectoresQuery = useSectoresQuery();
   const valesQuery = useValesQuery({ page: 1, limit: 200 });
+  const anulacionesQuery = useAnulacionesValesQuery(user?.role === "ADMIN");
   const resumenSolicitantesQuery = useResumenSolicitantesQuery(canUseFlow);
 
   const createValeMutation = useCreateValeMutation();
   const entregarValeMutation = useEntregarValeMutation();
+  const anularValeMutation = useAnularValeMutation();
   const updateProductoMutation = useUpdateProductoMutation();
   const registerMutation = useRegisterMutation();
   const createCuentaMutation = useCreateCuentaMutation();
@@ -96,6 +100,9 @@ export function ValesPage() {
     { id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
   ]);
   const [nextDraftItemId, setNextDraftItemId] = useState(2);
+  const [isAnularModalOpen, setIsAnularModalOpen] = useState(false);
+  const [anularValeId, setAnularValeId] = useState("");
+  const [anularMotivo, setAnularMotivo] = useState("");
 
   const productosPorUsuarioQuery = useProductosPorUsuarioQuery(
     historialUserId ? Number(historialUserId) : null,
@@ -109,6 +116,7 @@ export function ValesPage() {
   const funcionesGasto = funcionesGastoQuery.data?.data ?? [];
   const sectores = sectoresQuery.data?.data ?? [];
   const vales = valesQuery.data?.data ?? [];
+  const anulaciones = anulacionesQuery.data?.data ?? [];
 
   const usuarioOptions = useMemo(
     () =>
@@ -315,6 +323,44 @@ export function ValesPage() {
   function isCuentaContableMissingError(error: unknown) {
     const message = normalizeError(error, "").toLowerCase();
     return message.includes("cuenta contable");
+  }
+
+  function canAnularVale(estado: string) {
+    return estado === "APROBADO" || estado === "PARCIAL" || estado === "COMPLETADO";
+  }
+
+  function openAnularModal(valeId: string) {
+    setAnularValeId(valeId);
+    setAnularMotivo("");
+    setIsAnularModalOpen(true);
+  }
+
+  function handleConfirmAnularVale(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (user?.role !== "ADMIN") {
+      showError("Solo ADMIN puede anular vales en esta pantalla.");
+      return;
+    }
+    if (anularMotivo.trim().length < 5) {
+      showError("El motivo debe tener al menos 5 caracteres.");
+      return;
+    }
+    if (!anularValeId) {
+      showError("No se selecciono vale para anular.");
+      return;
+    }
+    anularValeMutation.mutate(
+      { id: anularValeId, payload: { motivo: anularMotivo.trim() } },
+      {
+        onSuccess: () => {
+          showSuccess("Vale anulado correctamente.");
+          setIsAnularModalOpen(false);
+          setAnularValeId("");
+          setAnularMotivo("");
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo anular el vale."))
+      }
+    );
   }
 
   async function handleCreateAndDeliverVale(event: FormEvent<HTMLFormElement>) {
@@ -744,6 +790,11 @@ export function ValesPage() {
                 <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                   Fecha
                 </th>
+                {user?.role === "ADMIN" ? (
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Accion
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
@@ -762,12 +813,29 @@ export function ValesPage() {
                   <td className="px-3 py-2 text-xs">
                     {vale.createdAt ? new Date(vale.createdAt).toLocaleString() : "-"}
                   </td>
+                  {user?.role === "ADMIN" ? (
+                    <td className="px-3 py-2 text-xs">
+                      {canAnularVale(vale.estado) ? (
+                        <button
+                          type="button"
+                          onClick={() => openAnularModal(vale.id)}
+                          className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+                        >
+                          Anular vale
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-[var(--color-on-surface-variant)]">
+                          No aplica
+                        </span>
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
               {valesRecientes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={user?.role === "ADMIN" ? 4 : 3}
                     className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                   >
                     Sin vales registrados.
@@ -778,6 +846,95 @@ export function ValesPage() {
           </table>
         </div>
       </article>
+
+      {user?.role === "ADMIN" ? (
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+          <h2 className="mb-4 text-lg font-bold">Auditoria de anulaciones</h2>
+          <div className="table-scroll overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Fecha anulacion
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Vale ID
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Solicitante
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Anulado por
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Motivo
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {anulaciones.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2 text-xs">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-xs font-mono">{item.vale?.id ?? "-"}</td>
+                    <td className="px-3 py-2 text-xs">{item.vale?.solicitante?.nombre ?? "-"}</td>
+                    <td className="px-3 py-2 text-xs">{item.usuario?.nombre ?? "-"}</td>
+                    <td className="px-3 py-2 text-xs">{item.motivo ?? "-"}</td>
+                  </tr>
+                ))}
+                {!anulaciones.length ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                    >
+                      Sin anulaciones registradas.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      ) : null}
+
+      {isAnularModalOpen && user?.role === "ADMIN" ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h3 className="text-lg font-bold">Anular vale</h3>
+            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+              Esta accion crea contra-asientos y devuelve stock automaticamente.
+            </p>
+            <form className="mt-3 space-y-3" onSubmit={handleConfirmAnularVale}>
+              <textarea
+                required
+                minLength={5}
+                value={anularMotivo}
+                onChange={(event) => setAnularMotivo(event.target.value)}
+                className={`${inputClassName} min-h-24`}
+                placeholder="Motivo de anulacion"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAnularModalOpen(false)}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={anularValeMutation.isPending}
+                  className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {anularValeMutation.isPending ? "Anulando..." : "Confirmar anulacion"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

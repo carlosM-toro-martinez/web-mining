@@ -2,6 +2,9 @@ import { getRequest, patchRequest, postRequest } from "@/shared/api/core/request
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   aprobarValePayloadSchema,
+  anulacionesListResponseSchema,
+  anularValePayloadSchema,
+  anularValeResponseSchema,
   createValePayloadSchema,
   entregarValePayloadSchema,
   entregarValeResponseSchema,
@@ -12,6 +15,7 @@ import {
   valesListResponseSchema,
   valeResponseSchema,
   type AprobarValePayload,
+  type AnularValePayload,
   type CreateValePayload,
   type EntregarValePayload,
   type ValesListParams
@@ -94,5 +98,21 @@ export async function rechazarVale(id: string, superintendenteId?: number) {
     url: apiEndpoints.vales.rechazar(id),
     body: superintendenteId ? { superintendenteId } : {},
     schema: valeResponseSchema
+  });
+}
+
+export async function anularVale(id: string, payload: AnularValePayload) {
+  const body = anularValePayloadSchema.parse(payload);
+  return patchRequest({
+    url: apiEndpoints.vales.anular(id),
+    body,
+    schema: anularValeResponseSchema
+  });
+}
+
+export async function getAnulacionesVales() {
+  return getRequest({
+    url: apiEndpoints.vales.anulaciones,
+    schema: anulacionesListResponseSchema
   });
 }

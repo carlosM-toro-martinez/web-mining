@@ -2,6 +2,7 @@ export const inventarioImportEndpoints = {
   catalogo: "/api/inventario-import/catalogo",
   stockInicial: "/api/inventario-import/stock-inicial",
   reiniciarStock: "/api/inventario-import/reiniciar-stock",
+  recalcularStock: "/api/inventario-import/recalcular-stock",
   sincronizarStock: "/api/inventario-import/sincronizar-stock",
   saldoMensual: "/api/inventario-import/saldo-mensual",
   saldoMensualItem: "/api/inventario-import/saldo-mensual/item",

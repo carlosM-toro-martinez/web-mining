@@ -26,6 +26,7 @@ import {
   useProductosQuery,
   useUpdateProductoMutation
 } from "@/features/productos/hooks/useProductos";
+import { useRecalcularStockMutation } from "@/features/inventario-import/hooks/useInventarioImport";
 import type { Producto } from "@/features/productos/model/producto.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -79,6 +80,7 @@ export function ProductsPage() {
 
   const createProductoMutation = useCreateProductoMutation();
   const updateProductoMutation = useUpdateProductoMutation();
+  const recalcularStockMutation = useRecalcularStockMutation();
 
   const grupos = categoriasQuery.data?.data ?? [];
   const subgruposPorGrupo = useMemo(
@@ -109,6 +111,10 @@ export function ProductsPage() {
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [rowCuentaSelection, setRowCuentaSelection] = useState<Record<number, string>>({});
+  const [isRecalcularModalOpen, setIsRecalcularModalOpen] = useState(false);
+  const [recalcularProductoId, setRecalcularProductoId] = useState("");
+  const [recalcularStockInicial, setRecalcularStockInicial] = useState("");
+  const [recalcularEliminarValeIds, setRecalcularEliminarValeIds] = useState("");
 
   const availableSubgrupos = grupoId ? (subgruposPorGrupo.get(Number(grupoId)) ?? []) : [];
   const filterSubgrupos = grupoDraft ? (subgruposPorGrupo.get(Number(grupoDraft)) ?? []) : [];
@@ -502,6 +508,49 @@ export function ProductsPage() {
       }
     );
   }
+
+  function openRecalcularModal() {
+    setIsRecalcularModalOpen(true);
+    setRecalcularProductoId("");
+    setRecalcularStockInicial("");
+    setRecalcularEliminarValeIds("");
+  }
+
+  function handleRecalcularStock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (user?.role !== "ADMIN") {
+      showError("Solo ADMIN puede usar esta correccion.");
+      return;
+    }
+    const productoId = Number(recalcularProductoId);
+    const stockInicial = Number(recalcularStockInicial);
+    if (!productoId || Number.isNaN(stockInicial) || stockInicial < 0) {
+      showError("Selecciona producto y stock inicial valido.");
+      return;
+    }
+    const eliminarValeIds = recalcularEliminarValeIds
+      .split(/[\s,;\n]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    recalcularStockMutation.mutate(
+      {
+        productoId,
+        stockInicial,
+        eliminarValeIds: eliminarValeIds.length ? eliminarValeIds : undefined
+      },
+      {
+        onSuccess: (response) => {
+          showSuccess(
+            `Recalculo aplicado. Stock final: ${response.data.stockFinal}. Movimientos recalculados: ${response.data.movimientosRecalculados}.`
+          );
+          setIsRecalcularModalOpen(false);
+        },
+        onError: (error) =>
+          showError(normalizeError(error, "No se pudo recalcular el stock del producto."))
+      }
+    );
+  }
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -523,6 +572,15 @@ export function ProductsPage() {
           </div>
 
           <div className="page-toolbar flex items-center gap-3">
+            {user?.role === "ADMIN" ? (
+              <button
+                type="button"
+                onClick={openRecalcularModal}
+                className="flex items-center gap-2 rounded-lg border border-[var(--color-error)]/55 px-4 py-2.5 text-sm font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+              >
+                Correccion historica
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={openImportDialog}
@@ -944,7 +1002,7 @@ export function ProductsPage() {
                   <tr>
                     <td
                       colSpan={9}
-                      className="px-4 py-6 text-center text-sm text-[var(--color-danger)]"
+                      className="px-4 py-6 text-center text-sm text-[var(--color-error)]"
                     >
                       No se pudo cargar productos. Revisa la respuesta del API/formato.
                     </td>
@@ -1119,6 +1177,78 @@ export function ProductsPage() {
               >
                 {createCategoriaMutation.isPending ? "Guardando..." : "Guardar categoria"}
               </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isRecalcularModalOpen && user?.role === "ADMIN" ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-2xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h3 className="text-lg font-bold">Recalcular stock historico</h3>
+            <p className="mt-1 text-xs text-[var(--color-error)]">
+              Esta accion modifica el historial de movimientos. Usar solo para correcciones.
+            </p>
+            <form className="mt-4 space-y-3" onSubmit={handleRecalcularStock}>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Producto
+                </label>
+                <select
+                  required
+                  value={recalcularProductoId}
+                  onChange={(event) => setRecalcularProductoId(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecciona producto</option>
+                  {products.map((producto) => (
+                    <option key={producto.id} value={producto.id}>
+                      {producto.codigo} - {producto.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Stock inicial corregido
+                </label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={recalcularStockInicial}
+                  onChange={(event) => setRecalcularStockInicial(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  IDs de vales a eliminar (opcional)
+                </label>
+                <textarea
+                  value={recalcularEliminarValeIds}
+                  onChange={(event) => setRecalcularEliminarValeIds(event.target.value)}
+                  className={`${inputClassName} min-h-24`}
+                  placeholder="uuid-1, uuid-2"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRecalcularModalOpen(false)}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={recalcularStockMutation.isPending}
+                  className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {recalcularStockMutation.isPending ? "Aplicando..." : "Aplicar correccion"}
+                </button>
+              </div>
             </form>
           </div>
         </div>

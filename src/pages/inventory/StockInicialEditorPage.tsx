@@ -33,7 +33,6 @@ export function StockInicialEditorPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedProductoId, setSelectedProductoId] = useState("");
 
-  const stockJson = useMemo(() => JSON.stringify(items, null, 2), [items]);
   const productoOptions = useMemo(
     () =>
       (productosQuery.data?.data ?? []).map((producto) => ({
@@ -177,11 +176,6 @@ export function StockInicialEditorPage() {
               </div>
             ))
           )}
-        </div>
-
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold">JSON generado</p>
-          <textarea value={stockJson} readOnly className={`${inputClassName} min-h-[220px] font-mono text-xs`} />
         </div>
 
         <div className="mt-4 flex gap-2">
