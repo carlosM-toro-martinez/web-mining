@@ -80,7 +80,7 @@ export function ComprasPage() {
   const pendingOfflineQuery = useInventoryOfflinePendingCount();
   const syncOfflineMutation = useSyncInventoryOfflineMutation();
 
-  const productosQuery = useProductosQuery({ page: 1, limit: 300, search: "" });
+  const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const [listPage, setListPage] = useState(1);
   const [listLimit] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState("");

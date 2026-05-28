@@ -72,7 +72,7 @@ export function EntregasPage() {
   const entregarValeMutation = useEntregarValeMutation();
   const resumenSolicitantesQuery = useResumenSolicitantesQuery(canApprove || canDeliver);
 
-  const productosQuery = useProductosQuery({ page: 1, limit: 300, search: "" });
+  const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const cuentasQuery = useCuentasQuery();
   const createSalidaMutation = useCreateSalidaManualMutation();
 

@@ -61,7 +61,7 @@ export function AccountingPage() {
   const funcionesQuery = useFuncionesGastoQuery();
   const sectoresQuery = useSectoresQuery();
   const cuentasQuery = useCuentasQuery();
-  const productosQuery = useProductosQuery({ page: 1, limit: 100, search: "" });
+  const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
 
   const createCentroMutation = useCreateCentroCostoMutation();
   const createFuncionMutation = useCreateFuncionGastoMutation();

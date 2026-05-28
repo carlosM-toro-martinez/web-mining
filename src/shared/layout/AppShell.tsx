@@ -23,6 +23,7 @@ import {
   RefreshCw,
   IdCard,
   PencilLine,
+  CalendarClock,
   Moon,
   Sun
 } from "lucide-react";
@@ -82,6 +83,7 @@ export function AppShell() {
       { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
       { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos" },
       { label: "Vales", icon: PackageCheck, to: "/inventario/vales" },
+      { label: "Vales históricos", icon: CalendarClock, to: "/inventario/vales-historicos" },
       { label: "Proveedores", icon: Building2, to: "/inventario/proveedores" },
       { label: "Stock", icon: Layers3, to: "/inventario/stock" },
       { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },

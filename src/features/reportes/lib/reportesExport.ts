@@ -23,6 +23,15 @@ function formatCellValue(value: string | number) {
   return value;
 }
 
+function formatInventoryDate(value: string) {
+  const midnightUtcMatch = /^(\d{4})-(\d{2})-(\d{2})T00:00:00(?:\.000)?Z$/.exec(value);
+  if (midnightUtcMatch) {
+    const [, year, month, day] = midnightUtcMatch;
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(value).toLocaleString("es-BO");
+}
+
 function monthLabelFromSubtitle(subtitle?: string) {
   if (!subtitle) return "CORRESPONDIENTE AL PERIODO SELECCIONADO";
   const clean = subtitle.replace(/^Correspondiente a:\s*/i, "").trim();
@@ -280,7 +289,7 @@ function legacyHeaders(tab: LegacyReportTab) {
 
 function legacyRow(item: LegacyReportItem, tab: LegacyReportTab) {
   const base = [
-    new Date(item.fecha).toLocaleString("es-BO"),
+    formatInventoryDate(item.fecha),
     item.tipo,
     item.productoNombre ?? "-",
     item.cantidad,

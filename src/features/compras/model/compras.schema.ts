@@ -44,6 +44,7 @@ export const compraSchema = z.object({
   usuarioRecibeId: numberLikeSchema.int().positive().optional().nullable(),
   estado: compraEstadoSchema,
   observacion: z.string().optional().nullable(),
+  fechaOperacion: z.string().optional().nullable(),
   createdAt: z.string().optional().nullable(),
   recibidoAt: z.string().optional().nullable(),
   proveedor: proveedorSchema.optional().nullable(),
@@ -81,6 +82,7 @@ export const recibirCompraResponseSchema = z.object({
 export const createCompraPayloadSchema = z.object({
   proveedorId: numberLikeSchema.int().positive("Proveedor invalido."),
   observacion: z.string().trim().optional(),
+  fechaOperacion: z.string().datetime().optional(),
   items: z
     .array(
       z.object({

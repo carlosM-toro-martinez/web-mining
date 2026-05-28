@@ -43,7 +43,7 @@ export function MovimientosAlmacenPage() {
     user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "SUPERINTENDENTE";
   const { showError, showSuccess } = useToast();
 
-  const productosQuery = useProductosQuery({ page: 1, limit: 300, search: "" });
+  const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const cuentasQuery = useCuentasQuery();
   const usersQuery = useUsersListQuery();
   const createSalidaMutation = useCreateSalidaManualMutation();

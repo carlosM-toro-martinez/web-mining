@@ -8,6 +8,7 @@ import { CategoriesPage } from "@/pages/inventory/CategoriesPage";
 import { ProductsPage } from "@/pages/inventory/ProductsPage";
 import { AccountingPage } from "@/pages/inventory/AccountingPage";
 import { ValesPage } from "@/pages/inventory/ValesPage";
+import { ValesHistoricosPage } from "@/pages/inventory/ValesHistoricosPage";
 import { EntregasPage } from "@/pages/inventory/EntregasPage";
 import { ComprasPage } from "@/pages/inventory/ComprasPage";
 import { ProveedoresPage } from "@/pages/inventory/ProveedoresPage";
@@ -171,6 +172,7 @@ export function AppRouter() {
           <Route element={<AlmaceneroRoute />}>
             <Route path="/inventario" element={<InventoryPage />} />
             <Route path="/inventario/vales" element={<ValesPage />} />
+            <Route path="/inventario/vales-historicos" element={<ValesHistoricosPage />} />
             <Route path="/inventario/compras" element={<ComprasPage />} />
             <Route path="/inventario/pedidos" element={<PedidosPage />} />
             <Route path="/inventario/importacion" element={<InventarioImportPage />} />

@@ -38,6 +38,7 @@ export const valeSchema = z.object({
   id: z.union([z.string().min(1), numberLikeSchema]).transform((value) => String(value)),
   solicitanteId: numberLikeSchema.int().positive().optional().nullable(),
   estado: valeEstadoSchema,
+  fechaOperacion: z.string().optional().nullable(),
   createdAt: z.string().optional().nullable(),
   aprobadoAt: z.string().optional().nullable(),
   entregadoAt: z.string().optional().nullable(),
@@ -145,6 +146,7 @@ export const entregarValeResponseSchema = z.object({
 
 export const createValePayloadSchema = z.object({
   solicitanteId: numberLikeSchema.int().positive("Solicitante invalido.").optional(),
+  fechaOperacion: z.string().datetime().optional(),
   items: z
     .array(
       z.object({
@@ -160,7 +162,8 @@ export const aprobarValePayloadSchema = z.object({
 });
 
 export const entregarValePayloadSchema = z.object({
-  cantidadesEntregadas: z.record(z.string(), numberLikeSchema.min(0))
+  cantidadesEntregadas: z.record(z.string(), numberLikeSchema.min(0)),
+  cuentaIds: z.record(z.string(), numberLikeSchema.int().positive()).optional()
 });
 
 export const anularValePayloadSchema = z.object({

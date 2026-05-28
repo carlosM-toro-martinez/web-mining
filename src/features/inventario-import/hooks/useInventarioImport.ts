@@ -1,8 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   deleteSaldoMensualById,
+  createCierreMes,
+  getCierresMes,
   getSaldoMensual,
   getSaldoMensualById,
+  inicializarPeriodoHistorico,
   importCatalogo,
   recalcularStock,
   reiniciarStock,
@@ -92,5 +95,25 @@ export function useUpdateSaldoMensualByIdMutation() {
 export function useDeleteSaldoMensualByIdMutation() {
   return useMutation({
     mutationFn: (id: string | number) => deleteSaldoMensualById(id)
+  });
+}
+
+export function useCierresMesQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["inventario-import", "cierre-mes"],
+    queryFn: () => getCierresMes(),
+    enabled
+  });
+}
+
+export function useCreateCierreMesMutation() {
+  return useMutation({
+    mutationFn: createCierreMes
+  });
+}
+
+export function useInicializarPeriodoHistoricoMutation() {
+  return useMutation({
+    mutationFn: inicializarPeriodoHistorico
   });
 }

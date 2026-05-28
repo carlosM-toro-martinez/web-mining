@@ -3,6 +3,10 @@ import { httpClient } from "@/shared/api/core/httpClient";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   importResultSchema,
+  cierreMesListResponseSchema,
+  cierreMesCreateResponseSchema,
+  cierreMesPayloadSchema,
+  inicializarPeriodoPayloadSchema,
   recalcularStockPayloadSchema,
   recalcularStockResponseSchema,
   reiniciarStockPayloadSchema,
@@ -22,7 +26,9 @@ import {
   type SaldoMensualPayload,
   type SaldoMensualQuery,
   type SincronizarStockPayload,
-  type StockInicialPayload
+  type StockInicialPayload,
+  type CierreMesPayload,
+  type InicializarPeriodoPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export async function importCatalogo(
@@ -124,5 +130,28 @@ export async function deleteSaldoMensualById(id: string | number) {
   return deleteRequest({
     url: apiEndpoints.inventarioImport.saldoMensualById(id),
     schema: saldoMensualDeleteResponseSchema
+  });
+}
+
+export async function getCierresMes() {
+  return getRequest({
+    url: apiEndpoints.inventarioImport.cierreMes,
+    schema: cierreMesListResponseSchema
+  });
+}
+
+export async function createCierreMes(payload: CierreMesPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.cierreMes,
+    body: cierreMesPayloadSchema.parse(payload),
+    schema: cierreMesCreateResponseSchema
+  });
+}
+
+export async function inicializarPeriodoHistorico(payload: InicializarPeriodoPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.saldoMensualInicializar,
+    body: inicializarPeriodoPayloadSchema.parse(payload),
+    schema: importResultSchema
   });
 }

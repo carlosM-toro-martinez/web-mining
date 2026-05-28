@@ -1,4 +1,4 @@
-import { getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
+import { getRequest, postRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   compraResponseSchema,
@@ -45,7 +45,7 @@ export async function getCompraById(id: string) {
 
 export async function recibirCompra(id: string, payload: RecibirCompraPayload) {
   const body = recibirCompraPayloadSchema.parse(payload);
-  return patchRequest({
+  return postRequest({
     url: apiEndpoints.compras.recibir(id),
     body,
     schema: recibirCompraResponseSchema

@@ -20,7 +20,10 @@ const binCardItemBaseSchema = z.object({
   usuarioNombre: z.string().optional().nullable(),
   referencia: z.string().optional().nullable(),
   referenciaId: z.union([z.string(), numberLikeSchema]).optional().nullable(),
-  productoNombre: z.string().optional().nullable()
+  productoNombre: z.string().optional().nullable(),
+  esRetroactivo: z.boolean().optional().nullable(),
+  periodoAnio: numberLikeSchema.int().optional().nullable(),
+  periodoMes: numberLikeSchema.int().min(1).max(12).optional().nullable()
 });
 
 export const binCardItemSchema = binCardItemBaseSchema;

@@ -72,7 +72,7 @@ export async function aprobarVale(id: string, payload: AprobarValePayload) {
 
 export async function entregarVale(id: string, payload: EntregarValePayload) {
   const body = entregarValePayloadSchema.parse(payload);
-  return patchRequest({
+  return postRequest({
     url: apiEndpoints.vales.entregar(id),
     body,
     schema: entregarValeResponseSchema

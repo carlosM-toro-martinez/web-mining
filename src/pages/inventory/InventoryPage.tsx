@@ -14,7 +14,8 @@ import {
   Settings,
   Truck,
   UploadCloud,
-  PencilLine
+  PencilLine,
+  CalendarClock
 } from "lucide-react";
 
 const cards = [
@@ -86,6 +87,13 @@ const cards = [
     description: "Control de vales de salida para consumo interno y trazabilidad.",
     to: "/inventario/vales",
     icon: PackageCheck,
+    available: true
+  },
+  {
+    title: "Vales históricos",
+    description: "Registro de vales con fecha de operación específica para periodos históricos.",
+    to: "/inventario/vales-historicos",
+    icon: CalendarClock,
     available: true
   },
   // {

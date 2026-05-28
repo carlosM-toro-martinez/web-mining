@@ -69,6 +69,27 @@ function isSaldoInicialReferencia(referencia: unknown) {
   return referencia.trim().toUpperCase() === "SALDO_INICIAL";
 }
 
+function formatInventoryDate(value: string) {
+  const midnightUtcMatch = /^(\d{4})-(\d{2})-(\d{2})T00:00:00(?:\.000)?Z$/.exec(value);
+  if (midnightUtcMatch) {
+    const [, year, month, day] = midnightUtcMatch;
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(value).toLocaleString();
+}
+
+function buildRetroactivoLabel(item: {
+  esRetroactivo?: boolean | null;
+  periodoAnio?: number | null;
+  periodoMes?: number | null;
+}) {
+  if (!item.esRetroactivo) return null;
+  if (item.periodoAnio && item.periodoMes) {
+    return `Retroactivo (${item.periodoMes}/${item.periodoAnio})`;
+  }
+  return "Retroactivo";
+}
+
 export function ReportesPage() {
   const { tipo } = useParams();
   const navigate = useNavigate();
@@ -81,22 +102,27 @@ export function ReportesPage() {
     return <Navigate to="/inventario/reportes/bin-card" replace />;
   }
 
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const defaultFechaInicio = `${currentYear}-01-01`;
+  const defaultFechaFin = today.toISOString().slice(0, 10);
+
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [productoIdDraft, setProductoIdDraft] = useState("");
-  const [dateModeDraft, setDateModeDraft] = useState<DateMode>("none");
+  const [dateModeDraft, setDateModeDraft] = useState<DateMode>("range");
   const [fechaDraft, setFechaDraft] = useState("");
-  const [fechaInicioDraft, setFechaInicioDraft] = useState("");
-  const [fechaFinDraft, setFechaFinDraft] = useState("");
+  const [fechaInicioDraft, setFechaInicioDraft] = useState(defaultFechaInicio);
+  const [fechaFinDraft, setFechaFinDraft] = useState(defaultFechaFin);
   const [dataModeDraft, setDataModeDraft] = useState<DataMode>("paged");
   const [productoId, setProductoId] = useState("");
-  const [dateMode, setDateMode] = useState<DateMode>("none");
+  const [dateMode, setDateMode] = useState<DateMode>("range");
   const [fecha, setFecha] = useState("");
-  const [fechaInicio, setFechaInicio] = useState("");
-  const [fechaFin, setFechaFin] = useState("");
+  const [fechaInicio, setFechaInicio] = useState(defaultFechaInicio);
+  const [fechaFin, setFechaFin] = useState(defaultFechaFin);
   const [dataMode, setDataMode] = useState<DataMode>("paged");
 
-  const productosQuery = useProductosQuery({ page: 1, limit: 1000, search: "" });
+  const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const productos = productosQuery.data?.data ?? [];
   const productoOptions = useMemo(
     () =>
@@ -220,16 +246,16 @@ export function ReportesPage() {
 
   function handleResetFilters() {
     setProductoIdDraft("");
-    setDateModeDraft("none");
+    setDateModeDraft("range");
     setFechaDraft("");
-    setFechaInicioDraft("");
-    setFechaFinDraft("");
+    setFechaInicioDraft(defaultFechaInicio);
+    setFechaFinDraft(defaultFechaFin);
     setDataModeDraft("paged");
     setProductoId("");
-    setDateMode("none");
+    setDateMode("range");
     setFecha("");
-    setFechaInicio("");
-    setFechaFin("");
+    setFechaInicio(defaultFechaInicio);
+    setFechaFin(defaultFechaFin);
     setDataMode("paged");
     setPage(1);
     setLimit(50);
@@ -567,11 +593,14 @@ export function ReportesPage() {
                   </tr>
                 ) : null}
                 {(dataMode === "all" ? legacyItems : pagedLegacyItems).map((item) => (
+                  // Highlight retroactive rows coming from closed-month operations.
                   <tr
                     key={item.id}
-                    className="transition hover:bg-[var(--color-surface-container-highest)]"
+                    className={`transition hover:bg-[var(--color-surface-container-highest)] ${
+                      item.esRetroactivo ? "italic bg-[var(--color-warning)]/10" : ""
+                    }`}
                   >
-                    <td className="px-3 py-2 text-xs">{new Date(item.fecha).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-xs">{formatInventoryDate(item.fecha)}</td>
                     <td className="px-3 py-2 text-xs">
                       <span
                         className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase ${
@@ -606,6 +635,11 @@ export function ReportesPage() {
                     <td className="px-3 py-2 text-xs">{item.usuarioNombre ?? "-"}</td>
                     <td className="px-3 py-2 text-xs">
                       {item.referencia ?? "-"} {item.referenciaId ? `(${item.referenciaId})` : ""}
+                      {buildRetroactivoLabel(item) ? (
+                        <span className="ml-1 rounded-full bg-[var(--color-warning)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-warning)] not-italic">
+                          {buildRetroactivoLabel(item)}
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
