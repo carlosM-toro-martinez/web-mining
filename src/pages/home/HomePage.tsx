@@ -22,19 +22,19 @@ export function HomePage() {
       description: "Vista general del sistema y estado operativo.",
       to: "/",
       icon: LayoutDashboard
-    },
+    }
     // {
     //   title: "Mapa",
     //   description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
     //   to: "/mapa",
     //   icon: Map
     // },
-    {
-      title: "Exploraciones",
-      description: "Registro de muestras geologicas en campo con soporte offline y sync.",
-      to: "/exploraciones",
-      icon: FlaskConical
-    }
+    // {
+    //   title: "Exploraciones",
+    //   description: "Registro de muestras geologicas en campo con soporte offline y sync.",
+    //   to: "/exploraciones",
+    //   icon: FlaskConical
+    // }
   ];
 
   if (isAdmin || isAlmacenero || isRecepcionista) {

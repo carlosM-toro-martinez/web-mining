@@ -57,13 +57,13 @@ export function AppShell() {
 
   const topNavItems = useMemo(() => {
     const items: NavItem[] = [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }];
-    if (isAdmin) {
-      items.push({ label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" });
-    }
+    // if (isAdmin) {
+    //   items.push({ label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" });
+    // }
     if (isAdmin || isAdministrador || isSuperintendente) {
       items.push({ label: "Personal", icon: IdCard, to: "/personal" });
     }
-    if (canManageUsers) {
+    if (isAdmin || isAdministrador || isSuperintendente) {
       items.push({
         label: "Exploraciones Data Room",
         icon: FlaskConical,
@@ -87,8 +87,7 @@ export function AppShell() {
       { label: "Proveedores", icon: Building2, to: "/inventario/proveedores" },
       { label: "Stock", icon: Layers3, to: "/inventario/stock" },
       { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },
-      { label: "Importación", icon: UploadCloud, to: "/inventario/importacion" }
-      ,
+      { label: "Importación", icon: UploadCloud, to: "/inventario/importacion" },
       { label: "Editar stock inicial", icon: PencilLine, to: "/inventario/stock-inicial-editar" }
     ];
     if (isAdmin) {
@@ -141,7 +140,7 @@ export function AppShell() {
   return (
     <div className="app-shell min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col bg-[var(--color-surface-container-low)] px-0 py-6 transition-all duration-300 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col overflow-y-auto bg-[var(--color-surface-container-low)] px-0 py-6 transition-all duration-300 lg:translate-x-0 ${
           isSidebarCollapsed ? "lg:w-20" : "lg:w-64"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
@@ -324,7 +323,9 @@ export function AppShell() {
             title={`Cambiar a modo ${mode === "dark" ? "claro" : "oscuro"}`}
           >
             {mode === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-            <span className="hidden sm:inline">{mode === "dark" ? "Modo claro" : "Modo oscuro"}</span>
+            <span className="hidden sm:inline">
+              {mode === "dark" ? "Modo claro" : "Modo oscuro"}
+            </span>
           </button>
         </div>
 

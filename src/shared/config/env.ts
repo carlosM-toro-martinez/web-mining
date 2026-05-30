@@ -9,7 +9,7 @@ const envSchema = z.object({
   VITE_BIOMETRIC_SYNC_USERS_URL: z
     .string()
     .url()
-    .default("http://api.marte.encuentrass.lat/iclock/sync-users")
+    .default("https://api.marte.encuentrass.lat/iclock/sync-users")
     .transform((value) => value.replace(/\/+$/, ""))
 });
 
