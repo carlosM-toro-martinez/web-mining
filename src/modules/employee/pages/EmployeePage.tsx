@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Download, PencilLine, RefreshCw, Trash2, Upload, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, PencilLine, RefreshCw, Trash2, Upload, UsersRound } from "lucide-react";
 import * as XLSX from "xlsx";
 import { EmployeeForm } from "@/modules/employee/components/EmployeeForm";
 import { useEmployees } from "@/modules/employee/hooks/useEmployees";
@@ -26,6 +26,8 @@ export function EmployeePage() {
   const [search, setSearch] = useState("");
   const [onlyActive, setOnlyActive] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
 
   const pendingCount = useMemo(
     () => employees.getAll.data.filter((employee) => employee.syncStatus === "PENDING").length,
@@ -39,11 +41,30 @@ export function EmployeePage() {
         !query ||
         employee.nombre.toLowerCase().includes(query) ||
         (employee.documento ?? "").toLowerCase().includes(query) ||
-        (employee.cargo ?? "").toLowerCase().includes(query);
+        (employee.cargo ?? "").toLowerCase().includes(query) ||
+        (employee.deviceUserId ?? "").toLowerCase().includes(query);
       const matchesActive = !onlyActive || employee.activo;
       return matchesSearch && matchesActive;
     });
   }, [employees.getAll.data, search, onlyActive]);
+
+  const total = filteredEmployees.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    return filteredEmployees.slice(start, start + limit);
+  }, [filteredEmployees, currentPage, limit]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, onlyActive]);
 
   async function handleCreate(values: {
     nombre: string;
@@ -370,7 +391,7 @@ export function EmployeePage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
-                placeholder="Buscar nombre/documento/cargo"
+                placeholder="Buscar nombre/documento/cargo/userId"
               />
               <label className="text-xs">
                 <input
@@ -434,7 +455,7 @@ export function EmployeePage() {
                   </tr>
                 ) : null}
 
-                {filteredEmployees.map((employee) => (
+                {paginatedEmployees.map((employee) => (
                   <tr key={employee.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                     <td className="px-4 py-3 text-sm">{employee.nombre}</td>
                     <td className="px-4 py-3 text-xs">{employee.documento ?? "-"}</td>
@@ -555,6 +576,29 @@ export function EmployeePage() {
                   <p key={`${item.employeeId}-${item.deviceUserId}`}>{item.nombre} ({item.deviceUserId})</p>
                 ))}
               </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]/55 px-5 py-3">
+            <span className="text-xs text-[var(--color-on-surface-variant)]">
+              {`Pagina ${currentPage} de ${totalPages}`}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => (current > 1 ? current - 1 : current))}
+                disabled={currentPage <= 1}
+                className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)] disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((current) => (current < totalPages ? current + 1 : current))}
+                disabled={currentPage >= totalPages}
+                className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)] disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
           </div>
         </article>

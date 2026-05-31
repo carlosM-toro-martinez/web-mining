@@ -58,13 +58,35 @@ function toEmployeeRecord(item: EmployeeApiItem): EmployeeRecord {
 }
 
 async function fetchEmployeesFromApi() {
-  const response = await httpClient.get("/api/employees", {
-    params: { page: 1, limit: 200 }
-  });
-  const payload = response.data as {
-    data?: EmployeeApiItem[];
-  };
-  return payload.data ?? [];
+  const limit = 500;
+  const employees: EmployeeApiItem[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const response = await httpClient.get("/api/employees", {
+      params: { page, limit }
+    });
+    const payload = response.data as {
+      data?: EmployeeApiItem[];
+      pagination?: {
+        page?: number;
+        totalPages?: number;
+      };
+    };
+    const currentBatch = payload.data ?? [];
+    employees.push(...currentBatch);
+
+    const totalPages = payload.pagination?.totalPages ?? 0;
+    if (totalPages > 0) {
+      hasMore = page < totalPages;
+    } else {
+      hasMore = currentBatch.length === limit;
+    }
+    page += 1;
+  }
+
+  return employees;
 }
 
 async function syncLocalEmployees(apiEmployees: EmployeeApiItem[]) {
