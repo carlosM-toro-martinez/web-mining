@@ -61,13 +61,13 @@ export function AppShell() {
     // if (isAdmin) {
     //   items.push({ label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" });
     // }
-    if (isAdmin || isAdministrador || isSuperintendente) {
-      items.push({
-        label: "Exploraciones Data Room",
-        icon: FlaskConical,
-        to: "/exploraciones-data-room"
-      });
-    }
+    // if (isAdmin || isAdministrador || isSuperintendente) {
+    //   items.push({
+    //     label: "Exploraciones Data Room",
+    //     icon: FlaskConical,
+    //     to: "/exploraciones-data-room"
+    //   });
+    // }
     if (canManageUsers) {
       items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
