@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useEmployees } from "@/modules/employee/hooks/useEmployees";
@@ -12,6 +12,16 @@ interface ReportDay {
   estado: string;
   minutosRetraso: number;
   real?: { entrada?: string; salida?: string } | null;
+}
+
+function getEstadoBadgeClass(estado: string) {
+  const normalized = estado.trim().toUpperCase();
+  if (normalized === "PUNTUAL") return "bg-emerald-500/12 text-emerald-600";
+  if (normalized === "TARDE") return "bg-amber-500/14 text-amber-600";
+  if (normalized === "ABANDONO") return "bg-red-500/14 text-red-600";
+  if (normalized === "AUSENTE") return "bg-rose-500/14 text-rose-600";
+  if (normalized === "VACACION" || normalized === "DESCANSO" || normalized === "PERMISO") return "bg-sky-500/14 text-sky-600";
+  return "bg-[var(--color-tertiary)]/12 text-[var(--color-tertiary)]";
 }
 
 interface ReportEmployee {
@@ -52,23 +62,244 @@ export function PersonalReportPage() {
 
   async function handleExportExcel() {
     try {
-      const rows = (reportQuery.data ?? []).flatMap((entry) =>
-        entry.dias.map((day) => ({
-          Empleado: entry.empleado.nombre,
-          Cargo: entry.empleado.cargo ?? "-",
-          Horario: entry.horarioActual?.nombre ?? "Sin horario",
-          Fecha: day.fecha,
-          Estado: day.estado,
-          Entrada: day.real?.entrada ?? "-",
-          Salida: day.real?.salida ?? "-",
-          "Min. Retraso": day.minutosRetraso
-        }))
-      );
+      const entries = reportQuery.data ?? [];
+      const fromDate = desde ? new Date(`${desde}T00:00:00`) : null;
+      const toDate = hasta ? new Date(`${hasta}T00:00:00`) : null;
+      const daysInRange =
+        fromDate && toDate
+          ? Math.max(
+              1,
+              Math.floor((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+            )
+          : 31;
+      const daysCount = Math.min(31, daysInRange);
+
+      const title = `LIBRO RAYADOR DE MITAS (${desde || "sin-desde"} a ${hasta || "sin-hasta"})`;
+      const headerTop = ["No.", "de", "Nombre y apellido", "Ocupación", "Jornal", ...Array.from({ length: daysCount }, (_, i) => i + 1)];
+      const headerBottom = ["", "Cod.", "", "", "Basico", ...Array.from({ length: daysCount }, (_, i) => {
+        if (!fromDate) return "";
+        const d = new Date(fromDate);
+        d.setDate(d.getDate() + i);
+        return ["D", "L", "M", "M", "J", "V", "S"][d.getDay()] ?? "";
+      })];
+
+      const detailRows = entries.flatMap((entry, index) => {
+        const marks = Array.from({ length: daysCount }, () => "");
+        let presentDays = 0;
+        for (const day of entry.dias) {
+          if (!fromDate) continue;
+          const current = new Date(`${day.fecha}T00:00:00`);
+          const position = Math.floor((current.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (position < 0 || position >= daysCount) continue;
+          const status = day.estado.toUpperCase();
+          if (status === "PUNTUAL" || status === "TARDE" || status === "ENTRADA" || status === "SALIDA") {
+            marks[position] = "1";
+            presentDays += 1;
+          } else if (status === "AUSENTE") {
+            marks[position] = "A";
+          } else if (status === "VACACION") {
+            marks[position] = "V";
+          } else if (status === "ABANDONO") {
+            marks[position] = "AB";
+          } else if (status === "DESCANSO") {
+            marks[position] = "D";
+          } else {
+            marks[position] = "";
+          }
+        }
+
+        const rowMain = [
+          index + 1,
+          String(entry.empleado.id ?? ""),
+          entry.empleado.nombre,
+          entry.empleado.cargo ?? "",
+          "",
+          ...Array.from({ length: daysCount }, () => "")
+        ];
+        const rowSalary = [
+          "",
+          "",
+          "",
+          "",
+          "",
+          ...Array.from({ length: daysCount }, () => "")
+        ];
+        const rowMarks = [
+          "",
+          "",
+          "",
+          "",
+          "",
+          ...marks
+        ];
+        const rowSummary = [
+          "",
+          "",
+          "",
+          "Días trabajados",
+          presentDays,
+          ...Array.from({ length: daysCount }, () => "")
+        ];
+        return [rowMain, rowSalary, rowMarks, rowSummary];
+      });
+
+      const totalPresent = entries.reduce((acc, entry) => {
+        return (
+          acc +
+          entry.dias.filter((day) => {
+            const status = day.estado.toUpperCase();
+            return status === "PUNTUAL" || status === "TARDE" || status === "ENTRADA" || status === "SALIDA";
+          }).length
+        );
+      }, 0);
+
+      const summaryRow = ["", "", "RESUMEN GENERAL", "", totalPresent, ...Array.from({ length: daysCount }, () => "")];
+
+      const aoa = [
+        [title],
+        ["PERSONAL TECNICO Y EMPLEADOS"],
+        [],
+        headerTop,
+        headerBottom,
+        ...detailRows,
+        [],
+        summaryRow
+      ];
+
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rows);
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 + daysCount } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 + daysCount } }
+      ];
+      ws["!cols"] = [
+        { wch: 6 },
+        { wch: 8 },
+        { wch: 34 },
+        { wch: 24 },
+        { wch: 12 },
+        ...Array.from({ length: daysCount }, () => ({ wch: 4 }))
+      ];
+      ws["!rows"] = [
+        { hpt: 28 },
+        { hpt: 22 },
+        { hpt: 8 },
+        { hpt: 22 },
+        { hpt: 20 },
+        ...Array.from({ length: detailRows.length }, () => ({ hpt: 19 })),
+        { hpt: 10 },
+        { hpt: 22 }
+      ];
+
+      const totalCols = 5 + daysCount;
+      const thinBorder = {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      };
+      const mediumBorder = {
+        top: { style: "medium", color: { rgb: "000000" } },
+        bottom: { style: "medium", color: { rgb: "000000" } },
+        left: { style: "medium", color: { rgb: "000000" } },
+        right: { style: "medium", color: { rgb: "000000" } }
+      };
+      const titleFill = { patternType: "solid", fgColor: { rgb: "F2F2F2" } };
+      const headerFill = { patternType: "solid", fgColor: { rgb: "BDD7EE" } };
+      const groupFill = { patternType: "solid", fgColor: { rgb: "EAF2FB" } };
+      const summaryFill = { patternType: "solid", fgColor: { rgb: "D9EAD3" } };
+
+      function cellAddress(row: number, col: number) {
+        return XLSX.utils.encode_cell({ r: row, c: col });
+      }
+
+      function applyStyle(row: number, col: number, style: Record<string, unknown>) {
+        const addr = cellAddress(row, col);
+        const cell = ws[addr];
+        if (!cell) return;
+        (cell as { s?: Record<string, unknown> }).s = {
+          ...(cell as { s?: Record<string, unknown> }).s,
+          ...style
+        };
+      }
+
+      function styleRow(row: number, style: Record<string, unknown>) {
+        for (let c = 0; c <= totalCols; c += 1) {
+          applyStyle(row, c, style);
+        }
+      }
+
+      // Title + subtitle
+      styleRow(0, {
+        font: { bold: true, sz: 14, name: "Calibri" },
+        fill: titleFill,
+        border: mediumBorder,
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRow(1, {
+        font: { bold: true, sz: 11, name: "Calibri" },
+        fill: titleFill,
+        border: mediumBorder,
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // Table headers
+      styleRow(3, {
+        font: { bold: true, name: "Calibri" },
+        fill: headerFill,
+        border: thinBorder,
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+      styleRow(4, {
+        font: { bold: true, name: "Calibri" },
+        fill: headerFill,
+        border: thinBorder,
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // Body borders
+      for (let r = 5; r <= aoa.length - 1; r += 1) {
+        styleRow(r, {
+          border: thinBorder,
+          font: { name: "Calibri", sz: 10 },
+          alignment: { vertical: "center" }
+        });
+      }
+
+      for (let r = 5; r < 5 + detailRows.length; r += 4) {
+        styleRow(r, { fill: groupFill, font: { name: "Calibri", sz: 10, bold: true } });
+        styleRow(r + 3, { fill: groupFill, font: { name: "Calibri", sz: 10, bold: true } });
+      }
+
+      styleRow(aoa.length - 1, {
+        fill: summaryFill,
+        font: { name: "Calibri", sz: 10, bold: true },
+        border: mediumBorder,
+        alignment: { horizontal: "center", vertical: "center" }
+      });
+
+      // Align key columns
+      for (let r = 5; r <= aoa.length - 1; r += 1) {
+        applyStyle(r, 0, { alignment: { horizontal: "center", vertical: "center" } });
+        applyStyle(r, 1, { alignment: { horizontal: "center", vertical: "center" } });
+        applyStyle(r, 2, { alignment: { horizontal: "left", vertical: "center" } });
+        applyStyle(r, 3, { alignment: { horizontal: "left", vertical: "center" } });
+        applyStyle(r, 4, { alignment: { horizontal: "center", vertical: "center" } });
+      }
+
+      // Outer border around main table area
+      for (let c = 0; c <= totalCols; c += 1) {
+        applyStyle(3, c, { border: { ...thinBorder, top: { style: "medium", color: { rgb: "000000" } } } });
+        applyStyle(aoa.length - 1, c, { border: { ...thinBorder, bottom: { style: "medium", color: { rgb: "000000" } } } });
+      }
+      for (let r = 3; r <= aoa.length - 1; r += 1) {
+        applyStyle(r, 0, { border: { ...thinBorder, left: { style: "medium", color: { rgb: "000000" } } } });
+        applyStyle(r, totalCols, { border: { ...thinBorder, right: { style: "medium", color: { rgb: "000000" } } } });
+      }
+
       XLSX.utils.book_append_sheet(wb, ws, "reporte-asistencia");
       XLSX.writeFile(wb, `reporte-asistencia-${desde || "sin-desde"}-${hasta || "sin-hasta"}.xlsx`);
-      showSuccess(`Excel generado con ${rows.length} filas.`);
+      showSuccess(`Excel generado con ${entries.length} trabajadores.`);
     } catch (error) {
       showError(error instanceof Error ? error.message : "No se pudo exportar el reporte.");
     }
@@ -115,7 +346,11 @@ export function PersonalReportPage() {
                     {entry.dias.map((day) => (
                       <tr key={`${entry.empleado.id}-${day.fecha}`} className="border-t border-[var(--color-border-soft)]">
                         <td className="px-2 py-1 text-xs font-mono">{day.fecha}</td>
-                        <td className="px-2 py-1 text-xs"><span className="rounded-full bg-[var(--color-tertiary)]/12 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-tertiary)]">{day.estado}</span></td>
+                        <td className="px-2 py-1 text-xs">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${getEstadoBadgeClass(day.estado)}`}>
+                            {day.estado}
+                          </span>
+                        </td>
                         <td className="px-2 py-1 text-xs font-mono">{day.real?.entrada ?? "-"}</td>
                         <td className="px-2 py-1 text-xs font-mono">{day.real?.salida ?? "-"}</td>
                         <td className="px-2 py-1 text-xs">{day.minutosRetraso}</td>

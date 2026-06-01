@@ -17,7 +17,7 @@ interface AbsenceItem {
   employee?: { id: number; nombre: string; cargo?: string | null } | null;
 }
 
-const tipos = ["VACACION", "DESCANSO", "PERMISO", "ENFERMEDAD", "FERIADO", "OTRO"];
+const tipos = ["VACACION", "DESCANSO", "PERMISO", "ENFERMEDAD", "FERIADO", "ABANDONO", "OTRO"];
 
 export function PersonalAbsencesPage() {
   const { showError, showSuccess } = useToast();
