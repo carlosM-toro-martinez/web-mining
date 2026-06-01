@@ -227,7 +227,7 @@ export function useEmployees() {
     queryKey: [...queryKeys.employees.all, "attendance"],
     queryFn: async () => {
       const response = await httpClient.get("/api/biometric/attendance", {
-        params: { page: 1, limit: 50 }
+        params: { page: 1, limit: 150 }
       });
       const payload = response.data as { data?: AttendanceItem[] };
       return payload.data ?? [];

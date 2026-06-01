@@ -156,7 +156,7 @@ export function EmployeePage() {
         <div className="flex items-center justify-between border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-5 py-3">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Lista de empleados</h2>
-            <span className="text-xs text-[var(--color-on-surface-variant)]">Pendientes de sync: {pendingCount}</span>
+            <span className="text-xs text-[var(--color-on-surface-variant)]">Pendientes de sync: {pendingCount} | Registros: {filteredEmployees.length} de {employees.getAll.data.length}</span>
           </div>
           <div className="flex items-center gap-2">
             <input value={search} onChange={(event) => setSearch(event.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" placeholder="Buscar nombre/documento/cargo/userId" />

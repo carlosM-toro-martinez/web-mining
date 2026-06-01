@@ -15,7 +15,7 @@ export function PersonalReportsPage() {
   const [reportEmpleadoId, setReportEmpleadoId] = useState("");
   const [reportTipo, setReportTipo] = useState("");
   const [reportPage, setReportPage] = useState(1);
-  const [reportLimit] = useState(50);
+  const [reportLimit] = useState(150);
 
   const attendanceReportQuery = useQuery({
     queryKey: ["employee-attendance-report", reportDesde, reportHasta, reportEmpleadoId, reportTipo, reportPage, reportLimit],
@@ -32,13 +32,14 @@ export function PersonalReportsPage() {
       });
       const payload = response.data as {
         data?: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }>;
-        meta?: { page?: number; totalPages?: number };
+        meta?: { total?: number; page?: number; totalPages?: number };
       };
-      return { data: payload.data ?? [], meta: payload.meta ?? { page: 1, totalPages: 1 } };
+      return { data: payload.data ?? [], meta: payload.meta ?? { total: 0, page: 1, totalPages: 1 } };
     }
   });
 
   const totalPages = useMemo(() => Math.max(1, attendanceReportQuery.data?.meta.totalPages ?? 1), [attendanceReportQuery.data]);
+  const totalRecords = useMemo(() => attendanceReportQuery.data?.meta.total ?? 0, [attendanceReportQuery.data]);
   const syncAttendanceMutation = useMutation({
     mutationFn: async () => {
       await httpClient.post("/api/biometric/sync-attendance");
@@ -78,6 +79,9 @@ export function PersonalReportsPage() {
       </header>
 
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] shadow-2xl">
+        <div className="border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-5 py-2">
+          <span className="text-xs text-[var(--color-on-surface-variant)]">Registros totales: {totalRecords}</span>
+        </div>
         <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
           <input type="date" value={reportDesde} onChange={(e) => { setReportDesde(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
           <input type="date" value={reportHasta} onChange={(e) => { setReportHasta(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
