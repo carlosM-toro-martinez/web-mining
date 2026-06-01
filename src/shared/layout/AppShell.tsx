@@ -98,7 +98,11 @@ export function AppShell() {
     if (!(isAdmin || isAdministrador || isSuperintendente)) return [];
     return [
       { label: "Personal", icon: IdCard, to: "/personal/empleados" },
-      { label: "Reportes", icon: FileBarChart2, to: "/personal/reportes" }
+      { label: "Reportes", icon: FileBarChart2, to: "/personal/reportes" },
+      { label: "Horarios", icon: CalendarClock, to: "/personal/horarios" },
+      { label: "Asignaciones", icon: ClipboardList, to: "/personal/asignaciones" },
+      { label: "Ausencias", icon: RefreshCw, to: "/personal/ausencias" },
+      { label: "Reporte", icon: FileBarChart2, to: "/personal/reporte" }
     ] as NavItem[];
   }, [isAdmin, isAdministrador, isSuperintendente]);
 

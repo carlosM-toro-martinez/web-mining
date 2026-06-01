@@ -12,14 +12,13 @@ export function PersonalReportsPage() {
   const queryClient = useQueryClient();
   const [reportDesde, setReportDesde] = useState("");
   const [reportHasta, setReportHasta] = useState("");
-  const [reportEmpleadoId, setReportEmpleadoId] = useState("");
-  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeLocalSearch, setEmployeeLocalSearch] = useState("");
   const [reportTipo, setReportTipo] = useState("");
   const [reportPage, setReportPage] = useState(1);
   const [reportLimit] = useState(150);
 
   const attendanceReportQuery = useQuery({
-    queryKey: ["employee-attendance-report", reportDesde, reportHasta, reportEmpleadoId, reportTipo, reportPage, reportLimit],
+    queryKey: ["employee-attendance-report", reportDesde, reportHasta, reportTipo, reportPage, reportLimit],
     queryFn: async () => {
       const response = await httpClient.get("/api/biometric/attendance", {
         params: {
@@ -27,7 +26,6 @@ export function PersonalReportsPage() {
           limit: reportLimit,
           desde: reportDesde || undefined,
           hasta: reportHasta || undefined,
-          empleadoId: reportEmpleadoId || undefined,
           tipo: reportTipo || undefined
         }
       });
@@ -41,11 +39,14 @@ export function PersonalReportsPage() {
 
   const totalPages = useMemo(() => Math.max(1, attendanceReportQuery.data?.meta.totalPages ?? 1), [attendanceReportQuery.data]);
   const totalRecords = useMemo(() => attendanceReportQuery.data?.meta.total ?? 0, [attendanceReportQuery.data]);
-  const employeesLookup = useMemo(() => {
-    return new Map(
-      employees.getAll.data.map((employee) => [String(employee.id), employee])
+  const locallyFilteredRows = useMemo(() => {
+    const rows = attendanceReportQuery.data?.data ?? [];
+    const query = employeeLocalSearch.trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((row) =>
+      `${row.empleado?.nombre ?? ""} ${row.deviceUserId ?? ""}`.toLowerCase().includes(query)
     );
-  }, [employees.getAll.data]);
+  }, [attendanceReportQuery.data?.data, employeeLocalSearch]);
   const syncAttendanceMutation = useMutation({
     mutationFn: async () => {
       await httpClient.post("/api/biometric/sync-attendance");
@@ -91,35 +92,12 @@ export function PersonalReportsPage() {
         <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
           <input type="date" value={reportDesde} onChange={(e) => { setReportDesde(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
           <input type="date" value={reportHasta} onChange={(e) => { setReportHasta(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
-          <div>
-            <input
-              list="employees-report-list"
-              value={employeeSearch}
-              onChange={(e) => {
-                const value = e.target.value;
-                setEmployeeSearch(value);
-                const selected = value.match(/^#(\d+)\s-\s/);
-                if (selected) {
-                  setReportEmpleadoId(selected[1] ?? "");
-                } else {
-                  setReportEmpleadoId("");
-                }
-                setReportPage(1);
-              }}
-              placeholder="Buscar empleado (#id - nombre)"
-              className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
-            />
-            <datalist id="employees-report-list">
-              {employees.getAll.data.map((employee) => (
-                <option
-                  key={employee.id}
-                  value={`#${employee.id} - ${employee.nombre}`}
-                >
-                  {`${employee.documento ?? "-"} | ${employee.cargo ?? "-"} | ${employee.deviceUserId ?? "-"}`}
-                </option>
-              ))}
-            </datalist>
-          </div>
+          <input
+            value={employeeLocalSearch}
+            onChange={(e) => setEmployeeLocalSearch(e.target.value)}
+            placeholder="Buscar empleado (filtro local)"
+            className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
+          />
           <select value={reportTipo} onChange={(e) => { setReportTipo(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs">
             <option value="">Todos los tipos</option>
             <option value="ENTRADA">ENTRADA</option>
@@ -135,16 +113,14 @@ export function PersonalReportsPage() {
             <thead><tr><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Empleado</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th></tr></thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {attendanceReportQuery.isLoading ? <tr><td colSpan={4} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Cargando reporte...</td></tr> : null}
-              {!attendanceReportQuery.isLoading && attendanceReportQuery.data?.data.length === 0 ? <tr><td colSpan={4} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Sin registros para esos filtros.</td></tr> : null}
-              {attendanceReportQuery.data?.data.map((item) => <tr key={String(item.id)}><td className="px-3 py-2 text-xs font-mono">{item.fecha}</td><td className="px-3 py-2 text-xs">{item.tipo}</td><td className="px-3 py-2 text-xs">{item.empleado?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs font-mono">{item.deviceUserId ?? "-"}</td></tr>)}
+              {!attendanceReportQuery.isLoading && locallyFilteredRows.length === 0 ? <tr><td colSpan={4} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Sin registros para esos filtros.</td></tr> : null}
+              {locallyFilteredRows.map((item) => <tr key={String(item.id)}><td className="px-3 py-2 text-xs font-mono">{item.fecha}</td><td className="px-3 py-2 text-xs">{item.tipo}</td><td className="px-3 py-2 text-xs">{item.empleado?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs font-mono">{item.deviceUserId ?? "-"}</td></tr>)}
             </tbody>
           </table>
         </div>
         <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]/55 px-5 py-3">
           <span className="text-xs text-[var(--color-on-surface-variant)]">
-            {`Pagina ${reportPage} de ${totalPages} | Empleado: ${
-              reportEmpleadoId ? employeesLookup.get(reportEmpleadoId)?.nombre ?? `#${reportEmpleadoId}` : "Todos"
-            }`}
+            {`Pagina ${reportPage} de ${totalPages} | Mostrando: ${locallyFilteredRows.length} (filtro local)`}
           </span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setReportPage((current) => (current > 1 ? current - 1 : current))} disabled={reportPage <= 1} className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"><ChevronLeft size={16} /></button>

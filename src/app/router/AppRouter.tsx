@@ -33,6 +33,10 @@ import { ExploracionesFormsPage } from "@/pages/exploraciones/ExploracionesForms
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
 import { PersonalHomePage } from "@/modules/employee/pages/PersonalHomePage";
 import { PersonalReportsPage } from "@/modules/employee/pages/PersonalReportsPage";
+import { PersonalSchedulesPage } from "@/modules/employee/pages/PersonalSchedulesPage";
+import { PersonalAssignmentsPage } from "@/modules/employee/pages/PersonalAssignmentsPage";
+import { PersonalAbsencesPage } from "@/modules/employee/pages/PersonalAbsencesPage";
+import { PersonalReportPage } from "@/modules/employee/pages/PersonalReportPage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
@@ -166,6 +170,10 @@ export function AppRouter() {
             <Route path="/personal" element={<PersonalHomePage />} />
             <Route path="/personal/empleados" element={<EmployeePage />} />
             <Route path="/personal/reportes" element={<PersonalReportsPage />} />
+            <Route path="/personal/horarios" element={<PersonalSchedulesPage />} />
+            <Route path="/personal/asignaciones" element={<PersonalAssignmentsPage />} />
+            <Route path="/personal/ausencias" element={<PersonalAbsencesPage />} />
+            <Route path="/personal/reporte" element={<PersonalReportPage />} />
           </Route>
           <Route path="/exploraciones/elementos" element={<ExploracionesElementosPage />} />
           <Route path="/exploraciones/reportes" element={<ExploracionesReportesPage />} />

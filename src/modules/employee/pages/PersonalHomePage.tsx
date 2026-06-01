@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ClipboardList, UsersRound, Clock3 } from "lucide-react";
+import { ClipboardList, UsersRound, Clock3, CalendarDays, UserCog, FileBarChart2 } from "lucide-react";
 
 const cards = [
   {
@@ -13,6 +13,30 @@ const cards = [
     description: "Asistencia filtrada por fecha, empleado y tipo con paginación.",
     to: "/personal/reportes",
     icon: ClipboardList
+  },
+  {
+    title: "Horarios",
+    description: "Configura turnos, tolerancia y días laborales.",
+    to: "/personal/horarios",
+    icon: CalendarDays
+  },
+  {
+    title: "Asignaciones",
+    description: "Asigna horarios a empleados y consulta historial.",
+    to: "/personal/asignaciones",
+    icon: UserCog
+  },
+  {
+    title: "Ausencias",
+    description: "Vacaciones, permisos y demás ausencias por empleado.",
+    to: "/personal/ausencias",
+    icon: Clock3
+  },
+  {
+    title: "Reporte Asistencia",
+    description: "Comparación de marcajes versus horario asignado.",
+    to: "/personal/reporte",
+    icon: FileBarChart2
   },
   {
     title: "Pendientes",
