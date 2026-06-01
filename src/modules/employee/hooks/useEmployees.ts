@@ -67,33 +67,24 @@ async function fetchEmployeesFromApi() {
 }
 
 async function syncLocalEmployees(apiEmployees: EmployeeApiItem[]) {
+  // Keep local IndexedDB in strict sync with backend response.
+  // This avoids cross-browser count drift from stale/extra records.
   if (apiEmployees.length === 0) {
     await employeeDb.employees.clear();
     return [];
   }
 
-  const normalized = apiEmployees.map(toEmployeeRecord);
-  const local = await employeeDb.employees.toArray();
-  const byRemoteId = new Map(
-    local.filter((item) => item.remoteId !== undefined).map((item) => [String(item.remoteId), item])
-  );
-
-  for (const employee of normalized) {
-    const existing = byRemoteId.get(String(employee.remoteId));
-    if (existing?.id) {
-      await employeeDb.employees.update(existing.id, {
-        nombre: employee.nombre,
-        documento: employee.documento,
-        cargo: employee.cargo,
-        deviceUserId: employee.deviceUserId,
-        activo: employee.activo,
-        syncStatus: employee.syncStatus,
-        updatedAt: new Date().toISOString()
-      });
-      continue;
-    }
-    await employeeDb.employees.add(employee);
+  const dedupedByRemoteId = new Map<string, EmployeeRecord>();
+  for (const item of apiEmployees) {
+    const record = toEmployeeRecord(item);
+    dedupedByRemoteId.set(String(record.remoteId), record);
   }
+  const normalized = Array.from(dedupedByRemoteId.values());
+
+  await employeeDb.transaction("rw", employeeDb.employees, async () => {
+    await employeeDb.employees.clear();
+    await employeeDb.employees.bulkAdd(normalized);
+  });
 
   return employeeDb.employees.orderBy("updatedAt").reverse().toArray();
 }

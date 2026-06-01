@@ -13,6 +13,7 @@ export function PersonalReportsPage() {
   const [reportDesde, setReportDesde] = useState("");
   const [reportHasta, setReportHasta] = useState("");
   const [reportEmpleadoId, setReportEmpleadoId] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [reportTipo, setReportTipo] = useState("");
   const [reportPage, setReportPage] = useState(1);
   const [reportLimit] = useState(150);
@@ -40,6 +41,11 @@ export function PersonalReportsPage() {
 
   const totalPages = useMemo(() => Math.max(1, attendanceReportQuery.data?.meta.totalPages ?? 1), [attendanceReportQuery.data]);
   const totalRecords = useMemo(() => attendanceReportQuery.data?.meta.total ?? 0, [attendanceReportQuery.data]);
+  const employeesLookup = useMemo(() => {
+    return new Map(
+      employees.getAll.data.map((employee) => [String(employee.id), employee])
+    );
+  }, [employees.getAll.data]);
   const syncAttendanceMutation = useMutation({
     mutationFn: async () => {
       await httpClient.post("/api/biometric/sync-attendance");
@@ -85,10 +91,35 @@ export function PersonalReportsPage() {
         <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
           <input type="date" value={reportDesde} onChange={(e) => { setReportDesde(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
           <input type="date" value={reportHasta} onChange={(e) => { setReportHasta(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
-          <select value={reportEmpleadoId} onChange={(e) => { setReportEmpleadoId(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs">
-            <option value="">Todos los empleados</option>
-            {employees.getAll.data.map((employee) => <option key={employee.id} value={employee.id}>{employee.nombre}</option>)}
-          </select>
+          <div>
+            <input
+              list="employees-report-list"
+              value={employeeSearch}
+              onChange={(e) => {
+                const value = e.target.value;
+                setEmployeeSearch(value);
+                const selected = value.match(/^#(\d+)\s-\s/);
+                if (selected) {
+                  setReportEmpleadoId(selected[1] ?? "");
+                } else {
+                  setReportEmpleadoId("");
+                }
+                setReportPage(1);
+              }}
+              placeholder="Buscar empleado (#id - nombre)"
+              className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
+            />
+            <datalist id="employees-report-list">
+              {employees.getAll.data.map((employee) => (
+                <option
+                  key={employee.id}
+                  value={`#${employee.id} - ${employee.nombre}`}
+                >
+                  {`${employee.documento ?? "-"} | ${employee.cargo ?? "-"} | ${employee.deviceUserId ?? "-"}`}
+                </option>
+              ))}
+            </datalist>
+          </div>
           <select value={reportTipo} onChange={(e) => { setReportTipo(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs">
             <option value="">Todos los tipos</option>
             <option value="ENTRADA">ENTRADA</option>
@@ -110,7 +141,11 @@ export function PersonalReportsPage() {
           </table>
         </div>
         <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]/55 px-5 py-3">
-          <span className="text-xs text-[var(--color-on-surface-variant)]">{`Pagina ${reportPage} de ${totalPages}`}</span>
+          <span className="text-xs text-[var(--color-on-surface-variant)]">
+            {`Pagina ${reportPage} de ${totalPages} | Empleado: ${
+              reportEmpleadoId ? employeesLookup.get(reportEmpleadoId)?.nombre ?? `#${reportEmpleadoId}` : "Todos"
+            }`}
+          </span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setReportPage((current) => (current > 1 ? current - 1 : current))} disabled={reportPage <= 1} className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"><ChevronLeft size={16} /></button>
             <button type="button" onClick={() => setReportPage((current) => (current < totalPages ? current + 1 : current))} disabled={reportPage >= totalPages} className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"><ChevronRight size={16} /></button>
