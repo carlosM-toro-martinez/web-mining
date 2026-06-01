@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, FileBarChart2, RefreshCw } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useEmployees } from "@/modules/employee/hooks/useEmployees";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -61,6 +62,71 @@ export function PersonalReportsPage() {
     }
   });
 
+  function splitRawDateTime(value: string) {
+    if (!value.includes("T")) {
+      return { fecha: value, hora: "-" };
+    }
+    const [fechaPart, timePartRaw] = value.split("T");
+    const horaPart = (timePartRaw ?? "").split(".")[0]?.replace("Z", "") ?? "-";
+    return {
+      fecha: fechaPart || value,
+      hora: horaPart || "-"
+    };
+  }
+
+  async function handleExportExcel() {
+    try {
+      const allRows: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }> = [];
+      let page = 1;
+      let totalPagesFromApi = 1;
+
+      do {
+        const response = await httpClient.get("/api/biometric/attendance", {
+          params: {
+            page,
+            limit: reportLimit,
+            desde: reportDesde || undefined,
+            hasta: reportHasta || undefined,
+            tipo: reportTipo || undefined
+          }
+        });
+        const payload = response.data as {
+          data?: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }>;
+          meta?: { totalPages?: number };
+        };
+        allRows.push(...(payload.data ?? []));
+        totalPagesFromApi = Math.max(1, payload.meta?.totalPages ?? 1);
+        page += 1;
+      } while (page <= totalPagesFromApi);
+
+      const query = employeeLocalSearch.trim().toLowerCase();
+      const locallyFiltered = !query
+        ? allRows
+        : allRows.filter((row) =>
+            `${row.empleado?.nombre ?? ""} ${row.deviceUserId ?? ""}`.toLowerCase().includes(query)
+          );
+
+      const rows = locallyFiltered.map((item) => {
+        const { fecha, hora } = splitRawDateTime(item.fecha);
+        return {
+          Fecha: fecha,
+          Hora: hora,
+          Tipo: item.tipo,
+          Empleado: item.empleado?.nombre ?? "-",
+          "Device User ID": item.deviceUserId ?? "-"
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, "asistencia");
+      XLSX.writeFile(wb, `asistencia-personal-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showSuccess(`Excel generado con ${rows.length} registros.`);
+    } catch (error) {
+      showError(error instanceof Error ? error.message : "No se pudo exportar asistencia.");
+    }
+  }
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -82,12 +148,19 @@ export function PersonalReportsPage() {
             <RefreshCw size={16} />
             {syncAttendanceMutation.isPending ? "Sincronizando..." : "Traer marcaciones biométrico"}
           </button>
+          <button
+            type="button"
+            onClick={() => void handleExportExcel()}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+          >
+            Exportar Excel
+          </button>
         </div>
       </header>
 
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] shadow-2xl">
         <div className="border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-5 py-2">
-          <span className="text-xs text-[var(--color-on-surface-variant)]">Registros totales: {totalRecords}</span>
+          <span className="rounded-full bg-[var(--color-primary)]/12 px-2.5 py-1 text-xs font-semibold text-[var(--color-primary)]">Registros totales: {totalRecords}</span>
         </div>
         <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
           <input type="date" value={reportDesde} onChange={(e) => { setReportDesde(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
@@ -110,11 +183,14 @@ export function PersonalReportsPage() {
         </div>
         <div className="table-scroll max-h-[420px] overflow-auto px-4 pb-4">
           <table className="w-full border-collapse text-left">
-            <thead><tr><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Empleado</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th></tr></thead>
+            <thead><tr><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Hora</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Empleado</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th></tr></thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {attendanceReportQuery.isLoading ? <tr><td colSpan={4} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Cargando reporte...</td></tr> : null}
-              {!attendanceReportQuery.isLoading && locallyFilteredRows.length === 0 ? <tr><td colSpan={4} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Sin registros para esos filtros.</td></tr> : null}
-              {locallyFilteredRows.map((item) => <tr key={String(item.id)}><td className="px-3 py-2 text-xs font-mono">{item.fecha}</td><td className="px-3 py-2 text-xs">{item.tipo}</td><td className="px-3 py-2 text-xs">{item.empleado?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs font-mono">{item.deviceUserId ?? "-"}</td></tr>)}
+              {attendanceReportQuery.isLoading ? <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Cargando reporte...</td></tr> : null}
+              {!attendanceReportQuery.isLoading && locallyFilteredRows.length === 0 ? <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Sin registros para esos filtros.</td></tr> : null}
+              {locallyFilteredRows.map((item) => {
+                const { fecha, hora } = splitRawDateTime(item.fecha);
+                return <tr key={String(item.id)} className="hover:bg-[var(--color-surface-container-high)]/60"><td className="px-3 py-2 text-xs font-mono">{fecha}</td><td className="px-3 py-2 text-xs font-mono">{hora}</td><td className="px-3 py-2 text-xs"><span className="rounded-full bg-[var(--color-tertiary)]/12 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-tertiary)]">{item.tipo}</span></td><td className="px-3 py-2 text-xs">{item.empleado?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs font-mono">{item.deviceUserId ?? "-"}</td></tr>;
+              })}
             </tbody>
           </table>
         </div>

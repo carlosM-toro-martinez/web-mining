@@ -75,7 +75,7 @@ export function PersonalAbsencesPage() {
   const employeeOptions = useMemo(
     () =>
       employees.getAll.data.map((employee) => ({
-        id: String(employee.id),
+        id: String(employee.remoteId ?? employee.id),
         label: employee.nombre,
         searchText: `${employee.documento ?? ""} ${employee.cargo ?? ""} ${employee.deviceUserId ?? ""}`
       })),
