@@ -7,7 +7,6 @@ interface EmployeeFormValues {
   nombre: string;
   documento?: string;
   cargo?: string;
-  deviceUserId?: string;
   activo?: boolean;
 }
 
@@ -27,18 +26,16 @@ export function EmployeeForm({
   mode = "create"
 }: EmployeeFormProps) {
   const [nombre, setNombre] = useState(initialValues?.nombre ?? "");
-  const [deviceUserId, setDeviceUserId] = useState(initialValues?.deviceUserId ?? "");
   const [documento, setDocumento] = useState(initialValues?.documento ?? "");
   const [cargo, setCargo] = useState(initialValues?.cargo ?? "");
   const [activo, setActivo] = useState(initialValues?.activo ?? true);
 
   useEffect(() => {
     setNombre(initialValues?.nombre ?? "");
-    setDeviceUserId(initialValues?.deviceUserId ?? "");
     setDocumento(initialValues?.documento ?? "");
     setCargo(initialValues?.cargo ?? "");
     setActivo(initialValues?.activo ?? true);
-  }, [initialValues?.nombre, initialValues?.deviceUserId, initialValues?.documento, initialValues?.cargo, initialValues?.activo]);
+  }, [initialValues?.nombre, initialValues?.documento, initialValues?.cargo, initialValues?.activo]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,12 +43,10 @@ export function EmployeeForm({
       nombre: nombre.trim(),
       documento: documento.trim() || undefined,
       cargo: cargo.trim() || undefined,
-      deviceUserId: deviceUserId.trim() || undefined,
       activo
     });
     if (mode === "create") {
       setNombre("");
-      setDeviceUserId("");
       setDocumento("");
       setCargo("");
       setActivo(true);
@@ -94,18 +89,6 @@ export function EmployeeForm({
           onChange={(event) => setCargo(event.target.value)}
           className={inputClassName}
           placeholder="Cargo (opcional)"
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-          Device User ID
-        </label>
-        <input
-          value={deviceUserId}
-          onChange={(event) => setDeviceUserId(event.target.value)}
-          className={`${inputClassName} font-mono`}
-          placeholder="PIN dispositivo (opcional)"
         />
       </div>
 

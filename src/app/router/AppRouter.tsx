@@ -31,6 +31,8 @@ import { ExploracionesDataRoomPage } from "@/pages/exploraciones/ExploracionesDa
 import { ExploracionesSurfaceDataRoomPage } from "@/pages/exploraciones/ExploracionesSurfaceDataRoomPage";
 import { ExploracionesFormsPage } from "@/pages/exploraciones/ExploracionesFormsPage";
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
+import { PersonalHomePage } from "@/modules/employee/pages/PersonalHomePage";
+import { PersonalReportsPage } from "@/modules/employee/pages/PersonalReportsPage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
@@ -161,7 +163,9 @@ export function AppRouter() {
             <Route path="/exploraciones" element={<ExploracionesPage />} />
           </Route>
           <Route element={<PersonalRoute />}>
-            <Route path="/personal" element={<EmployeePage />} />
+            <Route path="/personal" element={<PersonalHomePage />} />
+            <Route path="/personal/empleados" element={<EmployeePage />} />
+            <Route path="/personal/reportes" element={<PersonalReportsPage />} />
           </Route>
           <Route path="/exploraciones/elementos" element={<ExploracionesElementosPage />} />
           <Route path="/exploraciones/reportes" element={<ExploracionesReportesPage />} />

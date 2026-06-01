@@ -48,6 +48,7 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isInventoryExpanded, setIsInventoryExpanded] = useState(false);
+  const [isPersonalExpanded, setIsPersonalExpanded] = useState(false);
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
   const isAlmacenero = user?.role === "ALMACENERO";
   const isRecepcionista = user?.role === "RECEPCIONISTA";
@@ -60,9 +61,6 @@ export function AppShell() {
     // if (isAdmin) {
     //   items.push({ label: "Exploraciones", icon: FlaskConical, to: "/exploraciones" });
     // }
-    if (isAdmin || isAdministrador || isSuperintendente) {
-      items.push({ label: "Personal", icon: IdCard, to: "/personal" });
-    }
     if (isAdmin || isAdministrador || isSuperintendente) {
       items.push({
         label: "Exploraciones Data Room",
@@ -95,6 +93,14 @@ export function AppShell() {
     }
     return items;
   }, [canSeeInventoryRoute, isAdmin]);
+
+  const personalNavItems = useMemo(() => {
+    if (!(isAdmin || isAdministrador || isSuperintendente)) return [];
+    return [
+      { label: "Personal", icon: IdCard, to: "/personal/empleados" },
+      { label: "Reportes", icon: FileBarChart2, to: "/personal/reportes" }
+    ] as NavItem[];
+  }, [isAdmin, isAdministrador, isSuperintendente]);
 
   const avatarLabel = useMemo(() => {
     const source = user?.nombre?.trim();
@@ -130,12 +136,30 @@ export function AppShell() {
   }, [isInventoryExpanded]);
 
   useEffect(() => {
+    const persisted = window.localStorage.getItem("ui:personal-expanded");
+    if (persisted === "true") {
+      setIsPersonalExpanded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("ui:personal-expanded", isPersonalExpanded ? "true" : "false");
+  }, [isPersonalExpanded]);
+
+  useEffect(() => {
     if (location.pathname.startsWith("/inventario")) {
       setIsInventoryExpanded(true);
     }
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (location.pathname.startsWith("/personal")) {
+      setIsPersonalExpanded(true);
+    }
+  }, [location.pathname]);
+
   const isInventorySectionActive = location.pathname.startsWith("/inventario");
+  const isPersonalSectionActive = location.pathname.startsWith("/personal");
 
   return (
     <div className="app-shell min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
@@ -235,6 +259,62 @@ export function AppShell() {
               {isSidebarCollapsed || !isInventoryExpanded
                 ? null
                 : inventoryNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `ml-5 mr-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? "bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                            : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                        }`
+                      }
+                    >
+                      <item.icon size={16} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+            </>
+          ) : null}
+
+          {personalNavItems.length > 0 ? (
+            <>
+              <div
+                className={`mt-2 flex items-center ${
+                  isPersonalSectionActive
+                    ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                }`}
+              >
+                <NavLink
+                  to="/personal"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center py-3 text-sm font-semibold transition-all ${
+                    isSidebarCollapsed ? "w-full justify-center px-2" : "flex-1 gap-3 px-4"
+                  }`}
+                >
+                  <IdCard size={18} />
+                  {isSidebarCollapsed ? null : <span>Personal</span>}
+                </NavLink>
+                {isSidebarCollapsed ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setIsPersonalExpanded((current) => !current)}
+                    className="px-3 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)]"
+                    aria-label={isPersonalExpanded ? "Contraer personal" : "Expandir personal"}
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${isPersonalExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {isSidebarCollapsed || !isPersonalExpanded
+                ? null
+                : personalNavItems.map((item) => (
                     <NavLink
                       key={item.to}
                       to={item.to}
