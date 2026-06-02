@@ -3,7 +3,9 @@ import { movimientoSchema } from "@/features/movimientos/model/movimientos.schem
 
 const numberLikeSchema = z.coerce.number();
 
-export const compraEstadoSchema = z.enum(["PENDIENTE", "PARCIAL", "COMPLETADO"]).or(z.string().min(1));
+export const compraEstadoSchema = z
+  .enum(["PENDIENTE", "PARCIAL", "COMPLETADO"])
+  .or(z.string().min(1));
 
 const compraUsuarioSchema = z.object({
   id: numberLikeSchema.int().positive(),
@@ -43,6 +45,7 @@ export const compraSchema = z.object({
   usuarioRegistroId: numberLikeSchema.int().positive().optional().nullable(),
   usuarioRecibeId: numberLikeSchema.int().positive().optional().nullable(),
   estado: compraEstadoSchema,
+  numeroFactura: z.string().optional().nullable(),
   observacion: z.string().optional().nullable(),
   fechaOperacion: z.string().optional().nullable(),
   createdAt: z.string().optional().nullable(),
@@ -81,6 +84,7 @@ export const recibirCompraResponseSchema = z.object({
 
 export const createCompraPayloadSchema = z.object({
   proveedorId: numberLikeSchema.int().positive("Proveedor invalido."),
+  numeroFactura: z.string().trim().min(1).optional(),
   observacion: z.string().trim().optional(),
   fechaOperacion: z.string().datetime().optional(),
   items: z

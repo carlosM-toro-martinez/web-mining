@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { useCompraByIdQuery, useComprasQuery, useCreateCompraMutation, useRecibirCompraMutation } from "@/features/compras/hooks/useCompras";
+import {
+  useCompraByIdQuery,
+  useComprasQuery,
+  useCreateCompraMutation,
+  useRecibirCompraMutation
+} from "@/features/compras/hooks/useCompras";
 import { createCompra } from "@/features/compras/api/comprasApi";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
@@ -103,6 +108,7 @@ export function ComprasPage() {
   const recibirCompraMutation = useRecibirCompraMutation();
 
   const [proveedorId, setProveedorId] = useState("");
+  const [numeroFactura, setNumeroFactura] = useState("");
   const [observacion, setObservacion] = useState("");
   const [draftItems, setDraftItems] = useState<CompraDraftItem[]>([
     { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }
@@ -165,7 +171,9 @@ export function ComprasPage() {
   }
 
   function updateDraftItem(id: number, patch: Partial<CompraDraftItem>) {
-    setDraftItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    setDraftItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
   }
 
   function removeDraftItem(id: number) {
@@ -184,6 +192,7 @@ export function ComprasPage() {
 
     const payload = {
       proveedorId: Number(proveedorId),
+      numeroFactura: numeroFactura.trim() || undefined,
       observacion: observacion.trim() || undefined,
       items: draftItems.map((item) => ({
         productoId: Number(item.productoId),
@@ -200,7 +209,11 @@ export function ComprasPage() {
     if (
       payload.items.some(
         (item) =>
-          !item.productoId || !item.cantidadPedida || item.cantidadPedida <= 0 || !item.precioUnit || item.precioUnit <= 0
+          !item.productoId ||
+          !item.cantidadPedida ||
+          item.cantidadPedida <= 0 ||
+          !item.precioUnit ||
+          item.precioUnit <= 0
       )
     ) {
       showError("Completa producto, cantidad y precio unitario en todos los items.");
@@ -212,6 +225,7 @@ export function ComprasPage() {
         showSuccess("Pedido de compra creado correctamente.");
         setSelectedCompraId(response.data.id);
         setProveedorId("");
+        setNumeroFactura("");
         setObservacion("");
         setDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }]);
         setNextDraftItemId(2);
@@ -571,6 +585,14 @@ export function ComprasPage() {
                 </Link>
               </p>
             ) : null}
+            <input
+              type="text"
+              value={numeroFactura}
+              onChange={(event) => setNumeroFactura(event.target.value)}
+              className={inputClassName}
+              placeholder="Número de factura (opcional)"
+              disabled={!canManage}
+            />
             <textarea
               value={observacion}
               onChange={(event) => setObservacion(event.target.value)}
@@ -580,7 +602,10 @@ export function ComprasPage() {
             />
 
             {draftItems.map((item, index) => (
-              <div key={item.id} className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_160px_160px_auto]">
+              <div
+                key={item.id}
+                className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_160px_160px_auto]"
+              >
                 <AutocompleteSelect
                   value={item.productoId}
                   onChange={(nextValue) => updateDraftItem(item.id, { productoId: nextValue })}
@@ -595,7 +620,9 @@ export function ComprasPage() {
                   min="0.01"
                   step="0.01"
                   value={item.cantidadPedida}
-                  onChange={(event) => updateDraftItem(item.id, { cantidadPedida: event.target.value })}
+                  onChange={(event) =>
+                    updateDraftItem(item.id, { cantidadPedida: event.target.value })
+                  }
                   className={inputClassName}
                   placeholder={`Cantidad (${productos.find((producto) => producto.id === Number(item.productoId))?.unidad ?? "unidad"})`}
                   disabled={!canManage}
@@ -633,7 +660,9 @@ export function ComprasPage() {
               </button>
               <button
                 type="submit"
-                disabled={!canManage || createCompraMutation.isPending || proveedoresOrdenados.length === 0}
+                disabled={
+                  !canManage || createCompraMutation.isPending || proveedoresOrdenados.length === 0
+                }
                 className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
               >
                 {createCompraMutation.isPending ? "Guardando..." : "Crear compra"}
@@ -690,37 +719,60 @@ export function ComprasPage() {
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Accion</th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Estado
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Proveedor
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Fecha
+                  </th>
+                  <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Accion
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-soft)]">
                 {comprasQuery.isLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={4}
+                      className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Cargando compras...
                     </td>
                   </tr>
                 ) : null}
                 {!comprasQuery.isLoading && comprasOrdenadas.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={4}
+                      className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       No se encontraron compras.
                     </td>
                   </tr>
                 ) : null}
                 {comprasOrdenadas.map((compra) => (
-                  <tr key={compra.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+                  <tr
+                    key={compra.id}
+                    className="transition hover:bg-[var(--color-surface-container-highest)]"
+                  >
                     <td className="px-3 py-2 text-xs">
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoClassName(compra.estado)}`}>
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoClassName(compra.estado)}`}
+                      >
                         {compra.estado}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      <div className="font-semibold text-[var(--color-on-surface)]">{compra.proveedor?.nombre ?? "-"}</div>
-                      <div className="text-[11px] text-[var(--color-on-surface-variant)]">{compra.proveedor?.lugar ?? "Lugar no definido"}</div>
+                      <div className="font-semibold text-[var(--color-on-surface)]">
+                        {compra.proveedor?.nombre ?? "-"}
+                      </div>
+                      <div className="text-[11px] text-[var(--color-on-surface-variant)]">
+                        {compra.proveedor?.lugar ?? "Lugar no definido"}
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
                       {compra.createdAt ? new Date(compra.createdAt).toLocaleString() : "-"}
@@ -755,7 +807,11 @@ export function ComprasPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setListPage((current) => (comprasMeta && current < comprasMeta.totalPages ? current + 1 : current))}
+                onClick={() =>
+                  setListPage((current) =>
+                    comprasMeta && current < comprasMeta.totalPages ? current + 1 : current
+                  )
+                }
                 disabled={!comprasMeta || listPage >= comprasMeta.totalPages}
                 className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"
               >
@@ -777,18 +833,24 @@ export function ComprasPage() {
           <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando detalle...</p>
         ) : null}
         {compraDetailQuery.isError ? (
-          <p className="text-sm text-[var(--color-error)]">No se pudo cargar el detalle de la compra.</p>
+          <p className="text-sm text-[var(--color-error)]">
+            No se pudo cargar el detalle de la compra.
+          </p>
         ) : null}
 
         {selectedCompra ? (
           <form className="space-y-3" onSubmit={handleRecibirCompra}>
             <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3">
               <div className="mb-2 flex items-center gap-2">
-                <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoClassName(selectedCompra.estado)}`}>
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoClassName(selectedCompra.estado)}`}
+                >
                   {selectedCompra.estado}
                 </span>
                 <span className="text-xs text-[var(--color-on-surface-variant)]">
-                  {selectedCompra.createdAt ? new Date(selectedCompra.createdAt).toLocaleString() : "-"}
+                  {selectedCompra.createdAt
+                    ? new Date(selectedCompra.createdAt).toLocaleString()
+                    : "-"}
                 </span>
               </div>
               <p className="text-sm font-semibold">
@@ -809,10 +871,14 @@ export function ComprasPage() {
                   ? Math.min((item.cantidadRecibida / item.cantidadPedida) * 100, 100)
                   : 0;
               return (
-                <div key={item.id} className="space-y-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
+                <div
+                  key={item.id}
+                  className="space-y-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3"
+                >
                   <div>
                     <p className="text-sm font-semibold text-[var(--color-on-surface)]">
-                      {item.producto?.nombre ?? `Producto #${item.productoId}`} ({item.producto?.unidad ?? "u"})
+                      {item.producto?.nombre ?? `Producto #${item.productoId}`} (
+                      {item.producto?.unidad ?? "u"})
                     </p>
                     <p className="text-xs text-[var(--color-on-surface-variant)]">
                       Precio unitario: <strong>Bs. {item.precioUnit}</strong>
@@ -820,15 +886,21 @@ export function ComprasPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div className="rounded-md bg-[var(--color-surface-container-highest)] px-2 py-2">
-                      <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">Pedida</span>
+                      <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">
+                        Pedida
+                      </span>
                       <span className="font-semibold">{item.cantidadPedida}</span>
                     </div>
                     <div className="rounded-md bg-[var(--color-surface-container-highest)] px-2 py-2">
-                      <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">Recibida</span>
+                      <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">
+                        Recibida
+                      </span>
                       <span className="font-semibold">{item.cantidadRecibida}</span>
                     </div>
                     <div className="rounded-md bg-[var(--color-surface-container-highest)] px-2 py-2">
-                      <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">Pendiente</span>
+                      <span className="block text-[10px] uppercase text-[var(--color-on-surface-variant)]">
+                        Pendiente
+                      </span>
                       <span className="font-semibold">{pending}</span>
                     </div>
                   </div>
@@ -869,7 +941,10 @@ export function ComprasPage() {
                   onClick={() => {
                     const full: Record<string, string> = {};
                     selectedCompra.items.forEach((item) => {
-                      const pending = Math.max(item.cantidadPedida - (item.cantidadRecibida ?? 0), 0);
+                      const pending = Math.max(
+                        item.cantidadPedida - (item.cantidadRecibida ?? 0),
+                        0
+                      );
                       full[item.id] = String(pending);
                     });
                     setCantidadesRecibidas(full);
@@ -886,7 +961,11 @@ export function ComprasPage() {
             </p>
             <button
               type="submit"
-              disabled={!canManage || recibirCompraMutation.isPending || selectedCompra.estado === "COMPLETADO"}
+              disabled={
+                !canManage ||
+                recibirCompraMutation.isPending ||
+                selectedCompra.estado === "COMPLETADO"
+              }
               className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
             >
               {recibirCompraMutation.isPending ? "Registrando..." : "Confirmar recepcion"}

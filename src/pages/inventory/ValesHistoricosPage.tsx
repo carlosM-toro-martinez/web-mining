@@ -13,7 +13,10 @@ import {
 } from "@/features/inventario-import/hooks/useInventarioImport";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import { useCreateValeMutation, useEntregarValeMutation } from "@/features/vales/hooks/useVales";
-import { useCreateCompraMutation, useRecibirCompraMutation } from "@/features/compras/hooks/useCompras";
+import {
+  useCreateCompraMutation,
+  useRecibirCompraMutation
+} from "@/features/compras/hooks/useCompras";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
@@ -74,6 +77,7 @@ export function ValesHistoricosPage() {
   const [nextDraftItemId, setNextDraftItemId] = useState(2);
   const [proveedorId, setProveedorId] = useState("");
   const [fechaOperacionCompra, setFechaOperacionCompra] = useState("");
+  const [numeroFacturaCompra, setNumeroFacturaCompra] = useState("");
   const [compraDraftItems, setCompraDraftItems] = useState<CompraDraftItem[]>([
     { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }
   ]);
@@ -291,6 +295,7 @@ export function ValesHistoricosPage() {
     try {
       const created = await createCompraMutation.mutateAsync({
         proveedorId: proveedorIdNum,
+        numeroFactura: numeroFacturaCompra.trim() || undefined,
         fechaOperacion: `${fechaOperacionCompra}T00:00:00.000Z`,
         items: parsedItems
       });
@@ -308,6 +313,7 @@ export function ValesHistoricosPage() {
       );
       setProveedorId("");
       setFechaOperacionCompra("");
+      setNumeroFacturaCompra("");
       setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }]);
       setNextCompraDraftItemId(2);
     } catch (error) {
@@ -360,7 +366,10 @@ export function ValesHistoricosPage() {
         (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
       );
       const cuentaIds = Object.fromEntries(
-        (created.data.items ?? []).map((item, index) => [item.id, parsedItems[index]?.cuentaId ?? 0])
+        (created.data.items ?? []).map((item, index) => [
+          item.id,
+          parsedItems[index]?.cuentaId ?? 0
+        ])
       );
       if (Object.values(cuentaIds).some((value) => !value || value <= 0)) {
         showError("No se pudo mapear la cuenta contable por item para la entrega histórica.");
@@ -460,7 +469,8 @@ export function ValesHistoricosPage() {
                 Período cerrado detectado
               </div>
               <p className="mt-1">
-                Esta entrega será retroactiva: actualizará saldo mensual histórico y no el stock actual.
+                Esta entrega será retroactiva: actualizará saldo mensual histórico y no el stock
+                actual.
               </p>
             </div>
           ) : null}
@@ -498,7 +508,8 @@ export function ValesHistoricosPage() {
                 <option value="">Cuenta contable</option>
                 {cuentas.map((cuenta) => (
                   <option key={cuenta.id} value={cuenta.id}>
-                    {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre}/{cuenta.funcionGasto.nombre}
+                    {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre}/
+                    {cuenta.funcionGasto.nombre}
                   </option>
                 ))}
               </select>
@@ -539,7 +550,7 @@ export function ValesHistoricosPage() {
           Registrar compra histórica
         </h2>
         <form className="space-y-3" onSubmit={handleCreateAndReceiveCompraHistorica}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Proveedor
@@ -570,6 +581,18 @@ export function ValesHistoricosPage() {
                 className={inputClassName}
               />
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                N° Factura (opcional)
+              </label>
+              <input
+                type="text"
+                value={numeroFacturaCompra}
+                onChange={(event) => setNumeroFacturaCompra(event.target.value)}
+                className={inputClassName}
+                placeholder="FAC-2025-001"
+              />
+            </div>
           </div>
 
           {isPeriodoCerradoCompra ? (
@@ -579,7 +602,8 @@ export function ValesHistoricosPage() {
                 Período cerrado detectado
               </div>
               <p className="mt-1">
-                Esta recepción será retroactiva: actualizará saldo mensual histórico y no el stock actual.
+                Esta recepción será retroactiva: actualizará saldo mensual histórico y no el stock
+                actual.
               </p>
             </div>
           ) : null}
@@ -658,13 +682,17 @@ export function ValesHistoricosPage() {
           Cierre de mes y períodos cerrados
         </h2>
 
-        <form className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[160px_140px_auto]" onSubmit={handleInicializarPeriodo}>
+        <form
+          className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[160px_140px_auto]"
+          onSubmit={handleInicializarPeriodo}
+        >
           <div className="md:col-span-3">
             <p className="text-xs font-semibold text-[var(--color-on-surface)]">
               Inicializar período (solo primera vez)
             </p>
             <p className="text-xs text-[var(--color-on-surface-variant)]">
-              Aquí mismo se siembran los saldos iniciales del primer mes histórico. Solo elige año/mes y presiona el botón.
+              Aquí mismo se siembran los saldos iniciales del primer mes histórico. Solo elige
+              año/mes y presiona el botón.
             </p>
           </div>
           <div>
@@ -713,7 +741,8 @@ export function ValesHistoricosPage() {
               Revisar y corregir saldos (PASO 2 y PASO 3)
             </p>
             <p className="text-xs text-[var(--color-on-surface-variant)]">
-              Carga el período y edita <strong>saldo inicial</strong> y <strong>precio unitario</strong> por producto.
+              Carga el período y edita <strong>saldo inicial</strong> y{" "}
+              <strong>precio unitario</strong> por producto.
             </p>
           </div>
           <div>
@@ -777,14 +806,21 @@ export function ValesHistoricosPage() {
               <tbody className="divide-y divide-[var(--color-border-soft)]">
                 {saldosPeriodoQuery.isLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={5}
+                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                    >
                       Cargando saldos del período...
                     </td>
                   </tr>
                 ) : null}
-                {!saldosPeriodoQuery.isLoading && (saldosPeriodoQuery.data?.data ?? []).length === 0 ? (
+                {!saldosPeriodoQuery.isLoading &&
+                (saldosPeriodoQuery.data?.data ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={5}
+                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                    >
                       Sin registros para este período.
                     </td>
                   </tr>
@@ -848,7 +884,10 @@ export function ValesHistoricosPage() {
         ) : null}
 
         {canClosePeriod ? (
-          <form className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]" onSubmit={handleCreateCierreMes}>
+          <form
+            className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]"
+            onSubmit={handleCreateCierreMes}
+          >
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Año
@@ -906,14 +945,20 @@ export function ValesHistoricosPage() {
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {cierresMesQuery.isLoading ? (
                 <tr>
-                  <td colSpan={2} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                  <td
+                    colSpan={2}
+                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                  >
                     Cargando períodos cerrados...
                   </td>
                 </tr>
               ) : null}
               {!cierresMesQuery.isLoading && cierres.length === 0 ? (
                 <tr>
-                  <td colSpan={2} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                  <td
+                    colSpan={2}
+                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                  >
                     Aún no hay períodos cerrados.
                   </td>
                 </tr>
