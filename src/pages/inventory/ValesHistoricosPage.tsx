@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, Lock, Plus, ShoppingCart } from "lucide-react";
+import { AlertTriangle, CalendarClock, Lock, Plus, ShoppingCart, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
@@ -21,6 +21,7 @@ import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
+import { CreateProveedorModal } from "@/shared/ui/CreateProveedorModal";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
@@ -92,6 +93,10 @@ export function ValesHistoricosPage() {
   const [aperturaEnabled, setAperturaEnabled] = useState(false);
   const [saldoDraftById, setSaldoDraftById] = useState<Record<string, SaldoMensualDraft>>({});
   const [savingSaldoId, setSavingSaldoId] = useState<string | null>(null);
+  const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
+  const [saldoSearchQuery, setSaldoSearchQuery] = useState("");
+  const [saldoCurrentPage, setSaldoCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const usuarios = usersQuery.data?.data ?? [];
   const productos = productosQuery.data?.data ?? [];
@@ -107,6 +112,26 @@ export function ValesHistoricosPage() {
     [aperturaAnio, aperturaMes, now]
   );
   const saldosPeriodoQuery = useSaldoMensualQuery(aperturaParams, aperturaEnabled);
+
+  const filteredSaldos = useMemo(() => {
+    const allSaldos = saldosPeriodoQuery.data?.data ?? [];
+    if (!saldoSearchQuery.trim()) return allSaldos;
+    const query = saldoSearchQuery.toLowerCase();
+    return allSaldos.filter(
+      (item) =>
+        (item.productoCodigo ?? "").toLowerCase().includes(query) ||
+        (item.productoNombre ?? "").toLowerCase().includes(query)
+    );
+  }, [saldosPeriodoQuery.data?.data, saldoSearchQuery]);
+
+  const paginatedSaldos = useMemo(() => {
+    const start = (saldoCurrentPage - 1) * itemsPerPage;
+    return filteredSaldos.slice(start, start + itemsPerPage);
+  }, [filteredSaldos, saldoCurrentPage]);
+
+  const totalSaldoPages = useMemo(() => {
+    return Math.ceil(filteredSaldos.length / itemsPerPage);
+  }, [filteredSaldos.length]);
 
   const usuarioOptions = useMemo(
     () =>
@@ -555,19 +580,29 @@ export function ValesHistoricosPage() {
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Proveedor
               </label>
-              <select
-                required
-                value={proveedorId}
-                onChange={(event) => setProveedorId(event.target.value)}
-                className={inputClassName}
-              >
-                <option value="">Selecciona proveedor</option>
-                {proveedores.map((proveedor) => (
-                  <option key={proveedor.id} value={proveedor.id}>
-                    {proveedor.nombre}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  required
+                  value={proveedorId}
+                  onChange={(event) => setProveedorId(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecciona proveedor</option>
+                  {proveedores.map((proveedor) => (
+                    <option key={proveedor.id} value={proveedor.id}>
+                      {proveedor.nombre}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateProveedorModalOpen(true)}
+                  className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2.5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+                  title="Crear nuevo proveedor"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
@@ -782,104 +817,161 @@ export function ValesHistoricosPage() {
         </form>
 
         {aperturaEnabled ? (
-          <div className="table-scroll overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Código
-                  </th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Producto
-                  </th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Saldo inicial
-                  </th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Precio unitario
-                  </th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Acción
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border-soft)]">
-                {saldosPeriodoQuery.isLoading ? (
+          <div className="mb-4 space-y-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-[var(--color-on-surface)]">
+                  Productos en período: {filteredSaldos.length}
+                </h3>
+              </div>
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-3.5 text-[var(--color-on-surface-variant)]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por código o nombre..."
+                  value={saldoSearchQuery}
+                  onChange={(e) => {
+                    setSaldoSearchQuery(e.target.value);
+                    setSaldoCurrentPage(1);
+                  }}
+                  className={`${inputClassName} pl-10`}
+                />
+              </div>
+            </div>
+
+            <div className="table-scroll overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-[var(--color-surface-container)]">
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
-                    >
-                      Cargando saldos del período...
-                    </td>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Código
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Producto
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Saldo inicial
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Precio unitario
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Acción
+                    </th>
                   </tr>
-                ) : null}
-                {!saldosPeriodoQuery.isLoading &&
-                (saldosPeriodoQuery.data?.data ?? []).length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
-                    >
-                      Sin registros para este período.
-                    </td>
-                  </tr>
-                ) : null}
-                {(saldosPeriodoQuery.data?.data ?? []).map((row) => {
-                  const id = String(row.id);
-                  const draft = saldoDraftById[id] ?? {
-                    saldoInicial: String(row.saldoInicial ?? 0),
-                    precioUnit: String(row.precioUnit ?? 0)
-                  };
-                  return (
-                    <tr key={id}>
-                      <td className="px-3 py-2 text-xs">{row.productoCodigo}</td>
-                      <td className="px-3 py-2 text-xs">{row.productoNombre ?? "-"}</td>
-                      <td className="px-3 py-2 text-xs">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={draft.saldoInicial}
-                          onChange={(event) =>
-                            setSaldoDraftById((current) => ({
-                              ...current,
-                              [id]: { ...draft, saldoInicial: event.target.value }
-                            }))
-                          }
-                          className={inputClassName}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.0001"
-                          value={draft.precioUnit}
-                          onChange={(event) =>
-                            setSaldoDraftById((current) => ({
-                              ...current,
-                              [id]: { ...draft, precioUnit: event.target.value }
-                            }))
-                          }
-                          className={inputClassName}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => handleGuardarSaldoFila(id)}
-                          disabled={savingSaldoId === id}
-                          className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-                        >
-                          {savingSaldoId === id ? "Guardando..." : "Guardar"}
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {saldosPeriodoQuery.isLoading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
+                      >
+                        Cargando saldos del período...
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ) : null}
+                  {!saldosPeriodoQuery.isLoading && filteredSaldos.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
+                      >
+                        {saldoSearchQuery ? "No hay resultados para la búsqueda." : "Sin registros para este período."}
+                      </td>
+                    </tr>
+                  ) : null}
+                  {paginatedSaldos.map((row) => {
+                    const id = String(row.id);
+                    const draft = saldoDraftById[id] ?? {
+                      saldoInicial: String(row.saldoInicial ?? 0),
+                      precioUnit: String(row.precioUnit ?? 0)
+                    };
+                    return (
+                      <tr
+                        key={id}
+                        className="hover:bg-[var(--color-surface-container)] transition"
+                      >
+                        <td className="px-4 py-3 text-xs font-medium text-[var(--color-on-surface)]">
+                          {row.productoCodigo}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--color-on-surface)]">
+                          {row.productoNombre ?? "-"}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={draft.saldoInicial}
+                            onChange={(event) =>
+                              setSaldoDraftById((current) => ({
+                                ...current,
+                                [id]: { ...draft, saldoInicial: event.target.value }
+                              }))
+                            }
+                            className={`${inputClassName} text-xs`}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.0001"
+                            value={draft.precioUnit}
+                            onChange={(event) =>
+                              setSaldoDraftById((current) => ({
+                                ...current,
+                                [id]: { ...draft, precioUnit: event.target.value }
+                              }))
+                            }
+                            className={`${inputClassName} text-xs`}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => handleGuardarSaldoFila(id)}
+                            disabled={savingSaldoId === id}
+                            className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:opacity-60"
+                          >
+                            {savingSaldoId === id ? "Guardando..." : "Guardar"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {totalSaldoPages > 1 ? (
+              <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] pt-4">
+                <p className="text-xs text-[var(--color-on-surface-variant)]">
+                  Página {saldoCurrentPage} de {totalSaldoPages}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSaldoCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={saldoCurrentPage === 1}
+                    className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSaldoCurrentPage((prev) => Math.min(prev + 1, totalSaldoPages))
+                    }
+                    disabled={saldoCurrentPage === totalSaldoPages}
+                    className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -977,6 +1069,11 @@ export function ValesHistoricosPage() {
           </table>
         </div>
       </article>
+
+      <CreateProveedorModal
+        isOpen={isCreateProveedorModalOpen}
+        onClose={() => setIsCreateProveedorModalOpen(false)}
+      />
     </section>
   );
 }

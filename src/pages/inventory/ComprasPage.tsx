@@ -7,7 +7,8 @@ import {
   FileSpreadsheet,
   PackagePlus,
   ShoppingCart,
-  Upload
+  Upload,
+  Plus
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -23,6 +24,7 @@ import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
+import { CreateProveedorModal } from "@/shared/ui/CreateProveedorModal";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import {
@@ -120,6 +122,7 @@ export function ComprasPage() {
   const selectedCompra = compraDetailQuery.data?.data;
 
   const [cantidadesRecibidas, setCantidadesRecibidas] = useState<Record<string, string>>({});
+  const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
 
   const productos = productosQuery.data?.data ?? [];
   const proveedores = proveedoresQuery.data?.data ?? [];
@@ -556,32 +559,43 @@ export function ComprasPage() {
           </h2>
 
           <form className="space-y-3" onSubmit={handleCreateCompra}>
-            <select
-              required
-              value={proveedorId}
-              onChange={(event) => setProveedorId(event.target.value)}
-              className={inputClassName}
-              disabled={!canManage || proveedoresQuery.isLoading}
-            >
-              <option value="">
-                {proveedoresQuery.isLoading ? "Cargando proveedores..." : "Selecciona proveedor"}
-              </option>
-              {proveedoresOrdenados.map((proveedor) => (
-                <option key={proveedor.id} value={proveedor.id}>
-                  {proveedor.nombre}
-                  {proveedor.lugar ? ` - ${proveedor.lugar}` : ""}
-                  {proveedor.nit ? ` - NIT ${proveedor.nit}` : ""}
+            <div className="flex gap-2">
+              <select
+                required
+                value={proveedorId}
+                onChange={(event) => setProveedorId(event.target.value)}
+                className={inputClassName}
+                disabled={!canManage || proveedoresQuery.isLoading}
+              >
+                <option value="">
+                  {proveedoresQuery.isLoading ? "Cargando proveedores..." : "Selecciona proveedor"}
                 </option>
-              ))}
-            </select>
+                {proveedoresOrdenados.map((proveedor) => (
+                  <option key={proveedor.id} value={proveedor.id}>
+                    {proveedor.nombre}
+                    {proveedor.lugar ? ` - ${proveedor.lugar}` : ""}
+                    {proveedor.nit ? ` - NIT ${proveedor.nit}` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsCreateProveedorModalOpen(true)}
+                disabled={!canManage}
+                className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2.5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
+                title="Crear nuevo proveedor"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
             {!proveedoresQuery.isLoading && proveedoresOrdenados.length === 0 ? (
               <p className="text-xs text-[var(--color-on-surface-variant)]">
-                No hay proveedores registrados.{" "}
+                No hay proveedores registrados. Crea uno haciendo clic en el botón &quot;+&quot; o ve a{" "}
                 <Link
                   to="/inventario/proveedores"
                   className="font-semibold text-[var(--color-primary)] hover:underline"
                 >
-                  Crear proveedor
+                  Proveedores
                 </Link>
               </p>
             ) : null}
@@ -973,6 +987,11 @@ export function ComprasPage() {
           </form>
         ) : null}
       </article>
+
+      <CreateProveedorModal
+        isOpen={isCreateProveedorModalOpen}
+        onClose={() => setIsCreateProveedorModalOpen(false)}
+      />
     </section>
   );
 }
