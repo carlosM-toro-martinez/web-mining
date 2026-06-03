@@ -73,6 +73,13 @@ export async function syncPendingInventoryOperations() {
           attempts,
           lastError: error instanceof Error ? error.message : "Error desconocido"
         });
+        // If the error is a conflict (409) from the API, drop the operation
+        // to avoid repeated failing retries (e.g. "La compra ya está completada").
+        if (isApiError(error) && (error as any).statusCode === 409) {
+          await inventoryOfflineDb.operations.delete(operation.id);
+          continue;
+        }
+
         if (isOfflineLikeError(error)) {
           break;
         }

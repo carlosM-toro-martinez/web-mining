@@ -265,15 +265,10 @@ export function ProductsPage() {
       return;
     }
 
-    const parsedGrupoId = Number(grupoId);
-    const parsedSubgrupoId = Number(subgrupoId);
-    const parsedCentroCostoId = Number(centroCostoIdForm);
-    const parsedFuncionGastoId = Number(funcionGastoIdForm);
-
-    if (!parsedGrupoId || !parsedSubgrupoId || !parsedCentroCostoId || !parsedFuncionGastoId) {
-      showError("Debes seleccionar grupo, subgrupo, centro de costo y funcion de gasto.");
-      return;
-    }
+    const parsedGrupoId = grupoId ? Number(grupoId) : undefined;
+    const parsedSubgrupoId = subgrupoId ? Number(subgrupoId) : undefined;
+    const parsedCentroCostoId = centroCostoIdForm ? Number(centroCostoIdForm) : undefined;
+    const parsedFuncionGastoId = funcionGastoIdForm ? Number(funcionGastoIdForm) : undefined;
     const parsedCuentaId = cuentaIdForm ? Number(cuentaIdForm) : undefined;
 
     if (editingProductId) {
@@ -632,7 +627,10 @@ export function ProductsPage() {
           className="hidden"
         />
 
-        <form className="grid grid-cols-1 gap-3 md:grid-cols-7" onSubmit={(event) => event.preventDefault()}>
+        <form
+          className="grid grid-cols-1 gap-3 md:grid-cols-7"
+          onSubmit={(event) => event.preventDefault()}
+        >
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
               Buscar
@@ -791,7 +789,6 @@ export function ProductsPage() {
                   Grupo
                 </label>
                 <select
-                  required
                   value={grupoId}
                   onChange={(event) => handleGroupChange(event.target.value)}
                   className={inputClassName}
@@ -810,7 +807,6 @@ export function ProductsPage() {
                   Subgrupo
                 </label>
                 <select
-                  required
                   value={subgrupoId}
                   onChange={(event) => setSubgrupoId(event.target.value)}
                   className={inputClassName}
@@ -851,7 +847,6 @@ export function ProductsPage() {
                   Centro de costo
                 </label>
                 <select
-                  required
                   value={centroCostoIdForm}
                   onChange={(event) => handleCentroCostoChange(event.target.value)}
                   className={inputClassName}
@@ -870,7 +865,6 @@ export function ProductsPage() {
                   Funcion de gasto
                 </label>
                 <select
-                  required
                   value={funcionGastoIdForm}
                   onChange={(event) => handleFuncionGastoChange(event.target.value)}
                   className={inputClassName}
@@ -1009,7 +1003,9 @@ export function ProductsPage() {
                   </tr>
                 ) : null}
 
-                {!productosQuery.isLoading && !productosQuery.isError && paginatedProducts.length === 0 ? (
+                {!productosQuery.isLoading &&
+                !productosQuery.isError &&
+                paginatedProducts.length === 0 ? (
                   <tr>
                     <td
                       colSpan={9}

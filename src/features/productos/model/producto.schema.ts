@@ -9,15 +9,22 @@ const decimalLikeSchema = z
 
 const productoCategoriaSchema = z.object({
   id: z.coerce.number().int().positive(),
-  nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)"),
+  nombre: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((value) => value?.trim() || "(Sin nombre)"),
   codigo: z.string().optional().nullable(),
   parentId: z.coerce.number().int().positive().nullable().optional(),
   parent: z
     .object({
       id: z.number().int().positive(),
       codigo: z.string().optional().nullable(),
-      nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)")
-      ,
+      nombre: z
+        .string()
+        .optional()
+        .nullable()
+        .transform((value) => value?.trim() || "(Sin nombre)"),
       parentId: z.coerce.number().int().positive().nullable().optional()
     })
     .nullable()
@@ -70,9 +77,21 @@ const productoCuentaSchema = z.object({
 
 export const productoSchema = z.object({
   id: z.coerce.number().int().positive(),
-  codigo: z.string().optional().nullable().transform((value) => value?.trim() || "-"),
-  nombre: z.string().optional().nullable().transform((value) => value?.trim() || "(Sin nombre)"),
-  unidad: z.string().optional().nullable().transform((value) => value?.trim() || "UND"),
+  codigo: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((value) => value?.trim() || "-"),
+  nombre: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((value) => value?.trim() || "(Sin nombre)"),
+  unidad: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((value) => value?.trim() || "UND"),
   categoriaId: z.coerce.number().int().positive().optional().default(1),
   cuentaId: z.coerce.number().int().positive().nullable().optional(),
   esEpp: z.coerce.boolean().optional().default(false),
@@ -82,14 +101,15 @@ export const productoSchema = z.object({
   stock: productoStockSchema
     .nullable()
     .optional()
-    .transform((value) =>
-      value ?? {
-        cantidad: "0",
-        cantidadReservada: "0",
-        cantidadDisponible: "0",
-        precioUnit: "0",
-        precioProm: "0"
-      }
+    .transform(
+      (value) =>
+        value ?? {
+          cantidad: "0",
+          cantidadReservada: "0",
+          cantidadDisponible: "0",
+          precioUnit: "0",
+          precioProm: "0"
+        }
     )
 });
 
@@ -192,11 +212,11 @@ export const productoDeleteResponseSchema = z.object({
 export const createProductoPayloadSchema = z.object({
   codigo: z.string().trim().min(1, "El codigo es obligatorio."),
   nombre: z.string().trim().min(1, "El nombre es obligatorio."),
-  unidad: z.string().trim().min(1, "La unidad es obligatoria."),
-  grupoId: z.number().int().positive("Debes elegir un grupo."),
-  subgrupoId: z.number().int().positive("Debes elegir un subgrupo."),
-  centroCostoId: z.number().int().positive("Debes elegir un centro de costo."),
-  funcionGastoId: z.number().int().positive("Debes elegir una funcion de gasto."),
+  unidad: z.string().trim().min(1, "La unidad es obligatoria.").optional().default("UND"),
+  grupoId: z.number().int().positive("Debes elegir un grupo.").optional(),
+  subgrupoId: z.number().int().positive("Debes elegir un subgrupo.").optional(),
+  centroCostoId: z.number().int().positive("Debes elegir un centro de costo.").optional(),
+  funcionGastoId: z.number().int().positive("Debes elegir una funcion de gasto.").optional(),
   cuentaId: z.number().int().positive().nullable().optional(),
   esEpp: z.boolean().optional().default(false)
 });

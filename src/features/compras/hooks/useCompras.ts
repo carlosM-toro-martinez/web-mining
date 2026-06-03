@@ -20,6 +20,7 @@ import type {
   RecibirCompraPayload
 } from "@/features/compras/model/compras.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
+import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 export function useComprasQuery(params: ComprasQueryParams) {
   return useQuery({
@@ -83,6 +84,9 @@ export function useCreateCompraMutation() {
 
 export function useRecibirCompraMutation() {
   const queryClient = useQueryClient();
+  // Toasts are useful for surfacing server-side states like 409 (already completed)
+  const { showError, showSuccess } = useToast();
+
   return useMutation({
     mutationFn: async ({
       id,
@@ -115,13 +119,30 @@ export function useRecibirCompraMutation() {
       }
     },
     onMutate: async (variables) => {
-      if (!variables.stockAdjustments?.length) return { snapshots: [] as Array<[readonly unknown[], unknown]> };
+      if (!variables.stockAdjustments?.length)
+        return { snapshots: [] as Array<[readonly unknown[], unknown]> };
       const snapshots = applyOptimisticStockAdjustments(variables.stockAdjustments);
       return { snapshots };
     },
-    onError: async (_error, _variables, context) => {
+    onError: async (error, variables, context) => {
       if (context?.snapshots?.length) {
         rollbackOptimisticStockAdjustments(context.snapshots);
+      }
+
+      // Handle conflict: compra already completed (409) gracefully
+      try {
+        if (error && (error as any).statusCode === 409) {
+          showError((error as any).message || "La compra ya está completada.");
+          if (variables && variables.id) {
+            await queryClient.invalidateQueries({
+              queryKey: queryKeys.compras.detail(String(variables.id))
+            });
+          }
+          await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
+          return;
+        }
+      } catch (_e) {
+        // ignore
       }
     },
     onSuccess: async (response) => {

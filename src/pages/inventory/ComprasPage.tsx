@@ -25,6 +25,7 @@ import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { CreateProveedorModal } from "@/shared/ui/CreateProveedorModal";
+import { CreateProductoModal } from "@/shared/ui/CreateProductoModal";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import {
@@ -123,6 +124,7 @@ export function ComprasPage() {
 
   const [cantidadesRecibidas, setCantidadesRecibidas] = useState<Record<string, string>>({});
   const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
+  const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
 
   const productos = productosQuery.data?.data ?? [];
   const proveedores = proveedoresQuery.data?.data ?? [];
@@ -282,8 +284,7 @@ export function ComprasPage() {
           showSuccess(
             `Recepcion registrada. Estado: ${response.data.compra.estado}. Movimientos: ${response.data.movimientos.length}.`
           );
-        },
-        onError: (error) => showError(normalizeError(error, "No se pudo confirmar la recepcion."))
+        }
       }
     );
   }
@@ -590,7 +591,8 @@ export function ComprasPage() {
             </div>
             {!proveedoresQuery.isLoading && proveedoresOrdenados.length === 0 ? (
               <p className="text-xs text-[var(--color-on-surface-variant)]">
-                No hay proveedores registrados. Crea uno haciendo clic en el botón &quot;+&quot; o ve a{" "}
+                No hay proveedores registrados. Crea uno haciendo clic en el botón &quot;+&quot; o
+                ve a{" "}
                 <Link
                   to="/inventario/proveedores"
                   className="font-semibold text-[var(--color-primary)] hover:underline"
@@ -614,6 +616,20 @@ export function ComprasPage() {
               placeholder="Observacion"
               disabled={!canManage}
             />
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCreateProductoModalOpen(true)}
+                className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2.5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
+                disabled={!canManage}
+              >
+                <Plus size={18} />
+              </button>
+              <span className="text-xs text-[var(--color-on-surface-variant)]">
+                Crear producto nuevo
+              </span>
+            </div>
 
             {draftItems.map((item, index) => (
               <div
@@ -991,6 +1007,10 @@ export function ComprasPage() {
       <CreateProveedorModal
         isOpen={isCreateProveedorModalOpen}
         onClose={() => setIsCreateProveedorModalOpen(false)}
+      />
+      <CreateProductoModal
+        isOpen={isCreateProductoModalOpen}
+        onClose={() => setIsCreateProductoModalOpen(false)}
       />
     </section>
   );

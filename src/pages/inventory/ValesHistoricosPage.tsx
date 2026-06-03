@@ -22,6 +22,7 @@ import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { CreateProveedorModal } from "@/shared/ui/CreateProveedorModal";
+import { CreateProductoModal } from "@/shared/ui/CreateProductoModal";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
@@ -94,6 +95,7 @@ export function ValesHistoricosPage() {
   const [saldoDraftById, setSaldoDraftById] = useState<Record<string, SaldoMensualDraft>>({});
   const [savingSaldoId, setSavingSaldoId] = useState<string | null>(null);
   const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
+  const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
   const [saldoSearchQuery, setSaldoSearchQuery] = useState("");
   const [saldoCurrentPage, setSaldoCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -342,6 +344,9 @@ export function ValesHistoricosPage() {
       setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }]);
       setNextCompraDraftItemId(2);
     } catch (error) {
+      // If server reports the compra is already completed (409), the mutation hook
+      // already invalidates cache and shows a message, so avoid duplicating toasts.
+      if ((error as any)?.statusCode === 409) return;
       showError(normalizeError(error, "No se pudo registrar o recibir la compra histórica."));
     }
   }
@@ -551,8 +556,17 @@ export function ValesHistoricosPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => setIsCreateProductoModalOpen(true)}
+              disabled={!canUseFlow}
+              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
+            >
+              Crear producto
+            </button>
+            <button
+              type="button"
               onClick={addDraftItem}
-              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              disabled={!canUseFlow}
+              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
             >
               Agregar item
             </button>
@@ -693,8 +707,17 @@ export function ValesHistoricosPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => setIsCreateProductoModalOpen(true)}
+              disabled={!canUseFlow}
+              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
+            >
+              Crear producto
+            </button>
+            <button
+              type="button"
               onClick={addCompraDraftItem}
-              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              disabled={!canUseFlow}
+              className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
             >
               Agregar item
             </button>
@@ -825,7 +848,10 @@ export function ValesHistoricosPage() {
                 </h3>
               </div>
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-3.5 text-[var(--color-on-surface-variant)]" />
+                <Search
+                  size={16}
+                  className="absolute left-3 top-3.5 text-[var(--color-on-surface-variant)]"
+                />
                 <input
                   type="text"
                   placeholder="Buscar por código o nombre..."
@@ -877,7 +903,9 @@ export function ValesHistoricosPage() {
                         colSpan={5}
                         className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
                       >
-                        {saldoSearchQuery ? "No hay resultados para la búsqueda." : "Sin registros para este período."}
+                        {saldoSearchQuery
+                          ? "No hay resultados para la búsqueda."
+                          : "Sin registros para este período."}
                       </td>
                     </tr>
                   ) : null}
@@ -888,10 +916,7 @@ export function ValesHistoricosPage() {
                       precioUnit: String(row.precioUnit ?? 0)
                     };
                     return (
-                      <tr
-                        key={id}
-                        className="hover:bg-[var(--color-surface-container)] transition"
-                      >
+                      <tr key={id} className="hover:bg-[var(--color-surface-container)] transition">
                         <td className="px-4 py-3 text-xs font-medium text-[var(--color-on-surface)]">
                           {row.productoCodigo}
                         </td>
@@ -1073,6 +1098,10 @@ export function ValesHistoricosPage() {
       <CreateProveedorModal
         isOpen={isCreateProveedorModalOpen}
         onClose={() => setIsCreateProveedorModalOpen(false)}
+      />
+      <CreateProductoModal
+        isOpen={isCreateProductoModalOpen}
+        onClose={() => setIsCreateProductoModalOpen(false)}
       />
     </section>
   );
