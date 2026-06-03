@@ -41,6 +41,16 @@ interface CompraDraftItem {
   productoId: string;
   cantidadPedida: string;
   precioUnit: string;
+  precioGlobal: string;
+  usePrecioGlobal: boolean;
+}
+
+function computeCompraPrecioUnit(item: CompraDraftItem): number {
+  if (!item.usePrecioGlobal) return Number(item.precioUnit);
+  const total = Number(item.precioGlobal);
+  const qty = Number(item.cantidadPedida);
+  if (!qty || !Number.isFinite(total) || !Number.isFinite(qty)) return 0;
+  return total / qty;
 }
 
 interface SaldoMensualDraft {
@@ -82,7 +92,7 @@ export function ValesHistoricosPage() {
   const [fechaOperacionCompra, setFechaOperacionCompra] = useState("");
   const [numeroFacturaCompra, setNumeroFacturaCompra] = useState("");
   const [compraDraftItems, setCompraDraftItems] = useState<CompraDraftItem[]>([
-    { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }
+    { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
   ]);
   const [nextCompraDraftItemId, setNextCompraDraftItemId] = useState(2);
   const now = new Date();
@@ -229,7 +239,7 @@ export function ValesHistoricosPage() {
   function addCompraDraftItem() {
     setCompraDraftItems((current) => [
       ...current,
-      { id: nextCompraDraftItemId, productoId: "", cantidadPedida: "1", precioUnit: "" }
+      { id: nextCompraDraftItemId, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
     ]);
     setNextCompraDraftItemId((current) => current + 1);
   }
@@ -352,7 +362,7 @@ export function ValesHistoricosPage() {
     const parsedItems = compraDraftItems.map((item) => ({
       productoId: Number(item.productoId),
       cantidadPedida: Number(item.cantidadPedida),
-      precioUnit: Number(item.precioUnit)
+      precioUnit: computeCompraPrecioUnit(item)
     }));
     if (
       parsedItems.some(
@@ -389,7 +399,7 @@ export function ValesHistoricosPage() {
       setProveedorId("");
       setFechaOperacionCompra("");
       setNumeroFacturaCompra("");
-      setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "" }]);
+      setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }]);
       setNextCompraDraftItemId(2);
     } catch (error) {
       // If server reports the compra is already completed (409), the mutation hook
@@ -730,18 +740,51 @@ export function ValesHistoricosPage() {
                 className={inputClassName}
                 placeholder="Cantidad"
               />
-              <input
-                required
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={item.precioUnit}
-                onChange={(event) =>
-                  updateCompraDraftItem(item.id, { precioUnit: event.target.value })
-                }
-                className={inputClassName}
-                placeholder="Precio Bs."
-              />
+              <div className="flex flex-col gap-1">
+                <input
+                  required={!item.usePrecioGlobal}
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={item.usePrecioGlobal ? item.precioGlobal : item.precioUnit}
+                  onChange={(event) =>
+                    updateCompraDraftItem(
+                      item.id,
+                      item.usePrecioGlobal
+                        ? { precioGlobal: event.target.value }
+                        : { precioUnit: event.target.value }
+                    )
+                  }
+                  className={inputClassName}
+                  placeholder={item.usePrecioGlobal ? "Total factura Bs." : "Precio unit. Bs."}
+                />
+                {item.usePrecioGlobal ? (
+                  <p className="pl-1 text-[11px] font-semibold text-[var(--color-primary)]">
+                    ={" "}
+                    {Number(item.cantidadPedida) > 0 && Number(item.precioGlobal) > 0
+                      ? `Bs. ${(Number(item.precioGlobal) / Number(item.cantidadPedida)).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} / unidad`
+                      : "ingresa cantidad y total"}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateCompraDraftItem(item.id, {
+                      usePrecioGlobal: !item.usePrecioGlobal,
+                      precioGlobal: "",
+                      precioUnit: ""
+                    })
+                  }
+                  tabIndex={-1}
+                  className={`self-start rounded-full border px-2 py-0.5 text-[11px] font-medium transition ${
+                    item.usePrecioGlobal
+                      ? "border-[var(--color-primary)]/50 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10"
+                      : "border-[var(--color-outline-variant)] text-[var(--color-on-surface-variant)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  }`}
+                >
+                  {item.usePrecioGlobal ? "÷ Precio unitario" : "÷ Desde total"}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => removeCompraDraftItem(item.id)}
