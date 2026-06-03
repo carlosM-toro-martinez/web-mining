@@ -5,6 +5,7 @@ import {
   getCierresMes,
   getSaldoMensual,
   getSaldoMensualById,
+  getSaldoMensualPreview,
   inicializarPeriodoHistorico,
   importCatalogo,
   recalcularStock,
@@ -49,6 +50,14 @@ export function useSaldoMensualQuery(params: SaldoMensualQuery, enabled: boolean
   return useQuery({
     queryKey: ["inventario-import", "saldo-mensual", params],
     queryFn: () => getSaldoMensual(params),
+    enabled
+  });
+}
+
+export function useSaldoMensualPreviewQuery(params: SaldoMensualQuery, enabled: boolean) {
+  return useQuery({
+    queryKey: ["inventario-import", "saldo-mensual-preview", params],
+    queryFn: () => getSaldoMensualPreview(params),
     enabled
   });
 }

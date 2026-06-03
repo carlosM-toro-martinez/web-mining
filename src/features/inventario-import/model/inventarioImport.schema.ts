@@ -167,6 +167,37 @@ export type SincronizarStockPayload = z.infer<typeof sincronizarStockPayloadSche
 export type RecalcularStockPayload = z.infer<typeof recalcularStockPayloadSchema>;
 export type SaldoMensualItemUpsertPayload = z.infer<typeof saldoMensualItemUpsertPayloadSchema>;
 export type SaldoMensualItemPatchPayload = z.infer<typeof saldoMensualItemPatchPayloadSchema>;
+export const saldoMensualPreviewItemSchema = z.object({
+  productoCodigo: z.string(),
+  productoNombre: z.string().optional().nullable(),
+  unidad: z.string().optional().nullable(),
+  grupo: z.string().optional().nullable(),
+  subGrupo: z.string().optional().nullable(),
+  saldoInicial: numberLikeSchema,
+  ingresoQty: numberLikeSchema,
+  salidaQty: numberLikeSchema,
+  saldoFinal: numberLikeSchema,
+  precioUnit: numberLikeSchema,
+  totalBs: numberLikeSchema
+});
+
+export const saldoMensualPreviewResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    anio: numberLikeSchema.int(),
+    mes: numberLikeSchema.int(),
+    esCerrado: z.boolean(),
+    resumen: z.object({
+      totalProductos: numberLikeSchema.int(),
+      productosConMovimiento: numberLikeSchema.int(),
+      totalUnidades: numberLikeSchema,
+      totalBs: numberLikeSchema
+    }),
+    items: z.array(saldoMensualPreviewItemSchema)
+  })
+});
+
 export type CierreMesItem = z.infer<typeof cierreMesItemSchema>;
 export type CierreMesPayload = z.infer<typeof cierreMesPayloadSchema>;
 export type InicializarPeriodoPayload = z.infer<typeof inicializarPeriodoPayloadSchema>;
+export type SaldoMensualPreviewResponse = z.infer<typeof saldoMensualPreviewResponseSchema>;

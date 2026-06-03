@@ -15,6 +15,7 @@ import {
   saldoMensualItemUpsertPayloadSchema,
   saldoMensualListResponseSchema,
   saldoMensualPayloadSchema,
+  saldoMensualPreviewResponseSchema,
   saldoMensualQuerySchema,
   saldoMensualSingleResponseSchema,
   sincronizarStockPayloadSchema,
@@ -77,6 +78,16 @@ export async function getSaldoMensual(params: SaldoMensualQuery) {
     config: { params: parsed },
     schema: saldoMensualListResponseSchema
   });
+}
+
+export async function getSaldoMensualPreview(params: SaldoMensualQuery) {
+  const parsed = saldoMensualQuerySchema.parse(params);
+  const result = await getRequest({
+    url: apiEndpoints.inventarioImport.saldoMensualPreview,
+    config: { params: parsed },
+    schema: saldoMensualPreviewResponseSchema
+  });
+  return result.data;
 }
 
 export async function reiniciarStock(payload: ReiniciarStockPayload) {

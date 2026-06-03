@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, Lock, Plus, ShoppingCart, Search } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarClock, Lock, Plus, ShieldAlert, ShoppingCart, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
@@ -8,6 +8,7 @@ import {
   useCierresMesQuery,
   useCreateCierreMesMutation,
   useInicializarPeriodoHistoricoMutation,
+  useSaldoMensualPreviewQuery,
   useSaldoMensualQuery,
   useUpdateSaldoMensualByIdMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
@@ -98,6 +99,11 @@ export function ValesHistoricosPage() {
   const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
   const [saldoSearchQuery, setSaldoSearchQuery] = useState("");
   const [saldoCurrentPage, setSaldoCurrentPage] = useState(1);
+  const [previewAnio, setPreviewAnio] = useState(String(now.getFullYear()));
+  const [previewMes, setPreviewMes] = useState(String(now.getMonth() + 1));
+  const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [previewSearchQuery, setPreviewSearchQuery] = useState("");
+  const [previewCurrentPage, setPreviewCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   const usuarios = usersQuery.data?.data ?? [];
@@ -134,6 +140,36 @@ export function ValesHistoricosPage() {
   const totalSaldoPages = useMemo(() => {
     return Math.ceil(filteredSaldos.length / itemsPerPage);
   }, [filteredSaldos.length]);
+
+  const previewParams = useMemo(
+    () => ({
+      anio: Number(previewAnio) || now.getFullYear(),
+      mes: Number(previewMes) || now.getMonth() + 1
+    }),
+    [previewAnio, previewMes, now]
+  );
+  const previewQuery = useSaldoMensualPreviewQuery(previewParams, previewEnabled);
+
+  const filteredPreviewItems = useMemo(() => {
+    const items = previewQuery.data?.items ?? [];
+    if (!previewSearchQuery.trim()) return items;
+    const q = previewSearchQuery.toLowerCase();
+    return items.filter(
+      (item) =>
+        (item.productoCodigo ?? "").toLowerCase().includes(q) ||
+        (item.productoNombre ?? "").toLowerCase().includes(q)
+    );
+  }, [previewQuery.data, previewSearchQuery]);
+
+  const paginatedPreviewItems = useMemo(() => {
+    const start = (previewCurrentPage - 1) * itemsPerPage;
+    return filteredPreviewItems.slice(start, start + itemsPerPage);
+  }, [filteredPreviewItems, previewCurrentPage]);
+
+  const totalPreviewPages = useMemo(
+    () => Math.ceil(filteredPreviewItems.length / itemsPerPage),
+    [filteredPreviewItems.length]
+  );
 
   const usuarioOptions = useMemo(
     () =>
@@ -260,6 +296,18 @@ export function ValesHistoricosPage() {
       return;
     }
     setAperturaEnabled(true);
+  }
+
+  function handleVerPreview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const anio = Number(previewAnio);
+    const mes = Number(previewMes);
+    if (!anio || !mes) {
+      showError("Debes indicar año y mes válidos.");
+      return;
+    }
+    setPreviewEnabled(true);
+    setPreviewCurrentPage(1);
   }
 
   async function handleGuardarSaldoFila(id: string) {
@@ -735,24 +783,19 @@ export function ValesHistoricosPage() {
       </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-          <Lock size={16} className="text-[var(--color-primary)]" />
-          Cierre de mes y períodos cerrados
+        <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+          <BarChart3 size={16} className="text-[var(--color-primary)]" />
+          Vista previa — Saldo del mes
         </h2>
+        <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+          Consulta el estado real del mes combinando el saldo inicial con todos los movimientos
+          cargados hasta ahora. No modifica ningún dato.
+        </p>
 
         <form
-          className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[160px_140px_auto]"
-          onSubmit={handleInicializarPeriodo}
+          className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]"
+          onSubmit={handleVerPreview}
         >
-          <div className="md:col-span-3">
-            <p className="text-xs font-semibold text-[var(--color-on-surface)]">
-              Inicializar período (solo primera vez)
-            </p>
-            <p className="text-xs text-[var(--color-on-surface-variant)]">
-              Aquí mismo se siembran los saldos iniciales del primer mes histórico. Solo elige
-              año/mes y presiona el botón.
-            </p>
-          </div>
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
               Año
@@ -761,8 +804,11 @@ export function ValesHistoricosPage() {
               type="number"
               min="2000"
               max="2100"
-              value={initAnio}
-              onChange={(event) => setInitAnio(event.target.value)}
+              value={previewAnio}
+              onChange={(event) => {
+                setPreviewAnio(event.target.value);
+                setPreviewEnabled(false);
+              }}
               className={inputClassName}
             />
           </div>
@@ -774,58 +820,11 @@ export function ValesHistoricosPage() {
               type="number"
               min="1"
               max="12"
-              value={initMes}
-              onChange={(event) => setInitMes(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={inicializarPeriodoMutation.isPending}
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-            >
-              {inicializarPeriodoMutation.isPending ? "Inicializando..." : "Inicializar ahora"}
-            </button>
-          </div>
-        </form>
-
-        <form
-          className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[160px_140px_auto]"
-          onSubmit={handleCargarSaldosPeriodo}
-        >
-          <div className="md:col-span-3">
-            <p className="text-xs font-semibold text-[var(--color-on-surface)]">
-              Revisar y corregir saldos (PASO 2 y PASO 3)
-            </p>
-            <p className="text-xs text-[var(--color-on-surface-variant)]">
-              Carga el período y edita <strong>saldo inicial</strong> y{" "}
-              <strong>precio unitario</strong> por producto.
-            </p>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              Año
-            </label>
-            <input
-              type="number"
-              min="2000"
-              max="2100"
-              value={aperturaAnio}
-              onChange={(event) => setAperturaAnio(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              Mes
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="12"
-              value={aperturaMes}
-              onChange={(event) => setAperturaMes(event.target.value)}
+              value={previewMes}
+              onChange={(event) => {
+                setPreviewMes(event.target.value);
+                setPreviewEnabled(false);
+              }}
               className={inputClassName}
             />
           </div>
@@ -834,19 +833,72 @@ export function ValesHistoricosPage() {
               type="submit"
               className="rounded-lg border border-[var(--color-primary)]/55 px-4 py-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
             >
-              Cargar saldos del período
+              Ver saldo del mes
             </button>
           </div>
         </form>
 
-        {aperturaEnabled ? (
-          <div className="mb-4 space-y-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-[var(--color-on-surface)]">
-                  Productos en período: {filteredSaldos.length}
-                </h3>
+        {previewEnabled && previewQuery.isLoading ? (
+          <div className="py-4 text-center text-xs text-[var(--color-on-surface-variant)]">
+            Calculando saldo del mes...
+          </div>
+        ) : null}
+
+        {previewEnabled && previewQuery.data ? (
+          <div className="space-y-4">
+            <div>
+              {previewQuery.data.esCerrado ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-success)]/15 px-3 py-1 text-xs font-semibold text-[var(--color-success)]">
+                  <Lock size={12} />
+                  Período cerrado — valores definitivos
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-warning)]/15 px-3 py-1 text-xs font-semibold text-[var(--color-warning)]">
+                  <AlertTriangle size={12} />
+                  Período abierto — valores acumulados hasta ahora
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Total productos
+                </p>
+                <p className="mt-1 text-xl font-extrabold text-[var(--color-on-surface)]">
+                  {previewQuery.data.resumen.totalProductos}
+                </p>
               </div>
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Con movimiento
+                </p>
+                <p className="mt-1 text-xl font-extrabold text-[var(--color-primary)]">
+                  {previewQuery.data.resumen.productosConMovimiento}
+                </p>
+              </div>
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Total unidades
+                </p>
+                <p className="mt-1 text-xl font-extrabold text-[var(--color-on-surface)]">
+                  {previewQuery.data.resumen.totalUnidades.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Total Bs.
+                </p>
+                <p className="mt-1 text-xl font-extrabold text-[var(--color-on-surface)]">
+                  {previewQuery.data.resumen.totalBs.toLocaleString("es-BO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <div className="relative">
                 <Search
                   size={16}
@@ -855,14 +907,18 @@ export function ValesHistoricosPage() {
                 <input
                   type="text"
                   placeholder="Buscar por código o nombre..."
-                  value={saldoSearchQuery}
+                  value={previewSearchQuery}
                   onChange={(e) => {
-                    setSaldoSearchQuery(e.target.value);
-                    setSaldoCurrentPage(1);
+                    setPreviewSearchQuery(e.target.value);
+                    setPreviewCurrentPage(1);
                   }}
                   className={`${inputClassName} pl-10`}
                 />
               </div>
+              <p className="text-xs text-[var(--color-on-surface-variant)]">
+                {filteredPreviewItems.length}{" "}
+                {filteredPreviewItems.length !== 1 ? "productos" : "producto"}
+              </p>
             </div>
 
             <div className="table-scroll overflow-x-auto">
@@ -876,110 +932,101 @@ export function ValesHistoricosPage() {
                       Producto
                     </th>
                     <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Unidad
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Grupo
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                       Saldo inicial
                     </th>
-                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                      Precio unitario
+                    <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Ingresos
                     </th>
-                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                      Acción
+                    <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Salidas
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Saldo final
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Precio Bs.
+                    </th>
+                    <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Total Bs.
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border-soft)]">
-                  {saldosPeriodoQuery.isLoading ? (
+                  {paginatedPreviewItems.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={10}
                         className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
                       >
-                        Cargando saldos del período...
+                        {previewSearchQuery
+                          ? "Sin resultados para la búsqueda."
+                          : "Sin productos en este período."}
                       </td>
                     </tr>
                   ) : null}
-                  {!saldosPeriodoQuery.isLoading && filteredSaldos.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
-                      >
-                        {saldoSearchQuery
-                          ? "No hay resultados para la búsqueda."
-                          : "Sin registros para este período."}
+                  {paginatedPreviewItems.map((row) => (
+                    <tr
+                      key={row.productoCodigo}
+                      className="transition hover:bg-[var(--color-surface-container)]"
+                    >
+                      <td className="px-4 py-3 text-xs font-medium text-[var(--color-on-surface)]">
+                        {row.productoCodigo}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-on-surface)]">
+                        {row.productoNombre ?? "-"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                        {row.unidad ?? "-"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                        {row.grupo ?? "-"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums">
+                        {row.saldoInicial}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums text-[var(--color-success)]">
+                        {row.ingresoQty > 0 ? `+${row.ingresoQty}` : row.ingresoQty}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums text-[var(--color-error)]">
+                        {row.salidaQty > 0 ? `-${row.salidaQty}` : row.salidaQty}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs font-semibold tabular-nums">
+                        {row.saldoFinal}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs tabular-nums text-[var(--color-on-surface-variant)]">
+                        {row.precioUnit.toLocaleString("es-BO", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 4
+                        })}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs font-semibold tabular-nums">
+                        {row.totalBs.toLocaleString("es-BO", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
                       </td>
                     </tr>
-                  ) : null}
-                  {paginatedSaldos.map((row) => {
-                    const id = String(row.id);
-                    const draft = saldoDraftById[id] ?? {
-                      saldoInicial: String(row.saldoInicial ?? 0),
-                      precioUnit: String(row.precioUnit ?? 0)
-                    };
-                    return (
-                      <tr key={id} className="hover:bg-[var(--color-surface-container)] transition">
-                        <td className="px-4 py-3 text-xs font-medium text-[var(--color-on-surface)]">
-                          {row.productoCodigo}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-[var(--color-on-surface)]">
-                          {row.productoNombre ?? "-"}
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={draft.saldoInicial}
-                            onChange={(event) =>
-                              setSaldoDraftById((current) => ({
-                                ...current,
-                                [id]: { ...draft, saldoInicial: event.target.value }
-                              }))
-                            }
-                            className={`${inputClassName} text-xs`}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.0001"
-                            value={draft.precioUnit}
-                            onChange={(event) =>
-                              setSaldoDraftById((current) => ({
-                                ...current,
-                                [id]: { ...draft, precioUnit: event.target.value }
-                              }))
-                            }
-                            className={`${inputClassName} text-xs`}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => handleGuardarSaldoFila(id)}
-                            disabled={savingSaldoId === id}
-                            className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:opacity-60"
-                          >
-                            {savingSaldoId === id ? "Guardando..." : "Guardar"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            {totalSaldoPages > 1 ? (
+            {totalPreviewPages > 1 ? (
               <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] pt-4">
                 <p className="text-xs text-[var(--color-on-surface-variant)]">
-                  Página {saldoCurrentPage} de {totalSaldoPages}
+                  Página {previewCurrentPage} de {totalPreviewPages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setSaldoCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={saldoCurrentPage === 1}
+                    onClick={() => setPreviewCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={previewCurrentPage === 1}
                     className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-50"
                   >
                     Anterior
@@ -987,9 +1034,9 @@ export function ValesHistoricosPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setSaldoCurrentPage((prev) => Math.min(prev + 1, totalSaldoPages))
+                      setPreviewCurrentPage((prev) => Math.min(prev + 1, totalPreviewPages))
                     }
-                    disabled={saldoCurrentPage === totalSaldoPages}
+                    disabled={previewCurrentPage === totalPreviewPages}
                     className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-50"
                   >
                     Siguiente
@@ -999,11 +1046,40 @@ export function ValesHistoricosPage() {
             ) : null}
           </div>
         ) : null}
+      </article>
 
-        {canClosePeriod ? (
+      <div className="relative flex items-center py-2">
+        <div className="flex-grow border-t border-[var(--color-border-soft)]" />
+        <span className="mx-4 flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+          <ShieldAlert size={13} />
+          Administración de períodos
+        </span>
+        <div className="flex-grow border-t border-[var(--color-border-soft)]" />
+      </div>
+
+      <article className="rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-surface-container-low)] p-5">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="rounded-lg bg-[var(--color-warning)]/14 p-2 text-[var(--color-warning)]">
+            <ShieldAlert size={16} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Administración de períodos</h2>
+            <p className="mt-0.5 text-xs text-[var(--color-on-surface-variant)]">
+              Inicializa, revisa y cierra períodos mensuales. Solo para roles administrativos.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+          <p className="mb-0.5 text-xs font-bold text-[var(--color-on-surface)]">
+            Paso 1 — Inicializar período (solo la primera vez)
+          </p>
+          <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
+            Siembra los saldos iniciales del primer mes histórico. Úsalo una sola vez por período.
+          </p>
           <form
-            className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]"
-            onSubmit={handleCreateCierreMes}
+            className="grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]"
+            onSubmit={handleInicializarPeriodo}
           >
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
@@ -1013,8 +1089,8 @@ export function ValesHistoricosPage() {
                 type="number"
                 min="2000"
                 max="2100"
-                value={cierreAnio}
-                onChange={(event) => setCierreAnio(event.target.value)}
+                value={initAnio}
+                onChange={(event) => setInitAnio(event.target.value)}
                 className={inputClassName}
               />
             </div>
@@ -1026,73 +1102,343 @@ export function ValesHistoricosPage() {
                 type="number"
                 min="1"
                 max="12"
-                value={cierreMes}
-                onChange={(event) => setCierreMes(event.target.value)}
+                value={initMes}
+                onChange={(event) => setInitMes(event.target.value)}
                 className={inputClassName}
               />
             </div>
             <div className="flex items-end">
               <button
                 type="submit"
-                disabled={createCierreMesMutation.isPending}
+                disabled={inicializarPeriodoMutation.isPending}
                 className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
               >
-                {createCierreMesMutation.isPending ? "Cerrando..." : "Cerrar período"}
+                {inicializarPeriodoMutation.isPending ? "Inicializando..." : "Inicializar período"}
               </button>
             </div>
           </form>
+        </div>
+
+        <div className="mb-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+          <p className="mb-0.5 text-xs font-bold text-[var(--color-on-surface)]">
+            Paso 2 — Revisar y corregir saldos iniciales del período
+          </p>
+          <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
+            Carga el período y edita <strong>saldo inicial</strong> y{" "}
+            <strong>precio unitario</strong> por producto antes de cerrar.
+          </p>
+          <form
+            className="grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]"
+            onSubmit={handleCargarSaldosPeriodo}
+          >
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Año
+              </label>
+              <input
+                type="number"
+                min="2000"
+                max="2100"
+                value={aperturaAnio}
+                onChange={(event) => setAperturaAnio(event.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Mes
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="12"
+                value={aperturaMes}
+                onChange={(event) => setAperturaMes(event.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="rounded-lg border border-[var(--color-primary)]/55 px-4 py-2 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              >
+                Cargar saldos del período
+              </button>
+            </div>
+          </form>
+
+          {aperturaEnabled ? (
+            <div className="mt-4 space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-[var(--color-on-surface)]">
+                    Productos en período: {filteredSaldos.length}
+                  </h3>
+                </div>
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-3.5 text-[var(--color-on-surface-variant)]"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Buscar por código o nombre..."
+                    value={saldoSearchQuery}
+                    onChange={(e) => {
+                      setSaldoSearchQuery(e.target.value);
+                      setSaldoCurrentPage(1);
+                    }}
+                    className={`${inputClassName} pl-10`}
+                  />
+                </div>
+              </div>
+
+              <div className="table-scroll overflow-x-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead className="bg-[var(--color-surface-container)]">
+                    <tr>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Código
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Producto
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Saldo inicial
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Precio unitario
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Acción
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-soft)]">
+                    {saldosPeriodoQuery.isLoading ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
+                        >
+                          Cargando saldos del período...
+                        </td>
+                      </tr>
+                    ) : null}
+                    {!saldosPeriodoQuery.isLoading && filteredSaldos.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-4 py-4 text-center text-xs text-[var(--color-on-surface-variant)]"
+                        >
+                          {saldoSearchQuery
+                            ? "No hay resultados para la búsqueda."
+                            : "Sin registros para este período."}
+                        </td>
+                      </tr>
+                    ) : null}
+                    {paginatedSaldos.map((row) => {
+                      const id = String(row.id);
+                      const draft = saldoDraftById[id] ?? {
+                        saldoInicial: String(row.saldoInicial ?? 0),
+                        precioUnit: String(row.precioUnit ?? 0)
+                      };
+                      return (
+                        <tr
+                          key={id}
+                          className="hover:bg-[var(--color-surface-container)] transition"
+                        >
+                          <td className="px-4 py-3 text-xs font-medium text-[var(--color-on-surface)]">
+                            {row.productoCodigo}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-[var(--color-on-surface)]">
+                            {row.productoNombre ?? "-"}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={draft.saldoInicial}
+                              onChange={(event) =>
+                                setSaldoDraftById((current) => ({
+                                  ...current,
+                                  [id]: { ...draft, saldoInicial: event.target.value }
+                                }))
+                              }
+                              className={`${inputClassName} text-xs`}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.0001"
+                              value={draft.precioUnit}
+                              onChange={(event) =>
+                                setSaldoDraftById((current) => ({
+                                  ...current,
+                                  [id]: { ...draft, precioUnit: event.target.value }
+                                }))
+                              }
+                              className={`${inputClassName} text-xs`}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleGuardarSaldoFila(id)}
+                              disabled={savingSaldoId === id}
+                              className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:opacity-60"
+                            >
+                              {savingSaldoId === id ? "Guardando..." : "Guardar"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalSaldoPages > 1 ? (
+                <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] pt-4">
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">
+                    Página {saldoCurrentPage} de {totalSaldoPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSaldoCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={saldoCurrentPage === 1}
+                      className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSaldoCurrentPage((prev) => Math.min(prev + 1, totalSaldoPages))
+                      }
+                      disabled={saldoCurrentPage === totalSaldoPages}
+                      className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mb-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+          <p className="mb-3 text-xs font-bold text-[var(--color-on-surface)]">
+            Períodos ya cerrados
+          </p>
+          <div className="table-scroll overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Período
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Cerrado en
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {cierresMesQuery.isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                    >
+                      Cargando períodos cerrados...
+                    </td>
+                  </tr>
+                ) : null}
+                {!cierresMesQuery.isLoading && cierres.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                    >
+                      Aún no hay períodos cerrados.
+                    </td>
+                  </tr>
+                ) : null}
+                {cierres.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2 text-xs font-semibold">
+                      {String(item.mes).padStart(2, "0")}/{item.anio}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {item.creadoAt ? new Date(item.creadoAt).toLocaleString() : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {canClosePeriod ? (
+          <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-4">
+            <p className="mb-0.5 text-xs font-bold text-[var(--color-error)]">
+              Paso 3 — Cerrar período mensual
+            </p>
+            <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
+              Cierra el período de forma definitiva. Esta acción fija los saldos y no se puede
+              deshacer.
+            </p>
+            <form
+              className="grid grid-cols-1 gap-3 md:grid-cols-[160px_140px_auto]"
+              onSubmit={handleCreateCierreMes}
+            >
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Año
+                </label>
+                <input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={cierreAnio}
+                  onChange={(event) => setCierreAnio(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Mes
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={cierreMes}
+                  onChange={(event) => setCierreMes(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={createCierreMesMutation.isPending}
+                  className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {createCierreMesMutation.isPending ? "Cerrando..." : "Cerrar período"}
+                </button>
+              </div>
+            </form>
+          </div>
         ) : (
-          <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+          <p className="text-xs text-[var(--color-on-surface-variant)]">
             Solo ADMIN o SUPERINTENDENTE puede cerrar meses.
           </p>
         )}
-
-        <div className="table-scroll overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Período
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Cerrado en
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {cierresMesQuery.isLoading ? (
-                <tr>
-                  <td
-                    colSpan={2}
-                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
-                  >
-                    Cargando períodos cerrados...
-                  </td>
-                </tr>
-              ) : null}
-              {!cierresMesQuery.isLoading && cierres.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={2}
-                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
-                  >
-                    Aún no hay períodos cerrados.
-                  </td>
-                </tr>
-              ) : null}
-              {cierres.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-2 text-xs font-semibold">
-                    {String(item.mes).padStart(2, "0")}/{item.anio}
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    {item.creadoAt ? new Date(item.creadoAt).toLocaleString() : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </article>
 
       <CreateProveedorModal

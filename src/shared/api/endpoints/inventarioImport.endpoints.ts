@@ -7,6 +7,7 @@ export const inventarioImportEndpoints = {
   cierreMes: "/api/inventario-import/cierre-mes",
   saldoMensual: "/api/inventario-import/saldo-mensual",
   saldoMensualInicializar: "/api/inventario-import/saldo-mensual/inicializar",
+  saldoMensualPreview: "/api/inventario-import/saldo-mensual/preview",
   saldoMensualItem: "/api/inventario-import/saldo-mensual/item",
   saldoMensualById: (id: string | number) => `/api/inventario-import/saldo-mensual/${id}`
 } as const;
