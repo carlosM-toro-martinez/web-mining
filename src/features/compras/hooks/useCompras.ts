@@ -25,7 +25,8 @@ import { useToast } from "@/shared/ui/toast/ToastProvider";
 export function useComprasQuery(params: ComprasQueryParams) {
   return useQuery({
     queryKey: queryKeys.compras.list(params),
-    queryFn: () => getCompras(params)
+    queryFn: () => getCompras(params),
+    refetchOnMount: "always"
   });
 }
 

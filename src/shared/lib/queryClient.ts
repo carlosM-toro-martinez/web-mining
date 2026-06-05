@@ -42,9 +42,11 @@ export function startPersistingQueryCache() {
       const dehydrated = dehydrate(queryClient, {
         shouldDehydrateQuery: (query) => {
           const topLevelKey = String(query.queryKey[0] ?? "");
-          return ["productos", "proveedores", "compras", "vales", "contabilidad"].includes(
-            topLevelKey
-          );
+          // Only persist reference/catalog data. Transactional data (compras, vales)
+          // must NOT be persisted: stale localStorage state causes list pages to
+          // appear empty or outdated on laptops that had an old cache hydrated
+          // within the 60 s staleTime window, especially with refetchOnWindowFocus off.
+          return ["productos", "proveedores", "contabilidad"].includes(topLevelKey);
         }
       });
       window.localStorage.setItem(QUERY_CACHE_KEY, JSON.stringify(dehydrated));

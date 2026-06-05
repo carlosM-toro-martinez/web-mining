@@ -16,8 +16,12 @@ export function isOfflineLikeError(error: unknown) {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
   if (!isApiError(error)) return false;
   const msg = (error.message || "").toLowerCase();
+  // NOTE: do NOT check `error.statusCode === undefined` here.
+  // ZodError-derived ApiErrors also have statusCode=undefined (schema validation
+  // failures on a successful HTTP response). Treating them as offline errors
+  // causes the operation to be queued and retried endlessly even though the
+  // server already processed it.
   return (
-    error.statusCode === undefined ||
     msg.includes("no se pudo conectar") ||
     msg.includes("network") ||
     msg.includes("failed to fetch")
