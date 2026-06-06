@@ -63,6 +63,8 @@ export function CategoriesPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCodigo, setEditCodigo] = useState("");
   const [editNombre, setEditNombre] = useState("");
+  const [editParentId, setEditParentId] = useState<string>("");
+  const [editNivel, setEditNivel] = useState<"grupo" | "subgrupo">("grupo");
   const [isImporting, setIsImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -103,12 +105,16 @@ export function CategoriesPage() {
     setEditingId(row.id);
     setEditCodigo(row.codigo);
     setEditNombre(row.nombre);
+    setEditParentId(row.parentId ? String(row.parentId) : "");
+    setEditNivel(row.nivel);
   }
 
   function cancelEditing() {
     setEditingId(null);
     setEditCodigo("");
     setEditNombre("");
+    setEditParentId("");
+    setEditNivel("grupo");
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -149,8 +155,16 @@ export function CategoriesPage() {
       return;
     }
 
+    const parsedParentId = editParentId ? Number(editParentId) : undefined;
     updateCategoriaMutation.mutate(
-      { id: editingId, payload: { codigo: editCodigo, nombre: editNombre } },
+      {
+        id: editingId,
+        payload: {
+          codigo: editCodigo,
+          nombre: editNombre,
+          parentId: parsedParentId ?? null
+        }
+      },
       {
         onSuccess: () => {
           showSuccess("Categoria actualizada correctamente.");
@@ -481,6 +495,33 @@ export function CategoriesPage() {
 
           {editingId ? (
             <form className="space-y-4" onSubmit={handleUpdate}>
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                Editando{" "}
+                <span className="font-semibold text-[var(--color-on-surface)]">
+                  {editNivel === "subgrupo" ? "subgrupo" : "grupo"}
+                </span>
+              </div>
+
+              {editNivel === "subgrupo" ? (
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Grupo padre
+                  </label>
+                  <select
+                    value={editParentId}
+                    onChange={(event) => setEditParentId(event.target.value)}
+                    className={inputClassName}
+                  >
+                    <option value="">Sin cambios (mantener actual)</option>
+                    {grupos.map((grupo: CategoriaTreeNode) => (
+                      <option key={grupo.id} value={grupo.id}>
+                        {grupo.codigo} — {grupo.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
               <div>
                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                   Codigo

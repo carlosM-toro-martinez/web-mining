@@ -81,7 +81,8 @@ export const createCategoriaPayloadSchema = z.object({
 
 export const updateCategoriaPayloadSchema = z.object({
   codigo: z.string().trim().min(1, "El codigo es obligatorio."),
-  nombre: z.string().trim().min(1, "El nombre es obligatorio.")
+  nombre: z.string().trim().min(1, "El nombre es obligatorio."),
+  parentId: z.number().int().positive().optional().nullable()
 });
 
 export type Categoria = z.infer<typeof categoriaSchema>;

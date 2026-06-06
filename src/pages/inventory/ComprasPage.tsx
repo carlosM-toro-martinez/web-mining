@@ -13,6 +13,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
+  useAnulacionesHistorialQuery,
+  useAnularCompraMutation,
   useCompraByIdQuery,
   useComprasQuery,
   useCreateCompraMutation,
@@ -84,6 +86,9 @@ function estadoClassName(estado: string) {
   if (estado === "PARCIAL") {
     return "border-[var(--color-tertiary)]/35 bg-[var(--color-tertiary)]/18 text-[var(--color-tertiary)]";
   }
+  if (estado === "ANULADA") {
+    return "border-[var(--color-error)]/35 bg-[var(--color-error)]/18 text-[var(--color-error)]";
+  }
   return "border-[var(--color-warning)]/35 bg-[var(--color-warning)]/18 text-[var(--color-warning)]";
 }
 
@@ -119,6 +124,8 @@ export function ComprasPage() {
 
   const createCompraMutation = useCreateCompraMutation();
   const recibirCompraMutation = useRecibirCompraMutation();
+  const anularCompraMutation = useAnularCompraMutation();
+  const anulacionesHistorialQuery = useAnulacionesHistorialQuery();
 
   const [proveedorId, setProveedorId] = useState("");
   const [numeroFactura, setNumeroFactura] = useState("");
@@ -135,6 +142,10 @@ export function ComprasPage() {
   const [cantidadesRecibidas, setCantidadesRecibidas] = useState<Record<string, string>>({});
   const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
   const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
+  const [anularMotivo, setAnularMotivo] = useState("");
+  const [showAnularForm, setShowAnularForm] = useState(false);
+
+  const canAnular = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
 
   const productos = productosQuery.data?.data ?? [];
   const proveedores = proveedoresQuery.data?.data ?? [];
@@ -1046,7 +1057,134 @@ export function ComprasPage() {
             >
               {recibirCompraMutation.isPending ? "Registrando..." : "Confirmar recepcion"}
             </button>
+
+            {canAnular && selectedCompra.estado !== "ANULADA" ? (
+              <div className="mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-4">
+                {!showAnularForm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAnularForm(true)}
+                    className="text-xs font-semibold text-[var(--color-error)] hover:underline"
+                  >
+                    Anular esta compra
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-[var(--color-error)]">
+                      Anular compra — acción irreversible
+                    </p>
+                    <p className="text-xs text-[var(--color-on-surface-variant)]">
+                      Se crearán contra-movimientos por los ítems ya recibidos y la compra
+                      quedará marcada como ANULADA.
+                    </p>
+                    <textarea
+                      value={anularMotivo}
+                      onChange={(event) => setAnularMotivo(event.target.value)}
+                      rows={2}
+                      placeholder="Motivo de la anulación (obligatorio)"
+                      className={`${inputClassName} text-xs`}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={!anularMotivo.trim() || anularCompraMutation.isPending}
+                        onClick={async () => {
+                          try {
+                            const result = await anularCompraMutation.mutateAsync({
+                              id: selectedCompra.id,
+                              payload: { motivo: anularMotivo.trim() }
+                            });
+                            showSuccess(
+                              `Compra anulada. Contra-asientos generados: ${result.data.contraAsientos}.`
+                            );
+                            setAnularMotivo("");
+                            setShowAnularForm(false);
+                          } catch (error) {
+                            showError(normalizeError(error, "No se pudo anular la compra."));
+                          }
+                        }}
+                        className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                      >
+                        {anularCompraMutation.isPending ? "Anulando..." : "Confirmar anulación"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAnularForm(false);
+                          setAnularMotivo("");
+                        }}
+                        className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)]"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </form>
+        ) : null}
+      </article>
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-4 text-lg font-bold">Historial de anulaciones</h2>
+        {anulacionesHistorialQuery.isLoading ? (
+          <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando historial...</p>
+        ) : null}
+        {!anulacionesHistorialQuery.isLoading &&
+        (anulacionesHistorialQuery.data?.data ?? []).length === 0 ? (
+          <p className="text-sm text-[var(--color-on-surface-variant)]">
+            No hay anulaciones registradas.
+          </p>
+        ) : null}
+        {(anulacionesHistorialQuery.data?.data ?? []).length > 0 ? (
+          <div className="table-scroll overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Compra
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Motivo
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Anulado por
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Fecha
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {(anulacionesHistorialQuery.data?.data ?? []).map((anulacion) => (
+                  <tr key={anulacion.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+                    <td className="px-3 py-2 text-xs">
+                      <span className="font-mono text-[var(--color-on-surface-variant)]">
+                        #{anulacion.compraId ?? anulacion.compra?.id ?? "-"}
+                      </span>
+                      {anulacion.compra?.proveedor?.nombre ? (
+                        <span className="ml-1 text-[var(--color-on-surface-variant)]">
+                          — {anulacion.compra.proveedor.nombre}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[var(--color-on-surface)]">
+                      {anulacion.motivo ?? "-"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                      {anulacion.usuario?.nombre ?? "-"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                      {anulacion.createdAt
+                        ? new Date(anulacion.createdAt).toLocaleString()
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </article>
 

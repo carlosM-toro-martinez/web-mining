@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  anularCompra,
   createCompra,
+  getAnulacionesHistorial,
   getCompraById,
   getCompras,
   recibirCompra
@@ -14,6 +16,7 @@ import {
   rollbackOptimisticStockAdjustments
 } from "@/features/inventory-offline/lib/stockOptimistic";
 import type {
+  AnularCompraPayload,
   Compra,
   ComprasQueryParams,
   CreateCompraPayload,
@@ -36,6 +39,29 @@ export function useCompraByIdQuery(id: string) {
     queryKey: queryKeys.compras.detail(normalizedId),
     queryFn: () => getCompraById(normalizedId),
     enabled: Boolean(normalizedId)
+  });
+}
+
+export function useAnulacionesHistorialQuery() {
+  return useQuery({
+    queryKey: [...queryKeys.compras.all, "anulaciones-historial"],
+    queryFn: getAnulacionesHistorial,
+    refetchOnMount: "always"
+  });
+}
+
+export function useAnularCompraMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: AnularCompraPayload }) =>
+      anularCompra(id, payload),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
+      await queryClient.setQueryData(queryKeys.compras.detail(response.data.compra.id), {
+        success: true,
+        data: response.data.compra
+      });
+    }
   });
 }
 

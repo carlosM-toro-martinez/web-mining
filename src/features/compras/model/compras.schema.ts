@@ -82,6 +82,39 @@ export const recibirCompraResponseSchema = z.object({
   })
 });
 
+const anulacionUsuarioSchema = z.object({
+  id: numberLikeSchema.int().positive(),
+  nombre: z.string().optional().nullable(),
+  email: z.string().optional().nullable()
+});
+
+export const anulacionCompraSchema = z.object({
+  id: z.union([z.string(), numberLikeSchema]).transform((v) => String(v)),
+  compraId: z.union([z.string(), numberLikeSchema]).transform((v) => String(v)).optional().nullable(),
+  motivo: z.string().optional().nullable(),
+  createdAt: z.string().optional().nullable(),
+  usuario: anulacionUsuarioSchema.optional().nullable(),
+  compra: compraSchema.optional().nullable()
+});
+
+export const anularCompraPayloadSchema = z.object({
+  motivo: z.string().trim().min(1, "El motivo es obligatorio.")
+});
+
+export const anularCompraResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    compra: compraSchema,
+    anulacion: anulacionCompraSchema,
+    contraAsientos: numberLikeSchema.int().nonnegative()
+  })
+});
+
+export const anulacionesHistorialResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.array(anulacionCompraSchema)
+});
+
 export const createCompraPayloadSchema = z.object({
   proveedorId: numberLikeSchema.int().positive("Proveedor invalido."),
   numeroFactura: z.string().trim().min(1).optional(),
@@ -109,6 +142,8 @@ export const recibirCompraPayloadSchema = z.object({
   cantidadesRecibidas: z.record(z.string(), numberLikeSchema.min(0))
 });
 
+export type AnulacionCompra = z.infer<typeof anulacionCompraSchema>;
+export type AnularCompraPayload = z.infer<typeof anularCompraPayloadSchema>;
 export type Compra = z.infer<typeof compraSchema>;
 export type CompraItem = z.infer<typeof compraItemSchema>;
 export type CreateCompraPayload = z.infer<typeof createCompraPayloadSchema>;
