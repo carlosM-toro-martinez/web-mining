@@ -45,14 +45,14 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
 
-      - "traefik.http.routers.frontend.rule=Host(`marte.encuentrass.lat`) || Host(`minmartesrl.com`) || Host(`www.minmartesrl.com`)"
+      - "traefik.http.routers.frontend.rule=Host(`marte.encuentrass.lat`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=le"
 
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
       # HTTP → HTTPS redirect
-      - "traefik.http.routers.frontend-http.rule=Host(`marte.encuentrass.lat`) || Host(`minmartesrl.com`) || Host(`www.minmartesrl.com`)"
+      - "traefik.http.routers.frontend-http.rule=Host(`marte.encuentrass.lat`)"
       - "traefik.http.routers.frontend-http.entrypoints=web"
       - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
 
