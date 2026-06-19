@@ -49,9 +49,10 @@ export function useValesReportQuery(params: ValesReportQueryParams, enabled: boo
 
 export function useComprasReportQuery(params: ComprasReportQueryParams, enabled: boolean) {
   return useQuery({
-    queryKey: queryKeys.reportes.compras(params, false),
+    queryKey: queryKeys.reportes.comprasDetalle(params),
     queryFn: () => getComprasReport(params),
-    enabled
+    enabled,
+    refetchOnMount: "always"
   });
 }
 

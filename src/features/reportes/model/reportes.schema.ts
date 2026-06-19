@@ -94,20 +94,69 @@ const reporteValeItemSchema = z.object({
 const reporteCompraItemSchema = z.object({
   id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
   estado: z.string(),
+  numeroFactura: z.string().optional().nullable(),
+  observacion: z.string().optional().nullable(),
+  descuento: numberLikeSchema,
   createdAt: z.string().optional().nullable(),
   recibidoAt: z.string().optional().nullable(),
-  proveedor: z.object({ id: numberLikeSchema, nombre: z.string().optional().nullable() }).optional().nullable(),
-  items: z.array(z.object({
-    cantidadPedida: numberLikeSchema.optional().nullable(),
-    cantidadRecibida: numberLikeSchema.optional().nullable(),
-    precioUnit: numberLikeSchema.optional().nullable(),
-    producto: z.object({ id: numberLikeSchema.optional(), nombre: z.string().optional().nullable(), codigo: z.string().optional().nullable() }).optional().nullable()
-  })).optional().default([])
+  fechaOperacion: z.string().optional().nullable(),
+  proveedor: z
+    .object({
+      id: numberLikeSchema.int().positive(),
+      nombre: z.string().optional().nullable(),
+      razonSocial: z.string().optional().nullable(),
+      nit: z.string().optional().nullable(),
+      contacto: z.string().optional().nullable(),
+      lugar: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  usuarioRegistro: z
+    .object({ id: numberLikeSchema.int().positive(), nombre: z.string().optional().nullable() })
+    .optional()
+    .nullable(),
+  usuarioRecibe: z
+    .object({ id: numberLikeSchema.int().positive(), nombre: z.string().optional().nullable() })
+    .optional()
+    .nullable(),
+  anulacion: z
+    .object({
+      motivo: z.string(),
+      creadoAt: z.string().optional().nullable(),
+      usuario: z
+        .object({ id: numberLikeSchema.int().positive(), nombre: z.string().optional().nullable() })
+        .optional()
+        .nullable()
+    })
+    .optional()
+    .nullable(),
+  items: z
+    .array(
+      z.object({
+        productoId: numberLikeSchema.int().positive(),
+        codigo: z.string().optional().nullable(),
+        nombre: z.string().optional().nullable(),
+        unidad: z.string().optional().nullable(),
+        cantidadPedida: numberLikeSchema,
+        cantidadRecibida: numberLikeSchema,
+        precioUnit: numberLikeSchema,
+        subtotalBs: numberLikeSchema
+      })
+    )
+    .default([]),
+  subtotalBs: numberLikeSchema,
+  descuentoBs: numberLikeSchema,
+  totalBs: numberLikeSchema
 });
 
 export const stockReportResponseSchema = z.object({ success: z.boolean().optional(), data: z.array(stockItemSchema), meta: reporteMetaSchema });
 export const valesReportResponseSchema = z.object({ success: z.boolean().optional(), data: z.array(reporteValeItemSchema), meta: reporteMetaFlexibleSchema });
-export const comprasReportResponseSchema = z.object({ success: z.boolean().optional(), data: z.array(reporteCompraItemSchema), meta: reporteMetaFlexibleSchema });
+export const comprasReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.array(reporteCompraItemSchema),
+  meta: reporteMetaFlexibleSchema,
+  totalGeneral: numberLikeSchema
+});
 
 export const stockReportQueryParamsSchema = z.object({
   page: numberLikeSchema.int().positive().default(1),

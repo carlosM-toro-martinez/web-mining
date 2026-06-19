@@ -100,7 +100,18 @@ export const queryKeys = {
         fechaFin?: string;
       },
       fetchAll: boolean
-    ) => [...queryKeys.reportes.all, "compras", params, fetchAll] as const
+    ) => [...queryKeys.reportes.all, "compras", params, fetchAll] as const,
+    comprasDetalle: (
+      params: {
+        page: number;
+        limit: number;
+        estado?: string;
+        proveedorId?: number;
+        fechaInicio?: string;
+        fechaFin?: string;
+        sinPaginar?: boolean;
+      }
+    ) => [...queryKeys.reportes.all, "compras-detalle", params] as const
   },
   pedidos: {
     all: ["pedidos"] as const,

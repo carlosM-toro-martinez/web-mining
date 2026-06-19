@@ -82,7 +82,7 @@ export async function getValesReport(params: ValesReportQueryParams) {
 
 export async function getComprasReport(params: ComprasReportQueryParams) {
   return getRequest({
-    url: apiEndpoints.reportes.compras,
+    url: apiEndpoints.reportes.comprasDetalle,
     config: { params: cleanSimpleParams(params, comprasReportQueryParamsSchema.parse) },
     schema: comprasReportResponseSchema
   });

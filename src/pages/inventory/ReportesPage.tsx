@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   CalendarRange,
   ChevronLeft,
@@ -21,6 +21,7 @@ import {
   useValesReportQuery
 } from "@/features/reportes/hooks/useReportes";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
+import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
 import {
   buildBalanceMensualApiReportDefinition,
   buildEntradasAlmacenApiReportDefinition,
@@ -169,9 +170,19 @@ export function ReportesPage() {
   const [fechaFin, setFechaFin] = useState(defaultFechaFin);
   const [dataMode, setDataMode] = useState<DataMode>("paged");
   const [estadoReporte, setEstadoReporte] = useState("");
+  const [expandedCompraIds, setExpandedCompraIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setProductoIdDraft("");
+    setProductoId("");
+    setPage(1);
+    setExpandedCompraIds(new Set());
+  }, [tipo]);
 
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const productos = productosQuery.data?.data ?? [];
+  const proveedoresQuery = useProveedoresQuery({ page: 1, limit: 5000, search: "" });
+  const proveedores = proveedoresQuery.data?.data ?? [];
   const productoOptions = useMemo(
     () =>
       productos.map((producto) => ({
@@ -181,6 +192,19 @@ export function ReportesPage() {
       })),
     [productos]
   );
+  const proveedorOptions = useMemo(
+    () =>
+      proveedores.map((proveedor) => ({
+        id: String(proveedor.id),
+        label: `${proveedor.nombre}${proveedor.nit ? ` - NIT ${proveedor.nit}` : ""}`,
+        searchText: `${proveedor.nombre} ${proveedor.razonSocial ?? ""} ${proveedor.nit ?? ""} ${proveedor.lugar ?? ""}`
+      })),
+    [proveedores]
+  );
+  const primaryFilterOptions = tipo === "compras-resumen" ? proveedorOptions : productoOptions;
+  const primaryFilterLabel = tipo === "compras-resumen" ? "Proveedor" : "Producto";
+  const primaryFilterPlaceholder =
+    tipo === "compras-resumen" ? "Todos los proveedores" : "Todos los productos";
 
   const params = useMemo(
     () => ({
@@ -297,7 +321,8 @@ export function ReportesPage() {
   );
 
   const selectedProductLabel =
-    productoOptions.find((option) => option.id === productoId)?.label ?? "Todos los productos";
+    primaryFilterOptions.find((option) => option.id === productoId)?.label ??
+    primaryFilterPlaceholder;
   const selectedDateLabel =
     dateMode === "specific"
       ? fecha || "Sin fecha"
@@ -353,6 +378,7 @@ export function ReportesPage() {
     setFechaFin(fechaFinDraft);
     setDataMode(dataModeDraft);
     setEstadoReporte(estadoReporteDraft);
+    setExpandedCompraIds(new Set());
   }
 
   function handleResetFilters() {
@@ -370,6 +396,7 @@ export function ReportesPage() {
     setFechaFin(defaultFechaFin);
     setDataMode("paged");
     setEstadoReporte("");
+    setExpandedCompraIds(new Set());
     setPage(1);
     setLimit(50);
   }
@@ -520,13 +547,13 @@ export function ReportesPage() {
         >
           <div className="xl:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              Producto
+              {primaryFilterLabel}
             </label>
             <AutocompleteSelect
               value={productoIdDraft}
               onChange={setProductoIdDraft}
-              options={productoOptions}
-              placeholder="Todos los productos"
+              options={primaryFilterOptions}
+              placeholder={primaryFilterPlaceholder}
               className={inputClassName}
             />
           </div>
@@ -664,7 +691,7 @@ export function ReportesPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-[var(--color-on-surface-variant)]">
             <CalendarRange size={14} />
-            {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} | Producto: {selectedProductLabel}
+            {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} | {primaryFilterLabel}: {selectedProductLabel}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -695,6 +722,14 @@ export function ReportesPage() {
             </button>
           </div>
         </div>
+
+        {currentQuery.isError ? (
+          <div className="mb-4 rounded-lg border border-[var(--color-error)]/45 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
+            {currentQuery.error instanceof Error
+              ? currentQuery.error.message
+              : "No se pudo cargar el reporte seleccionado."}
+          </div>
+        ) : null}
 
         {isLegacyType ? (
           <div className="table-scroll overflow-x-auto">
@@ -832,6 +867,18 @@ export function ReportesPage() {
                       <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Disponible</th>
                       <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Valor Total</th>
                     </>
+                  ) : tipo === "compras-resumen" ? (
+                    <>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Factura</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha operación</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Ítems</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Subtotal Bs.</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Descuento</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Total Bs.</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Anulación</th>
+                    </>
                   ) : (
                     <>
                       <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">ID</th>
@@ -849,11 +896,106 @@ export function ReportesPage() {
                   </tr>
                 )) : tipo === "vales-resumen" ? (valesResumenQuery.data?.data ?? []).map((item) => (
                   <tr key={item.id}><td className="px-3 py-2 text-xs">{item.id}</td><td className="px-3 py-2 text-xs">{item.estado}</td><td className="px-3 py-2 text-xs">{item.solicitante?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}</td></tr>
-                )) : (comprasResumenQuery.data?.data ?? []).map((item) => (
-                  <tr key={item.id}><td className="px-3 py-2 text-xs">{item.id}</td><td className="px-3 py-2 text-xs">{item.estado}</td><td className="px-3 py-2 text-xs">{item.proveedor?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}</td></tr>
-                ))}
+                )) : (comprasResumenQuery.data?.data ?? []).map((item) => {
+                  const isExpanded = expandedCompraIds.has(item.id);
+                  return (
+                    <Fragment key={item.id}>
+                      <tr className="transition hover:bg-[var(--color-surface-container-highest)]">
+                        <td className="px-3 py-2 text-xs">{item.numeroFactura ?? "-"}</td>
+                        <td className="px-3 py-2 text-xs">{item.estado}</td>
+                        <td className="px-3 py-2 text-xs" title={item.proveedor?.razonSocial ?? undefined}>
+                          {item.proveedor?.nombre ?? "-"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {item.fechaOperacion
+                            ? formatInventoryDate(item.fechaOperacion)
+                            : item.createdAt
+                              ? formatInventoryDate(item.createdAt)
+                              : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedCompraIds((current) => {
+                                const next = new Set(current);
+                                if (next.has(item.id)) next.delete(item.id);
+                                else next.add(item.id);
+                                return next;
+                              })
+                            }
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)] px-2 py-1 font-semibold text-[var(--color-primary)] transition hover:border-[var(--color-primary)]"
+                            aria-expanded={isExpanded}
+                          >
+                            <ChevronRight
+                              size={13}
+                              className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                            />
+                            {item.items.length}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs">
+                          {item.subtotalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs">
+                          {item.descuento.toLocaleString("es-BO", { maximumFractionDigits: 2 })}% ({item.descuentoBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs font-semibold">
+                          {item.totalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-2 text-xs">{item.anulacion?.motivo ?? "-"}</td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr className="bg-[var(--color-surface-container-high)]">
+                          <td colSpan={9} className="px-5 py-3">
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse text-left">
+                                <thead>
+                                  <tr className="border-b border-[var(--color-border-soft)]">
+                                    <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Código</th>
+                                    <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Producto</th>
+                                    <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Unidad</th>
+                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Pedida</th>
+                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Recibida</th>
+                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">P. Unit. Bs.</th>
+                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Subtotal Bs.</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                                  {item.items.map((detalle) => (
+                                    <tr key={`${item.id}-${detalle.productoId}`}>
+                                      <td className="px-2 py-2 font-mono text-xs">{detalle.codigo ?? "-"}</td>
+                                      <td className="px-2 py-2 text-xs">{detalle.nombre ?? "-"}</td>
+                                      <td className="px-2 py-2 text-xs">{detalle.unidad ?? "-"}</td>
+                                      <td className="px-2 py-2 text-right text-xs">{detalle.cantidadPedida}</td>
+                                      <td className="px-2 py-2 text-right text-xs">{detalle.cantidadRecibida}</td>
+                                      <td className="px-2 py-2 text-right text-xs">
+                                        {detalle.precioUnit.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="px-2 py-2 text-right text-xs font-semibold">
+                                        {detalle.subtotalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
+            {tipo === "compras-resumen" && comprasResumenQuery.data ? (
+              <div className="mt-3 flex justify-end text-sm font-bold">
+                Total general: Bs. {comprasResumenQuery.data.totalGeneral.toLocaleString("es-BO", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })}
+              </div>
+            ) : null}
           </div>
         ) : reportDefinition ? (
           <>

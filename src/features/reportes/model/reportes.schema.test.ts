@@ -56,14 +56,32 @@ describe("reportes.schema", () => {
         {
           id: "compra-1",
           estado: "PARCIAL",
-          proveedor: { id: 3, nombre: "Proveedor A" },
-          items: []
+          numeroFactura: "FAC-001",
+          descuento: 5,
+          proveedor: { id: 3, nombre: "Proveedor A", nit: "123" },
+          items: [
+            {
+              productoId: 10,
+              codigo: "ELE-001",
+              nombre: "Cable",
+              unidad: "m",
+              cantidadPedida: 10,
+              cantidadRecibida: 8,
+              precioUnit: 5,
+              subtotalBs: 40
+            }
+          ],
+          subtotalBs: 40,
+          descuentoBs: 2,
+          totalBs: 38
         }
       ],
-      meta: { page: 1, limit: 20, total: 1, totalPages: 1 }
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      totalGeneral: 38
     });
 
     expect(parsed.data[0]?.estado).toBe("PARCIAL");
+    expect(parsed.data[0]?.totalBs).toBe(38);
   });
 
   it("parses entradas de almacen grouped by month", () => {
