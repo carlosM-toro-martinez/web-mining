@@ -5,5 +5,7 @@ export const reportesEndpoints = {
   vales: "/api/reportes/vales",
   compras: "/api/reportes/compras",
   balanceMensual: "/api/reportes/balance-mensual",
-  inventarioAlmacen: "/api/reportes/inventario-almacen"
+  inventarioAlmacen: "/api/reportes/inventario-almacen",
+  entradasAlmacen: "/api/reportes/entradas-almacen",
+  salidasAlmacen: "/api/reportes/salidas-almacen"
 } as const;

@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronRight,
-  FlaskConical,
   FileBarChart2,
   UploadCloud,
   LayoutDashboard,
@@ -31,7 +30,6 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 import { useInventoryOfflinePendingCount } from "@/features/inventory-offline/hooks/useInventoryOffline";
 import { useTheme } from "@/shared/theme/ThemeProvider";
 import minerImage from "@/assets/miner.png";
-import { getPostLogoutPath } from "@/app/router/domainConfig";
 
 interface NavItem {
   label: string;
@@ -436,7 +434,7 @@ export function AppShell() {
             type="button"
             onClick={() => {
               logout();
-              navigate(getPostLogoutPath(window.location.hostname), { replace: true });
+              navigate("/login", { replace: true });
             }}
             className="app-shell__logout-btn rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
           >

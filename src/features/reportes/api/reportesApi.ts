@@ -3,20 +3,21 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   binCardResponseSchema,
   binCardValoradoResponseSchema,
+  balanceMensualReportResponseSchema,
   comprasReportQueryParamsSchema,
   comprasReportResponseSchema,
+  entradasAlmacenReportResponseSchema,
+  inventarioAlmacenReportResponseSchema,
+  monthlyRangeReportQueryParamsSchema,
   stockReportQueryParamsSchema,
   stockReportResponseSchema,
   valesReportQueryParamsSchema,
   valesReportResponseSchema,
-  type BinCardItem,
-  type BinCardResponse,
-  type BinCardValoradoItem,
-  type BinCardValoradoResponse,
   reportesQueryParamsSchema,
-  type ReportesQueryParams
-  ,
+  salidasAlmacenReportResponseSchema,
+  type ReportesQueryParams,
   type ComprasReportQueryParams,
+  type MonthlyRangeReportQueryParams,
   type StockReportQueryParams,
   type ValesReportQueryParams
 } from "@/features/reportes/model/reportes.schema";
@@ -35,7 +36,7 @@ function cleanSimpleParams<T extends object>(params: T, parse: (payload: T) => T
   );
 }
 
-async function getBinCardPage(params: ReportesQueryParams): Promise<BinCardResponse> {
+async function getBinCardPage(params: ReportesQueryParams) {
   return getRequest({
     url: apiEndpoints.reportes.binCard,
     config: { params: cleanParams(params) },
@@ -45,7 +46,7 @@ async function getBinCardPage(params: ReportesQueryParams): Promise<BinCardRespo
 
 async function getBinCardValoradoPage(
   params: ReportesQueryParams
-): Promise<BinCardValoradoResponse> {
+) {
   return getRequest({
     url: apiEndpoints.reportes.binCardValorado,
     config: { params: cleanParams(params) },
@@ -53,38 +54,14 @@ async function getBinCardValoradoPage(
   });
 }
 
-async function fetchAllPages<TItem>(
-  initialParams: ReportesQueryParams,
-  fetchPage: (params: ReportesQueryParams) => Promise<{ items: TItem[]; meta: BinCardResponse["meta"] }>
-) {
-  const first = await fetchPage({ ...initialParams, page: 1 });
-  if (first.meta.totalPages <= 1) return first;
-
-  const pending: Promise<{ items: TItem[]; meta: BinCardResponse["meta"] }>[] = [];
-  for (let page = 2; page <= first.meta.totalPages; page += 1) {
-    pending.push(fetchPage({ ...initialParams, page }));
-  }
-  const rest = await Promise.all(pending);
-  const items = [first.items, ...rest.map((chunk) => chunk.items)].flat();
-  return {
-    items,
-    meta: {
-      page: 1,
-      limit: items.length || first.meta.limit,
-      total: items.length,
-      totalPages: 1
-    }
-  };
-}
-
 export async function getBinCard(params: ReportesQueryParams, fetchAll: boolean) {
   if (!fetchAll) return getBinCardPage(params);
-  return fetchAllPages<BinCardItem>(params, getBinCardPage);
+  return getBinCardPage({ ...params, sinPaginar: true });
 }
 
 export async function getBinCardValorado(params: ReportesQueryParams, fetchAll: boolean) {
   if (!fetchAll) return getBinCardValoradoPage(params);
-  return fetchAllPages<BinCardValoradoItem>(params, getBinCardValoradoPage);
+  return getBinCardValoradoPage({ ...params, sinPaginar: true });
 }
 
 export async function getStockReport(params: StockReportQueryParams) {
@@ -108,5 +85,37 @@ export async function getComprasReport(params: ComprasReportQueryParams) {
     url: apiEndpoints.reportes.compras,
     config: { params: cleanSimpleParams(params, comprasReportQueryParamsSchema.parse) },
     schema: comprasReportResponseSchema
+  });
+}
+
+export async function getBalanceMensualReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.balanceMensual,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: balanceMensualReportResponseSchema
+  });
+}
+
+export async function getInventarioAlmacenReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.inventarioAlmacen,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: inventarioAlmacenReportResponseSchema
+  });
+}
+
+export async function getEntradasAlmacenReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.entradasAlmacen,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: entradasAlmacenReportResponseSchema
+  });
+}
+
+export async function getSalidasAlmacenReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.salidasAlmacen,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: salidasAlmacenReportResponseSchema
   });
 }

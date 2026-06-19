@@ -61,11 +61,6 @@ export default defineConfig({
         ],
         shortcuts: [
           {
-            name: "Exploraciones",
-            short_name: "Exploraciones",
-            url: "/exploraciones"
-          },
-          {
             name: "Inventario",
             short_name: "Inventario",
             url: "/inventario"

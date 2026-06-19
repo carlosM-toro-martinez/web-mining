@@ -10,15 +10,23 @@ import {
 } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  useBalanceMensualReportQuery,
   useBinCardQuery,
   useBinCardValoradoQuery,
   useComprasReportQuery,
+  useEntradasAlmacenReportQuery,
+  useInventarioAlmacenReportQuery,
+  useSalidasAlmacenReportQuery,
   useStockReportQuery,
   useValesReportQuery
 } from "@/features/reportes/hooks/useReportes";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import {
+  buildBalanceMensualApiReportDefinition,
+  buildEntradasAlmacenApiReportDefinition,
+  buildInventarioAlmacenApiReportDefinition,
   buildInventoryReportDefinition,
+  buildSalidasAlmacenApiReportDefinition,
   INVENTORY_REPORTS,
   isInventoryReportType
 } from "@/features/reportes/lib/inventoryReportBuilder";
@@ -90,6 +98,44 @@ function buildRetroactivoLabel(item: {
   return "Retroactivo";
 }
 
+function monthRangeFromDates(params: {
+  dateMode: DateMode;
+  fecha: string;
+  fechaInicio: string;
+  fechaFin: string;
+}) {
+  const fallback = new Date();
+  const startSource =
+    params.dateMode === "specific"
+      ? params.fecha
+      : params.dateMode === "range"
+        ? params.fechaInicio
+        : "";
+  const endSource =
+    params.dateMode === "specific"
+      ? params.fecha
+      : params.dateMode === "range"
+        ? params.fechaFin
+        : "";
+  const start = startSource ? new Date(`${startSource}T00:00:00`) : fallback;
+  const end = endSource ? new Date(`${endSource}T00:00:00`) : start;
+  const safeStart = Number.isNaN(start.getTime()) ? fallback : start;
+  const safeEnd = Number.isNaN(end.getTime()) ? safeStart : end;
+
+  return {
+    anioInicio: safeStart.getFullYear(),
+    mesInicio: safeStart.getMonth() + 1,
+    anioFin: safeEnd.getFullYear(),
+    mesFin: safeEnd.getMonth() + 1
+  };
+}
+
+function isPagedMeta(
+  meta: { page?: number; totalPages?: number; total?: number } | undefined
+): meta is { page: number; totalPages: number; total: number } {
+  return typeof meta?.page === "number" && typeof meta.totalPages === "number";
+}
+
 export function ReportesPage() {
   const { tipo } = useParams();
   const navigate = useNavigate();
@@ -115,12 +161,14 @@ export function ReportesPage() {
   const [fechaInicioDraft, setFechaInicioDraft] = useState(defaultFechaInicio);
   const [fechaFinDraft, setFechaFinDraft] = useState(defaultFechaFin);
   const [dataModeDraft, setDataModeDraft] = useState<DataMode>("paged");
+  const [estadoReporteDraft, setEstadoReporteDraft] = useState("");
   const [productoId, setProductoId] = useState("");
   const [dateMode, setDateMode] = useState<DateMode>("range");
   const [fecha, setFecha] = useState("");
   const [fechaInicio, setFechaInicio] = useState(defaultFechaInicio);
   const [fechaFin, setFechaFin] = useState(defaultFechaFin);
   const [dataMode, setDataMode] = useState<DataMode>("paged");
+  const [estadoReporte, setEstadoReporte] = useState("");
 
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const productos = productosQuery.data?.data ?? [];
@@ -160,19 +208,56 @@ export function ReportesPage() {
   const binCardQuery = useBinCardQuery(params, dataMode === "all" || shouldFetchAllLegacy, isLegacyType && tipo === "bin-card");
   const binCardValoradoQuery = useBinCardValoradoQuery(
     params,
-    dataMode === "all" || shouldFetchAllLegacy || isAdminType,
-    (isLegacyType && tipo === "bin-card-valorado") || isAdminType
+    dataMode === "all" || shouldFetchAllLegacy || (isAdminType && (tipo === "costo-produccion" || tipo === "movimiento-almacen")),
+    (isLegacyType && tipo === "bin-card-valorado") ||
+      (isAdminType && (tipo === "costo-produccion" || tipo === "movimiento-almacen"))
+  );
+  const monthRangeParams = useMemo(
+    () => monthRangeFromDates({ dateMode, fecha, fechaInicio, fechaFin }),
+    [dateMode, fecha, fechaFin, fechaInicio]
+  );
+  const balanceMensualQuery = useBalanceMensualReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "balance-mensual"
+  );
+  const inventarioAlmacenQuery = useInventarioAlmacenReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "inventario-general"
+  );
+  const entradasAlmacenQuery = useEntradasAlmacenReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "entradas-almacen"
+  );
+  const salidasAlmacenQuery = useSalidasAlmacenReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "salidas-almacen"
   );
   const stockQuery = useStockReportQuery(
     { page, limit, categoriaId: undefined },
     isApiType && tipo === "stock-actual"
   );
   const valesResumenQuery = useValesReportQuery(
-    { page, limit, estado: undefined, solicitanteId: productoId ? Number(productoId) : undefined, fechaInicio, fechaFin },
+    {
+      page,
+      limit,
+      estado: estadoReporte || undefined,
+      solicitanteId: productoId ? Number(productoId) : undefined,
+      fechaInicio,
+      fechaFin,
+      sinPaginar: dataMode === "all"
+    },
     isApiType && tipo === "vales-resumen"
   );
   const comprasResumenQuery = useComprasReportQuery(
-    { page, limit, estado: undefined, proveedorId: productoId ? Number(productoId) : undefined, fechaInicio, fechaFin },
+    {
+      page,
+      limit,
+      estado: estadoReporte || undefined,
+      proveedorId: productoId ? Number(productoId) : undefined,
+      fechaInicio,
+      fechaFin,
+      sinPaginar: dataMode === "all"
+    },
     isApiType && tipo === "compras-resumen"
   );
 
@@ -221,16 +306,41 @@ export function ReportesPage() {
         : "Sin filtro";
 
   const reportDefinition = useMemo(
-    () =>
-      isAdminType
-        ? buildInventoryReportDefinition({
-            type: tipo,
-            items: valorizadoItems,
-            productos,
-            dateLabel: selectedDateLabel
-          })
-        : null,
-    [isAdminType, tipo, valorizadoItems, productos, selectedDateLabel]
+    () => {
+      if (!isAdminType) return null;
+      if (tipo === "balance-mensual" && balanceMensualQuery.data) {
+        return buildBalanceMensualApiReportDefinition(balanceMensualQuery.data);
+      }
+      if (tipo === "inventario-general" && inventarioAlmacenQuery.data) {
+        return buildInventarioAlmacenApiReportDefinition(inventarioAlmacenQuery.data);
+      }
+      if (tipo === "entradas-almacen" && entradasAlmacenQuery.data) {
+        return buildEntradasAlmacenApiReportDefinition(entradasAlmacenQuery.data);
+      }
+      if (tipo === "salidas-almacen" && salidasAlmacenQuery.data) {
+        return buildSalidasAlmacenApiReportDefinition(salidasAlmacenQuery.data);
+      }
+      if (tipo === "costo-produccion" || tipo === "movimiento-almacen") {
+        return buildInventoryReportDefinition({
+          type: tipo,
+          items: valorizadoItems,
+          productos,
+          dateLabel: selectedDateLabel
+        });
+      }
+      return null;
+    },
+    [
+      balanceMensualQuery.data,
+      entradasAlmacenQuery.data,
+      inventarioAlmacenQuery.data,
+      isAdminType,
+      productos,
+      selectedDateLabel,
+      salidasAlmacenQuery.data,
+      tipo,
+      valorizadoItems
+    ]
   );
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
@@ -242,6 +352,7 @@ export function ReportesPage() {
     setFechaInicio(fechaInicioDraft);
     setFechaFin(fechaFinDraft);
     setDataMode(dataModeDraft);
+    setEstadoReporte(estadoReporteDraft);
   }
 
   function handleResetFilters() {
@@ -251,12 +362,14 @@ export function ReportesPage() {
     setFechaInicioDraft(defaultFechaInicio);
     setFechaFinDraft(defaultFechaFin);
     setDataModeDraft("paged");
+    setEstadoReporteDraft("");
     setProductoId("");
     setDateMode("range");
     setFecha("");
     setFechaInicio(defaultFechaInicio);
     setFechaFin(defaultFechaFin);
     setDataMode("paged");
+    setEstadoReporte("");
     setPage(1);
     setLimit(50);
   }
@@ -292,8 +405,37 @@ export function ReportesPage() {
     }
   }
 
-  const currentQuery = isLegacyType ? legacyActiveQuery : isAdminType ? binCardValoradoQuery : tipo === "stock-actual" ? stockQuery : tipo === "vales-resumen" ? valesResumenQuery : comprasResumenQuery;
-  const currentMeta = isLegacyType ? legacyMeta : currentQuery.data?.meta;
+  const currentQuery = isLegacyType
+    ? legacyActiveQuery
+    : tipo === "balance-mensual"
+      ? balanceMensualQuery
+      : tipo === "inventario-general"
+        ? inventarioAlmacenQuery
+        : tipo === "entradas-almacen"
+          ? entradasAlmacenQuery
+          : tipo === "salidas-almacen"
+            ? salidasAlmacenQuery
+        : isAdminType
+          ? binCardValoradoQuery
+          : tipo === "stock-actual"
+            ? stockQuery
+            : tipo === "vales-resumen"
+              ? valesResumenQuery
+              : comprasResumenQuery;
+  const rawCurrentMeta =
+    isLegacyType ||
+    (isAdminType &&
+      tipo !== "balance-mensual" &&
+      tipo !== "inventario-general" &&
+      tipo !== "entradas-almacen" &&
+      tipo !== "salidas-almacen")
+      ? legacyMeta
+      : "data" in currentQuery && currentQuery.data && "meta" in currentQuery.data
+        ? currentQuery.data.meta
+        : undefined;
+  const currentMeta = isPagedMeta(rawCurrentMeta) ? rawCurrentMeta : undefined;
+  const currentTotal =
+    rawCurrentMeta && "total" in rawCurrentMeta ? rawCurrentMeta.total : reportDefinition?.rows.length;
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -415,6 +557,36 @@ export function ReportesPage() {
               <option value="all">Ver todo</option>
             </select>
           </div>
+          {tipo === "vales-resumen" || tipo === "compras-resumen" ? (
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Estado
+              </label>
+              <select
+                value={estadoReporteDraft}
+                onChange={(event) => setEstadoReporteDraft(event.target.value)}
+                className={inputClassName}
+              >
+                <option value="">Todos</option>
+                {tipo === "vales-resumen" ? (
+                  <>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="APROBADO">APROBADO</option>
+                    <option value="PARCIAL">PARCIAL</option>
+                    <option value="COMPLETADO">COMPLETADO</option>
+                    <option value="RECHAZADO">RECHAZADO</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="PARCIAL">PARCIAL</option>
+                    <option value="COMPLETADO">COMPLETADO</option>
+                    <option value="ANULADA">ANULADA</option>
+                  </>
+                )}
+              </select>
+            </div>
+          ) : null}
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
               Registros por pagina
@@ -710,7 +882,7 @@ export function ReportesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border-soft)]">
-                  {binCardValoradoQuery.isLoading ? (
+                  {currentQuery.isLoading ? (
                     <tr>
                       <td
                         colSpan={reportDefinition.columns.length}
@@ -720,7 +892,7 @@ export function ReportesPage() {
                       </td>
                     </tr>
                   ) : null}
-                  {!binCardValoradoQuery.isLoading && reportDefinition.rows.length === 0 ? (
+                  {!currentQuery.isLoading && reportDefinition.rows.length === 0 ? (
                     <tr>
                       <td
                         colSpan={reportDefinition.columns.length}
@@ -818,6 +990,10 @@ export function ReportesPage() {
                 <ChevronRight size={16} />
               </button>
             </div>
+          </div>
+        ) : currentTotal !== undefined ? (
+          <div className="mt-3 text-xs text-[var(--color-on-surface-variant)]">
+            Total: {currentTotal}
           </div>
         ) : null}
       </article>

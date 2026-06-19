@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
-import { Boxes, FlaskConical, LayoutDashboard, Map, MoveRight, UserPlus } from "lucide-react";
+import { Boxes, LayoutDashboard, MoveRight, UserPlus } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 interface DashboardItem {

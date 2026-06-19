@@ -1,9 +1,17 @@
 import type { Producto } from "@/features/productos/model/producto.schema";
-import type { BinCardValoradoItem } from "@/features/reportes/model/reportes.schema";
+import type {
+  BalanceMensualReportResponse,
+  BinCardValoradoItem,
+  EntradasAlmacenReportResponse,
+  InventarioAlmacenReportResponse,
+  SalidasAlmacenReportResponse
+} from "@/features/reportes/model/reportes.schema";
 
 export type InventoryReportType =
   | "balance-mensual"
   | "inventario-general"
+  | "entradas-almacen"
+  | "salidas-almacen"
   | "costo-produccion"
   | "movimiento-almacen";
 
@@ -62,6 +70,19 @@ function asCode(value: number | undefined) {
 
 function getNumber(value: number | null | undefined) {
   return typeof value === "number" && !Number.isNaN(value) ? value : 0;
+}
+
+function formatMonth(anio: number, mes: number) {
+  return `${String(mes).padStart(2, "0")}/${anio}`;
+}
+
+function formatRangeLabel(data: {
+  anioInicio: number;
+  mesInicio: number;
+  anioFin: number;
+  mesFin: number;
+}) {
+  return `${formatMonth(data.anioInicio, data.mesInicio)} a ${formatMonth(data.anioFin, data.mesFin)}`;
 }
 
 function enrichItems(items: BinCardValoradoItem[], productos: Producto[]) {
@@ -559,6 +580,16 @@ export const INVENTORY_REPORTS: Array<{
     description: "Detalle por grupo y subgrupo con cantidad, precio unitario y total."
   },
   {
+    type: "entradas-almacen",
+    title: "Entradas De Almacen",
+    description: "Ingresos por grupo, subgrupo y producto con cantidades y valorizacion."
+  },
+  {
+    type: "salidas-almacen",
+    title: "Salidas De Almacen",
+    description: "Egresos por grupo, subgrupo y producto con cantidades y valorizacion."
+  },
+  {
     type: "costo-produccion",
     title: "Costo De Produccion",
     description: "Detalle por subcuenta, subcentro y funcion de gasto con subtotales."
@@ -590,4 +621,472 @@ export function buildInventoryReportDefinition(context: BuildContext): Inventory
     default:
       return buildBalanceMensual(enriched, context.dateLabel);
   }
+}
+
+export function buildBalanceMensualApiReportDefinition(
+  response: BalanceMensualReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        grupo: "",
+        saldoInicial: "",
+        ingresoMateriales: "",
+        salidaMateriales: "",
+        saldoFinal: ""
+      }
+    });
+
+    for (const grupo of periodo.grupos) {
+      rows.push({
+        id: `grupo-${periodo.anio}-${periodo.mes}-${grupo.grupoCodigo ?? grupo.grupoNombre ?? rows.length}`,
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          grupo: `${grupo.grupoCodigo ?? "-"} - ${grupo.grupoNombre ?? "Sin grupo"}`,
+          saldoInicial: Number(grupo.saldoInicial.toFixed(2)),
+          ingresoMateriales: Number(grupo.ingresoMateriales.toFixed(2)),
+          salidaMateriales: Number(grupo.salidaMateriales.toFixed(2)),
+          saldoFinal: Number(grupo.saldoFinal.toFixed(2))
+        }
+      });
+    }
+
+    rows.push({
+      id: `total-${periodo.anio}-${periodo.mes}`,
+      type: "subtotal",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        grupo: "TOTAL PERIODO",
+        saldoInicial: Number(periodo.totales.saldoInicial.toFixed(2)),
+        ingresoMateriales: Number(periodo.totales.ingresoMateriales.toFixed(2)),
+        salidaMateriales: Number(periodo.totales.salidaMateriales.toFixed(2)),
+        saldoFinal: Number(periodo.totales.saldoFinal.toFixed(2))
+      }
+    });
+  }
+
+  const totals = data.meses.reduce(
+    (acc, periodo) => ({
+      saldoInicial: acc.saldoInicial + periodo.totales.saldoInicial,
+      ingresoMateriales: acc.ingresoMateriales + periodo.totales.ingresoMateriales,
+      salidaMateriales: acc.salidaMateriales + periodo.totales.salidaMateriales,
+      saldoFinal: acc.saldoFinal + periodo.totales.saldoFinal
+    }),
+    { saldoInicial: 0, ingresoMateriales: 0, salidaMateriales: 0, saldoFinal: 0 }
+  );
+
+  rows.push({
+    id: "total-general",
+    type: "total",
+    values: {
+      periodo: "RANGO",
+      grupo: "TOTAL GENERAL",
+      saldoInicial: Number(totals.saldoInicial.toFixed(2)),
+      ingresoMateriales: Number(totals.ingresoMateriales.toFixed(2)),
+      salidaMateriales: Number(totals.salidaMateriales.toFixed(2)),
+      saldoFinal: Number(totals.saldoFinal.toFixed(2))
+    }
+  });
+
+  return {
+    type: "balance-mensual",
+    title: "Balance Mensual De Almacenes Lipeña",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo" },
+      { key: "grupo", label: "Grupo" },
+      { key: "saldoInicial", label: "Saldo Inicial Bs.", align: "right" },
+      { key: "ingresoMateriales", label: "Ingreso Materiales Bs.", align: "right" },
+      { key: "salidaMateriales", label: "Salida Materiales Bs.", align: "right" },
+      { key: "saldoFinal", label: "Saldo Final Bs.", align: "right" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      { label: "Meses cerrados", value: data.meses.filter((periodo) => periodo.esCerrado).length }
+    ]
+  };
+}
+
+export function buildInventarioAlmacenApiReportDefinition(
+  response: InventarioAlmacenReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+  let productCount = 0;
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        codigo: "",
+        descripcion: "",
+        unidad: "",
+        saldoInicial: "",
+        ingresoQty: "",
+        salidaQty: "",
+        saldoFinal: "",
+        precioUnit: "",
+        totalBs: ""
+      }
+    });
+
+    for (const grupo of periodo.grupos) {
+      rows.push({
+        id: `grupo-${periodo.anio}-${periodo.mes}-${grupo.codigo ?? rows.length}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          codigo: grupo.codigo ?? "-",
+          descripcion: `GRUPO: ${grupo.nombre ?? "Sin grupo"}`,
+          unidad: "",
+          saldoInicial: "",
+          ingresoQty: "",
+          salidaQty: "",
+          saldoFinal: "",
+          precioUnit: "",
+          totalBs: Number(grupo.totalBs.toFixed(2))
+        }
+      });
+
+      for (const subGrupo of grupo.subGrupos) {
+        const subGrupoTotales = subGrupo.productos.reduce(
+          (totales, producto) => ({
+            saldoInicial: totales.saldoInicial + producto.saldoInicial,
+            ingresoQty: totales.ingresoQty + producto.ingresoQty,
+            salidaQty: totales.salidaQty + producto.salidaQty,
+            saldoFinal: totales.saldoFinal + producto.saldoFinal,
+            totalBs: totales.totalBs + producto.totalBs
+          }),
+          { saldoInicial: 0, ingresoQty: 0, salidaQty: 0, saldoFinal: 0, totalBs: 0 }
+        );
+
+        rows.push({
+          id: `subgrupo-${periodo.anio}-${periodo.mes}-${grupo.codigo ?? "grupo"}-${subGrupo.codigo ?? rows.length}`,
+          type: "group",
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            codigo: subGrupo.codigo ?? "-",
+            descripcion: `Sub-Grupo: ${subGrupo.nombre ?? "Sin subgrupo"}`,
+            unidad: "",
+            saldoInicial: "",
+            ingresoQty: "",
+            salidaQty: "",
+            saldoFinal: "",
+            precioUnit: "",
+            totalBs: ""
+          }
+        });
+
+        for (const producto of subGrupo.productos) {
+          productCount += 1;
+          rows.push({
+            id: `producto-${periodo.anio}-${periodo.mes}-${producto.codigo ?? productCount}`,
+            values: {
+              periodo: formatMonth(periodo.anio, periodo.mes),
+              codigo: producto.codigo ?? "-",
+              descripcion: producto.nombre ?? "Sin nombre",
+              unidad: producto.unidad ?? "-",
+              saldoInicial: Number(producto.saldoInicial.toFixed(2)),
+              ingresoQty: Number(producto.ingresoQty.toFixed(2)),
+              salidaQty: Number(producto.salidaQty.toFixed(2)),
+              saldoFinal: Number(producto.saldoFinal.toFixed(2)),
+              precioUnit: Number(producto.precioUnit.toFixed(2)),
+              totalBs: Number(producto.totalBs.toFixed(2))
+            }
+          });
+        }
+
+        rows.push({
+          id: `subgrupo-total-${periodo.anio}-${periodo.mes}-${grupo.codigo ?? "grupo"}-${subGrupo.codigo ?? rows.length}`,
+          type: "subtotal",
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            codigo: "",
+            descripcion: `TOTAL SUB-GRUPO ${subGrupo.codigo ?? "-"} ${subGrupo.nombre ?? "Sin subgrupo"}`,
+            unidad: "",
+            saldoInicial: Number(subGrupoTotales.saldoInicial.toFixed(2)),
+            ingresoQty: Number(subGrupoTotales.ingresoQty.toFixed(2)),
+            salidaQty: Number(subGrupoTotales.salidaQty.toFixed(2)),
+            saldoFinal: Number(subGrupoTotales.saldoFinal.toFixed(2)),
+            precioUnit: "",
+            totalBs: Number(subGrupoTotales.totalBs.toFixed(2))
+          }
+        });
+      }
+    }
+
+    rows.push({
+      id: `total-${periodo.anio}-${periodo.mes}`,
+      type: "total",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        codigo: "",
+        descripcion: "TOTAL GENERAL DEL PERIODO",
+        unidad: "",
+        saldoInicial: "",
+        ingresoQty: "",
+        salidaQty: "",
+        saldoFinal: "",
+        precioUnit: "",
+        totalBs: Number(periodo.totalGeneral.toFixed(2))
+      }
+    });
+  }
+
+  const totalGeneral = data.meses.reduce((sum, periodo) => sum + periodo.totalGeneral, 0);
+
+  return {
+    type: "inventario-general",
+    title: "Inventario De Almacen General Mina Lipeña",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo" },
+      { key: "codigo", label: "Codigo" },
+      { key: "descripcion", label: "Descripcion" },
+      { key: "unidad", label: "Unidad", align: "center" },
+      { key: "saldoInicial", label: "Saldo Inicial", align: "right" },
+      { key: "ingresoQty", label: "Ingreso", align: "right" },
+      { key: "salidaQty", label: "Salida", align: "right" },
+      { key: "saldoFinal", label: "Saldo Final", align: "right" },
+      { key: "precioUnit", label: "P. Unit.", align: "right" },
+      { key: "totalBs", label: "Total Bs.", align: "right" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      { label: "Productos", value: productCount },
+      { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
+    ]
+  };
+}
+
+type MovimientoAlmacenNormalizado = {
+  anioInicio: number;
+  mesInicio: number;
+  anioFin: number;
+  mesFin: number;
+  meses: Array<{
+    anio: number;
+    mes: number;
+    esCerrado: boolean;
+    totalGeneral: number;
+    grupos: Array<{
+      codigo?: string | null;
+      nombre?: string | null;
+      totalBs: number;
+      subGrupos: Array<{
+        codigo?: string | null;
+        nombre?: string | null;
+        productos: Array<{
+          codigo?: string | null;
+          nombre?: string | null;
+          unidad?: string | null;
+          cantidad: number;
+          precioUnit: number;
+          totalBs: number;
+        }>;
+      }>;
+    }>;
+  }>;
+};
+
+function buildMovimientoAlmacenApiReportDefinition(params: {
+  type: "entradas-almacen" | "salidas-almacen";
+  title: string;
+  quantityLabel: string;
+  data: MovimientoAlmacenNormalizado;
+}): InventoryReportDefinition {
+  const rows: InventoryReportRow[] = [];
+  let productCount = 0;
+
+  for (const periodo of params.data.meses) {
+    rows.push({
+      id: `periodo-${params.type}-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        codigo: "",
+        descripcion: "",
+        unidad: "",
+        cantidad: "",
+        precioUnit: "",
+        totalBs: ""
+      }
+    });
+
+    for (const grupo of periodo.grupos) {
+      rows.push({
+        id: `grupo-${params.type}-${periodo.anio}-${periodo.mes}-${grupo.codigo ?? rows.length}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          codigo: grupo.codigo ?? "-",
+          descripcion: `GRUPO: ${grupo.nombre ?? "Sin grupo"}`,
+          unidad: "",
+          cantidad: "",
+          precioUnit: "",
+          totalBs: Number(grupo.totalBs.toFixed(2))
+        }
+      });
+
+      for (const subGrupo of grupo.subGrupos) {
+        const subGrupoTotales = subGrupo.productos.reduce(
+          (totales, producto) => ({
+            cantidad: totales.cantidad + producto.cantidad,
+            totalBs: totales.totalBs + producto.totalBs
+          }),
+          { cantidad: 0, totalBs: 0 }
+        );
+
+        rows.push({
+          id: `subgrupo-${params.type}-${periodo.anio}-${periodo.mes}-${grupo.codigo ?? "grupo"}-${subGrupo.codigo ?? rows.length}`,
+          type: "group",
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            codigo: subGrupo.codigo ?? "-",
+            descripcion: `Sub-Grupo: ${subGrupo.nombre ?? "Sin subgrupo"}`,
+            unidad: "",
+            cantidad: "",
+            precioUnit: "",
+            totalBs: ""
+          }
+        });
+
+        for (const producto of subGrupo.productos) {
+          productCount += 1;
+          rows.push({
+            id: `producto-${params.type}-${periodo.anio}-${periodo.mes}-${producto.codigo ?? productCount}`,
+            values: {
+              periodo: formatMonth(periodo.anio, periodo.mes),
+              codigo: producto.codigo ?? "-",
+              descripcion: producto.nombre ?? "Sin nombre",
+              unidad: producto.unidad ?? "-",
+              cantidad: Number(producto.cantidad.toFixed(2)),
+              precioUnit: Number(producto.precioUnit.toFixed(2)),
+              totalBs: Number(producto.totalBs.toFixed(2))
+            }
+          });
+        }
+
+        rows.push({
+          id: `subgrupo-total-${params.type}-${periodo.anio}-${periodo.mes}-${grupo.codigo ?? "grupo"}-${subGrupo.codigo ?? rows.length}`,
+          type: "subtotal",
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            codigo: "",
+            descripcion: `TOTAL SUB-GRUPO ${subGrupo.codigo ?? "-"} ${subGrupo.nombre ?? "Sin subgrupo"}`,
+            unidad: "",
+            cantidad: Number(subGrupoTotales.cantidad.toFixed(2)),
+            precioUnit: "",
+            totalBs: Number(subGrupoTotales.totalBs.toFixed(2))
+          }
+        });
+      }
+    }
+
+    rows.push({
+      id: `total-${params.type}-${periodo.anio}-${periodo.mes}`,
+      type: "total",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        codigo: "",
+        descripcion: "TOTAL GENERAL DEL PERIODO",
+        unidad: "",
+        cantidad: "",
+        precioUnit: "",
+        totalBs: Number(periodo.totalGeneral.toFixed(2))
+      }
+    });
+  }
+
+  const totalGeneral = params.data.meses.reduce(
+    (total, periodo) => total + periodo.totalGeneral,
+    0
+  );
+
+  return {
+    type: params.type,
+    title: params.title,
+    subtitle: `Correspondiente a: ${formatRangeLabel(params.data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo" },
+      { key: "codigo", label: "Codigo" },
+      { key: "descripcion", label: "Descripcion" },
+      { key: "unidad", label: "Unidad", align: "center" },
+      { key: "cantidad", label: params.quantityLabel, align: "right" },
+      { key: "precioUnit", label: "P. Unit.", align: "right" },
+      { key: "totalBs", label: "Total Bs.", align: "right" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: params.data.meses.length },
+      { label: "Productos con movimiento", value: productCount },
+      { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
+    ]
+  };
+}
+
+export function buildEntradasAlmacenApiReportDefinition(
+  response: EntradasAlmacenReportResponse
+): InventoryReportDefinition {
+  return buildMovimientoAlmacenApiReportDefinition({
+    type: "entradas-almacen",
+    title: "Entradas De Almacen General Mina Lipeña",
+    quantityLabel: "Cantidad Ingresada",
+    data: {
+      ...response.data,
+      meses: response.data.meses.map((periodo) => ({
+        ...periodo,
+        grupos: periodo.grupos.map((grupo) => ({
+          ...grupo,
+          totalBs: grupo.totalBsEntrada,
+          subGrupos: grupo.subGrupos.map((subGrupo) => ({
+            ...subGrupo,
+            productos: subGrupo.productos.map((producto) => ({
+              ...producto,
+              cantidad: producto.ingresoQty,
+              totalBs: producto.totalBsEntrada
+            }))
+          }))
+        }))
+      }))
+    }
+  });
+}
+
+export function buildSalidasAlmacenApiReportDefinition(
+  response: SalidasAlmacenReportResponse
+): InventoryReportDefinition {
+  return buildMovimientoAlmacenApiReportDefinition({
+    type: "salidas-almacen",
+    title: "Salidas De Almacen General Mina Lipeña",
+    quantityLabel: "Cantidad Despachada",
+    data: {
+      ...response.data,
+      meses: response.data.meses.map((periodo) => ({
+        ...periodo,
+        grupos: periodo.grupos.map((grupo) => ({
+          ...grupo,
+          totalBs: grupo.totalBsSalida,
+          subGrupos: grupo.subGrupos.map((subGrupo) => ({
+            ...subGrupo,
+            productos: subGrupo.productos.map((producto) => ({
+              ...producto,
+              cantidad: producto.salidaQty,
+              totalBs: producto.totalBsSalida
+            }))
+          }))
+        }))
+      }))
+    }
+  });
 }

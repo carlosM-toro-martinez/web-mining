@@ -1,13 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  getBalanceMensualReport,
   getBinCard,
   getBinCardValorado,
   getComprasReport,
+  getEntradasAlmacenReport,
+  getInventarioAlmacenReport,
+  getSalidasAlmacenReport,
   getStockReport,
   getValesReport
 } from "@/features/reportes/api/reportesApi";
 import type {
   ComprasReportQueryParams,
+  MonthlyRangeReportQueryParams,
   ReportesQueryParams,
   StockReportQueryParams,
   ValesReportQueryParams
@@ -46,6 +51,50 @@ export function useComprasReportQuery(params: ComprasReportQueryParams, enabled:
   return useQuery({
     queryKey: queryKeys.reportes.compras(params, false),
     queryFn: () => getComprasReport(params),
+    enabled
+  });
+}
+
+export function useBalanceMensualReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "balance-mensual", params] as const,
+    queryFn: () => getBalanceMensualReport(params),
+    enabled
+  });
+}
+
+export function useInventarioAlmacenReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "inventario-almacen", params] as const,
+    queryFn: () => getInventarioAlmacenReport(params),
+    enabled
+  });
+}
+
+export function useEntradasAlmacenReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "entradas-almacen", params] as const,
+    queryFn: () => getEntradasAlmacenReport(params),
+    enabled
+  });
+}
+
+export function useSalidasAlmacenReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "salidas-almacen", params] as const,
+    queryFn: () => getSalidasAlmacenReport(params),
     enabled
   });
 }

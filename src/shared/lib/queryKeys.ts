@@ -23,16 +23,6 @@ export const queryKeys = {
       sinCuenta?: boolean;
     }) => [...queryKeys.productos.all, "list", params] as const
   },
-  exploraciones: {
-    all: ["exploraciones"] as const,
-    offline: () => [...queryKeys.exploraciones.all, "offline"] as const,
-    elementosOffline: () => [...queryKeys.exploraciones.all, "elementos-offline"] as const,
-    remotas: () => [...queryKeys.exploraciones.all, "remotas"] as const,
-    elementos: () => [...queryKeys.exploraciones.all, "elementos"] as const,
-    laboratorios: () => [...queryKeys.exploraciones.all, "laboratorios"] as const,
-    hierarchy: (params: { search?: string; page?: number; limit?: number }) =>
-      [...queryKeys.exploraciones.all, "hierarchy", params] as const
-  },
   auth: {
     all: ["auth"] as const,
     users: () => [...queryKeys.auth.all, "users"] as const
