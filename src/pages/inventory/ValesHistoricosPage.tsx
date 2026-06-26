@@ -13,9 +13,16 @@ import {
   useUpdateSaldoMensualByIdMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
-import { useCreateValeMutation, useEntregarValeMutation } from "@/features/vales/hooks/useVales";
 import {
+  useAnularValeMutation,
+  useCreateValeMutation,
+  useEntregarValeMutation,
+  useValesQuery
+} from "@/features/vales/hooks/useVales";
+import {
+  useAnularCompraMutation,
   useCreateCompraMutation,
+  useComprasQuery,
   useRecibirCompraMutation
 } from "@/features/compras/hooks/useCompras";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
@@ -58,9 +65,26 @@ interface SaldoMensualDraft {
   precioUnit: string;
 }
 
+type HistoricoConsultaParams = {
+  anio: number;
+  mes: number;
+  estado?: string;
+  solicitanteId?: number;
+  proveedorId?: number;
+};
+
 function normalizeError(error: unknown, fallbackMessage: string) {
   if (error instanceof ApiError) return error.message;
   return fallbackMessage;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("es-BO");
+}
+
+function formatNumber(value: number) {
+  return value.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function ValesHistoricosPage() {
@@ -73,13 +97,17 @@ export function ValesHistoricosPage() {
   const cierresMesQuery = useCierresMesQuery();
   const createValeMutation = useCreateValeMutation();
   const entregarValeMutation = useEntregarValeMutation();
+  const anularValeMutation = useAnularValeMutation();
   const createCompraMutation = useCreateCompraMutation();
   const recibirCompraMutation = useRecibirCompraMutation();
+  const anularCompraMutation = useAnularCompraMutation();
   const createCierreMesMutation = useCreateCierreMesMutation();
   const inicializarPeriodoMutation = useInicializarPeriodoHistoricoMutation();
   const updateSaldoMensualByIdMutation = useUpdateSaldoMensualByIdMutation();
   const canUseFlow =
     user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE" || user?.role === "ALMACENERO";
+  const canAnularHistorico = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const canManagePeriods = user?.role === "ADMIN";
   const canClosePeriod = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
 
   const [solicitanteId, setSolicitanteId] = useState("");
@@ -114,6 +142,21 @@ export function ValesHistoricosPage() {
   const [previewEnabled, setPreviewEnabled] = useState(false);
   const [previewSearchQuery, setPreviewSearchQuery] = useState("");
   const [previewCurrentPage, setPreviewCurrentPage] = useState(1);
+  const [historicoAnio, setHistoricoAnio] = useState(String(now.getFullYear()));
+  const [historicoMes, setHistoricoMes] = useState(String(now.getMonth() + 1));
+  const [historicoEstado, setHistoricoEstado] = useState("");
+  const [historicoSolicitanteId, setHistoricoSolicitanteId] = useState("");
+  const [historicoProveedorId, setHistoricoProveedorId] = useState("");
+  const [compraHistoricoAnio, setCompraHistoricoAnio] = useState(String(now.getFullYear()));
+  const [compraHistoricoMes, setCompraHistoricoMes] = useState(String(now.getMonth() + 1));
+  const [compraHistoricoEstado, setCompraHistoricoEstado] = useState("");
+  const [compraHistoricoProveedorId, setCompraHistoricoProveedorId] = useState("");
+  const [isHistoricoPanelOpen, setIsHistoricoPanelOpen] = useState(false);
+  const [isValesHistoricosOpen, setIsValesHistoricosOpen] = useState(true);
+  const [isComprasHistoricasOpen, setIsComprasHistoricasOpen] = useState(true);
+  const [historicoConsulta, setHistoricoConsulta] = useState<HistoricoConsultaParams | null>(null);
+  const [compraHistoricoConsulta, setCompraHistoricoConsulta] =
+    useState<HistoricoConsultaParams | null>(null);
   const itemsPerPage = 10;
 
   const usuarios = usersQuery.data?.data ?? [];
@@ -122,6 +165,36 @@ export function ValesHistoricosPage() {
   const cierres = cierresMesQuery.data?.data ?? [];
   const proveedoresQuery = useProveedoresQuery({ page: 1, limit: 500, search: undefined });
   const proveedores = proveedoresQuery.data?.data ?? [];
+  const historicoParams = useMemo(
+    () => ({
+      anio: historicoConsulta?.anio ?? now.getFullYear(),
+      mes: historicoConsulta?.mes ?? now.getMonth() + 1,
+      estado: historicoConsulta?.estado,
+      sinPaginar: true,
+      page: 1,
+      limit: 100
+    }),
+    [historicoConsulta, now]
+  );
+  const compraHistoricoParams = useMemo(
+    () => ({
+      anio: compraHistoricoConsulta?.anio ?? now.getFullYear(),
+      mes: compraHistoricoConsulta?.mes ?? now.getMonth() + 1,
+      estado: compraHistoricoConsulta?.estado,
+      sinPaginar: true,
+      page: 1,
+      limit: 100
+    }),
+    [compraHistoricoConsulta, now]
+  );
+  const valesHistoricosQuery = useValesQuery({
+    ...historicoParams,
+    solicitanteId: historicoConsulta?.solicitanteId
+  }, Boolean(historicoConsulta));
+  const comprasHistoricasQuery = useComprasQuery({
+    ...compraHistoricoParams,
+    proveedorId: compraHistoricoConsulta?.proveedorId
+  }, Boolean(compraHistoricoConsulta));
   const aperturaParams = useMemo(
     () => ({
       anio: Number(aperturaAnio) || now.getFullYear(),
@@ -199,6 +272,16 @@ export function ValesHistoricosPage() {
         searchText: `${producto.codigo} ${producto.nombre} ${producto.unidad}`
       })),
     [productos]
+  );
+
+  const proveedorOptions = useMemo(
+    () =>
+      proveedores.map((proveedor) => ({
+        id: String(proveedor.id),
+        label: `${proveedor.nombre}${proveedor.nit ? ` - NIT ${proveedor.nit}` : ""}`,
+        searchText: `${proveedor.nombre} ${proveedor.razonSocial ?? ""} ${proveedor.nit ?? ""}`
+      })),
+    [proveedores]
   );
 
   const isPeriodoCerrado = useMemo(() => {
@@ -320,6 +403,42 @@ export function ValesHistoricosPage() {
     setPreviewCurrentPage(1);
   }
 
+  function handleConsultarHistoricos(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const anio = Number(historicoAnio);
+    const mes = Number(historicoMes);
+    if (!anio || !mes || mes < 1 || mes > 12) {
+      showError("Debes indicar año y mes válidos para consultar históricos.");
+      return;
+    }
+    setHistoricoConsulta({
+      anio,
+      mes,
+      estado: historicoEstado || undefined,
+      solicitanteId: historicoSolicitanteId ? Number(historicoSolicitanteId) : undefined
+    });
+    setIsHistoricoPanelOpen(true);
+    setIsValesHistoricosOpen(true);
+  }
+
+  function handleConsultarComprasHistoricas(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const anio = Number(compraHistoricoAnio);
+    const mes = Number(compraHistoricoMes);
+    if (!anio || !mes || mes < 1 || mes > 12) {
+      showError("Debes indicar año y mes válidos para consultar compras históricas.");
+      return;
+    }
+    setCompraHistoricoConsulta({
+      anio,
+      mes,
+      estado: compraHistoricoEstado || undefined,
+      proveedorId: compraHistoricoProveedorId ? Number(compraHistoricoProveedorId) : undefined
+    });
+    setIsHistoricoPanelOpen(true);
+    setIsComprasHistoricasOpen(true);
+  }
+
   async function handleGuardarSaldoFila(id: string) {
     const draft = saldoDraftById[id];
     if (!draft) return;
@@ -345,6 +464,50 @@ export function ValesHistoricosPage() {
       showError(normalizeError(error, "No se pudo actualizar el saldo del producto."));
     } finally {
       setSavingSaldoId(null);
+    }
+  }
+
+  async function handleAnularValeHistorico(id: string) {
+    if (!canAnularHistorico) {
+      showError("Solo ADMIN o SUPERINTENDENTE puede anular vales históricos.");
+      return;
+    }
+    const motivo = window.prompt("Motivo de anulación del vale histórico:");
+    if (!motivo || motivo.trim().length < 5) {
+      showError("El motivo debe tener al menos 5 caracteres.");
+      return;
+    }
+    try {
+      const result = await anularValeMutation.mutateAsync({
+        id,
+        payload: { motivo: motivo.trim() }
+      });
+      await queryClient.invalidateQueries({ queryKey: ["inventario-import", "saldo-mensual"] });
+      showSuccess(`Vale anulado. Contra-asientos generados: ${result.data.contraAsientos}.`);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo anular el vale histórico."));
+    }
+  }
+
+  async function handleAnularCompraHistorica(id: string) {
+    if (!canAnularHistorico) {
+      showError("Solo ADMIN o SUPERINTENDENTE puede anular compras históricas.");
+      return;
+    }
+    const motivo = window.prompt("Motivo de anulación de la compra histórica:");
+    if (!motivo || !motivo.trim()) {
+      showError("El motivo es obligatorio.");
+      return;
+    }
+    try {
+      const result = await anularCompraMutation.mutateAsync({
+        id,
+        payload: { motivo: motivo.trim() }
+      });
+      await queryClient.invalidateQueries({ queryKey: ["inventario-import", "saldo-mensual"] });
+      showSuccess(`Compra anulada. Contra-asientos generados: ${result.data.contraAsientos}.`);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo anular la compra histórica."));
     }
   }
 
@@ -515,6 +678,227 @@ export function ValesHistoricosPage() {
           </div>
         </div>
       </header>
+
+      {false ? (
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="rounded-lg bg-[var(--color-primary)]/14 p-2 text-[var(--color-primary)]">
+            <Search size={16} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Observar históricos por período</h2>
+            <p className="mt-0.5 text-xs text-[var(--color-on-surface-variant)]">
+              Lista vales y compras del período seleccionado. ADMIN y SUPERINTENDENTE pueden anular registros.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Año
+            </label>
+            <input
+              type="number"
+              min="2000"
+              max="2100"
+              value={historicoAnio}
+              onChange={(event) => setHistoricoAnio(event.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Mes
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={historicoMes}
+              onChange={(event) => setHistoricoMes(event.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Estado
+            </label>
+            <select
+              value={historicoEstado}
+              onChange={(event) => setHistoricoEstado(event.target.value)}
+              className={inputClassName}
+            >
+              <option value="">Todos</option>
+              <option value="PENDIENTE">PENDIENTE</option>
+              <option value="APROBADO">APROBADO</option>
+              <option value="PARCIAL">PARCIAL</option>
+              <option value="COMPLETADO">COMPLETADO</option>
+              <option value="ANULADO">ANULADO</option>
+              <option value="ANULADA">ANULADA</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Solicitante
+            </label>
+            <AutocompleteSelect
+              value={historicoSolicitanteId}
+              onChange={setHistoricoSolicitanteId}
+              options={usuarioOptions}
+              placeholder="Todos los solicitantes"
+              className={inputClassName}
+              maxVisibleOptions={30}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Proveedor
+            </label>
+            <AutocompleteSelect
+              value={historicoProveedorId}
+              onChange={setHistoricoProveedorId}
+              options={proveedorOptions}
+              placeholder="Todos los proveedores"
+              className={inputClassName}
+              maxVisibleOptions={30}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+            <h3 className="mb-3 font-bold">Vales del período</h3>
+            <div className="table-scroll overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Vale</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Solicitante</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {valesHistoricosQuery.isLoading ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
+                        Cargando vales...
+                      </td>
+                    </tr>
+                  ) : null}
+                  {!valesHistoricosQuery.isLoading && (valesHistoricosQuery.data?.data ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
+                        Sin vales para el período.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {(valesHistoricosQuery.data?.data ?? []).map((vale) => (
+                    <tr key={vale.id} className="align-top transition hover:bg-[var(--color-surface-container-highest)]">
+                      <td className="px-3 py-2 text-xs font-mono">
+                        {vale.id}
+                        <div className="mt-1 space-y-1 font-sans text-[11px] text-[var(--color-on-surface-variant)]">
+                          {vale.items.map((item) => (
+                            <div key={item.id}>
+                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
+                              {item.producto?.nombre ?? "Producto"}: {formatNumber(item.cantidadEntregada || item.cantidadSolicitada)}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-xs">{vale.estado}</td>
+                      <td className="px-3 py-2 text-xs">{vale.solicitante?.nombre ?? "-"}</td>
+                      <td className="px-3 py-2 text-xs">{formatDateTime(vale.fechaOperacion ?? vale.createdAt)}</td>
+                      <td className="px-3 py-2 text-right text-xs">
+                        {canAnularHistorico && vale.estado !== "ANULADO" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleAnularValeHistorico(vale.id)}
+                            disabled={anularValeMutation.isPending}
+                            className="rounded-md border border-[var(--color-error)]/45 px-2 py-1 font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                          >
+                            Anular
+                          </button>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+            <h3 className="mb-3 font-bold">Compras del período</h3>
+            <div className="table-scroll overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Factura</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {comprasHistoricasQuery.isLoading ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
+                        Cargando compras...
+                      </td>
+                    </tr>
+                  ) : null}
+                  {!comprasHistoricasQuery.isLoading && (comprasHistoricasQuery.data?.data ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
+                        Sin compras para el período.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {(comprasHistoricasQuery.data?.data ?? []).map((compra) => (
+                    <tr key={compra.id} className="align-top transition hover:bg-[var(--color-surface-container-highest)]">
+                      <td className="px-3 py-2 text-xs">
+                        <span className="font-semibold">{compra.numeroFactura ?? "-"}</span>
+                        <div className="mt-1 space-y-1 text-[11px] text-[var(--color-on-surface-variant)]">
+                          {compra.items.map((item) => (
+                            <div key={item.id}>
+                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
+                              {item.producto?.nombre ?? "Producto"}: {formatNumber(item.cantidadRecibida || item.cantidadPedida)} x Bs. {formatNumber(item.precioUnit)}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-xs">{compra.estado}</td>
+                      <td className="px-3 py-2 text-xs">{compra.proveedor?.nombre ?? "-"}</td>
+                      <td className="px-3 py-2 text-xs">{formatDateTime(compra.fechaOperacion ?? compra.createdAt)}</td>
+                      <td className="px-3 py-2 text-right text-xs">
+                        {canAnularHistorico && compra.estado !== "ANULADA" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleAnularCompraHistorica(compra.id)}
+                            disabled={anularCompraMutation.isPending}
+                            className="rounded-md border border-[var(--color-error)]/45 px-2 py-1 font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                          >
+                            Anular
+                          </button>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </article>
+      ) : null}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
@@ -1091,16 +1475,355 @@ export function ValesHistoricosPage() {
         ) : null}
       </article>
 
-      <div className="relative flex items-center py-2">
-        <div className="flex-grow border-t border-[var(--color-border-soft)]" />
-        <span className="mx-4 flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
-          <ShieldAlert size={13} />
-          Administración de períodos
-        </span>
-        <div className="flex-grow border-t border-[var(--color-border-soft)]" />
-      </div>
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <button
+          type="button"
+          onClick={() => setIsHistoricoPanelOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span className="flex items-start gap-3">
+            <span className="rounded-lg bg-[var(--color-primary)]/14 p-2 text-[var(--color-primary)]">
+              <Search size={16} />
+            </span>
+            <span>
+              <span className="block text-lg font-bold">Observar históricos por período</span>
+              <span className="mt-0.5 block text-xs text-[var(--color-on-surface-variant)]">
+                Consulta vales y compras solo cuando lo necesites. Puedes contraer esta sección.
+              </span>
+            </span>
+          </span>
+          <span className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+            {isHistoricoPanelOpen ? "Contraer" : "Abrir"}
+          </span>
+        </button>
 
-      <article className="rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-surface-container-low)] p-5">
+        {isHistoricoPanelOpen ? (
+          <div className="mt-5 space-y-5">
+            <section className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+              <h3 className="mb-3 font-bold">Consultar vales de salida</h3>
+              <form
+              className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5"
+              onSubmit={handleConsultarHistoricos}
+            >
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Año
+                </label>
+                <input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={historicoAnio}
+                  onChange={(event) => setHistoricoAnio(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Mes
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={historicoMes}
+                  onChange={(event) => setHistoricoMes(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Estado
+                </label>
+                <select
+                  value={historicoEstado}
+                  onChange={(event) => setHistoricoEstado(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Todos</option>
+                  <option value="PENDIENTE">PENDIENTE</option>
+                  <option value="APROBADO">APROBADO</option>
+                  <option value="PARCIAL">PARCIAL</option>
+                  <option value="COMPLETADO">COMPLETADO</option>
+                  <option value="ANULADO">ANULADO</option>
+                  <option value="ANULADA">ANULADA</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Solicitante
+                </label>
+                <AutocompleteSelect
+                  value={historicoSolicitanteId}
+                  onChange={setHistoricoSolicitanteId}
+                  options={usuarioOptions}
+                  placeholder="Todos"
+                  className={inputClassName}
+                  maxVisibleOptions={30}
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]"
+                >
+                  Consultar vales
+                </button>
+              </div>
+            </form>
+            </section>
+
+            <section className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+              <h3 className="mb-3 font-bold">Consultar compras históricas</h3>
+              <form
+                className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5"
+                onSubmit={handleConsultarComprasHistoricas}
+              >
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Año
+                  </label>
+                  <input
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    value={compraHistoricoAnio}
+                    onChange={(event) => setCompraHistoricoAnio(event.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Mes
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={compraHistoricoMes}
+                    onChange={(event) => setCompraHistoricoMes(event.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Estado
+                  </label>
+                  <select
+                    value={compraHistoricoEstado}
+                    onChange={(event) => setCompraHistoricoEstado(event.target.value)}
+                    className={inputClassName}
+                  >
+                    <option value="">Todos</option>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="PARCIAL">PARCIAL</option>
+                    <option value="COMPLETADO">COMPLETADO</option>
+                    <option value="ANULADA">ANULADA</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Proveedor
+                  </label>
+                  <AutocompleteSelect
+                    value={compraHistoricoProveedorId}
+                    onChange={setCompraHistoricoProveedorId}
+                    options={proveedorOptions}
+                    placeholder="Todos"
+                    className={inputClassName}
+                    maxVisibleOptions={30}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]"
+                  >
+                    Consultar compras
+                  </button>
+                </div>
+              </form>
+            </section>
+
+              <div className="space-y-4">
+                <section className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-bold">
+                      {historicoConsulta
+                        ? `Vales del período ${String(historicoConsulta.mes).padStart(2, "0")}/${historicoConsulta.anio}`
+                        : "Vales de salida"}
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsValesHistoricosOpen((current) => !current)}
+                        className="rounded-md border border-[var(--color-outline-variant)] px-2 py-1 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                      >
+                        {isValesHistoricosOpen ? "Contraer" : "Expandir"}
+                      </button>
+                      {historicoConsulta ? (
+                        <button
+                          type="button"
+                          onClick={() => setHistoricoConsulta(null)}
+                          className="rounded-md border border-[var(--color-outline-variant)] px-2 py-1 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-error)] hover:text-[var(--color-error)]"
+                        >
+                          Limpiar
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {isValesHistoricosOpen ? (
+                    <>
+                  {!historicoConsulta ? (
+                    <p className="text-xs text-[var(--color-on-surface-variant)]">
+                      Pulsa <strong>Consultar vales</strong> para cargar esta lista.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                    {valesHistoricosQuery.isLoading ? (
+                      <p className="text-xs text-[var(--color-on-surface-variant)]">Cargando vales...</p>
+                    ) : null}
+                    {!valesHistoricosQuery.isLoading && (valesHistoricosQuery.data?.data ?? []).length === 0 ? (
+                      <p className="text-xs text-[var(--color-on-surface-variant)]">Sin vales para el período.</p>
+                    ) : null}
+                    {(valesHistoricosQuery.data?.data ?? []).map((vale) => (
+                      <div
+                        key={vale.id}
+                        className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold">
+                              Vale <span className="font-mono">{vale.id}</span> · {vale.estado}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+                              {vale.solicitante?.nombre ?? "Sin solicitante"} · {formatDateTime(vale.fechaOperacion ?? vale.createdAt)}
+                            </p>
+                          </div>
+                          {canAnularHistorico && vale.estado !== "ANULADO" ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleAnularValeHistorico(vale.id)}
+                              disabled={anularValeMutation.isPending}
+                              className="rounded-md border border-[var(--color-error)]/45 px-2 py-1 text-xs font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                            >
+                              Anular
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 grid gap-1 text-xs text-[var(--color-on-surface-variant)]">
+                          {vale.items.map((item) => (
+                            <span key={item.id}>
+                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
+                              {item.producto?.nombre ?? "Producto"}: {formatNumber(item.cantidadEntregada || item.cantidadSolicitada)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+                  )}
+                    </>
+                  ) : null}
+                </section>
+
+                <section className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-bold">
+                      {compraHistoricoConsulta
+                        ? `Compras del período ${String(compraHistoricoConsulta.mes).padStart(2, "0")}/${compraHistoricoConsulta.anio}`
+                        : "Compras históricas"}
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsComprasHistoricasOpen((current) => !current)}
+                        className="rounded-md border border-[var(--color-outline-variant)] px-2 py-1 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                      >
+                        {isComprasHistoricasOpen ? "Contraer" : "Expandir"}
+                      </button>
+                      {compraHistoricoConsulta ? (
+                        <button
+                          type="button"
+                          onClick={() => setCompraHistoricoConsulta(null)}
+                          className="rounded-md border border-[var(--color-outline-variant)] px-2 py-1 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-error)] hover:text-[var(--color-error)]"
+                        >
+                          Limpiar
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {isComprasHistoricasOpen ? (
+                    <>
+                  {!compraHistoricoConsulta ? (
+                    <p className="text-xs text-[var(--color-on-surface-variant)]">
+                      Pulsa <strong>Consultar compras</strong> para cargar esta lista.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                    {comprasHistoricasQuery.isLoading ? (
+                      <p className="text-xs text-[var(--color-on-surface-variant)]">Cargando compras...</p>
+                    ) : null}
+                    {!comprasHistoricasQuery.isLoading && (comprasHistoricasQuery.data?.data ?? []).length === 0 ? (
+                      <p className="text-xs text-[var(--color-on-surface-variant)]">Sin compras para el período.</p>
+                    ) : null}
+                    {(comprasHistoricasQuery.data?.data ?? []).map((compra) => (
+                      <div
+                        key={compra.id}
+                        className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold">
+                              Factura {compra.numeroFactura ?? "-"} · {compra.estado}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+                              {compra.proveedor?.nombre ?? "Sin proveedor"} · {formatDateTime(compra.fechaOperacion ?? compra.createdAt)}
+                            </p>
+                          </div>
+                          {canAnularHistorico && compra.estado !== "ANULADA" ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleAnularCompraHistorica(compra.id)}
+                              disabled={anularCompraMutation.isPending}
+                              className="rounded-md border border-[var(--color-error)]/45 px-2 py-1 text-xs font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                            >
+                              Anular
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 grid gap-1 text-xs text-[var(--color-on-surface-variant)]">
+                          {compra.items.map((item) => (
+                            <span key={item.id}>
+                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
+                              {item.producto?.nombre ?? "Producto"}: {formatNumber(item.cantidadRecibida || item.cantidadPedida)} x Bs. {formatNumber(item.precioUnit)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+                  )}
+                    </>
+                  ) : null}
+                </section>
+              </div>
+          </div>
+        ) : null}
+      </article>
+
+      {canManagePeriods ? (
+        <>
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-[var(--color-border-soft)]" />
+            <span className="mx-4 flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+              <ShieldAlert size={13} />
+              Administración de períodos
+            </span>
+            <div className="flex-grow border-t border-[var(--color-border-soft)]" />
+          </div>
+
+          <article className="rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-5 flex items-start gap-3">
           <div className="rounded-lg bg-[var(--color-warning)]/14 p-2 text-[var(--color-warning)]">
             <ShieldAlert size={16} />
@@ -1482,7 +2205,9 @@ export function ValesHistoricosPage() {
             Solo ADMIN o SUPERINTENDENTE puede cerrar meses.
           </p>
         )}
-      </article>
+          </article>
+        </>
+      ) : null}
 
       <CreateProveedorModal
         isOpen={isCreateProveedorModalOpen}

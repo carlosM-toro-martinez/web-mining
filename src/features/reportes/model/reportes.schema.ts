@@ -149,6 +149,40 @@ const reporteCompraItemSchema = z.object({
   totalBs: numberLikeSchema
 });
 
+const reporteComprasProveedorItemSchema = z.object({
+  codigo: z.string().optional().nullable(),
+  nombre: z.string().optional().nullable(),
+  unidad: z.string().optional().nullable(),
+  cantidadRecibida: numberLikeSchema,
+  precioUnit: numberLikeSchema,
+  totalBs: numberLikeSchema,
+  totalSinIVA: numberLikeSchema,
+  grupo: z.string().optional().nullable(),
+  categoria: z.string().optional().nullable()
+});
+
+const reporteComprasProveedorCompraSchema = z.object({
+  id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+  estado: z.string(),
+  numeroFactura: z.string().optional().nullable(),
+  fechaOperacion: z.string().optional().nullable(),
+  createdAt: z.string().optional().nullable(),
+  proveedor: z
+    .object({
+      id: numberLikeSchema.int().positive(),
+      nombre: z.string().optional().nullable(),
+      razonSocial: z.string().optional().nullable(),
+      nit: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  items: z.array(reporteComprasProveedorItemSchema).default([]),
+  subtotalBs: numberLikeSchema,
+  descuentoBs: numberLikeSchema,
+  totalBs: numberLikeSchema,
+  totalSinIVA: numberLikeSchema
+});
+
 export const stockReportResponseSchema = z.object({ success: z.boolean().optional(), data: z.array(stockItemSchema), meta: reporteMetaSchema });
 export const valesReportResponseSchema = z.object({ success: z.boolean().optional(), data: z.array(reporteValeItemSchema), meta: reporteMetaFlexibleSchema });
 export const comprasReportResponseSchema = z.object({
@@ -156,6 +190,13 @@ export const comprasReportResponseSchema = z.object({
   data: z.array(reporteCompraItemSchema),
   meta: reporteMetaFlexibleSchema,
   totalGeneral: numberLikeSchema
+});
+export const comprasProveedorReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.array(reporteComprasProveedorCompraSchema),
+  meta: reporteMetaFlexibleSchema,
+  totalGeneral: numberLikeSchema,
+  totalGeneralSinIVA: numberLikeSchema
 });
 
 export const stockReportQueryParamsSchema = z.object({
@@ -275,21 +316,44 @@ const movimientoAlmacenProductoBaseSchema = z.object({
   precioUnit: numberLikeSchema
 });
 
-const entradaAlmacenProductoSchema = movimientoAlmacenProductoBaseSchema.extend({
-  ingresoQty: numberLikeSchema,
-  totalBsEntrada: numberLikeSchema
-});
+const entradaAlmacenProductoSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const producto = value as Record<string, unknown>;
+    return {
+      ...producto,
+      ingresoQty:
+        producto.ingresoQty ?? producto.cantidad ?? producto.cantidadEntrada ?? producto.ingresos ?? 0,
+      precioUnit: producto.precioUnit ?? producto.precioUnitario ?? 0
+    };
+  },
+  movimientoAlmacenProductoBaseSchema.extend({
+    ingresoQty: numberLikeSchema,
+    totalBsEntrada: numberLikeSchema.optional(),
+    totalBs: numberLikeSchema.optional()
+  })
+);
 
 const salidaAlmacenProductoSchema = movimientoAlmacenProductoBaseSchema.extend({
   salidaQty: numberLikeSchema,
   totalBsSalida: numberLikeSchema
 });
 
-const entradaAlmacenSubGrupoSchema = z.object({
-  codigo: z.string().optional().nullable(),
-  nombre: z.string().optional().nullable(),
-  productos: z.array(entradaAlmacenProductoSchema)
-});
+const entradaAlmacenSubGrupoSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const subGrupo = value as Record<string, unknown>;
+    return {
+      ...subGrupo,
+      productos: subGrupo.productos ?? subGrupo.items ?? []
+    };
+  },
+  z.object({
+    codigo: z.string().optional().nullable(),
+    nombre: z.string().optional().nullable(),
+    productos: z.array(entradaAlmacenProductoSchema)
+  })
+);
 
 const salidaAlmacenSubGrupoSchema = z.object({
   codigo: z.string().optional().nullable(),
@@ -310,12 +374,23 @@ export const entradasAlmacenReportResponseSchema = z.object({
         mes: numberLikeSchema.int().min(1).max(12),
         esCerrado: z.boolean(),
         grupos: z.array(
-          z.object({
+          z.preprocess(
+            (value) => {
+              if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+              const grupo = value as Record<string, unknown>;
+              return {
+                ...grupo,
+                subGrupos: grupo.subGrupos ?? grupo.subgrupos ?? []
+              };
+            },
+            z.object({
             codigo: z.string().optional().nullable(),
             nombre: z.string().optional().nullable(),
-            totalBsEntrada: numberLikeSchema,
+            totalBsEntrada: numberLikeSchema.optional(),
+            totalBs: numberLikeSchema.optional(),
             subGrupos: z.array(entradaAlmacenSubGrupoSchema)
-          })
+            })
+          )
         ),
         totalGeneral: numberLikeSchema
       })
@@ -357,6 +432,7 @@ export type ReportesQueryParams = z.infer<typeof reportesQueryParamsSchema>;
 export type StockReportQueryParams = z.infer<typeof stockReportQueryParamsSchema>;
 export type ValesReportQueryParams = z.infer<typeof valesReportQueryParamsSchema>;
 export type ComprasReportQueryParams = z.infer<typeof comprasReportQueryParamsSchema>;
+export type ComprasProveedorReportResponse = z.infer<typeof comprasProveedorReportResponseSchema>;
 export type MonthlyRangeReportQueryParams = z.infer<typeof monthlyRangeReportQueryParamsSchema>;
 export type BalanceMensualReportResponse = z.infer<typeof balanceMensualReportResponseSchema>;
 export type InventarioAlmacenReportResponse = z.infer<typeof inventarioAlmacenReportResponseSchema>;

@@ -1,7 +1,11 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
-import type { BinCardItem, BinCardValoradoItem } from "@/features/reportes/model/reportes.schema";
+import type {
+  BinCardItem,
+  BinCardValoradoItem,
+  ComprasProveedorReportResponse
+} from "@/features/reportes/model/reportes.schema";
 import type {
   InventoryReportDefinition,
   InventoryReportType
@@ -38,6 +42,33 @@ function monthLabelFromSubtitle(subtitle?: string) {
   if (!clean || clean.toLowerCase() === "sin filtro")
     return "CORRESPONDIENTE AL PERIODO SELECCIONADO";
   return `CORRESPONDIENTE A ${clean.toUpperCase()}`;
+}
+
+const MONTH_NAMES = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE"
+];
+
+function comprasProveedorPeriodLabel(fechaInicio: string, fechaFin: string) {
+  const source = fechaFin || fechaInicio;
+  if (!source) return "PERIODO SELECCIONADO";
+  const date = new Date(`${source}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "PERIODO SELECCIONADO";
+  return `MES DE  ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function asExcelNumber(value: number) {
+  return Number(value.toFixed(2));
 }
 
 function openBrowserPrintDialog(doc: jsPDF, fileName: string) {
@@ -241,6 +272,79 @@ export function exportInventoryReportExcel(report: InventoryReportDefinition) {
   XLSX.utils.book_append_sheet(workbook, sheet, report.title.slice(0, 31));
   const fileName = `${safeFileToken(report.title)}-${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(workbook, fileName);
+}
+
+export function exportComprasProveedorExcel(params: {
+  response: ComprasProveedorReportResponse;
+  fechaInicio: string;
+  fechaFin: string;
+}) {
+  const rows: Array<Array<string | number>> = [];
+
+  for (const compra of params.response.data) {
+    const proveedor = compra.proveedor?.nombre ?? compra.proveedor?.razonSocial ?? "";
+    const factura = compra.numeroFactura ?? "";
+    compra.items.forEach((item, index) => {
+      rows.push([
+        index === 0 ? proveedor : "",
+        index === 0 ? factura : "",
+        item.cantidadRecibida,
+        item.unidad ?? "",
+        item.nombre ?? "",
+        asExcelNumber(item.totalBs),
+        asExcelNumber(item.totalSinIVA),
+        item.grupo ?? item.categoria ?? ""
+      ]);
+    });
+  }
+
+  const aoa: Array<Array<string | number>> = [
+    [],
+    [],
+    ["EMPRESA MINERA MARTE S.R.L."],
+    ["LIPEÑA"],
+    [],
+    [
+      "",
+      "",
+      "CUADRO DE INVENTARIOS Y SUMINISTROS CORRESPONDIENTE AL",
+      comprasProveedorPeriodLabel(params.fechaInicio, params.fechaFin)
+    ],
+    [],
+    ["P R O V E E D O R", "No FACTURA", "CANTIDAD", "UNIDAD", "D E S C R I P C I O N", "F-total Bs", "(-13%) Bs", "GRUPO"],
+    ...rows,
+    ["", "", "", "", "TOTAL GENERAL", asExcelNumber(params.response.totalGeneral), asExcelNumber(params.response.totalGeneralSinIVA), ""]
+  ];
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!merges"] = [
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 1 } },
+    { s: { r: 5, c: 2 }, e: { r: 5, c: 6 } }
+  ];
+  sheet["!cols"] = [
+    { wch: 28 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 44 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 18 }
+  ];
+  sheet["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 7, c: 0 },
+      e: { r: Math.max(7, 7 + rows.length), c: 7 }
+    })
+  };
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Inventarios y Suministros");
+  XLSX.writeFile(
+    workbook,
+    `inventarios-y-suministros-${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 }
 
 export function exportInventoryReportPdf(report: InventoryReportDefinition) {

@@ -52,6 +52,9 @@ export async function getRequest<TResponse>({
     return schema.parse(response.data);
   } catch (error) {
     if (error instanceof ZodError) {
+      if (import.meta.env.DEV) {
+        console.error(`[API schema] GET ${url}`, error.issues);
+      }
       throw new ApiError("Respuesta del servidor con formato inesperado.", {
         details: {
           url,

@@ -4,6 +4,7 @@ import {
   binCardResponseSchema,
   binCardValoradoResponseSchema,
   balanceMensualReportResponseSchema,
+  comprasProveedorReportResponseSchema,
   comprasReportQueryParamsSchema,
   comprasReportResponseSchema,
   entradasAlmacenReportResponseSchema,
@@ -85,6 +86,14 @@ export async function getComprasReport(params: ComprasReportQueryParams) {
     url: apiEndpoints.reportes.comprasDetalle,
     config: { params: cleanSimpleParams(params, comprasReportQueryParamsSchema.parse) },
     schema: comprasReportResponseSchema
+  });
+}
+
+export async function getComprasProveedorReport(params: ComprasReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.comprasProveedor,
+    config: { params: cleanSimpleParams(params, comprasReportQueryParamsSchema.parse) },
+    schema: comprasProveedorReportResponseSchema
   });
 }
 

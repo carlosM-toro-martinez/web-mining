@@ -38,10 +38,11 @@ export function useValeQuery(id: string) {
   });
 }
 
-export function useValesQuery(params?: ValesListParams) {
+export function useValesQuery(params?: ValesListParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.vales.list(params),
-    queryFn: () => getVales(params)
+    queryFn: () => getVales(params),
+    enabled
   });
 }
 

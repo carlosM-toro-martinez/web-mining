@@ -3,6 +3,7 @@ import {
   getBalanceMensualReport,
   getBinCard,
   getBinCardValorado,
+  getComprasProveedorReport,
   getComprasReport,
   getEntradasAlmacenReport,
   getInventarioAlmacenReport,
@@ -51,6 +52,18 @@ export function useComprasReportQuery(params: ComprasReportQueryParams, enabled:
   return useQuery({
     queryKey: queryKeys.reportes.comprasDetalle(params),
     queryFn: () => getComprasReport(params),
+    enabled,
+    refetchOnMount: "always"
+  });
+}
+
+export function useComprasProveedorReportQuery(
+  params: ComprasReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: queryKeys.reportes.comprasProveedor(params),
+    queryFn: () => getComprasProveedorReport(params),
     enabled,
     refetchOnMount: "always"
   });

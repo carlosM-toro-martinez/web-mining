@@ -1046,18 +1046,30 @@ export function buildEntradasAlmacenApiReportDefinition(
       ...response.data,
       meses: response.data.meses.map((periodo) => ({
         ...periodo,
-        grupos: periodo.grupos.map((grupo) => ({
-          ...grupo,
-          totalBs: grupo.totalBsEntrada,
-          subGrupos: grupo.subGrupos.map((subGrupo) => ({
+        grupos: periodo.grupos.map((grupo) => {
+          const subGrupos = grupo.subGrupos.map((subGrupo) => ({
             ...subGrupo,
             productos: subGrupo.productos.map((producto) => ({
               ...producto,
               cantidad: producto.ingresoQty,
-              totalBs: producto.totalBsEntrada
+              totalBs:
+                producto.totalBsEntrada ??
+                producto.totalBs ??
+                producto.ingresoQty * producto.precioUnit
             }))
-          }))
-        }))
+          }));
+          const totalProductos = subGrupos.reduce(
+            (total, subGrupo) =>
+              total + subGrupo.productos.reduce((subtotal, producto) => subtotal + producto.totalBs, 0),
+            0
+          );
+
+          return {
+            ...grupo,
+            totalBs: grupo.totalBsEntrada ?? grupo.totalBs ?? totalProductos,
+            subGrupos
+          };
+        })
       }))
     }
   });

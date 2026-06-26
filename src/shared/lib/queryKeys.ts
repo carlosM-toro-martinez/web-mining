@@ -36,7 +36,17 @@ export const queryKeys = {
   },
   vales: {
     all: ["vales"] as const,
-    list: (params?: { estado?: string; solicitanteId?: number; page?: number; limit?: number }) =>
+    list: (params?: {
+      estado?: string;
+      solicitanteId?: number;
+      anio?: number;
+      mes?: number;
+      fechaInicio?: string;
+      fechaFin?: string;
+      sinPaginar?: boolean;
+      page?: number;
+      limit?: number;
+    }) =>
       [...queryKeys.vales.all, "list", params ?? {}] as const,
     detail: (id: string) => [...queryKeys.vales.all, "detail", id] as const,
     historialSolicitante: (userId: number, page: number, limit: number) =>
@@ -44,7 +54,17 @@ export const queryKeys = {
   },
   compras: {
     all: ["compras"] as const,
-    list: (params: { estado?: string; proveedorId?: number; page: number; limit: number }) =>
+    list: (params: {
+      estado?: string;
+      proveedorId?: number;
+      anio?: number;
+      mes?: number;
+      fechaInicio?: string;
+      fechaFin?: string;
+      sinPaginar?: boolean;
+      page: number;
+      limit: number;
+    }) =>
       [...queryKeys.compras.all, "list", params] as const,
     detail: (id: string) => [...queryKeys.compras.all, "detail", id] as const
   },
@@ -111,7 +131,18 @@ export const queryKeys = {
         fechaFin?: string;
         sinPaginar?: boolean;
       }
-    ) => [...queryKeys.reportes.all, "compras-detalle", params] as const
+    ) => [...queryKeys.reportes.all, "compras-detalle", params] as const,
+    comprasProveedor: (
+      params: {
+        page: number;
+        limit: number;
+        estado?: string;
+        proveedorId?: number;
+        fechaInicio?: string;
+        fechaFin?: string;
+        sinPaginar?: boolean;
+      }
+    ) => [...queryKeys.reportes.all, "compras-proveedor", params] as const
   },
   pedidos: {
     all: ["pedidos"] as const,

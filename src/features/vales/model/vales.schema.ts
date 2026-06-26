@@ -23,16 +23,29 @@ const valeProductoStockSchema = z
 const valeProductoSchema = z.object({
   id: numberLikeSchema.int().positive(),
   nombre: z.string().min(1).optional().nullable(),
+  codigo: z.string().optional().nullable(),
+  unidad: z.string().optional().nullable(),
   stock: valeProductoStockSchema.optional()
 });
 
-export const valeItemSchema = z.object({
-  id: z.union([z.string().min(1), numberLikeSchema]).transform((value) => String(value)),
-  productoId: numberLikeSchema.int().positive(),
-  cantidadSolicitada: numberLikeSchema.nonnegative(),
-  cantidadEntregada: numberLikeSchema.nonnegative().default(0),
-  producto: valeProductoSchema.optional().nullable()
-});
+export const valeItemSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const item = value as Record<string, unknown>;
+    const producto = item.producto as { id?: unknown } | undefined;
+    return {
+      ...item,
+      productoId: item.productoId ?? producto?.id
+    };
+  },
+  z.object({
+    id: z.union([z.string().min(1), numberLikeSchema]).transform((value) => String(value)),
+    productoId: numberLikeSchema.int().positive(),
+    cantidadSolicitada: numberLikeSchema.nonnegative(),
+    cantidadEntregada: numberLikeSchema.nonnegative().default(0),
+    producto: valeProductoSchema.optional().nullable()
+  })
+);
 
 export const valeSchema = z.object({
   id: z.union([z.string().min(1), numberLikeSchema]).transform((value) => String(value)),
@@ -46,6 +59,7 @@ export const valeSchema = z.object({
   solicitante: valeUsuarioSchema.optional().nullable(),
   superintendente: valeUsuarioSchema.optional().nullable(),
   almacenero: valeUsuarioSchema.optional().nullable(),
+  anulacion: z.any().optional().nullable(),
   items: z.array(valeItemSchema).optional().default([])
 });
 
@@ -97,6 +111,10 @@ const listMetaSchema = z.object({
   totalPages: numberLikeSchema.int().positive()
 });
 
+const listMetaSinPaginarSchema = z.object({
+  total: numberLikeSchema.int().nonnegative()
+});
+
 export const valesListResponseSchema = z
   .object({
     success: z.boolean().optional().default(true),
@@ -111,8 +129,15 @@ export const valesListResponseSchema = z
       .transform((value) => {
         if (Array.isArray(value)) return value;
         return value.vales ?? value.rows ?? [];
-      }),
-    meta: listMetaSchema.optional()
+    }),
+    meta: z
+      .union([listMetaSchema, listMetaSinPaginarSchema])
+      .transform((value) =>
+        "page" in value
+          ? value
+          : { page: 1, limit: value.total, total: value.total, totalPages: 1 }
+      )
+      .optional()
   })
   .or(
     z.object({
@@ -173,6 +198,11 @@ export const anularValePayloadSchema = z.object({
 export const valesListParamsSchema = z.object({
   estado: z.string().trim().optional(),
   solicitanteId: numberLikeSchema.int().positive().optional(),
+  anio: numberLikeSchema.int().min(2000).max(2100).optional(),
+  mes: numberLikeSchema.int().min(1).max(12).optional(),
+  fechaInicio: z.string().trim().optional(),
+  fechaFin: z.string().trim().optional(),
+  sinPaginar: z.boolean().optional(),
   page: numberLikeSchema.int().positive().optional(),
   limit: numberLikeSchema.int().positive().optional()
 });

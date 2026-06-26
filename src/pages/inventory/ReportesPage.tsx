@@ -13,6 +13,7 @@ import {
   useBalanceMensualReportQuery,
   useBinCardQuery,
   useBinCardValoradoQuery,
+  useComprasProveedorReportQuery,
   useComprasReportQuery,
   useEntradasAlmacenReportQuery,
   useInventarioAlmacenReportQuery,
@@ -32,6 +33,7 @@ import {
   isInventoryReportType
 } from "@/features/reportes/lib/inventoryReportBuilder";
 import {
+  exportComprasProveedorExcel,
   exportInventoryReportExcel,
   exportInventoryReportPdf,
   exportLegacyBinCardExcel,
@@ -46,7 +48,7 @@ const inputClassName =
 type DateMode = "none" | "specific" | "range";
 type DataMode = "paged" | "all";
 type LegacyReportType = "bin-card" | "bin-card-valorado";
-type ApiReportType = "stock-actual" | "vales-resumen" | "compras-resumen";
+type ApiReportType = "stock-actual" | "vales-resumen" | "compras-resumen" | "inventarios-suministros";
 
 const LEGACY_REPORTS: Array<{ type: LegacyReportType; title: string; description: string }> = [
   {
@@ -65,7 +67,12 @@ function isLegacyReportType(value: string | undefined): value is LegacyReportTyp
   return value === "bin-card" || value === "bin-card-valorado";
 }
 function isApiReportType(value: string | undefined): value is ApiReportType {
-  return value === "stock-actual" || value === "vales-resumen" || value === "compras-resumen";
+  return (
+    value === "stock-actual" ||
+    value === "vales-resumen" ||
+    value === "compras-resumen" ||
+    value === "inventarios-suministros"
+  );
 }
 
 function formatLegacyCellValue(value: unknown) {
@@ -201,10 +208,11 @@ export function ReportesPage() {
       })),
     [proveedores]
   );
-  const primaryFilterOptions = tipo === "compras-resumen" ? proveedorOptions : productoOptions;
-  const primaryFilterLabel = tipo === "compras-resumen" ? "Proveedor" : "Producto";
+  const usesProveedorFilter = tipo === "compras-resumen" || tipo === "inventarios-suministros";
+  const primaryFilterOptions = usesProveedorFilter ? proveedorOptions : productoOptions;
+  const primaryFilterLabel = usesProveedorFilter ? "Proveedor" : "Producto";
   const primaryFilterPlaceholder =
-    tipo === "compras-resumen" ? "Todos los proveedores" : "Todos los productos";
+    usesProveedorFilter ? "Todos los proveedores" : "Todos los productos";
 
   const params = useMemo(
     () => ({
@@ -284,6 +292,18 @@ export function ReportesPage() {
     },
     isApiType && tipo === "compras-resumen"
   );
+  const comprasProveedorQuery = useComprasProveedorReportQuery(
+    {
+      page,
+      limit,
+      estado: estadoReporte || undefined,
+      proveedorId: productoId ? Number(productoId) : undefined,
+      fechaInicio,
+      fechaFin,
+      sinPaginar: dataMode === "all"
+    },
+    isApiType && tipo === "inventarios-suministros"
+  );
 
   const legacyActiveQuery = tipo === "bin-card" ? binCardQuery : binCardValoradoQuery;
   const legacyItems = useMemo(
@@ -318,6 +338,24 @@ export function ReportesPage() {
         .filter((item) => !isSaldoInicialReferencia(item.referencia))
         .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()),
     [binCardValoradoQuery.data?.items]
+  );
+  const inventariosSuministrosRows = useMemo(
+    () =>
+      (comprasProveedorQuery.data?.data ?? []).flatMap((compra) =>
+        compra.items.map((item, index) => ({
+          id: `${compra.id}-${item.codigo ?? index}`,
+          proveedor:
+            index === 0 ? compra.proveedor?.nombre ?? compra.proveedor?.razonSocial ?? "-" : "",
+          factura: index === 0 ? compra.numeroFactura ?? "-" : "",
+          cantidad: item.cantidadRecibida,
+          unidad: item.unidad ?? "-",
+          descripcion: item.nombre ?? "-",
+          totalBs: item.totalBs,
+          totalSinIVA: item.totalSinIVA,
+          grupo: item.grupo ?? item.categoria ?? "-"
+        }))
+      ),
+    [comprasProveedorQuery.data?.data]
   );
 
   const selectedProductLabel =
@@ -411,6 +449,14 @@ export function ReportesPage() {
       });
       return;
     }
+    if (tipo === "inventarios-suministros" && comprasProveedorQuery.data) {
+      exportComprasProveedorExcel({
+        response: comprasProveedorQuery.data,
+        fechaInicio,
+        fechaFin
+      });
+      return;
+    }
     if (reportDefinition) exportInventoryReportExcel(reportDefinition);
   }
 
@@ -448,7 +494,9 @@ export function ReportesPage() {
             ? stockQuery
             : tipo === "vales-resumen"
               ? valesResumenQuery
-              : comprasResumenQuery;
+              : tipo === "compras-resumen"
+                ? comprasResumenQuery
+                : comprasProveedorQuery;
   const rawCurrentMeta =
     isLegacyType ||
     (isAdminType &&
@@ -521,7 +569,12 @@ export function ReportesPage() {
           {[
             { type: "stock-actual", title: "Stock Actual", description: "Stock con reservado, disponible y valor total." },
             { type: "vales-resumen", title: "Resumen De Vales", description: "Vales filtrables por estado, solicitante y fechas." },
-            { type: "compras-resumen", title: "Resumen De Compras", description: "Compras filtrables por estado, proveedor y fechas." }
+            { type: "compras-resumen", title: "Resumen De Compras", description: "Compras filtrables por estado, proveedor y fechas." },
+            {
+              type: "inventarios-suministros",
+              title: "Inventarios Y Suministros",
+              description: "Compras por proveedor con total factura y valor sin IVA."
+            }
           ].map((report) => (
             <button
               key={report.type}
@@ -584,7 +637,7 @@ export function ReportesPage() {
               <option value="all">Ver todo</option>
             </select>
           </div>
-          {tipo === "vales-resumen" || tipo === "compras-resumen" ? (
+          {tipo === "vales-resumen" || tipo === "compras-resumen" || tipo === "inventarios-suministros" ? (
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Estado
@@ -700,6 +753,7 @@ export function ReportesPage() {
               disabled={
                 (isLegacyType && legacyItems.length === 0) ||
                 (isAdminType && (!reportDefinition || reportDefinition.rows.length === 0)) ||
+                (tipo === "inventarios-suministros" && (comprasProveedorQuery.data?.data.length ?? 0) === 0) ||
                 currentQuery.isLoading
               }
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface)] transition hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -713,6 +767,7 @@ export function ReportesPage() {
               disabled={
                 (isLegacyType && legacyItems.length === 0) ||
                 (isAdminType && (!reportDefinition || reportDefinition.rows.length === 0)) ||
+                tipo === "inventarios-suministros" ||
                 currentQuery.isLoading
               }
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface)] transition hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -879,6 +934,17 @@ export function ReportesPage() {
                       <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Total Bs.</th>
                       <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Anulación</th>
                     </>
+                  ) : tipo === "inventarios-suministros" ? (
+                    <>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Factura</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cantidad</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Unidad</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Descripción</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">F-total Bs.</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">(-13%) Bs.</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Grupo</th>
+                    </>
                   ) : (
                     <>
                       <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">ID</th>
@@ -896,6 +962,21 @@ export function ReportesPage() {
                   </tr>
                 )) : tipo === "vales-resumen" ? (valesResumenQuery.data?.data ?? []).map((item) => (
                   <tr key={item.id}><td className="px-3 py-2 text-xs">{item.id}</td><td className="px-3 py-2 text-xs">{item.estado}</td><td className="px-3 py-2 text-xs">{item.solicitante?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}</td></tr>
+                )) : tipo === "inventarios-suministros" ? inventariosSuministrosRows.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2 text-xs">{item.proveedor}</td>
+                    <td className="px-3 py-2 text-xs">{item.factura}</td>
+                    <td className="px-3 py-2 text-right text-xs">{item.cantidad}</td>
+                    <td className="px-3 py-2 text-xs">{item.unidad}</td>
+                    <td className="px-3 py-2 text-xs">{item.descripcion}</td>
+                    <td className="px-3 py-2 text-right text-xs">
+                      {item.totalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs">
+                      {item.totalSinIVA.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-3 py-2 text-xs">{item.grupo}</td>
+                  </tr>
                 )) : (comprasResumenQuery.data?.data ?? []).map((item) => {
                   const isExpanded = expandedCompraIds.has(item.id);
                   return (
@@ -994,6 +1075,21 @@ export function ReportesPage() {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2
                 })}
+              </div>
+            ) : tipo === "inventarios-suministros" && comprasProveedorQuery.data ? (
+              <div className="mt-3 flex justify-end gap-4 text-sm font-bold">
+                <span>
+                  Total general: Bs. {comprasProveedorQuery.data.totalGeneral.toLocaleString("es-BO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
+                <span>
+                  (-13%): Bs. {comprasProveedorQuery.data.totalGeneralSinIVA.toLocaleString("es-BO", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
               </div>
             ) : null}
           </div>

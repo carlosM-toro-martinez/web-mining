@@ -103,7 +103,7 @@ export async function rechazarVale(id: string, superintendenteId?: number) {
 
 export async function anularVale(id: string, payload: AnularValePayload) {
   const body = anularValePayloadSchema.parse(payload);
-  return patchRequest({
+  return postRequest({
     url: apiEndpoints.vales.anular(id),
     body,
     schema: anularValeResponseSchema

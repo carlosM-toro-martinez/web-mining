@@ -4,7 +4,7 @@ import { movimientoSchema } from "@/features/movimientos/model/movimientos.schem
 const numberLikeSchema = z.coerce.number();
 
 export const compraEstadoSchema = z
-  .enum(["PENDIENTE", "PARCIAL", "COMPLETADO"])
+  .enum(["PENDIENTE", "PARCIAL", "COMPLETADO", "ANULADA"])
   .or(z.string().min(1));
 
 const compraUsuarioSchema = z.object({
@@ -30,14 +30,25 @@ const compraProductoSchema = z.object({
   cuenta: z.any().optional().nullable()
 });
 
-export const compraItemSchema = z.object({
-  id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
-  productoId: numberLikeSchema.int().positive(),
-  cantidadPedida: numberLikeSchema.nonnegative(),
-  cantidadRecibida: numberLikeSchema.nonnegative().default(0),
-  precioUnit: numberLikeSchema.nonnegative(),
-  producto: compraProductoSchema.optional().nullable()
-});
+export const compraItemSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const item = value as Record<string, unknown>;
+    const producto = item.producto as { id?: unknown } | undefined;
+    return {
+      ...item,
+      productoId: item.productoId ?? producto?.id
+    };
+  },
+  z.object({
+    id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+    productoId: numberLikeSchema.int().positive(),
+    cantidadPedida: numberLikeSchema.nonnegative(),
+    cantidadRecibida: numberLikeSchema.nonnegative().default(0),
+    precioUnit: numberLikeSchema.nonnegative(),
+    producto: compraProductoSchema.optional().nullable()
+  })
+);
 
 export const compraSchema = z.object({
   id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
@@ -53,6 +64,7 @@ export const compraSchema = z.object({
   proveedor: proveedorSchema.optional().nullable(),
   usuarioRegistro: compraUsuarioSchema.optional().nullable(),
   usuarioRecibe: compraUsuarioSchema.optional().nullable(),
+  anulacion: z.any().optional().nullable(),
   items: z.array(compraItemSchema).optional().default([])
 });
 
@@ -68,10 +80,21 @@ const comprasMetaSchema = z.object({
   totalPages: numberLikeSchema.int().positive()
 });
 
+const comprasMetaSinPaginarSchema = z.object({
+  total: numberLikeSchema.int().nonnegative()
+});
+
 export const comprasListResponseSchema = z.object({
   success: z.boolean().optional().default(true),
   data: z.array(compraSchema),
-  meta: comprasMetaSchema.optional()
+  meta: z
+    .union([comprasMetaSchema, comprasMetaSinPaginarSchema])
+    .transform((value) =>
+      "page" in value
+        ? value
+        : { page: 1, limit: value.total, total: value.total, totalPages: 1 }
+    )
+    .optional()
 });
 
 export const recibirCompraResponseSchema = z.object({
@@ -134,6 +157,11 @@ export const createCompraPayloadSchema = z.object({
 export const comprasQueryParamsSchema = z.object({
   estado: z.string().trim().optional(),
   proveedorId: numberLikeSchema.int().positive().optional(),
+  anio: numberLikeSchema.int().min(2000).max(2100).optional(),
+  mes: numberLikeSchema.int().min(1).max(12).optional(),
+  fechaInicio: z.string().trim().optional(),
+  fechaFin: z.string().trim().optional(),
+  sinPaginar: z.boolean().optional(),
   page: numberLikeSchema.int().positive().default(1),
   limit: numberLikeSchema.int().positive().default(10)
 });
