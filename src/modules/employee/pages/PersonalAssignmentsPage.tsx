@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
-import { useEmployees } from "@/modules/employee/hooks/useEmployees";
+import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/useEmployees";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -77,8 +77,8 @@ export function PersonalAssignmentsPage() {
     () =>
       employees.getAll.data.map((employee) => ({
         id: String(employee.remoteId ?? employee.id),
-        label: employee.nombre,
-        searchText: `${employee.documento ?? ""} ${employee.cargo ?? ""} ${employee.deviceUserId ?? ""}`
+        label: `${employee.nombre} - ${getTipoPersonalLabel(employee.tipoPersonal)}`,
+        searchText: `${employee.documento ?? ""} ${employee.cargo ?? ""} ${employee.deviceUserId ?? ""} ${getTipoPersonalLabel(employee.tipoPersonal)}`
       })),
     [employees.getAll.data]
   );

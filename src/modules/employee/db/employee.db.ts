@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from "dexie";
 
 export type EmployeeSyncStatus = "PENDING" | "SYNCED" | "ERROR";
+export type EmployeeTipoPersonal = "OBRERO" | "TECNICO_EMPLEADO";
 export type SyncQueueAction = "CREATE" | "UPDATE";
 export type SyncQueueStatus = "PENDING" | "DONE" | "ERROR";
 
@@ -10,6 +11,7 @@ export interface EmployeeRecord {
   nombre: string;
   documento?: string;
   cargo?: string;
+  tipoPersonal: EmployeeTipoPersonal;
   deviceUserId?: string;
   activo: boolean;
   syncStatus: EmployeeSyncStatus;
@@ -42,6 +44,16 @@ class EmployeeDb extends Dexie {
       employees: "++id, deviceUserId, syncStatus, updatedAt",
       syncQueue: "++id, action, status, updatedAt"
     });
+    this.version(2)
+      .stores({
+        employees: "++id, deviceUserId, syncStatus, tipoPersonal, updatedAt",
+        syncQueue: "++id, action, status, updatedAt"
+      })
+      .upgrade(async (tx) => {
+        await tx.table<EmployeeRecord, number>("employees").toCollection().modify((employee) => {
+          employee.tipoPersonal = employee.tipoPersonal ?? "OBRERO";
+        });
+      });
   }
 }
 

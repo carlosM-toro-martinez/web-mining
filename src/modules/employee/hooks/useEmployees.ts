@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { employeeDb, type EmployeeRecord } from "@/modules/employee/db/employee.db";
+import { employeeDb, type EmployeeRecord, type EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import { env } from "@/shared/config/env";
@@ -10,6 +10,7 @@ interface EmployeePayload {
   nombre: string;
   documento?: string;
   cargo?: string;
+  tipoPersonal?: EmployeeTipoPersonal;
   deviceUserId?: string;
   activo?: boolean;
 }
@@ -23,6 +24,7 @@ interface EmployeeApiItem {
   nombre?: string;
   documento?: string | null;
   cargo?: string | null;
+  tipoPersonal?: EmployeeTipoPersonal | null;
   deviceUserId?: string | null;
   activo?: boolean;
   syncStatus?: "PENDING" | "SYNCED" | "ERROR";
@@ -42,6 +44,15 @@ interface AttendanceItem {
   } | null;
 }
 
+export const tipoPersonalOptions: Array<{ value: EmployeeTipoPersonal; label: string }> = [
+  { value: "OBRERO", label: "Obrero" },
+  { value: "TECNICO_EMPLEADO", label: "Técnico / empleado" }
+];
+
+export function getTipoPersonalLabel(value?: EmployeeTipoPersonal | null) {
+  return tipoPersonalOptions.find((option) => option.value === value)?.label ?? "Obrero";
+}
+
 function toEmployeeRecord(item: EmployeeApiItem): EmployeeRecord {
   const now = new Date().toISOString();
   return {
@@ -49,6 +60,7 @@ function toEmployeeRecord(item: EmployeeApiItem): EmployeeRecord {
     nombre: item.nombre ?? "",
     documento: item.documento ?? undefined,
     cargo: item.cargo ?? undefined,
+    tipoPersonal: item.tipoPersonal ?? "OBRERO",
     deviceUserId: item.deviceUserId ?? undefined,
     activo: item.activo ?? true,
     syncStatus: item.syncStatus ?? "PENDING",

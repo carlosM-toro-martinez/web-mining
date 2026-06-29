@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, FileBarChart2, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
-import { useEmployees } from "@/modules/employee/hooks/useEmployees";
+import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/useEmployees";
+import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -23,6 +24,14 @@ function getCurrentMonthRange() {
   };
 }
 
+interface AttendanceReportRow {
+  id: number | string;
+  fecha: string;
+  tipo: string;
+  deviceUserId?: string;
+  empleado?: { nombre: string; tipoPersonal?: EmployeeTipoPersonal | null } | null;
+}
+
 export function PersonalReportsPage() {
   const { showError, showSuccess } = useToast();
   const employees = useEmployees();
@@ -40,7 +49,7 @@ export function PersonalReportsPage() {
     queryKey: ["employee-attendance-report", reportDesde, reportHasta, reportTipo, reportPage, reportLimit, isEmployeeSearchActive],
     queryFn: async () => {
       if (isEmployeeSearchActive) {
-        const allRows: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }> = [];
+        const allRows: AttendanceReportRow[] = [];
         let page = 1;
         let totalPagesFromApi = 1;
 
@@ -55,7 +64,7 @@ export function PersonalReportsPage() {
             }
           });
           const payload = response.data as {
-            data?: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }>;
+            data?: AttendanceReportRow[];
             meta?: { total?: number; page?: number; totalPages?: number };
           };
           allRows.push(...(payload.data ?? []));
@@ -76,7 +85,7 @@ export function PersonalReportsPage() {
         }
       });
       const payload = response.data as {
-        data?: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }>;
+        data?: AttendanceReportRow[];
         meta?: { total?: number; page?: number; totalPages?: number };
       };
       return { data: payload.data ?? [], meta: payload.meta ?? { total: 0, page: 1, totalPages: 1 } };
@@ -88,7 +97,7 @@ export function PersonalReportsPage() {
     const query = employeeLocalSearch.trim().toLowerCase();
     if (!query) return rows;
     return rows.filter((row) =>
-      `${row.empleado?.nombre ?? ""} ${row.deviceUserId ?? ""}`.toLowerCase().includes(query)
+      `${row.empleado?.nombre ?? ""} ${row.deviceUserId ?? ""} ${getTipoPersonalLabel(row.empleado?.tipoPersonal)}`.toLowerCase().includes(query)
     );
   }, [attendanceReportQuery.data?.data, employeeLocalSearch]);
   const totalPages = useMemo(
@@ -127,7 +136,7 @@ export function PersonalReportsPage() {
 
   async function handleExportExcel() {
     try {
-      const allRows: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }> = [];
+      const allRows: AttendanceReportRow[] = [];
       let page = 1;
       let totalPagesFromApi = 1;
 
@@ -142,7 +151,7 @@ export function PersonalReportsPage() {
           }
         });
         const payload = response.data as {
-          data?: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }>;
+          data?: AttendanceReportRow[];
           meta?: { totalPages?: number };
         };
         allRows.push(...(payload.data ?? []));
@@ -164,6 +173,7 @@ export function PersonalReportsPage() {
           Hora: hora,
           Tipo: item.tipo,
           Empleado: item.empleado?.nombre ?? "-",
+          "Tipo personal": getTipoPersonalLabel(item.empleado?.tipoPersonal),
           "Device User ID": item.deviceUserId ?? "-"
         };
       });
@@ -222,7 +232,7 @@ export function PersonalReportsPage() {
               setEmployeeLocalSearch(e.target.value);
               setReportPage(1);
             }}
-            placeholder="Buscar empleado (filtro local)"
+            placeholder="Buscar empleado o tipo (filtro local)"
             className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
           />
           <select value={reportTipo} onChange={(e) => { setReportTipo(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs">
@@ -237,13 +247,13 @@ export function PersonalReportsPage() {
         </div>
         <div className="table-scroll max-h-[420px] overflow-auto px-4 pb-4">
           <table className="w-full border-collapse text-left">
-            <thead><tr><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Hora</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Empleado</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th></tr></thead>
+            <thead><tr><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Hora</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Empleado</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo personal</th><th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th></tr></thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {attendanceReportQuery.isLoading ? <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Cargando reporte...</td></tr> : null}
-              {!attendanceReportQuery.isLoading && locallyFilteredRows.length === 0 ? <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Sin registros para esos filtros.</td></tr> : null}
+              {attendanceReportQuery.isLoading ? <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Cargando reporte...</td></tr> : null}
+              {!attendanceReportQuery.isLoading && locallyFilteredRows.length === 0 ? <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-[var(--color-on-surface-variant)]">Sin registros para esos filtros.</td></tr> : null}
               {locallyFilteredRows.map((item) => {
                 const { fecha, hora } = splitRawDateTime(item.fecha);
-                return <tr key={String(item.id)} className="hover:bg-[var(--color-surface-container-high)]/60"><td className="px-3 py-2 text-xs font-mono">{fecha}</td><td className="px-3 py-2 text-xs font-mono">{hora}</td><td className="px-3 py-2 text-xs"><span className="rounded-full bg-[var(--color-tertiary)]/12 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-tertiary)]">{item.tipo}</span></td><td className="px-3 py-2 text-xs">{item.empleado?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs font-mono">{item.deviceUserId ?? "-"}</td></tr>;
+                return <tr key={String(item.id)} className="hover:bg-[var(--color-surface-container-high)]/60"><td className="px-3 py-2 text-xs font-mono">{fecha}</td><td className="px-3 py-2 text-xs font-mono">{hora}</td><td className="px-3 py-2 text-xs"><span className="rounded-full bg-[var(--color-tertiary)]/12 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-tertiary)]">{item.tipo}</span></td><td className="px-3 py-2 text-xs">{item.empleado?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{getTipoPersonalLabel(item.empleado?.tipoPersonal)}</td><td className="px-3 py-2 text-xs font-mono">{item.deviceUserId ?? "-"}</td></tr>;
               })}
             </tbody>
           </table>

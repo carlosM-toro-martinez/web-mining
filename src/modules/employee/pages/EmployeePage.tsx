@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, PencilLine, RefreshCw, Trash2, UsersRound } from "lucide-react";
 import { EmployeeForm } from "@/modules/employee/components/EmployeeForm";
-import { useEmployees } from "@/modules/employee/hooks/useEmployees";
+import {
+  getTipoPersonalLabel,
+  tipoPersonalOptions,
+  useEmployees
+} from "@/modules/employee/hooks/useEmployees";
+import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { env } from "@/shared/config/env";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -11,6 +16,7 @@ interface EditingEmployee {
   nombre: string;
   documento?: string;
   cargo?: string;
+  tipoPersonal: EmployeeTipoPersonal;
   activo: boolean;
 }
 
@@ -22,6 +28,7 @@ export function EmployeePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [onlyActive, setOnlyActive] = useState(false);
+  const [tipoPersonalFilter, setTipoPersonalFilter] = useState<"" | EmployeeTipoPersonal>("");
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
 
@@ -38,10 +45,12 @@ export function EmployeePage() {
         employee.nombre.toLowerCase().includes(query) ||
         (employee.documento ?? "").toLowerCase().includes(query) ||
         (employee.cargo ?? "").toLowerCase().includes(query) ||
-        (employee.deviceUserId ?? "").toLowerCase().includes(query);
-      return matchesSearch && (!onlyActive || employee.activo);
+        (employee.deviceUserId ?? "").toLowerCase().includes(query) ||
+        getTipoPersonalLabel(employee.tipoPersonal).toLowerCase().includes(query);
+      const matchesTipo = !tipoPersonalFilter || employee.tipoPersonal === tipoPersonalFilter;
+      return matchesSearch && matchesTipo && (!onlyActive || employee.activo);
     });
-  }, [employees.getAll.data, search, onlyActive]);
+  }, [employees.getAll.data, search, tipoPersonalFilter, onlyActive]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / limit));
   const currentPage = Math.min(page, totalPages);
@@ -56,9 +65,9 @@ export function EmployeePage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, onlyActive]);
+  }, [search, tipoPersonalFilter, onlyActive]);
 
-  async function handleCreate(values: { nombre: string; documento?: string; cargo?: string; activo?: boolean }) {
+  async function handleCreate(values: { nombre: string; documento?: string; cargo?: string; tipoPersonal?: EmployeeTipoPersonal; activo?: boolean }) {
     try {
       await employees.create(values);
       setIsFormOpen(false);
@@ -68,7 +77,7 @@ export function EmployeePage() {
     }
   }
 
-  async function handleUpdate(values: { nombre: string; documento?: string; cargo?: string; activo?: boolean }) {
+  async function handleUpdate(values: { nombre: string; documento?: string; cargo?: string; tipoPersonal?: EmployeeTipoPersonal; activo?: boolean }) {
     if (!editing) return;
     try {
       await employees.update({ id: editing.id, ...values });
@@ -160,26 +169,39 @@ export function EmployeePage() {
           </div>
           <div className="flex items-center gap-2">
             <input value={search} onChange={(event) => setSearch(event.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" placeholder="Buscar nombre/documento/cargo/userId" />
+            <select
+              value={tipoPersonalFilter}
+              onChange={(event) => setTipoPersonalFilter(event.target.value as "" | EmployeeTipoPersonal)}
+              className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
+            >
+              <option value="">Todo tipo</option>
+              {tipoPersonalOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <label className="text-xs"><input type="checkbox" checked={onlyActive} onChange={(event) => setOnlyActive(event.target.checked)} className="mr-1 h-3.5 w-3.5" />Solo activos</label>
           </div>
         </div>
         <div className="table-scroll overflow-x-auto">
           <table className="w-full border-collapse text-left">
-            <thead><tr><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Nombre</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Documento</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cargo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Sync</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Activo</th><th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th></tr></thead>
+            <thead><tr><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Nombre</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Documento</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cargo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Sync</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Activo</th><th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th></tr></thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {employees.getAll.isLoading ? <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando empleados...</td></tr> : null}
-              {!employees.getAll.isLoading && filteredEmployees.length === 0 ? <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">No hay empleados registrados.</td></tr> : null}
+              {employees.getAll.isLoading ? <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando empleados...</td></tr> : null}
+              {!employees.getAll.isLoading && filteredEmployees.length === 0 ? <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">No hay empleados registrados.</td></tr> : null}
               {paginatedEmployees.map((employee) => (
                 <tr key={employee.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                   <td className="px-4 py-3 text-sm">{employee.nombre}</td>
                   <td className="px-4 py-3 text-xs">{employee.documento ?? "-"}</td>
                   <td className="px-4 py-3 text-xs">{employee.cargo ?? "-"}</td>
+                  <td className="px-4 py-3 text-xs">{getTipoPersonalLabel(employee.tipoPersonal)}</td>
                   <td className="px-4 py-3 font-mono text-xs">{employee.deviceUserId ?? "-"}</td>
                   <td className="px-4 py-3 text-xs font-semibold">{employee.syncStatus}</td>
                   <td className="px-4 py-3 text-xs">{employee.activo ? "Sí" : "No"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => { setEditing({ id: employee.id!, nombre: employee.nombre, documento: employee.documento, cargo: employee.cargo, activo: employee.activo }); setIsFormOpen(true); }} className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)]"><PencilLine size={12} />Editar</button>
+                      <button type="button" onClick={() => { setEditing({ id: employee.id!, nombre: employee.nombre, documento: employee.documento, cargo: employee.cargo, tipoPersonal: employee.tipoPersonal, activo: employee.activo }); setIsFormOpen(true); }} className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)]"><PencilLine size={12} />Editar</button>
                       <button type="button" onClick={() => handleDelete(employee.id!)} className="inline-flex items-center gap-1 rounded-md border border-red-500/45 px-3 py-1.5 text-xs font-semibold text-red-600"><Trash2 size={12} />Eliminar</button>
                     </div>
                   </td>

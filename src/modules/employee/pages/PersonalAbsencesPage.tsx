@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
-import { useEmployees } from "@/modules/employee/hooks/useEmployees";
+import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/useEmployees";
+import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -14,7 +15,7 @@ interface AbsenceItem {
   motivo?: string | null;
   aprobado: boolean;
   creadoPor?: string | null;
-  employee?: { id: number; nombre: string; cargo?: string | null } | null;
+  employee?: { id: number; nombre: string; cargo?: string | null; tipoPersonal?: EmployeeTipoPersonal | null } | null;
 }
 
 const tipos = ["VACACION", "DESCANSO", "PERMISO", "ENFERMEDAD", "FERIADO", "ABANDONO", "OTRO"];
@@ -76,8 +77,8 @@ export function PersonalAbsencesPage() {
     () =>
       employees.getAll.data.map((employee) => ({
         id: String(employee.remoteId ?? employee.id),
-        label: employee.nombre,
-        searchText: `${employee.documento ?? ""} ${employee.cargo ?? ""} ${employee.deviceUserId ?? ""}`
+        label: `${employee.nombre} - ${getTipoPersonalLabel(employee.tipoPersonal)}`,
+        searchText: `${employee.documento ?? ""} ${employee.cargo ?? ""} ${employee.deviceUserId ?? ""} ${getTipoPersonalLabel(employee.tipoPersonal)}`
       })),
     [employees.getAll.data]
   );
@@ -111,7 +112,7 @@ export function PersonalAbsencesPage() {
             <tbody>
               {absencesQuery.data?.data.map((item) => (
                 <tr key={item.id} className="border-t border-[var(--color-border-soft)]">
-                  <td className="px-4 py-2 text-sm">{item.employee?.nombre ?? "-"}</td>
+                  <td className="px-4 py-2 text-sm">{item.employee ? `${item.employee.nombre} - ${getTipoPersonalLabel(item.employee.tipoPersonal)}` : "-"}</td>
                   <td className="px-4 py-2 text-sm">{item.tipo}</td>
                   <td className="px-4 py-2 text-sm font-mono">{item.desde}</td>
                   <td className="px-4 py-2 text-sm font-mono">{item.hasta}</td>
