@@ -14,6 +14,11 @@ interface ReportDay {
   real?: { entrada?: string; salida?: string } | null;
 }
 
+function hasAttendanceMark(day: ReportDay) {
+  const status = day.estado.trim().toUpperCase();
+  return Boolean(day.real?.entrada || day.real?.salida || status === "PUNTUAL" || status === "TARDE" || status === "ENTRADA" || status === "SALIDA");
+}
+
 function getEstadoBadgeClass(estado: string) {
   const normalized = estado.trim().toUpperCase();
   if (normalized === "PUNTUAL") return "bg-emerald-500/12 text-emerald-600";
@@ -92,7 +97,7 @@ export function PersonalReportPage() {
           const position = Math.floor((current.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
           if (position < 0 || position >= daysCount) continue;
           const status = day.estado.toUpperCase();
-          if (status === "PUNTUAL" || status === "TARDE" || status === "ENTRADA" || status === "SALIDA") {
+          if (hasAttendanceMark(day)) {
             marks[position] = "1";
             presentDays += 1;
           } else if (status === "AUSENTE") {
@@ -146,10 +151,7 @@ export function PersonalReportPage() {
       const totalPresent = entries.reduce((acc, entry) => {
         return (
           acc +
-          entry.dias.filter((day) => {
-            const status = day.estado.toUpperCase();
-            return status === "PUNTUAL" || status === "TARDE" || status === "ENTRADA" || status === "SALIDA";
-          }).length
+          entry.dias.filter((day) => hasAttendanceMark(day)).length
         );
       }, 0);
 
@@ -341,7 +343,7 @@ export function PersonalReportPage() {
               </p>
               <div className="mt-2 table-scroll overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead><tr><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Estado</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Entrada</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Salida</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Retraso</th></tr></thead>
+                  <thead><tr><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Fecha</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Estado</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Entrada</th><th className="px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">Retraso</th></tr></thead>
                   <tbody>
                     {entry.dias.map((day) => (
                       <tr key={`${entry.empleado.id}-${day.fecha}`} className="border-t border-[var(--color-border-soft)]">
@@ -352,7 +354,6 @@ export function PersonalReportPage() {
                           </span>
                         </td>
                         <td className="px-2 py-1 text-xs font-mono">{day.real?.entrada ?? "-"}</td>
-                        <td className="px-2 py-1 text-xs font-mono">{day.real?.salida ?? "-"}</td>
                         <td className="px-2 py-1 text-xs">{day.minutosRetraso}</td>
                       </tr>
                     ))}

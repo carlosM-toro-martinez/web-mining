@@ -7,20 +7,65 @@ import { httpClient } from "@/shared/api/core/httpClient";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthRange() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  return {
+    desde: formatDateInputValue(firstDay),
+    hasta: formatDateInputValue(today)
+  };
+}
+
 export function PersonalReportsPage() {
   const { showError, showSuccess } = useToast();
   const employees = useEmployees();
   const queryClient = useQueryClient();
-  const [reportDesde, setReportDesde] = useState("");
-  const [reportHasta, setReportHasta] = useState("");
+  const defaultRange = useMemo(() => getCurrentMonthRange(), []);
+  const [reportDesde, setReportDesde] = useState(defaultRange.desde);
+  const [reportHasta, setReportHasta] = useState(defaultRange.hasta);
   const [employeeLocalSearch, setEmployeeLocalSearch] = useState("");
   const [reportTipo, setReportTipo] = useState("");
   const [reportPage, setReportPage] = useState(1);
   const [reportLimit] = useState(150);
+  const isEmployeeSearchActive = employeeLocalSearch.trim().length > 0;
 
   const attendanceReportQuery = useQuery({
-    queryKey: ["employee-attendance-report", reportDesde, reportHasta, reportTipo, reportPage, reportLimit],
+    queryKey: ["employee-attendance-report", reportDesde, reportHasta, reportTipo, reportPage, reportLimit, isEmployeeSearchActive],
     queryFn: async () => {
+      if (isEmployeeSearchActive) {
+        const allRows: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }> = [];
+        let page = 1;
+        let totalPagesFromApi = 1;
+
+        do {
+          const response = await httpClient.get("/api/biometric/attendance", {
+            params: {
+              page,
+              limit: reportLimit,
+              desde: reportDesde || undefined,
+              hasta: reportHasta || undefined,
+              tipo: reportTipo || undefined
+            }
+          });
+          const payload = response.data as {
+            data?: Array<{ id: number | string; fecha: string; tipo: string; deviceUserId?: string; empleado?: { nombre: string } | null }>;
+            meta?: { total?: number; page?: number; totalPages?: number };
+          };
+          allRows.push(...(payload.data ?? []));
+          totalPagesFromApi = Math.max(1, payload.meta?.totalPages ?? 1);
+          page += 1;
+        } while (page <= totalPagesFromApi);
+
+        return { data: allRows, meta: { total: allRows.length, page: 1, totalPages: 1 } };
+      }
+
       const response = await httpClient.get("/api/biometric/attendance", {
         params: {
           page: reportPage,
@@ -38,8 +83,6 @@ export function PersonalReportsPage() {
     }
   });
 
-  const totalPages = useMemo(() => Math.max(1, attendanceReportQuery.data?.meta.totalPages ?? 1), [attendanceReportQuery.data]);
-  const totalRecords = useMemo(() => attendanceReportQuery.data?.meta.total ?? 0, [attendanceReportQuery.data]);
   const locallyFilteredRows = useMemo(() => {
     const rows = attendanceReportQuery.data?.data ?? [];
     const query = employeeLocalSearch.trim().toLowerCase();
@@ -48,6 +91,14 @@ export function PersonalReportsPage() {
       `${row.empleado?.nombre ?? ""} ${row.deviceUserId ?? ""}`.toLowerCase().includes(query)
     );
   }, [attendanceReportQuery.data?.data, employeeLocalSearch]);
+  const totalPages = useMemo(
+    () => (isEmployeeSearchActive ? 1 : Math.max(1, attendanceReportQuery.data?.meta.totalPages ?? 1)),
+    [attendanceReportQuery.data?.meta.totalPages, isEmployeeSearchActive]
+  );
+  const totalRecords = useMemo(
+    () => (isEmployeeSearchActive ? locallyFilteredRows.length : attendanceReportQuery.data?.meta.total ?? 0),
+    [attendanceReportQuery.data?.meta.total, isEmployeeSearchActive, locallyFilteredRows.length]
+  );
   const syncAttendanceMutation = useMutation({
     mutationFn: async () => {
       await httpClient.post("/api/biometric/sync-attendance");
@@ -167,7 +218,10 @@ export function PersonalReportsPage() {
           <input type="date" value={reportHasta} onChange={(e) => { setReportHasta(e.target.value); setReportPage(1); }} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs" />
           <input
             value={employeeLocalSearch}
-            onChange={(e) => setEmployeeLocalSearch(e.target.value)}
+            onChange={(e) => {
+              setEmployeeLocalSearch(e.target.value);
+              setReportPage(1);
+            }}
             placeholder="Buscar empleado (filtro local)"
             className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-xs"
           />
@@ -196,7 +250,9 @@ export function PersonalReportsPage() {
         </div>
         <div className="flex items-center justify-between border-t border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]/55 px-5 py-3">
           <span className="text-xs text-[var(--color-on-surface-variant)]">
-            {`Pagina ${reportPage} de ${totalPages} | Mostrando: ${locallyFilteredRows.length} (filtro local)`}
+            {isEmployeeSearchActive
+              ? `Busqueda por empleado: ${locallyFilteredRows.length} registros del rango`
+              : `Pagina ${reportPage} de ${totalPages} | Mostrando: ${locallyFilteredRows.length}`}
           </span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setReportPage((current) => (current > 1 ? current - 1 : current))} disabled={reportPage <= 1} className="rounded-md bg-[var(--color-surface-container-highest)] p-1.5 text-[var(--color-on-surface-variant)] disabled:opacity-40"><ChevronLeft size={16} /></button>
