@@ -444,7 +444,7 @@ export function AppShell() {
       </header>
 
       <main
-        className={`min-h-screen px-4 pb-12 pt-24 transition-all duration-300 lg:px-8 ${
+        className={`min-h-screen px-4 pb-56 pt-24 transition-all duration-300 lg:px-8 ${
           isSidebarCollapsed ? "lg:ml-20" : "lg:ml-64"
         }`}
       >
@@ -455,7 +455,7 @@ export function AppShell() {
         src={minerImage}
         alt=""
         aria-hidden="true"
-        className="app-shell__miner pointer-events-none fixed bottom-5 right-5 z-30 h-24 w-24 opacity-90 md:h-28 md:w-28"
+        className="app-shell__miner pointer-events-none fixed right-5 z-30 h-24 w-24 opacity-90 md:h-28 md:w-28"
       />
     </div>
   );
