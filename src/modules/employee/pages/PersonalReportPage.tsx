@@ -20,13 +20,21 @@ function hasAttendanceMark(day: ReportDay) {
   return Boolean(day.real?.entrada || day.real?.salida || status === "PUNTUAL" || status === "TARDE" || status === "ENTRADA" || status === "SALIDA");
 }
 
+function hasLateMark(day: ReportDay) {
+  return day.estado.trim().toUpperCase() === "TARDE" || day.minutosRetraso > 0;
+}
+
+function isNonWorkingStatus(status: string) {
+  return status === "DESCANSO" || status === "NO_LABORAL";
+}
+
 function getEstadoBadgeClass(estado: string) {
   const normalized = estado.trim().toUpperCase();
   if (normalized === "PUNTUAL") return "bg-emerald-500/12 text-emerald-600";
   if (normalized === "TARDE") return "bg-amber-500/14 text-amber-600";
   if (normalized === "ABANDONO") return "bg-red-500/14 text-red-600";
   if (normalized === "AUSENTE") return "bg-rose-500/14 text-rose-600";
-  if (normalized === "VACACION" || normalized === "DESCANSO" || normalized === "PERMISO") return "bg-sky-500/14 text-sky-600";
+  if (normalized === "VACACION" || isNonWorkingStatus(normalized) || normalized === "PERMISO") return "bg-sky-500/14 text-sky-600";
   return "bg-[var(--color-tertiary)]/12 text-[var(--color-tertiary)]";
 }
 
@@ -60,8 +68,56 @@ interface ReportEmployee {
 
 type RayadorCellValue = string | number;
 
+interface SheetCellPosition {
+  r: number;
+  c: number;
+}
+
+interface SheetMergeRange {
+  s: SheetCellPosition;
+  e: SheetCellPosition;
+}
+
 function createBlankRayadorRow(length: number): RayadorCellValue[] {
   return Array.from({ length }, () => "");
+}
+
+function normalizeMergeRange(range: SheetMergeRange): SheetMergeRange {
+  return {
+    s: {
+      r: Math.min(range.s.r, range.e.r),
+      c: Math.min(range.s.c, range.e.c)
+    },
+    e: {
+      r: Math.max(range.s.r, range.e.r),
+      c: Math.max(range.s.c, range.e.c)
+    }
+  };
+}
+
+function rangesOverlap(a: SheetMergeRange, b: SheetMergeRange) {
+  return a.s.r <= b.e.r && a.e.r >= b.s.r && a.s.c <= b.e.c && a.e.c >= b.s.c;
+}
+
+function getSafeMergeRanges(ranges: SheetMergeRange[], totalRows: number, totalCols: number) {
+  const safeRanges: SheetMergeRange[] = [];
+
+  ranges.forEach((range) => {
+    const normalized = normalizeMergeRange(range);
+    const isInsideSheet =
+      normalized.s.r >= 0 &&
+      normalized.s.c >= 0 &&
+      normalized.e.r < totalRows &&
+      normalized.e.c < totalCols;
+    const hasArea = normalized.s.r !== normalized.e.r || normalized.s.c !== normalized.e.c;
+    const overlapsExisting = safeRanges.some((safeRange) => rangesOverlap(safeRange, normalized));
+
+    if (isInsideSheet && hasArea && !overlapsExisting) {
+      safeRanges.push(normalized);
+    }
+  });
+
+  return safeRanges;
 }
 
 interface AttendanceSummary {
@@ -151,7 +207,7 @@ export function PersonalReportPage() {
       if (position < 0 || position >= daysCount) continue;
       const status = day.estado.toUpperCase();
       if (hasAttendanceMark(day)) {
-        marks[position] = "1";
+        marks[position] = hasLateMark(day) ? "R" : "1";
         ordinaryDays += 1;
       } else if (status === "AUSENTE" || status === "ABANDONO") {
         marks[position] = "F";
@@ -162,7 +218,7 @@ export function PersonalReportPage() {
       } else if (status === "PERMISO" || status === "ENFERMEDAD" || status === "FERIADO") {
         marks[position] = "LIC";
         leaveDays += 1;
-      } else if (status === "DESCANSO") {
+      } else if (isNonWorkingStatus(status)) {
         marks[position] = "D";
         sundayDays += 1;
       }
@@ -205,7 +261,7 @@ export function PersonalReportPage() {
       const titleYear = fromDate?.getFullYear() ?? "";
       const totalCols = 22;
 
-      const employeesSection = entries.filter((entry) => entry.empleado.tipoPersonal !== "OBRERO");
+      const employeesSection = entries.filter((entry) => entry.empleado.tipoPersonal === "TECNICO_EMPLEADO");
       const workersSection = entries.filter((entry) => entry.empleado.tipoPersonal === "OBRERO");
       const aoa: RayadorCellValue[][] = [
         createBlankRayadorRow(totalCols),
@@ -330,7 +386,7 @@ export function PersonalReportPage() {
         { wch: 8 }
       ];
       ws["!rows"] = Array.from({ length: aoa.length }, (_, index) => ({ hpt: index < 3 ? 10 : 13 }));
-      ws["!merges"] = [
+      ws["!merges"] = getSafeMergeRanges([
         { s: { r: 0, c: 1 }, e: { r: 0, c: 5 } },
         { s: { r: 1, c: 1 }, e: { r: 1, c: 5 } },
         { s: { r: 2, c: 1 }, e: { r: 2, c: 19 } },
@@ -347,7 +403,7 @@ export function PersonalReportPage() {
           { s: { r: layout.headerStartRow, c: 18 }, e: { r: layout.headerStartRow + 1, c: 18 } },
           { s: { r: layout.headerStartRow, c: 20 }, e: { r: layout.headerStartRow + 1, c: 20 } }
         ])
-      ];
+      ], aoa.length, totalCols);
 
       const thinBorder = {
         top: { style: "thin", color: { rgb: "000000" } },
@@ -496,7 +552,7 @@ export function PersonalReportPage() {
             if (position < 0 || position >= daysCount) continue;
             const status = day.estado.toUpperCase();
             if (hasAttendanceMark(day)) {
-              marks[position] = "1";
+              marks[position] = hasLateMark(day) ? "R" : "1";
               presentDays += 1;
             } else if (status === "AUSENTE") {
               marks[position] = "F";
@@ -510,7 +566,7 @@ export function PersonalReportPage() {
             } else if (status === "PERMISO" || status === "ENFERMEDAD" || status === "FERIADO") {
               marks[position] = "LIC";
               licenseDays += 1;
-            } else if (status === "DESCANSO") {
+            } else if (isNonWorkingStatus(status)) {
               marks[position] = "D";
               domingoDays += 1;
             } else {
@@ -553,7 +609,7 @@ export function PersonalReportPage() {
         {
           title: "PERSONAL TECNICO Y EMPLEADOS",
           sideTitle: "",
-          entries: entries.filter((entry) => entry.empleado.tipoPersonal !== "OBRERO")
+          entries: entries.filter((entry) => entry.empleado.tipoPersonal === "TECNICO_EMPLEADO")
         },
         {
           title: "PERSONAL  OBRERO",
@@ -618,14 +674,14 @@ export function PersonalReportPage() {
           ];
         }).flat()
       );
-      ws["!merges"] = [
+      ws["!merges"] = getSafeMergeRanges([
         { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
         { s: { r: 1, c: 8 }, e: { r: 3, c: dayEndCol } },
         { s: { r: 1, c: summaryStartCol }, e: { r: 3, c: summaryEndCol } },
         { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
         ...employeeMerges
-      ];
+      ], aoa.length, totalCols);
       ws["!cols"] = [
         { wch: 3 },
         { wch: 4 },
@@ -658,6 +714,7 @@ export function PersonalReportPage() {
       };
       const whiteFill = { patternType: "solid", fgColor: { rgb: "FFFFFF" } };
       const yellowFill = { patternType: "solid", fgColor: { rgb: "FFFF00" } };
+      const lateFill = { patternType: "solid", fgColor: { rgb: "FCE4D6" } };
 
       function cellAddress(row: number, col: number) {
         return XLSX.utils.encode_cell({ r: row, c: col });
@@ -720,8 +777,13 @@ export function PersonalReportPage() {
           for (let c = dayStartCol; c <= dayEndCol; c += 1) {
             const value = ws[cellAddress(r + 2, c)]?.v;
             applyStyle(r + 2, c, {
-              fill: value === "D" ? yellowFill : whiteFill,
-              font: { name: "Calibri", sz: 7, bold: value === "D" },
+              fill: value === "D" ? yellowFill : value === "R" ? lateFill : whiteFill,
+              font: {
+                name: "Calibri",
+                sz: 7,
+                bold: value === "D" || value === "R",
+                ...(value === "R" ? { color: { rgb: "C00000" } } : {})
+              },
               alignment: { horizontal: "center", vertical: "center" }
             });
           }
