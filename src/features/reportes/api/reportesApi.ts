@@ -1,6 +1,8 @@
 import { getRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
+  anulacionesEntradasReportResponseSchema,
+  anulacionesSalidasReportResponseSchema,
   binCardResponseSchema,
   binCardValoradoResponseSchema,
   balanceMensualReportResponseSchema,
@@ -126,5 +128,21 @@ export async function getSalidasAlmacenReport(params: MonthlyRangeReportQueryPar
     url: apiEndpoints.reportes.salidasAlmacen,
     config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
     schema: salidasAlmacenReportResponseSchema
+  });
+}
+
+export async function getAnulacionesEntradasReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.anulacionesEntradas,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: anulacionesEntradasReportResponseSchema
+  });
+}
+
+export async function getAnulacionesSalidasReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.anulacionesSalidas,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: anulacionesSalidasReportResponseSchema
   });
 }

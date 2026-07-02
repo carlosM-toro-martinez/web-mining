@@ -1,5 +1,7 @@
 import type { Producto } from "@/features/productos/model/producto.schema";
 import type {
+  AnulacionesEntradasReportResponse,
+  AnulacionesSalidasReportResponse,
   BalanceMensualReportResponse,
   BinCardValoradoItem,
   EntradasAlmacenReportResponse,
@@ -12,6 +14,8 @@ export type InventoryReportType =
   | "inventario-general"
   | "entradas-almacen"
   | "salidas-almacen"
+  | "anulaciones-entradas"
+  | "anulaciones-salidas"
   | "costo-produccion"
   | "movimiento-almacen";
 
@@ -590,6 +594,16 @@ export const INVENTORY_REPORTS: Array<{
     description: "Egresos por grupo, subgrupo y producto con cantidades y valorizacion."
   },
   {
+    type: "anulaciones-entradas",
+    title: "Anulaciones De Entradas",
+    description: "Compras anuladas con detalle de productos, motivo y usuario de anulacion."
+  },
+  {
+    type: "anulaciones-salidas",
+    title: "Anulaciones De Salidas",
+    description: "Vales anulados con detalle de productos, motivo y usuario de anulacion."
+  },
+  {
     type: "costo-produccion",
     title: "Costo De Produccion",
     description: "Detalle por subcuenta, subcentro y funcion de gasto con subtotales."
@@ -1101,4 +1115,202 @@ export function buildSalidasAlmacenApiReportDefinition(
       }))
     }
   });
+}
+
+function formatReportDate(value?: string | null) {
+  if (!value) return "";
+  const midnightUtcMatch = /^(\d{4})-(\d{2})-(\d{2})T00:00:00(?:\.000)?Z$/.exec(value);
+  if (midnightUtcMatch) {
+    const [, year, month, day] = midnightUtcMatch;
+    return `${day}/${month}/${year}`;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("es-BO");
+}
+
+export function buildAnulacionesEntradasApiReportDefinition(
+  response: AnulacionesEntradasReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+  let itemCount = 0;
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-anulaciones-entradas-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        documento: "",
+        fechaOperacion: "",
+        proveedor: "",
+        producto: "",
+        cantidad: "",
+        precioUnit: "",
+        motivo: "",
+        anuladoPor: "",
+        fechaAnulacion: ""
+      }
+    });
+
+    for (const compra of periodo.comprasAnuladas) {
+      if (!compra.items.length) {
+        rows.push({
+          id: `compra-anulada-${compra.id}`,
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            documento: compra.numeroFactura ?? `Compra ${compra.id}`,
+            fechaOperacion: formatReportDate(compra.fechaOperacion),
+            proveedor: compra.proveedor?.nombre ?? "",
+            producto: "",
+            cantidad: "",
+            precioUnit: "",
+            motivo: compra.anulacion?.motivo ?? "",
+            anuladoPor: compra.anulacion?.usuario?.nombre ?? "",
+            fechaAnulacion: formatReportDate(compra.anulacion?.creadoEn ?? compra.anulacion?.creadoAt)
+          }
+        });
+        continue;
+      }
+
+      compra.items.forEach((item, index) => {
+        itemCount += 1;
+        rows.push({
+          id: `compra-anulada-${compra.id}-${item.id}`,
+          values: {
+            periodo: index === 0 ? formatMonth(periodo.anio, periodo.mes) : "",
+            documento: index === 0 ? compra.numeroFactura ?? `Compra ${compra.id}` : "",
+            fechaOperacion: index === 0 ? formatReportDate(compra.fechaOperacion) : "",
+            proveedor: index === 0 ? compra.proveedor?.nombre ?? "" : "",
+            producto: `${item.producto?.codigo ?? "-"} - ${item.producto?.nombre ?? "Sin producto"} (${item.producto?.unidad ?? "-"})`,
+            cantidad: Number((item.cantidadRecibida ?? item.cantidadSolicitada ?? 0).toFixed(2)),
+            precioUnit: item.precioUnit ? Number(item.precioUnit.toFixed(2)) : "",
+            motivo: index === 0 ? compra.anulacion?.motivo ?? "" : "",
+            anuladoPor: index === 0 ? compra.anulacion?.usuario?.nombre ?? "" : "",
+            fechaAnulacion:
+              index === 0 ? formatReportDate(compra.anulacion?.creadoEn ?? compra.anulacion?.creadoAt) : ""
+          }
+        });
+      });
+    }
+  }
+
+  return {
+    type: "anulaciones-entradas",
+    title: "Anulaciones De Entradas",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo" },
+      { key: "documento", label: "Factura / Compra" },
+      { key: "fechaOperacion", label: "Fecha Operacion" },
+      { key: "proveedor", label: "Proveedor" },
+      { key: "producto", label: "Producto" },
+      { key: "cantidad", label: "Cantidad", align: "right" },
+      { key: "precioUnit", label: "P. Unit.", align: "right" },
+      { key: "motivo", label: "Motivo" },
+      { key: "anuladoPor", label: "Anulado Por" },
+      { key: "fechaAnulacion", label: "Fecha Anulacion" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      {
+        label: "Compras anuladas",
+        value: data.meses.reduce((sum, periodo) => sum + periodo.comprasAnuladas.length, 0)
+      },
+      { label: "Items", value: itemCount }
+    ]
+  };
+}
+
+export function buildAnulacionesSalidasApiReportDefinition(
+  response: AnulacionesSalidasReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+  let itemCount = 0;
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-anulaciones-salidas-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        documento: "",
+        fechaOperacion: "",
+        solicitante: "",
+        producto: "",
+        cantidad: "",
+        motivo: "",
+        anuladoPor: "",
+        fechaAnulacion: ""
+      }
+    });
+
+    for (const vale of periodo.valesAnulados) {
+      if (!vale.items.length) {
+        rows.push({
+          id: `vale-anulado-${vale.id}`,
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            documento: vale.codigo ?? `Vale ${vale.id}`,
+            fechaOperacion: formatReportDate(vale.fechaOperacion),
+            solicitante: vale.solicitante?.nombre ?? "",
+            producto: "",
+            cantidad: "",
+            motivo: vale.anulacion?.motivo ?? "",
+            anuladoPor: vale.anulacion?.usuario?.nombre ?? "",
+            fechaAnulacion: formatReportDate(vale.anulacion?.creadoEn ?? vale.anulacion?.creadoAt)
+          }
+        });
+        continue;
+      }
+
+      vale.items.forEach((item, index) => {
+        itemCount += 1;
+        rows.push({
+          id: `vale-anulado-${vale.id}-${item.id}`,
+          values: {
+            periodo: index === 0 ? formatMonth(periodo.anio, periodo.mes) : "",
+            documento: index === 0 ? vale.codigo ?? `Vale ${vale.id}` : "",
+            fechaOperacion: index === 0 ? formatReportDate(vale.fechaOperacion) : "",
+            solicitante: index === 0 ? vale.solicitante?.nombre ?? "" : "",
+            producto: `${item.producto?.codigo ?? "-"} - ${item.producto?.nombre ?? "Sin producto"} (${item.producto?.unidad ?? "-"})`,
+            cantidad: Number((item.cantidad ?? 0).toFixed(2)),
+            motivo: index === 0 ? vale.anulacion?.motivo ?? "" : "",
+            anuladoPor: index === 0 ? vale.anulacion?.usuario?.nombre ?? "" : "",
+            fechaAnulacion:
+              index === 0 ? formatReportDate(vale.anulacion?.creadoEn ?? vale.anulacion?.creadoAt) : ""
+          }
+        });
+      });
+    }
+  }
+
+  return {
+    type: "anulaciones-salidas",
+    title: "Anulaciones De Salidas",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo" },
+      { key: "documento", label: "Vale" },
+      { key: "fechaOperacion", label: "Fecha Operacion" },
+      { key: "solicitante", label: "Solicitante" },
+      { key: "producto", label: "Producto" },
+      { key: "cantidad", label: "Cantidad", align: "right" },
+      { key: "motivo", label: "Motivo" },
+      { key: "anuladoPor", label: "Anulado Por" },
+      { key: "fechaAnulacion", label: "Fecha Anulacion" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      {
+        label: "Vales anulados",
+        value: data.meses.reduce((sum, periodo) => sum + periodo.valesAnulados.length, 0)
+      },
+      { label: "Items", value: itemCount }
+    ]
+  };
 }

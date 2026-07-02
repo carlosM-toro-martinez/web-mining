@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  getAnulacionesEntradasReport,
+  getAnulacionesSalidasReport,
   getBalanceMensualReport,
   getBinCard,
   getBinCardValorado,
@@ -109,6 +111,28 @@ export function useSalidasAlmacenReportQuery(
   return useQuery({
     queryKey: [...queryKeys.reportes.all, "salidas-almacen", params] as const,
     queryFn: () => getSalidasAlmacenReport(params),
+    enabled
+  });
+}
+
+export function useAnulacionesEntradasReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "anulaciones-entradas", params] as const,
+    queryFn: () => getAnulacionesEntradasReport(params),
+    enabled
+  });
+}
+
+export function useAnulacionesSalidasReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "anulaciones-salidas", params] as const,
+    queryFn: () => getAnulacionesSalidasReport(params),
     enabled
   });
 }

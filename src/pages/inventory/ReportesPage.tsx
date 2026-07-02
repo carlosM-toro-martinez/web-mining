@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  useAnulacionesEntradasReportQuery,
+  useAnulacionesSalidasReportQuery,
   useBalanceMensualReportQuery,
   useBinCardQuery,
   useBinCardValoradoQuery,
@@ -24,6 +26,8 @@ import {
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
 import {
+  buildAnulacionesEntradasApiReportDefinition,
+  buildAnulacionesSalidasApiReportDefinition,
   buildBalanceMensualApiReportDefinition,
   buildEntradasAlmacenApiReportDefinition,
   buildInventarioAlmacenApiReportDefinition,
@@ -33,11 +37,14 @@ import {
   isInventoryReportType
 } from "@/features/reportes/lib/inventoryReportBuilder";
 import {
+  exportComprasReportExcel,
   exportComprasProveedorExcel,
   exportInventoryReportExcel,
   exportInventoryReportPdf,
   exportLegacyBinCardExcel,
-  exportLegacyBinCardPdf
+  exportLegacyBinCardPdf,
+  exportStockReportExcel,
+  exportValesReportExcel
 } from "@/features/reportes/lib/reportesExport";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
@@ -264,6 +271,14 @@ export function ReportesPage() {
     monthRangeParams,
     isAdminType && tipo === "salidas-almacen"
   );
+  const anulacionesEntradasQuery = useAnulacionesEntradasReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "anulaciones-entradas"
+  );
+  const anulacionesSalidasQuery = useAnulacionesSalidasReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "anulaciones-salidas"
+  );
   const stockQuery = useStockReportQuery(
     { page, limit, categoriaId: undefined },
     isApiType && tipo === "stock-actual"
@@ -383,6 +398,12 @@ export function ReportesPage() {
       if (tipo === "salidas-almacen" && salidasAlmacenQuery.data) {
         return buildSalidasAlmacenApiReportDefinition(salidasAlmacenQuery.data);
       }
+      if (tipo === "anulaciones-entradas" && anulacionesEntradasQuery.data) {
+        return buildAnulacionesEntradasApiReportDefinition(anulacionesEntradasQuery.data);
+      }
+      if (tipo === "anulaciones-salidas" && anulacionesSalidasQuery.data) {
+        return buildAnulacionesSalidasApiReportDefinition(anulacionesSalidasQuery.data);
+      }
       if (tipo === "costo-produccion" || tipo === "movimiento-almacen") {
         return buildInventoryReportDefinition({
           type: tipo,
@@ -394,6 +415,8 @@ export function ReportesPage() {
       return null;
     },
     [
+      anulacionesEntradasQuery.data,
+      anulacionesSalidasQuery.data,
       balanceMensualQuery.data,
       entradasAlmacenQuery.data,
       inventarioAlmacenQuery.data,
@@ -457,6 +480,27 @@ export function ReportesPage() {
       });
       return;
     }
+    if (tipo === "stock-actual" && stockQuery.data) {
+      exportStockReportExcel({
+        response: stockQuery.data,
+        dateFilterLabel: selectedDateLabel
+      });
+      return;
+    }
+    if (tipo === "vales-resumen" && valesResumenQuery.data) {
+      exportValesReportExcel({
+        response: valesResumenQuery.data,
+        dateFilterLabel: selectedDateLabel
+      });
+      return;
+    }
+    if (tipo === "compras-resumen" && comprasResumenQuery.data) {
+      exportComprasReportExcel({
+        response: comprasResumenQuery.data,
+        dateFilterLabel: selectedDateLabel
+      });
+      return;
+    }
     if (reportDefinition) exportInventoryReportExcel(reportDefinition);
   }
 
@@ -486,8 +530,12 @@ export function ReportesPage() {
         ? inventarioAlmacenQuery
         : tipo === "entradas-almacen"
           ? entradasAlmacenQuery
-          : tipo === "salidas-almacen"
-            ? salidasAlmacenQuery
+        : tipo === "salidas-almacen"
+          ? salidasAlmacenQuery
+          : tipo === "anulaciones-entradas"
+            ? anulacionesEntradasQuery
+            : tipo === "anulaciones-salidas"
+              ? anulacionesSalidasQuery
         : isAdminType
           ? binCardValoradoQuery
           : tipo === "stock-actual"
@@ -503,7 +551,9 @@ export function ReportesPage() {
       tipo !== "balance-mensual" &&
       tipo !== "inventario-general" &&
       tipo !== "entradas-almacen" &&
-      tipo !== "salidas-almacen")
+      tipo !== "salidas-almacen" &&
+      tipo !== "anulaciones-entradas" &&
+      tipo !== "anulaciones-salidas")
       ? legacyMeta
       : "data" in currentQuery && currentQuery.data && "meta" in currentQuery.data
         ? currentQuery.data.meta

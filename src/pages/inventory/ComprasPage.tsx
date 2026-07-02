@@ -92,6 +92,22 @@ function estadoClassName(estado: string) {
   return "border-[var(--color-warning)]/35 bg-[var(--color-warning)]/18 text-[var(--color-warning)]";
 }
 
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthRange() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  return {
+    fechaInicio: formatDateInputValue(firstDay),
+    fechaFin: formatDateInputValue(today)
+  };
+}
+
 export function ComprasPage() {
   const { user } = useAuth();
   const canManage =
@@ -108,6 +124,9 @@ export function ComprasPage() {
   const [listLimit] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState("");
   const [proveedorFilterId, setProveedorFilterId] = useState("");
+  const defaultListDateRange = useMemo(() => getCurrentMonthRange(), []);
+  const [fechaInicioFilter, setFechaInicioFilter] = useState(defaultListDateRange.fechaInicio);
+  const [fechaFinFilter, setFechaFinFilter] = useState(defaultListDateRange.fechaFin);
 
   const proveedoresQuery = useProveedoresQuery({
     page: 1,
@@ -119,7 +138,9 @@ export function ComprasPage() {
     page: listPage,
     limit: listLimit,
     estado: estadoFilter || undefined,
-    proveedorId: proveedorFilterId ? Number(proveedorFilterId) : undefined
+    proveedorId: proveedorFilterId ? Number(proveedorFilterId) : undefined,
+    fechaInicio: fechaInicioFilter || undefined,
+    fechaFin: fechaFinFilter || undefined
   });
 
   const createCompraMutation = useCreateCompraMutation();
@@ -760,7 +781,7 @@ export function ComprasPage() {
 
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
           <h2 className="mb-4 text-lg font-bold">Listado de compras</h2>
-          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
             <select
               value={estadoFilter}
               onChange={(event) => {
@@ -789,11 +810,33 @@ export function ComprasPage() {
                 </option>
               ))}
             </select>
+            <input
+              type="date"
+              value={fechaInicioFilter}
+              onChange={(event) => {
+                setFechaInicioFilter(event.target.value);
+                setListPage(1);
+              }}
+              className={inputClassName}
+              aria-label="Fecha inicio"
+            />
+            <input
+              type="date"
+              value={fechaFinFilter}
+              onChange={(event) => {
+                setFechaFinFilter(event.target.value);
+                setListPage(1);
+              }}
+              className={inputClassName}
+              aria-label="Fecha fin"
+            />
             <button
               type="button"
               onClick={() => {
                 setEstadoFilter("");
                 setProveedorFilterId("");
+                setFechaInicioFilter(defaultListDateRange.fechaInicio);
+                setFechaFinFilter(defaultListDateRange.fechaFin);
                 setListPage(1);
               }}
               className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const numberLikeSchema = z.coerce.number();
+const idLikeSchema = z.union([z.string(), numberLikeSchema]).transform((value) => String(value));
 
 const reporteMetaSchema = z.object({
   page: numberLikeSchema.int().positive(),
@@ -424,11 +425,188 @@ export const salidasAlmacenReportResponseSchema = z.object({
   })
 });
 
+const reporteUsuarioSchema = z
+  .object({
+    id: idLikeSchema,
+    nombre: z.string().optional().nullable(),
+    email: z.string().optional().nullable()
+  })
+  .optional()
+  .nullable();
+
+const reporteAnulacionSchema = z
+  .object({
+    id: idLikeSchema.optional().nullable(),
+    motivo: z.string().optional().nullable(),
+    creadoEn: z.string().optional().nullable(),
+    creadoAt: z.string().optional().nullable(),
+    usuario: reporteUsuarioSchema
+  })
+  .optional()
+  .nullable();
+
+const reporteProductoAnuladoSchema = z.object({
+  id: idLikeSchema.optional().nullable(),
+  codigo: z.string().optional().nullable(),
+  nombre: z.string().optional().nullable(),
+  unidad: z.string().optional().nullable()
+});
+
+const anulacionEntradaItemSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const item = value as Record<string, unknown>;
+    return {
+      ...item,
+      id: item.id ?? item.productoId ?? `${item.codigo ?? ""}-${item.nombre ?? ""}`,
+      producto: item.producto ?? {
+        id: item.productoId,
+        codigo: item.codigo,
+        nombre: item.nombre,
+        unidad: item.unidad
+      },
+      cantidadSolicitada: item.cantidadSolicitada ?? item.cantidadPedida
+    };
+  },
+  z.object({
+    id: idLikeSchema.optional().nullable(),
+    producto: reporteProductoAnuladoSchema.optional().nullable(),
+    cantidadSolicitada: numberLikeSchema.optional().nullable(),
+    cantidadRecibida: numberLikeSchema.optional().nullable(),
+    precioUnit: numberLikeSchema.optional().nullable(),
+    totalBs: numberLikeSchema.optional().nullable()
+  })
+);
+
+const anulacionSalidaItemSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const item = value as Record<string, unknown>;
+    return {
+      ...item,
+      id: item.id ?? item.productoId ?? `${item.codigo ?? ""}-${item.nombre ?? ""}`,
+      producto: item.producto ?? {
+        id: item.productoId,
+        codigo: item.codigo,
+        nombre: item.nombre,
+        unidad: item.unidad
+      }
+    };
+  },
+  z.object({
+    id: idLikeSchema.optional().nullable(),
+    producto: reporteProductoAnuladoSchema.optional().nullable(),
+    cantidad: numberLikeSchema.optional().nullable()
+  })
+);
+
+const compraAnuladaSchema = z.object({
+  id: idLikeSchema,
+  numeroFactura: z.string().optional().nullable(),
+  observacion: z.string().optional().nullable(),
+  createdAt: z.string().optional().nullable(),
+  recibidoAt: z.string().optional().nullable(),
+  fechaOperacion: z.string().optional().nullable(),
+  estado: z.string().optional().nullable(),
+  proveedor: z
+    .object({
+      id: idLikeSchema,
+      nombre: z.string().optional().nullable(),
+      razonSocial: z.string().optional().nullable(),
+      nit: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  usuarioRegistro: reporteUsuarioSchema,
+  usuarioRecibe: reporteUsuarioSchema,
+  items: z.array(anulacionEntradaItemSchema).default([]),
+  anulacion: reporteAnulacionSchema,
+  totalBs: numberLikeSchema.optional().nullable()
+});
+
+const valeAnuladoSchema = z.object({
+  id: idLikeSchema,
+  codigo: z.string().optional().nullable(),
+  fechaOperacion: z.string().optional().nullable(),
+  estado: z.string().optional().nullable(),
+  solicitante: z
+    .object({
+      id: idLikeSchema,
+      nombre: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  usuarioRegistro: reporteUsuarioSchema,
+  items: z.array(anulacionSalidaItemSchema).default([]),
+  anulacion: reporteAnulacionSchema
+});
+
+export const anulacionesEntradasReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int(),
+    mesInicio: numberLikeSchema.int(),
+    anioFin: numberLikeSchema.int(),
+    mesFin: numberLikeSchema.int(),
+    meses: z.array(
+      z.preprocess(
+        (value) => {
+          if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+          const periodo = value as Record<string, unknown>;
+          return {
+            ...periodo,
+            esCerrado: periodo.esCerrado ?? false,
+            comprasAnuladas: periodo.comprasAnuladas ?? periodo.compras ?? []
+          };
+        },
+        z.object({
+          anio: numberLikeSchema.int(),
+          mes: numberLikeSchema.int().min(1).max(12),
+          esCerrado: z.boolean().default(false),
+          comprasAnuladas: z.array(compraAnuladaSchema).default([])
+        })
+      )
+    )
+  })
+});
+
+export const anulacionesSalidasReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int(),
+    mesInicio: numberLikeSchema.int(),
+    anioFin: numberLikeSchema.int(),
+    mesFin: numberLikeSchema.int(),
+    meses: z.array(
+      z.preprocess(
+        (value) => {
+          if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+          const periodo = value as Record<string, unknown>;
+          return {
+            ...periodo,
+            esCerrado: periodo.esCerrado ?? false,
+            valesAnulados: periodo.valesAnulados ?? periodo.vales ?? periodo.salidas ?? []
+          };
+        },
+        z.object({
+          anio: numberLikeSchema.int(),
+          mes: numberLikeSchema.int().min(1).max(12),
+          esCerrado: z.boolean().default(false),
+          valesAnulados: z.array(valeAnuladoSchema).default([])
+        })
+      )
+    )
+  })
+});
+
 export type BinCardItem = z.infer<typeof binCardItemSchema>;
 export type BinCardValoradoItem = z.infer<typeof binCardValoradoItemSchema>;
 export type BinCardResponse = z.infer<typeof binCardResponseSchema>;
 export type BinCardValoradoResponse = z.infer<typeof binCardValoradoResponseSchema>;
 export type ReportesQueryParams = z.infer<typeof reportesQueryParamsSchema>;
+export type StockReportResponse = z.infer<typeof stockReportResponseSchema>;
+export type ValesReportResponse = z.infer<typeof valesReportResponseSchema>;
+export type ComprasReportResponse = z.infer<typeof comprasReportResponseSchema>;
 export type StockReportQueryParams = z.infer<typeof stockReportQueryParamsSchema>;
 export type ValesReportQueryParams = z.infer<typeof valesReportQueryParamsSchema>;
 export type ComprasReportQueryParams = z.infer<typeof comprasReportQueryParamsSchema>;
@@ -438,3 +616,5 @@ export type BalanceMensualReportResponse = z.infer<typeof balanceMensualReportRe
 export type InventarioAlmacenReportResponse = z.infer<typeof inventarioAlmacenReportResponseSchema>;
 export type EntradasAlmacenReportResponse = z.infer<typeof entradasAlmacenReportResponseSchema>;
 export type SalidasAlmacenReportResponse = z.infer<typeof salidasAlmacenReportResponseSchema>;
+export type AnulacionesEntradasReportResponse = z.infer<typeof anulacionesEntradasReportResponseSchema>;
+export type AnulacionesSalidasReportResponse = z.infer<typeof anulacionesSalidasReportResponseSchema>;
