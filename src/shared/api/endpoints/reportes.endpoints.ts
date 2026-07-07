@@ -10,6 +10,9 @@ export const reportesEndpoints = {
   inventarioAlmacen: "/api/reportes/inventario-almacen",
   entradasAlmacen: "/api/reportes/entradas-almacen",
   salidasAlmacen: "/api/reportes/salidas-almacen",
+  detalleMateriales: "/api/reportes/detalle-materiales",
+  diarioAlmacenes: "/api/reportes/diario-almacenes",
+  cuadroSuministros: "/api/reportes/cuadro-suministros",
   anulacionesEntradas: "/api/reportes/anulaciones-entradas",
   anulacionesSalidas: "/api/reportes/anulaciones-salidas"
 } as const;

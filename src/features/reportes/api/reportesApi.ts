@@ -9,6 +9,9 @@ import {
   comprasProveedorReportResponseSchema,
   comprasReportQueryParamsSchema,
   comprasReportResponseSchema,
+  cuadroSuministrosReportResponseSchema,
+  detalleMaterialesReportResponseSchema,
+  diarioAlmacenesReportResponseSchema,
   entradasAlmacenReportResponseSchema,
   inventarioAlmacenReportResponseSchema,
   monthlyRangeReportQueryParamsSchema,
@@ -128,6 +131,30 @@ export async function getSalidasAlmacenReport(params: MonthlyRangeReportQueryPar
     url: apiEndpoints.reportes.salidasAlmacen,
     config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
     schema: salidasAlmacenReportResponseSchema
+  });
+}
+
+export async function getDetalleMaterialesReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.detalleMateriales,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: detalleMaterialesReportResponseSchema
+  });
+}
+
+export async function getDiarioAlmacenesReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.diarioAlmacenes,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: diarioAlmacenesReportResponseSchema
+  });
+}
+
+export async function getCuadroSuministrosReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.cuadroSuministros,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: cuadroSuministrosReportResponseSchema
   });
 }
 

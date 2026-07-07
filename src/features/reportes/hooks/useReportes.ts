@@ -7,6 +7,9 @@ import {
   getBinCardValorado,
   getComprasProveedorReport,
   getComprasReport,
+  getCuadroSuministrosReport,
+  getDetalleMaterialesReport,
+  getDiarioAlmacenesReport,
   getEntradasAlmacenReport,
   getInventarioAlmacenReport,
   getSalidasAlmacenReport,
@@ -111,6 +114,39 @@ export function useSalidasAlmacenReportQuery(
   return useQuery({
     queryKey: [...queryKeys.reportes.all, "salidas-almacen", params] as const,
     queryFn: () => getSalidasAlmacenReport(params),
+    enabled
+  });
+}
+
+export function useDetalleMaterialesReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "detalle-materiales", params] as const,
+    queryFn: () => getDetalleMaterialesReport(params),
+    enabled
+  });
+}
+
+export function useDiarioAlmacenesReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "diario-almacenes", params] as const,
+    queryFn: () => getDiarioAlmacenesReport(params),
+    enabled
+  });
+}
+
+export function useCuadroSuministrosReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "cuadro-suministros", params] as const,
+    queryFn: () => getCuadroSuministrosReport(params),
     enabled
   });
 }

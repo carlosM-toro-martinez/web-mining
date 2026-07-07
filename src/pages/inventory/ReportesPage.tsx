@@ -15,7 +15,9 @@ import {
   useBalanceMensualReportQuery,
   useBinCardQuery,
   useBinCardValoradoQuery,
-  useComprasProveedorReportQuery,
+  useCuadroSuministrosReportQuery,
+  useDetalleMaterialesReportQuery,
+  useDiarioAlmacenesReportQuery,
   useComprasReportQuery,
   useEntradasAlmacenReportQuery,
   useInventarioAlmacenReportQuery,
@@ -29,16 +31,17 @@ import {
   buildAnulacionesEntradasApiReportDefinition,
   buildAnulacionesSalidasApiReportDefinition,
   buildBalanceMensualApiReportDefinition,
+  buildCuadroSuministrosApiReportDefinition,
+  buildDetalleMaterialesApiReportDefinition,
+  buildDiarioAlmacenesApiReportDefinition,
   buildEntradasAlmacenApiReportDefinition,
   buildInventarioAlmacenApiReportDefinition,
-  buildInventoryReportDefinition,
   buildSalidasAlmacenApiReportDefinition,
   INVENTORY_REPORTS,
   isInventoryReportType
 } from "@/features/reportes/lib/inventoryReportBuilder";
 import {
   exportComprasReportExcel,
-  exportComprasProveedorExcel,
   exportInventoryReportExcel,
   exportInventoryReportPdf,
   exportLegacyBinCardExcel,
@@ -55,7 +58,7 @@ const inputClassName =
 type DateMode = "none" | "specific" | "range";
 type DataMode = "paged" | "all";
 type LegacyReportType = "bin-card" | "bin-card-valorado";
-type ApiReportType = "stock-actual" | "vales-resumen" | "compras-resumen" | "inventarios-suministros";
+type ApiReportType = "stock-actual" | "vales-resumen" | "compras-resumen";
 
 const LEGACY_REPORTS: Array<{ type: LegacyReportType; title: string; description: string }> = [
   {
@@ -70,16 +73,65 @@ const LEGACY_REPORTS: Array<{ type: LegacyReportType; title: string; description
   }
 ];
 
+const API_REPORTS: Array<{ type: ApiReportType; title: string; description: string }> = [
+  {
+    type: "stock-actual",
+    title: "Stock Actual",
+    description: "Stock con reservado, disponible y valor total."
+  },
+  {
+    type: "vales-resumen",
+    title: "Resumen De Vales",
+    description: "Vales filtrables por estado, solicitante y fechas."
+  },
+  {
+    type: "compras-resumen",
+    title: "Resumen De Compras",
+    description: "Compras filtrables por estado, proveedor y fechas."
+  }
+];
+
+const REPORT_GROUPS = [
+  {
+    title: "Kardex",
+    reports: LEGACY_REPORTS
+  },
+  {
+    title: "Almacen mensual",
+    reports: INVENTORY_REPORTS.filter((report) =>
+      [
+        "balance-mensual",
+        "inventario-general",
+        "inventarios-suministros",
+        "entradas-almacen",
+        "salidas-almacen"
+      ].includes(report.type)
+    )
+  },
+  {
+    title: "Contabilidad",
+    reports: INVENTORY_REPORTS.filter((report) =>
+      ["diario-almacenes", "detalle-materiales", "costo-produccion", "movimiento-almacen"].includes(
+        report.type
+      )
+    )
+  },
+  {
+    title: "Control y auditoria",
+    reports: [
+      ...INVENTORY_REPORTS.filter((report) =>
+        ["anulaciones-entradas", "anulaciones-salidas"].includes(report.type)
+      ),
+      ...API_REPORTS
+    ]
+  }
+];
+
 function isLegacyReportType(value: string | undefined): value is LegacyReportType {
   return value === "bin-card" || value === "bin-card-valorado";
 }
 function isApiReportType(value: string | undefined): value is ApiReportType {
-  return (
-    value === "stock-actual" ||
-    value === "vales-resumen" ||
-    value === "compras-resumen" ||
-    value === "inventarios-suministros"
-  );
+  return value === "stock-actual" || value === "vales-resumen" || value === "compras-resumen";
 }
 
 function formatLegacyCellValue(value: unknown) {
@@ -215,11 +267,12 @@ export function ReportesPage() {
       })),
     [proveedores]
   );
-  const usesProveedorFilter = tipo === "compras-resumen" || tipo === "inventarios-suministros";
+  const usesProveedorFilter = tipo === "compras-resumen";
   const primaryFilterOptions = usesProveedorFilter ? proveedorOptions : productoOptions;
   const primaryFilterLabel = usesProveedorFilter ? "Proveedor" : "Producto";
-  const primaryFilterPlaceholder =
-    usesProveedorFilter ? "Todos los proveedores" : "Todos los productos";
+  const primaryFilterPlaceholder = usesProveedorFilter
+    ? "Todos los proveedores"
+    : "Todos los productos";
 
   const params = useMemo(
     () => ({
@@ -244,12 +297,15 @@ export function ReportesPage() {
   );
 
   const shouldFetchAllLegacy = isLegacyType;
-  const binCardQuery = useBinCardQuery(params, dataMode === "all" || shouldFetchAllLegacy, isLegacyType && tipo === "bin-card");
+  const binCardQuery = useBinCardQuery(
+    params,
+    dataMode === "all" || shouldFetchAllLegacy,
+    isLegacyType && tipo === "bin-card"
+  );
   const binCardValoradoQuery = useBinCardValoradoQuery(
     params,
-    dataMode === "all" || shouldFetchAllLegacy || (isAdminType && (tipo === "costo-produccion" || tipo === "movimiento-almacen")),
-    (isLegacyType && tipo === "bin-card-valorado") ||
-      (isAdminType && (tipo === "costo-produccion" || tipo === "movimiento-almacen"))
+    dataMode === "all" || shouldFetchAllLegacy,
+    isLegacyType && tipo === "bin-card-valorado"
   );
   const monthRangeParams = useMemo(
     () => monthRangeFromDates({ dateMode, fecha, fechaInicio, fechaFin }),
@@ -270,6 +326,18 @@ export function ReportesPage() {
   const salidasAlmacenQuery = useSalidasAlmacenReportQuery(
     monthRangeParams,
     isAdminType && tipo === "salidas-almacen"
+  );
+  const detalleMaterialesQuery = useDetalleMaterialesReportQuery(
+    monthRangeParams,
+    isAdminType && (tipo === "detalle-materiales" || tipo === "costo-produccion")
+  );
+  const diarioAlmacenesQuery = useDiarioAlmacenesReportQuery(
+    monthRangeParams,
+    isAdminType && (tipo === "diario-almacenes" || tipo === "movimiento-almacen")
+  );
+  const cuadroSuministrosQuery = useCuadroSuministrosReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "inventarios-suministros"
   );
   const anulacionesEntradasQuery = useAnulacionesEntradasReportQuery(
     monthRangeParams,
@@ -307,19 +375,6 @@ export function ReportesPage() {
     },
     isApiType && tipo === "compras-resumen"
   );
-  const comprasProveedorQuery = useComprasProveedorReportQuery(
-    {
-      page,
-      limit,
-      estado: estadoReporte || undefined,
-      proveedorId: productoId ? Number(productoId) : undefined,
-      fechaInicio,
-      fechaFin,
-      sinPaginar: dataMode === "all"
-    },
-    isApiType && tipo === "inventarios-suministros"
-  );
-
   const legacyActiveQuery = tipo === "bin-card" ? binCardQuery : binCardValoradoQuery;
   const legacyItems = useMemo(
     () =>
@@ -347,32 +402,6 @@ export function ReportesPage() {
     };
   }, [legacyItems.length, limit, page]);
 
-  const valorizadoItems = useMemo(
-    () =>
-      [...(binCardValoradoQuery.data?.items ?? [])]
-        .filter((item) => !isSaldoInicialReferencia(item.referencia))
-        .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()),
-    [binCardValoradoQuery.data?.items]
-  );
-  const inventariosSuministrosRows = useMemo(
-    () =>
-      (comprasProveedorQuery.data?.data ?? []).flatMap((compra) =>
-        compra.items.map((item, index) => ({
-          id: `${compra.id}-${item.codigo ?? index}`,
-          proveedor:
-            index === 0 ? compra.proveedor?.nombre ?? compra.proveedor?.razonSocial ?? "-" : "",
-          factura: index === 0 ? compra.numeroFactura ?? "-" : "",
-          cantidad: item.cantidadRecibida,
-          unidad: item.unidad ?? "-",
-          descripcion: item.nombre ?? "-",
-          totalBs: item.totalBs,
-          totalSinIVA: item.totalSinIVA,
-          grupo: item.grupo ?? item.categoria ?? "-"
-        }))
-      ),
-    [comprasProveedorQuery.data?.data]
-  );
-
   const selectedProductLabel =
     primaryFilterOptions.find((option) => option.id === productoId)?.label ??
     primaryFilterPlaceholder;
@@ -383,51 +412,49 @@ export function ReportesPage() {
         ? `${fechaInicio || "-"} a ${fechaFin || "-"}`
         : "Sin filtro";
 
-  const reportDefinition = useMemo(
-    () => {
-      if (!isAdminType) return null;
-      if (tipo === "balance-mensual" && balanceMensualQuery.data) {
-        return buildBalanceMensualApiReportDefinition(balanceMensualQuery.data);
-      }
-      if (tipo === "inventario-general" && inventarioAlmacenQuery.data) {
-        return buildInventarioAlmacenApiReportDefinition(inventarioAlmacenQuery.data);
-      }
-      if (tipo === "entradas-almacen" && entradasAlmacenQuery.data) {
-        return buildEntradasAlmacenApiReportDefinition(entradasAlmacenQuery.data);
-      }
-      if (tipo === "salidas-almacen" && salidasAlmacenQuery.data) {
-        return buildSalidasAlmacenApiReportDefinition(salidasAlmacenQuery.data);
-      }
-      if (tipo === "anulaciones-entradas" && anulacionesEntradasQuery.data) {
-        return buildAnulacionesEntradasApiReportDefinition(anulacionesEntradasQuery.data);
-      }
-      if (tipo === "anulaciones-salidas" && anulacionesSalidasQuery.data) {
-        return buildAnulacionesSalidasApiReportDefinition(anulacionesSalidasQuery.data);
-      }
-      if (tipo === "costo-produccion" || tipo === "movimiento-almacen") {
-        return buildInventoryReportDefinition({
-          type: tipo,
-          items: valorizadoItems,
-          productos,
-          dateLabel: selectedDateLabel
-        });
-      }
-      return null;
-    },
-    [
-      anulacionesEntradasQuery.data,
-      anulacionesSalidasQuery.data,
-      balanceMensualQuery.data,
-      entradasAlmacenQuery.data,
-      inventarioAlmacenQuery.data,
-      isAdminType,
-      productos,
-      selectedDateLabel,
-      salidasAlmacenQuery.data,
-      tipo,
-      valorizadoItems
-    ]
-  );
+  const reportDefinition = useMemo(() => {
+    if (!isAdminType) return null;
+    if (tipo === "balance-mensual" && balanceMensualQuery.data) {
+      return buildBalanceMensualApiReportDefinition(balanceMensualQuery.data);
+    }
+    if (tipo === "inventario-general" && inventarioAlmacenQuery.data) {
+      return buildInventarioAlmacenApiReportDefinition(inventarioAlmacenQuery.data);
+    }
+    if (tipo === "entradas-almacen" && entradasAlmacenQuery.data) {
+      return buildEntradasAlmacenApiReportDefinition(entradasAlmacenQuery.data);
+    }
+    if (tipo === "salidas-almacen" && salidasAlmacenQuery.data) {
+      return buildSalidasAlmacenApiReportDefinition(salidasAlmacenQuery.data);
+    }
+    if ((tipo === "detalle-materiales" || tipo === "costo-produccion") && detalleMaterialesQuery.data) {
+      return buildDetalleMaterialesApiReportDefinition(detalleMaterialesQuery.data);
+    }
+    if ((tipo === "diario-almacenes" || tipo === "movimiento-almacen") && diarioAlmacenesQuery.data) {
+      return buildDiarioAlmacenesApiReportDefinition(diarioAlmacenesQuery.data);
+    }
+    if (tipo === "inventarios-suministros" && cuadroSuministrosQuery.data) {
+      return buildCuadroSuministrosApiReportDefinition(cuadroSuministrosQuery.data);
+    }
+    if (tipo === "anulaciones-entradas" && anulacionesEntradasQuery.data) {
+      return buildAnulacionesEntradasApiReportDefinition(anulacionesEntradasQuery.data);
+    }
+    if (tipo === "anulaciones-salidas" && anulacionesSalidasQuery.data) {
+      return buildAnulacionesSalidasApiReportDefinition(anulacionesSalidasQuery.data);
+    }
+    return null;
+  }, [
+    anulacionesEntradasQuery.data,
+    anulacionesSalidasQuery.data,
+    balanceMensualQuery.data,
+    cuadroSuministrosQuery.data,
+    detalleMaterialesQuery.data,
+    diarioAlmacenesQuery.data,
+    entradasAlmacenQuery.data,
+    inventarioAlmacenQuery.data,
+    isAdminType,
+    salidasAlmacenQuery.data,
+    tipo
+  ]);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -469,14 +496,6 @@ export function ReportesPage() {
         items: dataMode === "all" ? legacyItems : pagedLegacyItems,
         productLabel: selectedProductLabel,
         dateFilterLabel: selectedDateLabel
-      });
-      return;
-    }
-    if (tipo === "inventarios-suministros" && comprasProveedorQuery.data) {
-      exportComprasProveedorExcel({
-        response: comprasProveedorQuery.data,
-        fechaInicio,
-        fechaFin
       });
       return;
     }
@@ -530,21 +549,29 @@ export function ReportesPage() {
         ? inventarioAlmacenQuery
         : tipo === "entradas-almacen"
           ? entradasAlmacenQuery
-        : tipo === "salidas-almacen"
-          ? salidasAlmacenQuery
-          : tipo === "anulaciones-entradas"
-            ? anulacionesEntradasQuery
-            : tipo === "anulaciones-salidas"
-              ? anulacionesSalidasQuery
-        : isAdminType
-          ? binCardValoradoQuery
-          : tipo === "stock-actual"
-            ? stockQuery
-            : tipo === "vales-resumen"
-              ? valesResumenQuery
-              : tipo === "compras-resumen"
-                ? comprasResumenQuery
-                : comprasProveedorQuery;
+          : tipo === "salidas-almacen"
+            ? salidasAlmacenQuery
+            : tipo === "detalle-materiales"
+              ? detalleMaterialesQuery
+              : tipo === "costo-produccion"
+                ? detalleMaterialesQuery
+                : tipo === "diario-almacenes"
+                  ? diarioAlmacenesQuery
+                  : tipo === "movimiento-almacen"
+                    ? diarioAlmacenesQuery
+                    : tipo === "inventarios-suministros"
+                      ? cuadroSuministrosQuery
+                      : tipo === "anulaciones-entradas"
+                        ? anulacionesEntradasQuery
+                        : tipo === "anulaciones-salidas"
+                          ? anulacionesSalidasQuery
+                          : tipo === "stock-actual"
+                            ? stockQuery
+                            : tipo === "vales-resumen"
+                              ? valesResumenQuery
+                              : tipo === "compras-resumen"
+                                ? comprasResumenQuery
+                                : comprasResumenQuery;
   const rawCurrentMeta =
     isLegacyType ||
     (isAdminType &&
@@ -552,6 +579,11 @@ export function ReportesPage() {
       tipo !== "inventario-general" &&
       tipo !== "entradas-almacen" &&
       tipo !== "salidas-almacen" &&
+      tipo !== "detalle-materiales" &&
+      tipo !== "costo-produccion" &&
+      tipo !== "diario-almacenes" &&
+      tipo !== "movimiento-almacen" &&
+      tipo !== "inventarios-suministros" &&
       tipo !== "anulaciones-entradas" &&
       tipo !== "anulaciones-salidas")
       ? legacyMeta
@@ -560,7 +592,9 @@ export function ReportesPage() {
         : undefined;
   const currentMeta = isPagedMeta(rawCurrentMeta) ? rawCurrentMeta : undefined;
   const currentTotal =
-    rawCurrentMeta && "total" in rawCurrentMeta ? rawCurrentMeta.total : reportDefinition?.rows.length;
+    rawCurrentMeta && "total" in rawCurrentMeta
+      ? rawCurrentMeta.total
+      : reportDefinition?.rows.length;
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -583,62 +617,37 @@ export function ReportesPage() {
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-          Tipo de reporte (rutas)
+          Tipo de reporte
         </p>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {LEGACY_REPORTS.map((report) => (
-            <button
-              key={report.type}
-              type="button"
-              onClick={() => navigate(`/inventario/reportes/${report.type}`)}
-              className={`rounded-lg border px-3 py-3 text-left transition ${
-                report.type === tipo
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/12"
-                  : "border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] hover:border-[var(--color-primary)]"
-              }`}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {REPORT_GROUPS.map((group) => (
+            <section
+              key={group.title}
+              className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3"
             >
-              <p className="text-sm font-bold">{report.title}</p>
-              <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">{report.description}</p>
-            </button>
-          ))}
-          {INVENTORY_REPORTS.map((report) => (
-            <button
-              key={report.type}
-              type="button"
-              onClick={() => navigate(`/inventario/reportes/${report.type}`)}
-              className={`rounded-lg border px-3 py-3 text-left transition ${
-                report.type === tipo
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/12"
-                  : "border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] hover:border-[var(--color-primary)]"
-              }`}
-            >
-              <p className="text-sm font-bold">{report.title}</p>
-              <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">{report.description}</p>
-            </button>
-          ))}
-          {[
-            { type: "stock-actual", title: "Stock Actual", description: "Stock con reservado, disponible y valor total." },
-            { type: "vales-resumen", title: "Resumen De Vales", description: "Vales filtrables por estado, solicitante y fechas." },
-            { type: "compras-resumen", title: "Resumen De Compras", description: "Compras filtrables por estado, proveedor y fechas." },
-            {
-              type: "inventarios-suministros",
-              title: "Inventarios Y Suministros",
-              description: "Compras por proveedor con total factura y valor sin IVA."
-            }
-          ].map((report) => (
-            <button
-              key={report.type}
-              type="button"
-              onClick={() => navigate(`/inventario/reportes/${report.type}`)}
-              className={`rounded-lg border px-3 py-3 text-left transition ${
-                report.type === tipo
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/12"
-                  : "border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] hover:border-[var(--color-primary)]"
-              }`}
-            >
-              <p className="text-sm font-bold">{report.title}</p>
-              <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">{report.description}</p>
-            </button>
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                {group.title}
+              </h2>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {group.reports.map((report) => (
+                  <button
+                    key={report.type}
+                    type="button"
+                    onClick={() => navigate(`/inventario/reportes/${report.type}`)}
+                    className={`rounded-lg border px-3 py-3 text-left transition ${
+                      report.type === tipo
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/14 shadow-sm"
+                        : "border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] hover:border-[var(--color-primary)]"
+                    }`}
+                  >
+                    <p className="text-sm font-bold">{report.title}</p>
+                    <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+                      {report.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </article>
@@ -687,7 +696,7 @@ export function ReportesPage() {
               <option value="all">Ver todo</option>
             </select>
           </div>
-          {tipo === "vales-resumen" || tipo === "compras-resumen" || tipo === "inventarios-suministros" ? (
+          {tipo === "vales-resumen" || tipo === "compras-resumen" ? (
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Estado
@@ -794,7 +803,8 @@ export function ReportesPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-[var(--color-on-surface-variant)]">
             <CalendarRange size={14} />
-            {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} | {primaryFilterLabel}: {selectedProductLabel}
+            {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} | {primaryFilterLabel}:{" "}
+            {selectedProductLabel}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -803,7 +813,6 @@ export function ReportesPage() {
               disabled={
                 (isLegacyType && legacyItems.length === 0) ||
                 (isAdminType && (!reportDefinition || reportDefinition.rows.length === 0)) ||
-                (tipo === "inventarios-suministros" && (comprasProveedorQuery.data?.data.length ?? 0) === 0) ||
                 currentQuery.isLoading
               }
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface)] transition hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -817,7 +826,6 @@ export function ReportesPage() {
               disabled={
                 (isLegacyType && legacyItems.length === 0) ||
                 (isAdminType && (!reportDefinition || reportDefinition.rows.length === 0)) ||
-                tipo === "inventarios-suministros" ||
                 currentQuery.isLoading
               }
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface)] transition hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -894,7 +902,8 @@ export function ReportesPage() {
                     </td>
                   </tr>
                 ) : null}
-                {!legacyActiveQuery.isLoading && (dataMode === "all" ? legacyItems : pagedLegacyItems).length === 0 ? (
+                {!legacyActiveQuery.isLoading &&
+                (dataMode === "all" ? legacyItems : pagedLegacyItems).length === 0 ? (
                   <tr>
                     <td
                       colSpan={tipo === "bin-card-valorado" ? 12 : 8}
@@ -965,181 +974,242 @@ export function ReportesPage() {
                 <tr>
                   {tipo === "stock-actual" ? (
                     <>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Codigo</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Producto</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Stock</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Reservado</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Disponible</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Valor Total</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Codigo
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Producto
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Stock
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Reservado
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Disponible
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Valor Total
+                      </th>
                     </>
                   ) : tipo === "compras-resumen" ? (
                     <>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Factura</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha operación</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Ítems</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Subtotal Bs.</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Descuento</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Total Bs.</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Anulación</th>
-                    </>
-                  ) : tipo === "inventarios-suministros" ? (
-                    <>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Factura</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cantidad</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Unidad</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Descripción</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">F-total Bs.</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">(-13%) Bs.</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Grupo</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Factura
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Estado
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Proveedor
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Fecha operación
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Ítems
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Subtotal Bs.
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Descuento
+                      </th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Total Bs.
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Anulación
+                      </th>
                     </>
                   ) : (
                     <>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">ID</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Principal</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        ID
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Estado
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Principal
+                      </th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        Fecha
+                      </th>
                     </>
                   )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-soft)]">
-                {tipo === "stock-actual" ? (stockQuery.data?.data ?? []).map((item) => (
-                  <tr key={`${item.productoId}`}>
-                    <td className="px-3 py-2 text-xs">{item.codigo ?? "-"}</td><td className="px-3 py-2 text-xs">{item.nombre ?? "-"}</td><td className="px-3 py-2 text-right text-xs">{item.cantidad}</td><td className="px-3 py-2 text-right text-xs">{item.cantidadReservada}</td><td className="px-3 py-2 text-right text-xs">{item.cantidadDisponible}</td><td className="px-3 py-2 text-right text-xs">{item.valorTotal}</td>
-                  </tr>
-                )) : tipo === "vales-resumen" ? (valesResumenQuery.data?.data ?? []).map((item) => (
-                  <tr key={item.id}><td className="px-3 py-2 text-xs">{item.id}</td><td className="px-3 py-2 text-xs">{item.estado}</td><td className="px-3 py-2 text-xs">{item.solicitante?.nombre ?? "-"}</td><td className="px-3 py-2 text-xs">{item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}</td></tr>
-                )) : tipo === "inventarios-suministros" ? inventariosSuministrosRows.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3 py-2 text-xs">{item.proveedor}</td>
-                    <td className="px-3 py-2 text-xs">{item.factura}</td>
-                    <td className="px-3 py-2 text-right text-xs">{item.cantidad}</td>
-                    <td className="px-3 py-2 text-xs">{item.unidad}</td>
-                    <td className="px-3 py-2 text-xs">{item.descripcion}</td>
-                    <td className="px-3 py-2 text-right text-xs">
-                      {item.totalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-right text-xs">
-                      {item.totalSinIVA.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-xs">{item.grupo}</td>
-                  </tr>
-                )) : (comprasResumenQuery.data?.data ?? []).map((item) => {
-                  const isExpanded = expandedCompraIds.has(item.id);
-                  return (
-                    <Fragment key={item.id}>
-                      <tr className="transition hover:bg-[var(--color-surface-container-highest)]">
-                        <td className="px-3 py-2 text-xs">{item.numeroFactura ?? "-"}</td>
-                        <td className="px-3 py-2 text-xs">{item.estado}</td>
-                        <td className="px-3 py-2 text-xs" title={item.proveedor?.razonSocial ?? undefined}>
-                          {item.proveedor?.nombre ?? "-"}
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          {item.fechaOperacion
-                            ? formatInventoryDate(item.fechaOperacion)
-                            : item.createdAt
-                              ? formatInventoryDate(item.createdAt)
-                              : "-"}
-                        </td>
-                        <td className="px-3 py-2 text-right text-xs">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedCompraIds((current) => {
-                                const next = new Set(current);
-                                if (next.has(item.id)) next.delete(item.id);
-                                else next.add(item.id);
-                                return next;
-                              })
-                            }
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)] px-2 py-1 font-semibold text-[var(--color-primary)] transition hover:border-[var(--color-primary)]"
-                            aria-expanded={isExpanded}
-                          >
-                            <ChevronRight
-                              size={13}
-                              className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                            />
-                            {item.items.length}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-right text-xs">
-                          {item.subtotalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-3 py-2 text-right text-xs">
-                          {item.descuento.toLocaleString("es-BO", { maximumFractionDigits: 2 })}% ({item.descuentoBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                        </td>
-                        <td className="px-3 py-2 text-right text-xs font-semibold">
-                          {item.totalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-3 py-2 text-xs">{item.anulacion?.motivo ?? "-"}</td>
+                {tipo === "stock-actual"
+                  ? (stockQuery.data?.data ?? []).map((item) => (
+                      <tr key={`${item.productoId}`}>
+                        <td className="px-3 py-2 text-xs">{item.codigo ?? "-"}</td>
+                        <td className="px-3 py-2 text-xs">{item.nombre ?? "-"}</td>
+                        <td className="px-3 py-2 text-right text-xs">{item.cantidad}</td>
+                        <td className="px-3 py-2 text-right text-xs">{item.cantidadReservada}</td>
+                        <td className="px-3 py-2 text-right text-xs">{item.cantidadDisponible}</td>
+                        <td className="px-3 py-2 text-right text-xs">{item.valorTotal}</td>
                       </tr>
-                      {isExpanded ? (
-                        <tr className="bg-[var(--color-surface-container-high)]">
-                          <td colSpan={9} className="px-5 py-3">
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse text-left">
-                                <thead>
-                                  <tr className="border-b border-[var(--color-border-soft)]">
-                                    <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Código</th>
-                                    <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Producto</th>
-                                    <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Unidad</th>
-                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Pedida</th>
-                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Recibida</th>
-                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">P. Unit. Bs.</th>
-                                    <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">Subtotal Bs.</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--color-border-soft)]">
-                                  {item.items.map((detalle) => (
-                                    <tr key={`${item.id}-${detalle.productoId}`}>
-                                      <td className="px-2 py-2 font-mono text-xs">{detalle.codigo ?? "-"}</td>
-                                      <td className="px-2 py-2 text-xs">{detalle.nombre ?? "-"}</td>
-                                      <td className="px-2 py-2 text-xs">{detalle.unidad ?? "-"}</td>
-                                      <td className="px-2 py-2 text-right text-xs">{detalle.cantidadPedida}</td>
-                                      <td className="px-2 py-2 text-right text-xs">{detalle.cantidadRecibida}</td>
-                                      <td className="px-2 py-2 text-right text-xs">
-                                        {detalle.precioUnit.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </td>
-                                      <td className="px-2 py-2 text-right text-xs font-semibold">
-                                        {detalle.subtotalBs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                    ))
+                  : tipo === "vales-resumen"
+                    ? (valesResumenQuery.data?.data ?? []).map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-3 py-2 text-xs">{item.id}</td>
+                          <td className="px-3 py-2 text-xs">{item.estado}</td>
+                          <td className="px-3 py-2 text-xs">{item.solicitante?.nombre ?? "-"}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
+                      ))
+                    : (comprasResumenQuery.data?.data ?? []).map((item) => {
+                        const isExpanded = expandedCompraIds.has(item.id);
+                        return (
+                          <Fragment key={item.id}>
+                            <tr className="transition hover:bg-[var(--color-surface-container-highest)]">
+                              <td className="px-3 py-2 text-xs">{item.numeroFactura ?? "-"}</td>
+                              <td className="px-3 py-2 text-xs">{item.estado}</td>
+                              <td
+                                className="px-3 py-2 text-xs"
+                                title={item.proveedor?.razonSocial ?? undefined}
+                              >
+                                {item.proveedor?.nombre ?? "-"}
+                              </td>
+                              <td className="px-3 py-2 text-xs">
+                                {item.fechaOperacion
+                                  ? formatInventoryDate(item.fechaOperacion)
+                                  : item.createdAt
+                                    ? formatInventoryDate(item.createdAt)
+                                    : "-"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedCompraIds((current) => {
+                                      const next = new Set(current);
+                                      if (next.has(item.id)) next.delete(item.id);
+                                      else next.add(item.id);
+                                      return next;
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)] px-2 py-1 font-semibold text-[var(--color-primary)] transition hover:border-[var(--color-primary)]"
+                                  aria-expanded={isExpanded}
+                                >
+                                  <ChevronRight
+                                    size={13}
+                                    className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                                  />
+                                  {item.items.length}
+                                </button>
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs">
+                                {item.subtotalBs.toLocaleString("es-BO", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs">
+                                {item.descuento.toLocaleString("es-BO", {
+                                  maximumFractionDigits: 2
+                                })}
+                                % (
+                                {item.descuentoBs.toLocaleString("es-BO", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}
+                                )
+                              </td>
+                              <td className="px-3 py-2 text-right text-xs font-semibold">
+                                {item.totalBs.toLocaleString("es-BO", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}
+                              </td>
+                              <td className="px-3 py-2 text-xs">{item.anulacion?.motivo ?? "-"}</td>
+                            </tr>
+                            {isExpanded ? (
+                              <tr className="bg-[var(--color-surface-container-high)]">
+                                <td colSpan={9} className="px-5 py-3">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse text-left">
+                                      <thead>
+                                        <tr className="border-b border-[var(--color-border-soft)]">
+                                          <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            Código
+                                          </th>
+                                          <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            Producto
+                                          </th>
+                                          <th className="px-2 py-2 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            Unidad
+                                          </th>
+                                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            Pedida
+                                          </th>
+                                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            Recibida
+                                          </th>
+                                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            P. Unit. Bs.
+                                          </th>
+                                          <th className="px-2 py-2 text-right text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                                            Subtotal Bs.
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-[var(--color-border-soft)]">
+                                        {item.items.map((detalle) => (
+                                          <tr key={`${item.id}-${detalle.productoId}`}>
+                                            <td className="px-2 py-2 font-mono text-xs">
+                                              {detalle.codigo ?? "-"}
+                                            </td>
+                                            <td className="px-2 py-2 text-xs">
+                                              {detalle.nombre ?? "-"}
+                                            </td>
+                                            <td className="px-2 py-2 text-xs">
+                                              {detalle.unidad ?? "-"}
+                                            </td>
+                                            <td className="px-2 py-2 text-right text-xs">
+                                              {detalle.cantidadPedida}
+                                            </td>
+                                            <td className="px-2 py-2 text-right text-xs">
+                                              {detalle.cantidadRecibida}
+                                            </td>
+                                            <td className="px-2 py-2 text-right text-xs">
+                                              {detalle.precioUnit.toLocaleString("es-BO", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                              })}
+                                            </td>
+                                            <td className="px-2 py-2 text-right text-xs font-semibold">
+                                              {detalle.subtotalBs.toLocaleString("es-BO", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                              })}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        );
+                      })}
               </tbody>
             </table>
             {tipo === "compras-resumen" && comprasResumenQuery.data ? (
               <div className="mt-3 flex justify-end text-sm font-bold">
-                Total general: Bs. {comprasResumenQuery.data.totalGeneral.toLocaleString("es-BO", {
+                Total general: Bs.{" "}
+                {comprasResumenQuery.data.totalGeneral.toLocaleString("es-BO", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2
                 })}
-              </div>
-            ) : tipo === "inventarios-suministros" && comprasProveedorQuery.data ? (
-              <div className="mt-3 flex justify-end gap-4 text-sm font-bold">
-                <span>
-                  Total general: Bs. {comprasProveedorQuery.data.totalGeneral.toLocaleString("es-BO", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </span>
-                <span>
-                  (-13%): Bs. {comprasProveedorQuery.data.totalGeneralSinIVA.toLocaleString("es-BO", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </span>
               </div>
             ) : null}
           </div>
@@ -1147,7 +1217,9 @@ export function ReportesPage() {
           <>
             <div className="mb-2">
               <h2 className="text-base font-bold uppercase">{reportDefinition.title}</h2>
-              <p className="text-xs text-[var(--color-on-surface-variant)]">{reportDefinition.subtitle}</p>
+              <p className="text-xs text-[var(--color-on-surface-variant)]">
+                {reportDefinition.subtitle}
+              </p>
             </div>
             <div className="table-scroll overflow-x-auto">
               <table className="w-full border-collapse text-left">

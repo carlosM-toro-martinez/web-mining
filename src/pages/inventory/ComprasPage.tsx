@@ -42,6 +42,7 @@ import {
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+const filterInputClassName = `${inputClassName} min-w-0`;
 
 interface CompraDraftItem {
   id: number;
@@ -781,14 +782,14 @@ export function ComprasPage() {
 
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
           <h2 className="mb-4 text-lg font-bold">Listado de compras</h2>
-          <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
+          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(170px,1fr)_minmax(220px,1.3fr)_minmax(170px,1fr)_minmax(170px,1fr)_130px]">
             <select
               value={estadoFilter}
               onChange={(event) => {
                 setEstadoFilter(event.target.value);
                 setListPage(1);
               }}
-              className={inputClassName}
+              className={filterInputClassName}
             >
               <option value="">Todos los estados</option>
               <option value="PENDIENTE">PENDIENTE</option>
@@ -801,7 +802,7 @@ export function ComprasPage() {
                 setProveedorFilterId(event.target.value);
                 setListPage(1);
               }}
-              className={inputClassName}
+              className={filterInputClassName}
             >
               <option value="">Todos los proveedores</option>
               {proveedoresOrdenados.map((proveedor) => (
@@ -817,7 +818,7 @@ export function ComprasPage() {
                 setFechaInicioFilter(event.target.value);
                 setListPage(1);
               }}
-              className={inputClassName}
+              className={filterInputClassName}
               aria-label="Fecha inicio"
             />
             <input
@@ -827,7 +828,7 @@ export function ComprasPage() {
                 setFechaFinFilter(event.target.value);
                 setListPage(1);
               }}
-              className={inputClassName}
+              className={filterInputClassName}
               aria-label="Fecha fin"
             />
             <button
@@ -839,7 +840,7 @@ export function ComprasPage() {
                 setFechaFinFilter(defaultListDateRange.fechaFin);
                 setListPage(1);
               }}
-              className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+              className="min-h-11 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] sm:col-span-2 xl:col-span-1"
             >
               Limpiar
             </button>

@@ -337,10 +337,6 @@ export function ValesPage() {
 
   function handleConfirmAnularVale(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (user?.role !== "ADMIN") {
-      showError("Solo ADMIN puede anular vales en esta pantalla.");
-      return;
-    }
     if (anularMotivo.trim().length < 5) {
       showError("El motivo debe tener al menos 5 caracteres.");
       return;
@@ -790,11 +786,9 @@ export function ValesPage() {
                 <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                   Fecha
                 </th>
-                {user?.role === "ADMIN" ? (
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Accion
-                  </th>
-                ) : null}
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                  Accion
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
@@ -813,29 +807,27 @@ export function ValesPage() {
                   <td className="px-3 py-2 text-xs">
                     {vale.createdAt ? new Date(vale.createdAt).toLocaleString() : "-"}
                   </td>
-                  {user?.role === "ADMIN" ? (
-                    <td className="px-3 py-2 text-xs">
-                      {canAnularVale(vale.estado) ? (
-                        <button
-                          type="button"
-                          onClick={() => openAnularModal(vale.id)}
-                          className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
-                        >
-                          Anular vale
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-[var(--color-on-surface-variant)]">
-                          No aplica
-                        </span>
-                      )}
-                    </td>
-                  ) : null}
+                  <td className="px-3 py-2 text-xs">
+                    {canAnularVale(vale.estado) ? (
+                      <button
+                        type="button"
+                        onClick={() => openAnularModal(vale.id)}
+                        className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+                      >
+                        Anular vale
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-[var(--color-on-surface-variant)]">
+                        No aplica
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {valesRecientes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={user?.role === "ADMIN" ? 4 : 3}
+                    colSpan={4}
                     className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                   >
                     Sin vales registrados.
@@ -899,7 +891,7 @@ export function ValesPage() {
         </article>
       ) : null}
 
-      {isAnularModalOpen && user?.role === "ADMIN" ? (
+      {isAnularModalOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-lg rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
             <h3 className="text-lg font-bold">Anular vale</h3>

@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
 import type {
@@ -276,7 +276,512 @@ function savePdfTable(params: {
   openBrowserPrintDialog(doc, params.fileName);
 }
 
+type StyledCell = string | number;
+
+function setCellStyle(
+  sheet: XLSX.WorkSheet,
+  address: string,
+  style: Record<string, unknown>,
+  value?: StyledCell
+) {
+  if (!sheet[address]) sheet[address] = { t: typeof value === "number" ? "n" : "s", v: value ?? "" };
+  sheet[address].s = style;
+}
+
+function styleRange(
+  sheet: XLSX.WorkSheet,
+  range: XLSX.Range,
+  style: Record<string, unknown>,
+  numericColumns: Set<number> = new Set()
+) {
+  for (let row = range.s.r; row <= range.e.r; row += 1) {
+    for (let col = range.s.c; col <= range.e.c; col += 1) {
+      const address = XLSX.utils.encode_cell({ r: row, c: col });
+      const current = sheet[address];
+      setCellStyle(sheet, address, {
+        ...style,
+        ...(numericColumns.has(col) && typeof current?.v === "number" ? { numFmt: "#,##0.00" } : {})
+      });
+    }
+  }
+}
+
+function reportColumnWidths(report: InventoryReportDefinition) {
+  if (report.type === "balance-mensual") {
+    return [{ wch: 12 }, { wch: 19 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
+  }
+  if (report.type === "inventario-general") {
+    return [
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 44 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 }
+    ];
+  }
+  if (report.type === "inventarios-suministros") {
+    return [
+      { wch: 11 },
+      { wch: 28 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 46 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 12 }
+    ];
+  }
+  if (report.type === "diario-almacenes") {
+    return [
+      { wch: 11 },
+      { wch: 14 },
+      { wch: 48 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 15 }
+    ];
+  }
+  if (report.type === "detalle-materiales") {
+    return [{ wch: 11 }, { wch: 12 }, { wch: 16 }, { wch: 15 }, { wch: 28 }];
+  }
+  return report.columns.map((column) => {
+    if (column.align === "right") return { wch: 16 };
+    if (column.label.toLowerCase().includes("descripcion")) return { wch: 48 };
+    return { wch: 22 };
+  });
+}
+
+function applyAdministrativeWorkbookStyle(
+  sheet: XLSX.WorkSheet,
+  report: InventoryReportDefinition,
+  rowStart: number,
+  rowCount: number
+) {
+  const lastCol = Math.max(report.columns.length - 1, 1);
+  const numericColumns = new Set(
+    report.columns
+      .map((column, index) => (column.align === "right" ? index : -1))
+      .filter((index) => index >= 0)
+  );
+  const thinBorder = {
+    top: { style: "thin", color: { rgb: "000000" } },
+    bottom: { style: "thin", color: { rgb: "000000" } },
+    left: { style: "thin", color: { rgb: "000000" } },
+    right: { style: "thin", color: { rgb: "000000" } }
+  };
+  const titleStyle = {
+    font: { bold: true, sz: 13, underline: true },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+  const subtitleStyle = {
+    font: { bold: true, sz: 11 },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+  const headerFill =
+    report.type === "inventario-general" ? "F4B183" : report.type === "balance-mensual" ? "FFFFFF" : "F2F2F2";
+  const headerStyle = {
+    font: { bold: true, sz: 10 },
+    fill: { fgColor: { rgb: headerFill } },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    border: thinBorder
+  };
+  const bodyStyle = {
+    font: { sz: 10 },
+    alignment: { vertical: "center", wrapText: true },
+    border: thinBorder
+  };
+  const groupStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10 },
+    fill: { fgColor: { rgb: "002F6C" } },
+    alignment: { vertical: "center", wrapText: true },
+    border: thinBorder
+  };
+  const subtotalStyle = {
+    font: { bold: true, sz: 10 },
+    fill: { fgColor: { rgb: "FFF200" } },
+    alignment: { vertical: "center", wrapText: true },
+    border: thinBorder
+  };
+  const totalStyle = {
+    font: { bold: true, sz: 10 },
+    fill: { fgColor: { rgb: "FFE699" } },
+    alignment: { vertical: "center", wrapText: true },
+    border: thinBorder
+  };
+
+  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: lastCol } }, titleStyle);
+  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } }, headerStyle);
+  styleRange(
+    sheet,
+    { s: { r: rowStart, c: 0 }, e: { r: rowStart + rowCount - 1, c: lastCol } },
+    bodyStyle,
+    numericColumns
+  );
+
+  report.rows.forEach((row, index) => {
+    if (!row.type) return;
+    const style = row.type === "group" ? groupStyle : row.type === "subtotal" ? subtotalStyle : totalStyle;
+    styleRange(
+      sheet,
+      { s: { r: rowStart + index, c: 0 }, e: { r: rowStart + index, c: lastCol } },
+      style,
+      numericColumns
+    );
+  });
+
+  styleRange(sheet, { s: { r: 1, c: 0 }, e: { r: 2, c: lastCol } }, subtitleStyle);
+  sheet["!cols"] = reportColumnWidths(report);
+  sheet["!rows"] = [
+    { hpt: 20 },
+    { hpt: 18 },
+    { hpt: 18 },
+    { hpt: 8 },
+    { hpt: 28 },
+    ...report.rows.map(() => ({ hpt: 18 }))
+  ];
+}
+
+const excelThinBorder = {
+  top: { style: "thin", color: { rgb: "000000" } },
+  bottom: { style: "thin", color: { rgb: "000000" } },
+  left: { style: "thin", color: { rgb: "000000" } },
+  right: { style: "thin", color: { rgb: "000000" } }
+};
+
+const excelTitleStyle = {
+  font: { bold: true, sz: 12, underline: true },
+  alignment: { horizontal: "center", vertical: "center" }
+};
+
+const excelHeaderStyle = {
+  font: { bold: true, sz: 10 },
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  border: excelThinBorder
+};
+
+const excelBodyStyle = {
+  font: { sz: 10 },
+  alignment: { vertical: "center", wrapText: true },
+  border: excelThinBorder
+};
+
+function cellAddress(row: number, col: number) {
+  return XLSX.utils.encode_cell({ r: row, c: col });
+}
+
+function appendAndSaveStyledSheet(params: {
+  sheet: XLSX.WorkSheet;
+  sheetName: string;
+  fileToken: string;
+}) {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, params.sheet, params.sheetName.slice(0, 31));
+  XLSX.writeFile(workbook, `${params.fileToken}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function valueOf(row: { values: Record<string, string | number> }, key: string) {
+  return row.values[key] ?? "";
+}
+
+function numberFormatRange(sheet: XLSX.WorkSheet, startRow: number, endRow: number, columns: number[]) {
+  for (let row = startRow; row <= endRow; row += 1) {
+    for (const col of columns) {
+      const address = cellAddress(row, col);
+      if (sheet[address] && typeof sheet[address].v === "number") {
+        sheet[address].s = { ...(sheet[address].s ?? {}), numFmt: "#,##0.00" };
+      }
+    }
+  }
+}
+
+function exportBalanceMensualStyledExcel(report: InventoryReportDefinition) {
+  const dataRows = report.rows.filter((row) => row.values.grupo);
+  const rows = dataRows.map((row) => [
+    String(valueOf(row, "grupo")).replace(/^0?/, ""),
+    valueOf(row, "saldoInicial"),
+    valueOf(row, "ingresoMateriales"),
+    valueOf(row, "salidaMateriales"),
+    valueOf(row, "saldoFinal")
+  ]);
+  const aoa: Array<Array<string | number>> = [
+    ["Empresa Minera"],
+    ["MARTE S.R.L."],
+    ["BALANCE MENSUAL DE ALMACENES LIPEÑA"],
+    [monthLabelFromSubtitle(report.subtitle)],
+    [],
+    ["GRUPO", "SALDO AL", "INGRESO\nMATERIALES", "SALIDA\nMATERIALES", "SALDO AL"],
+    ...rows
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!merges"] = [
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } }
+  ];
+  sheet["!cols"] = [{ wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
+  setCellStyle(sheet, "A1", { font: { bold: true, sz: 16 } });
+  setCellStyle(sheet, "A2", { font: { bold: true, sz: 24, underline: true } });
+  styleRange(sheet, { s: { r: 2, c: 0 }, e: { r: 3, c: 4 } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 5, c: 0 }, e: { r: 5, c: 4 } }, excelHeaderStyle);
+  styleRange(sheet, { s: { r: 6, c: 0 }, e: { r: 5 + rows.length, c: 4 } }, excelBodyStyle);
+  numberFormatRange(sheet, 6, 5 + rows.length, [1, 2, 3, 4]);
+  dataRows.forEach((row, index) => {
+    if (!row.type) return;
+    const fill = row.type === "total" ? "FFE699" : "F2F2F2";
+    styleRange(
+      sheet,
+      { s: { r: 6 + index, c: 0 }, e: { r: 6 + index, c: 4 } },
+      { ...excelBodyStyle, font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: fill } } },
+      new Set([1, 2, 3, 4])
+    );
+  });
+  appendAndSaveStyledSheet({ sheet, sheetName: "Balance Mensual", fileToken: "balance-mensual-almacenes" });
+}
+
+function exportInventarioGeneralStyledExcel(report: InventoryReportDefinition) {
+  const rows = report.rows
+    .filter((row) => row.values.codigo || row.values.descripcion)
+    .map((row) => [
+      valueOf(row, "codigo"),
+      valueOf(row, "descripcion"),
+      valueOf(row, "unidad"),
+      valueOf(row, "saldoFinal"),
+      valueOf(row, "precioUnit"),
+      valueOf(row, "totalBs")
+    ]);
+  const aoa: Array<Array<string | number>> = [
+    ["INVENTARIO DE ALMACEN GENERAL MINA LA LIPEÑA"],
+    [monthLabelFromSubtitle(report.subtitle)],
+    ["(Expresado en bolivianos)"],
+    [],
+    ["", "", "UNIDAD", "SALDOS DEL MES", "", ""],
+    ["", "", "UNIDAD", "CANTIDAD", "P. UNIT.", "TOTAL"],
+    ...rows
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } },
+    { s: { r: 4, c: 3 }, e: { r: 4, c: 5 } }
+  ];
+  sheet["!cols"] = [{ wch: 13 }, { wch: 43 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
+  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 5 } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 5, c: 5 } }, excelHeaderStyle);
+  styleRange(sheet, { s: { r: 4, c: 3 }, e: { r: 5, c: 5 } }, {
+    ...excelHeaderStyle,
+    fill: { fgColor: { rgb: "F4B183" } }
+  });
+  styleRange(sheet, { s: { r: 6, c: 0 }, e: { r: 5 + rows.length, c: 5 } }, excelBodyStyle);
+  numberFormatRange(sheet, 6, 5 + rows.length, [3, 4, 5]);
+  report.rows
+    .filter((row) => row.values.codigo || row.values.descripcion)
+    .forEach((row, index) => {
+      const excelRow = 6 + index;
+      if (row.type === "group") {
+        styleRange(sheet, { s: { r: excelRow, c: 0 }, e: { r: excelRow, c: 1 } }, {
+          ...excelBodyStyle,
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10 },
+          fill: { fgColor: { rgb: "002F6C" } }
+        });
+        styleRange(sheet, { s: { r: excelRow, c: 2 }, e: { r: excelRow, c: 5 } }, {
+          ...excelBodyStyle,
+          fill: { fgColor: { rgb: "F4B183" } }
+        });
+      } else {
+        styleRange(sheet, { s: { r: excelRow, c: 3 }, e: { r: excelRow, c: 5 } }, {
+          ...excelBodyStyle,
+          fill: { fgColor: { rgb: row.type === "total" || row.type === "subtotal" ? "FFF200" : "F4B183" } }
+        }, new Set([3, 4, 5]));
+      }
+    });
+  appendAndSaveStyledSheet({ sheet, sheetName: "Inventario Almacen", fileToken: "inventario-almacen-general" });
+}
+
+function exportCuadroSuministrosStyledExcel(report: InventoryReportDefinition) {
+  const outputRows: Array<Array<string | number>> = [];
+  const sourceRows: Array<"normal" | "total"> = [];
+  let proveedor = "";
+  let providerPrinted = false;
+
+  for (const row of report.rows) {
+    if (row.type === "group" && row.values.proveedor) {
+      proveedor = String(row.values.proveedor);
+      providerPrinted = false;
+      continue;
+    }
+    if (row.type === "group") continue;
+    if (row.type === "total") {
+      outputRows.push(["", "", "", "", "TOTAL GENERAL", valueOf(row, "totalBs"), valueOf(row, "sinIvaBs"), ""]);
+      sourceRows.push("total");
+      continue;
+    }
+    outputRows.push([
+      providerPrinted ? "" : proveedor,
+      valueOf(row, "factura"),
+      valueOf(row, "cantidad"),
+      valueOf(row, "unidad"),
+      valueOf(row, "descripcion"),
+      valueOf(row, "totalBs"),
+      valueOf(row, "sinIvaBs"),
+      valueOf(row, "grupo")
+    ]);
+    providerPrinted = true;
+    sourceRows.push("normal");
+  }
+
+  const aoa: Array<Array<string | number>> = [
+    ["CUADRO DE INVENTARIOS Y SUMINISTROS CORRESPONDIENTE AL", monthLabelFromSubtitle(report.subtitle)],
+    [],
+    ["P R O V E E D O R", "No\nFACTU", "CANTID.", "UNIDA", "D E S C R I P C I O N", "F-total\nBs", "(-13%)\nBs", "GRUPO"],
+    ...outputRows
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+  sheet["!cols"] = [
+    { wch: 28 },
+    { wch: 10 },
+    { wch: 9 },
+    { wch: 9 },
+    { wch: 42 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 12 }
+  ];
+  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, excelHeaderStyle);
+  styleRange(sheet, { s: { r: 3, c: 0 }, e: { r: 2 + outputRows.length, c: 7 } }, {
+    ...excelBodyStyle,
+    alignment: { vertical: "center", wrapText: true }
+  });
+  numberFormatRange(sheet, 3, 2 + outputRows.length, [2, 5, 6]);
+  sourceRows.forEach((kind, index) => {
+    if (kind !== "total") return;
+    styleRange(sheet, { s: { r: 3 + index, c: 0 }, e: { r: 3 + index, c: 7 } }, {
+      ...excelBodyStyle,
+      font: { bold: true, sz: 10 },
+      fill: { fgColor: { rgb: "FFF200" } }
+    }, new Set([5, 6]));
+  });
+  appendAndSaveStyledSheet({ sheet, sheetName: "Cuadro Suministros", fileToken: "cuadro-inventarios-suministros" });
+}
+
+function exportDetalleMaterialesStyledExcel(report: InventoryReportDefinition) {
+  const rows = report.rows
+    .filter((row) => row.type !== "group" || row.values.subCentro)
+    .map((row) => [
+      valueOf(row, "subCuenta"),
+      valueOf(row, "subCentro"),
+      "",
+      valueOf(row, "importeBs"),
+      valueOf(row, "subtotalBs")
+    ]);
+  const aoa: Array<Array<string | number>> = [
+    ["Empresa Minera"],
+    ["MARTE S.R.L."],
+    ["DETALLE DE MATERIALES  COSTO DE PRODUCCION"],
+    [monthLabelFromSubtitle(report.subtitle)],
+    ["", "", "", "", "T-C. $us  6,96"],
+    [],
+    ["SUB\nCUENTA", "SUB\nCENTRO", "", "IMPORTE\nBs.", "SUB TOTALES DE\nFUNCION DEL GASTO  Bs."],
+    ...rows
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!merges"] = [
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } }
+  ];
+  sheet["!cols"] = [{ wch: 12 }, { wch: 13 }, { wch: 4 }, { wch: 16 }, { wch: 32 }];
+  setCellStyle(sheet, "A1", { font: { bold: true, sz: 16 } });
+  setCellStyle(sheet, "A2", { font: { bold: true, sz: 22, underline: true } });
+  styleRange(sheet, { s: { r: 2, c: 0 }, e: { r: 4, c: 4 } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 6, c: 0 }, e: { r: 6, c: 4 } }, excelHeaderStyle);
+  styleRange(sheet, { s: { r: 7, c: 0 }, e: { r: 6 + rows.length, c: 4 } }, excelBodyStyle);
+  numberFormatRange(sheet, 7, 6 + rows.length, [3, 4]);
+  report.rows
+    .filter((row) => row.type !== "group" || row.values.subCentro)
+    .forEach((row, index) => {
+      if (row.type === "subtotal" || row.type === "total") {
+        styleRange(sheet, { s: { r: 7 + index, c: 0 }, e: { r: 7 + index, c: 4 } }, {
+          ...excelBodyStyle,
+          font: { bold: true, sz: 10 }
+        }, new Set([3, 4]));
+      }
+    });
+  appendAndSaveStyledSheet({ sheet, sheetName: "Detalle Materiales", fileToken: "detalle-materiales-costo-produccion" });
+}
+
+function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
+  const rows = report.rows
+    .filter((row) => row.type !== "group" || row.values.descripcion)
+    .map((row) => [
+      valueOf(row, "cargos"),
+      valueOf(row, "descripcion"),
+      valueOf(row, "parcialesBs"),
+      valueOf(row, "cuenta"),
+      valueOf(row, "debeBs"),
+      valueOf(row, "haberBs")
+    ]);
+  const aoa: Array<Array<string | number>> = [
+    ["COMPROBANTE  DE  DIARIO"],
+    ["DIARIO  ALMACENES"],
+    ["SECTOR:  LIPEÑA", monthLabelFromSubtitle(report.subtitle)],
+    [],
+    ["C A R G O S", "D E S C R I P C I O N", "PARCIALES\nBs.", "No  DE CUENTA", "BOLIVIANOS\nD E B E", "BOLIVIANOS\nH A B E R"],
+    ...rows
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+    { s: { r: 2, c: 1 }, e: { r: 2, c: 5 } }
+  ];
+  sheet["!cols"] = [{ wch: 14 }, { wch: 46 }, { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 15 }];
+  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 5 } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 5 } }, excelHeaderStyle);
+  styleRange(sheet, { s: { r: 5, c: 0 }, e: { r: 4 + rows.length, c: 5 } }, excelBodyStyle);
+  numberFormatRange(sheet, 5, 4 + rows.length, [2, 4, 5]);
+  report.rows
+    .filter((row) => row.type !== "group" || row.values.descripcion)
+    .forEach((row, index) => {
+      if (row.type === "group" || row.type === "total") {
+        styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: 5 } }, {
+          ...excelBodyStyle,
+          font: { bold: true, sz: 10 }
+        }, new Set([2, 4, 5]));
+      }
+    });
+  appendAndSaveStyledSheet({ sheet, sheetName: "Diario Almacenes", fileToken: "diario-almacenes" });
+}
+
 export function exportInventoryReportExcel(report: InventoryReportDefinition) {
+  if (report.type === "balance-mensual") {
+    exportBalanceMensualStyledExcel(report);
+    return;
+  }
+  if (report.type === "inventario-general") {
+    exportInventarioGeneralStyledExcel(report);
+    return;
+  }
+  if (report.type === "inventarios-suministros") {
+    exportCuadroSuministrosStyledExcel(report);
+    return;
+  }
+  if (report.type === "detalle-materiales" || report.type === "costo-produccion") {
+    exportDetalleMaterialesStyledExcel(report);
+    return;
+  }
+  if (report.type === "diario-almacenes" || report.type === "movimiento-almacen") {
+    exportDiarioAlmacenesStyledExcel(report);
+    return;
+  }
+
   const headers = report.columns.map((column) => column.label);
   const rows = report.rows.map((row) =>
     report.columns.map((column) => row.values[column.key] ?? "")
@@ -301,11 +806,7 @@ export function exportInventoryReportExcel(report: InventoryReportDefinition) {
     { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: lastCol } }
   ];
-  sheet["!cols"] = report.columns.map((column) => {
-    if (column.align === "right") return { wch: 16 };
-    if (column.label.toLowerCase().includes("descripcion")) return { wch: 48 };
-    return { wch: 22 };
-  });
+  applyAdministrativeWorkbookStyle(sheet, report, 5, rows.length);
   sheet["!autofilter"] = {
     ref: XLSX.utils.encode_range({
       s: { r: 4, c: 0 },

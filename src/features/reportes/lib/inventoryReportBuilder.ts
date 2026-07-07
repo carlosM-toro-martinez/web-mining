@@ -4,6 +4,9 @@ import type {
   AnulacionesSalidasReportResponse,
   BalanceMensualReportResponse,
   BinCardValoradoItem,
+  CuadroSuministrosReportResponse,
+  DetalleMaterialesReportResponse,
+  DiarioAlmacenesReportResponse,
   EntradasAlmacenReportResponse,
   InventarioAlmacenReportResponse,
   SalidasAlmacenReportResponse
@@ -12,6 +15,9 @@ import type {
 export type InventoryReportType =
   | "balance-mensual"
   | "inventario-general"
+  | "detalle-materiales"
+  | "diario-almacenes"
+  | "inventarios-suministros"
   | "entradas-almacen"
   | "salidas-almacen"
   | "anulaciones-entradas"
@@ -568,6 +574,354 @@ function buildMovimientoAlmacen(items: EnrichedItem[], dateLabel: string): Inven
   };
 }
 
+export function buildDetalleMaterialesApiReportDefinition(
+  response: DetalleMaterialesReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+  let lineCount = 0;
+
+  for (const periodo of data.meses) {
+    const subtotals = new Map(
+      periodo.subtotalesPorSubCentro.map((subtotal) => [
+        subtotal.subCentro ?? "",
+        { nombre: subtotal.nombre ?? "", importeBs: subtotal.importeBs }
+      ])
+    );
+    const bySubCentro = new Map<string, typeof periodo.lineas>();
+
+    for (const linea of periodo.lineas) {
+      const key = linea.subCentro ?? "";
+      const chunk = bySubCentro.get(key);
+      if (chunk) chunk.push(linea);
+      else bySubCentro.set(key, [linea]);
+    }
+
+    rows.push({
+      id: `periodo-detalle-materiales-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        subCuenta: "",
+        subCentro: "",
+        importeBs: "",
+        subtotalBs: ""
+      }
+    });
+
+    for (const [subCentro, lineas] of [...bySubCentro.entries()].sort((a, b) =>
+      a[0].localeCompare(b[0])
+    )) {
+      const subtotal = subtotals.get(subCentro);
+      rows.push({
+        id: `subcentro-${periodo.anio}-${periodo.mes}-${subCentro}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          subCuenta: "",
+          subCentro: `${subCentro} ${subtotal?.nombre ?? lineas[0]?.subCentroNombre ?? ""}`.trim(),
+          importeBs: "",
+          subtotalBs: ""
+        }
+      });
+
+      for (const linea of lineas.sort((a, b) => (a.subCuenta ?? "").localeCompare(b.subCuenta ?? ""))) {
+        lineCount += 1;
+        rows.push({
+          id: `detalle-materiales-${periodo.anio}-${periodo.mes}-${subCentro}-${linea.subCuenta}-${lineCount}`,
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            subCuenta: linea.subCuenta ?? "",
+            subCentro: linea.subCentro ?? "",
+            importeBs: Number(linea.importeBs.toFixed(2)),
+            subtotalBs: ""
+          }
+        });
+      }
+
+      rows.push({
+        id: `subtotal-detalle-materiales-${periodo.anio}-${periodo.mes}-${subCentro}`,
+        type: "subtotal",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          subCuenta: "",
+          subCentro: `SUBTOTAL ${subCentro}`,
+          importeBs: "",
+          subtotalBs: Number((subtotal?.importeBs ?? 0).toFixed(2))
+        }
+      });
+    }
+
+    rows.push({
+      id: `total-detalle-materiales-${periodo.anio}-${periodo.mes}`,
+      type: "total",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        subCuenta: "",
+        subCentro: "TOTAL GENERAL",
+        importeBs: "",
+        subtotalBs: Number(periodo.totalGeneral.toFixed(2))
+      }
+    });
+  }
+
+  const totalGeneral = data.meses.reduce((sum, periodo) => sum + periodo.totalGeneral, 0);
+
+  return {
+    type: "detalle-materiales",
+    title: "Detalle De Materiales Costo De Produccion",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo", align: "center" },
+      { key: "subCuenta", label: "Sub Cuenta", align: "center" },
+      { key: "subCentro", label: "Sub Centro" },
+      { key: "importeBs", label: "Importe Bs.", align: "right" },
+      { key: "subtotalBs", label: "Sub Totales Funcion Del Gasto Bs.", align: "right" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      { label: "Lineas", value: lineCount },
+      { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
+    ]
+  };
+}
+
+export function buildDiarioAlmacenesApiReportDefinition(
+  response: DiarioAlmacenesReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-diario-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        cargos: "",
+        descripcion: "",
+        parcialesBs: "",
+        cuenta: "",
+        debeBs: "",
+        haberBs: ""
+      }
+    });
+    rows.push({
+      id: `inventario-debe-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        cargos: "26 002 000",
+        descripcion: "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
+        parcialesBs: "",
+        cuenta: "26.002.000",
+        debeBs: Number(periodo.totalInventarioDebe.toFixed(2)),
+        haberBs: ""
+      }
+    });
+    rows.push({
+      id: `saldo-anterior-${periodo.anio}-${periodo.mes}`,
+      values: {
+        periodo: "",
+        cargos: "",
+        descripcion: `Saldo inventario al  cierre anterior`,
+        parcialesBs: Number(periodo.saldoInventarioAnterior.toFixed(2)),
+        cuenta: "",
+        debeBs: "",
+        haberBs: ""
+      }
+    });
+    rows.push({
+      id: `compras-${periodo.anio}-${periodo.mes}`,
+      values: {
+        periodo: "",
+        cargos: "",
+        descripcion: "Cuadro Mat. y Sumin. del mes",
+        parcialesBs: Number(periodo.comprasImporteBs.toFixed(2)),
+        cuenta: "",
+        debeBs: "",
+        haberBs: ""
+      }
+    });
+
+    for (const cuenta of periodo.cuentasHaber) {
+      rows.push({
+        id: `haber-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          cargos: cuenta.centroCostoCodigo ?? "",
+          descripcion: cuenta.centroCostoNombre ?? "",
+          parcialesBs: "",
+          cuenta: `${cuenta.centroCostoCodigo ?? ""}.000`.replace(/^\./, ""),
+          debeBs: "",
+          haberBs: Number(cuenta.totalBs.toFixed(2))
+        }
+      });
+
+      for (const subCentro of cuenta.subCentros) {
+        rows.push({
+          id: `haber-sub-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}-${subCentro.codigoCompleto}-${subCentro.funcionGastoCodigo}`,
+          values: {
+            periodo: "",
+            cargos: "",
+            descripcion: `${subCentro.funcionGastoCodigo ?? ""} - ${subCentro.funcionGastoNombre ?? ""}`.trim(),
+            parcialesBs: Number(subCentro.totalBs.toFixed(2)),
+            cuenta: subCentro.codigoCompleto ?? "",
+            debeBs: "",
+            haberBs: ""
+          }
+        });
+      }
+    }
+
+    rows.push({
+      id: `total-diario-${periodo.anio}-${periodo.mes}`,
+      type: "total",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        cargos: "",
+        descripcion: "TOTALES",
+        parcialesBs: "",
+        cuenta: "",
+        debeBs: Number(periodo.totalInventarioDebe.toFixed(2)),
+        haberBs: Number(periodo.totalSalidasHaber.toFixed(2))
+      }
+    });
+  }
+
+  const totalDebe = data.meses.reduce((sum, periodo) => sum + periodo.totalInventarioDebe, 0);
+  const totalHaber = data.meses.reduce((sum, periodo) => sum + periodo.totalSalidasHaber, 0);
+
+  return {
+    type: "diario-almacenes",
+    title: "Diario Almacenes",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo", align: "center" },
+      { key: "cargos", label: "Cargos", align: "center" },
+      { key: "descripcion", label: "Descripcion" },
+      { key: "parcialesBs", label: "Parciales Bs.", align: "right" },
+      { key: "cuenta", label: "No De Cuenta", align: "center" },
+      { key: "debeBs", label: "Debe Bs.", align: "right" },
+      { key: "haberBs", label: "Haber Bs.", align: "right" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      { label: "Total debe", value: Number(totalDebe.toFixed(2)) },
+      { label: "Total haber", value: Number(totalHaber.toFixed(2)) }
+    ]
+  };
+}
+
+export function buildCuadroSuministrosApiReportDefinition(
+  response: CuadroSuministrosReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+  let itemCount = 0;
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-cuadro-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        proveedor: "",
+        factura: "",
+        cantidad: "",
+        unidad: "",
+        descripcion: "",
+        totalBs: "",
+        sinIvaBs: "",
+        grupo: ""
+      }
+    });
+
+    for (const proveedor of periodo.proveedores) {
+      const proveedorNombre = proveedor.proveedor?.nombre ?? "Sin proveedor";
+      rows.push({
+        id: `proveedor-cuadro-${periodo.anio}-${periodo.mes}-${proveedorNombre}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          proveedor: proveedorNombre,
+          factura: "",
+          cantidad: "",
+          unidad: "",
+          descripcion: "",
+          totalBs: Number(proveedor.totalBs.toFixed(2)),
+          sinIvaBs: "",
+          grupo: ""
+        }
+      });
+
+      for (const compra of proveedor.compras) {
+        compra.items.forEach((item, index) => {
+          itemCount += 1;
+          rows.push({
+            id: `cuadro-item-${periodo.anio}-${periodo.mes}-${compra.id}-${index}`,
+            values: {
+              periodo: "",
+              proveedor: "",
+              factura: index === 0 ? compra.numeroFactura ?? "" : "",
+              cantidad: Number(item.cantidad.toFixed(2)),
+              unidad: item.unidad ?? "",
+              descripcion: item.nombre ?? "",
+              totalBs: Number(item.importeBs.toFixed(2)),
+              sinIvaBs: Number(item.importeSinIVA.toFixed(2)),
+              grupo: item.grupo?.codigo ?? ""
+            }
+          });
+        });
+      }
+    }
+
+    rows.push({
+      id: `total-cuadro-${periodo.anio}-${periodo.mes}`,
+      type: "total",
+      values: {
+        periodo: formatMonth(periodo.anio, periodo.mes),
+        proveedor: "",
+        factura: "",
+        cantidad: "",
+        unidad: "",
+        descripcion: "TOTAL GENERAL",
+        totalBs: Number(periodo.totalGeneral.toFixed(2)),
+        sinIvaBs: Number((periodo.totalGeneral * 0.87).toFixed(2)),
+        grupo: ""
+      }
+    });
+  }
+
+  const totalGeneral = data.meses.reduce((sum, periodo) => sum + periodo.totalGeneral, 0);
+
+  return {
+    type: "inventarios-suministros",
+    title: "Cuadro De Inventarios Y Suministros",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo", align: "center" },
+      { key: "proveedor", label: "Proveedor" },
+      { key: "factura", label: "No Factura", align: "center" },
+      { key: "cantidad", label: "Cantidad", align: "right" },
+      { key: "unidad", label: "Unidad", align: "center" },
+      { key: "descripcion", label: "Descripcion" },
+      { key: "totalBs", label: "F-total Bs.", align: "right" },
+      { key: "sinIvaBs", label: "(-13%) Bs.", align: "right" },
+      { key: "grupo", label: "Grupo", align: "center" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      { label: "Items", value: itemCount },
+      { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
+    ]
+  };
+}
+
 export const INVENTORY_REPORTS: Array<{
   type: InventoryReportType;
   title: string;
@@ -582,6 +936,11 @@ export const INVENTORY_REPORTS: Array<{
     type: "inventario-general",
     title: "Inventario General",
     description: "Detalle por grupo y subgrupo con cantidad, precio unitario y total."
+  },
+  {
+    type: "inventarios-suministros",
+    title: "Inventarios Y Suministros",
+    description: "Cuadro de compras por proveedor, factura, grupo y valor sin IVA."
   },
   {
     type: "entradas-almacen",
@@ -609,9 +968,19 @@ export const INVENTORY_REPORTS: Array<{
     description: "Detalle por subcuenta, subcentro y funcion de gasto con subtotales."
   },
   {
+    type: "detalle-materiales",
+    title: "Detalle Materiales",
+    description: "Costo de produccion por subcuenta y subcentro con subtotales."
+  },
+  {
     type: "movimiento-almacen",
     title: "Movimiento Almacen",
     description: "Asiento consolidado de cargos, debe y haber del periodo."
+  },
+  {
+    type: "diario-almacenes",
+    title: "Diario Almacenes",
+    description: "Comprobante de diario y movimiento contable de almacenes."
   }
 ];
 

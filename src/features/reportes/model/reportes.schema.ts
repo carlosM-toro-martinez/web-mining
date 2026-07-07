@@ -425,6 +425,134 @@ export const salidasAlmacenReportResponseSchema = z.object({
   })
 });
 
+const detalleMaterialesLineaSchema = z.object({
+  subCuenta: z.string().optional().nullable().default(""),
+  subCentro: z.string().optional().nullable().default(""),
+  subCentroNombre: z.string().optional().nullable(),
+  importeBs: numberLikeSchema
+});
+
+const detalleMaterialesSubtotalSchema = z.object({
+  subCentro: z.string().optional().nullable().default(""),
+  nombre: z.string().optional().nullable(),
+  importeBs: numberLikeSchema
+});
+
+export const detalleMaterialesReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int(),
+    mesInicio: numberLikeSchema.int(),
+    anioFin: numberLikeSchema.int(),
+    mesFin: numberLikeSchema.int(),
+    meses: z.array(
+      z.object({
+        anio: numberLikeSchema.int(),
+        mes: numberLikeSchema.int().min(1).max(12),
+        esCerrado: z.boolean().default(false),
+        lineas: z.array(detalleMaterialesLineaSchema).default([]),
+        subtotalesPorSubCentro: z.array(detalleMaterialesSubtotalSchema).default([]),
+        totalGeneral: numberLikeSchema
+      })
+    )
+  })
+});
+
+const diarioSubCentroSchema = z.object({
+  cuentaId: idLikeSchema.optional().nullable(),
+  codigoCompleto: z.string().optional().nullable(),
+  funcionGastoCodigo: z.string().optional().nullable(),
+  funcionGastoNombre: z.string().optional().nullable(),
+  sectorCodigo: z.string().optional().nullable(),
+  totalBs: numberLikeSchema
+});
+
+const diarioCuentaHaberSchema = z.object({
+  centroCostoCodigo: z.string().optional().nullable(),
+  centroCostoNombre: z.string().optional().nullable(),
+  totalBs: numberLikeSchema,
+  subCentros: z.array(diarioSubCentroSchema).default([])
+});
+
+export const diarioAlmacenesReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int(),
+    mesInicio: numberLikeSchema.int(),
+    anioFin: numberLikeSchema.int(),
+    mesFin: numberLikeSchema.int(),
+    meses: z.array(
+      z.object({
+        anio: numberLikeSchema.int(),
+        mes: numberLikeSchema.int().min(1).max(12),
+        esCerrado: z.boolean().default(false),
+        saldoInventarioAnterior: numberLikeSchema,
+        comprasImporteBs: numberLikeSchema,
+        totalInventarioDebe: numberLikeSchema,
+        cuentasHaber: z.array(diarioCuentaHaberSchema).default([]),
+        totalSalidasHaber: numberLikeSchema
+      })
+    )
+  })
+});
+
+const cuadroSuministrosItemSchema = z.object({
+  productoId: idLikeSchema.optional().nullable(),
+  nombre: z.string().optional().nullable(),
+  unidad: z.string().optional().nullable(),
+  cantidad: numberLikeSchema,
+  precioUnit: numberLikeSchema.optional().nullable(),
+  importeBs: numberLikeSchema,
+  importeSinIVA: numberLikeSchema,
+  grupo: z
+    .object({
+      codigo: z.string().optional().nullable(),
+      nombre: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable()
+});
+
+const cuadroSuministrosCompraSchema = z.object({
+  id: idLikeSchema,
+  numeroFactura: z.string().optional().nullable(),
+  fechaOperacion: z.string().optional().nullable(),
+  items: z.array(cuadroSuministrosItemSchema).default([]),
+  subtotalBs: numberLikeSchema
+});
+
+const cuadroSuministrosProveedorSchema = z.object({
+  proveedor: z
+    .object({
+      id: idLikeSchema.optional().nullable(),
+      nombre: z.string().optional().nullable(),
+      nit: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  compras: z.array(cuadroSuministrosCompraSchema).default([]),
+  totalBs: numberLikeSchema
+});
+
+export const cuadroSuministrosReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int(),
+    mesInicio: numberLikeSchema.int(),
+    anioFin: numberLikeSchema.int(),
+    mesFin: numberLikeSchema.int(),
+    meses: z.array(
+      z.object({
+        anio: numberLikeSchema.int(),
+        mes: numberLikeSchema.int().min(1).max(12),
+        esCerrado: z.boolean().default(false),
+        proveedores: z.array(cuadroSuministrosProveedorSchema).default([]),
+        totalGeneral: numberLikeSchema
+      })
+    )
+  })
+});
+
 const reporteUsuarioSchema = z
   .object({
     id: idLikeSchema,
@@ -616,5 +744,8 @@ export type BalanceMensualReportResponse = z.infer<typeof balanceMensualReportRe
 export type InventarioAlmacenReportResponse = z.infer<typeof inventarioAlmacenReportResponseSchema>;
 export type EntradasAlmacenReportResponse = z.infer<typeof entradasAlmacenReportResponseSchema>;
 export type SalidasAlmacenReportResponse = z.infer<typeof salidasAlmacenReportResponseSchema>;
+export type DetalleMaterialesReportResponse = z.infer<typeof detalleMaterialesReportResponseSchema>;
+export type DiarioAlmacenesReportResponse = z.infer<typeof diarioAlmacenesReportResponseSchema>;
+export type CuadroSuministrosReportResponse = z.infer<typeof cuadroSuministrosReportResponseSchema>;
 export type AnulacionesEntradasReportResponse = z.infer<typeof anulacionesEntradasReportResponseSchema>;
 export type AnulacionesSalidasReportResponse = z.infer<typeof anulacionesSalidasReportResponseSchema>;
