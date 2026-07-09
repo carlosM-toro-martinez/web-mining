@@ -331,13 +331,15 @@ const entradaAlmacenProductoSchema = z.preprocess(
   movimientoAlmacenProductoBaseSchema.extend({
     ingresoQty: numberLikeSchema,
     totalBsEntrada: numberLikeSchema.optional(),
+    totalBsEntradaMenos13: numberLikeSchema.optional(),
     totalBs: numberLikeSchema.optional()
   })
 );
 
 const salidaAlmacenProductoSchema = movimientoAlmacenProductoBaseSchema.extend({
   salidaQty: numberLikeSchema,
-  totalBsSalida: numberLikeSchema
+  totalBsSalida: numberLikeSchema,
+  totalBsSalidaMenos13: numberLikeSchema.optional()
 });
 
 const entradaAlmacenSubGrupoSchema = z.preprocess(
@@ -388,12 +390,14 @@ export const entradasAlmacenReportResponseSchema = z.object({
             codigo: z.string().optional().nullable(),
             nombre: z.string().optional().nullable(),
             totalBsEntrada: numberLikeSchema.optional(),
+            totalBsEntradaMenos13: numberLikeSchema.optional(),
             totalBs: numberLikeSchema.optional(),
             subGrupos: z.array(entradaAlmacenSubGrupoSchema)
             })
           )
         ),
-        totalGeneral: numberLikeSchema
+        totalGeneral: numberLikeSchema,
+        totalGeneralMenos13: numberLikeSchema.optional()
       })
     )
   })
@@ -416,10 +420,12 @@ export const salidasAlmacenReportResponseSchema = z.object({
             codigo: z.string().optional().nullable(),
             nombre: z.string().optional().nullable(),
             totalBsSalida: numberLikeSchema,
+            totalBsSalidaMenos13: numberLikeSchema.optional(),
             subGrupos: z.array(salidaAlmacenSubGrupoSchema)
           })
         ),
-        totalGeneral: numberLikeSchema
+        totalGeneral: numberLikeSchema,
+        totalGeneralMenos13: numberLikeSchema.optional()
       })
     )
   })

@@ -4,13 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useRegisterMutation } from "@/features/auth/hooks/useRegisterMutation";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
-import {
-  useCentrosCostoQuery,
-  useCreateCuentaMutation,
-  useCuentasQuery,
-  useFuncionesGastoQuery,
-  useSectoresQuery
-} from "@/features/contabilidad/hooks/useContabilidad";
+import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
 import {
   useProductosQuery,
   useUpdateProductoMutation
@@ -33,6 +27,7 @@ import {
 } from "@/features/inventory-offline/hooks/useInventoryOffline";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
+import { CreateCuentaModal } from "@/shared/ui/CreateCuentaModal";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
@@ -70,9 +65,6 @@ export function ValesPage() {
   const usersQuery = useUsersListQuery();
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const cuentasQuery = useCuentasQuery();
-  const centrosCostoQuery = useCentrosCostoQuery();
-  const funcionesGastoQuery = useFuncionesGastoQuery();
-  const sectoresQuery = useSectoresQuery();
   const valesQuery = useValesQuery({ page: 1, limit: 200 });
   const anulacionesQuery = useAnulacionesValesQuery(user?.role === "ADMIN");
   const resumenSolicitantesQuery = useResumenSolicitantesQuery(canUseFlow);
@@ -82,7 +74,6 @@ export function ValesPage() {
   const anularValeMutation = useAnularValeMutation();
   const updateProductoMutation = useUpdateProductoMutation();
   const registerMutation = useRegisterMutation();
-  const createCuentaMutation = useCreateCuentaMutation();
   const pendingOfflineQuery = useInventoryOfflinePendingCount();
   const syncOfflineMutation = useSyncInventoryOfflineMutation();
 
@@ -93,9 +84,6 @@ export function ValesPage() {
   const [newWorkerName, setNewWorkerName] = useState("");
   const [isCreateCuentaModalOpen, setIsCreateCuentaModalOpen] = useState(false);
   const [targetDraftItemIdForCuenta, setTargetDraftItemIdForCuenta] = useState<number | null>(null);
-  const [centroCostoCreateId, setCentroCostoCreateId] = useState("");
-  const [funcionGastoCreateId, setFuncionGastoCreateId] = useState("");
-  const [sectorCreateId, setSectorCreateId] = useState("");
   const [draftItems, setDraftItems] = useState<ValeDraftItem[]>([
     { id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
   ]);
@@ -112,9 +100,6 @@ export function ValesPage() {
   const usuarios = usersQuery.data?.data ?? [];
   const productos = productosQuery.data?.data ?? [];
   const cuentas = cuentasQuery.data?.data ?? [];
-  const centrosCosto = centrosCostoQuery.data?.data ?? [];
-  const funcionesGasto = funcionesGastoQuery.data?.data ?? [];
-  const sectores = sectoresQuery.data?.data ?? [];
   const vales = valesQuery.data?.data ?? [];
   const anulaciones = anulacionesQuery.data?.data ?? [];
 
@@ -147,34 +132,6 @@ export function ValesPage() {
       })),
     [resumenSolicitantesQuery.data?.data]
   );
-  const centroCostoOptions = useMemo(
-    () =>
-      centrosCosto.map((item) => ({
-        id: String(item.id),
-        label: `${item.codigo} - ${item.nombre}`,
-        searchText: `${item.codigo} ${item.nombre}`
-      })),
-    [centrosCosto]
-  );
-  const funcionGastoOptions = useMemo(
-    () =>
-      funcionesGasto.map((item) => ({
-        id: String(item.id),
-        label: `${item.codigo} - ${item.nombre}`,
-        searchText: `${item.codigo} ${item.nombre}`
-      })),
-    [funcionesGasto]
-  );
-  const sectorOptions = useMemo(
-    () =>
-      sectores.map((item) => ({
-        id: String(item.id),
-        label: `${item.codigo} - ${item.nombre}`,
-        searchText: `${item.codigo} ${item.nombre}`
-      })),
-    [sectores]
-  );
-
   const productosHistoricosFiltrados = useMemo(() => {
     const rows = productosPorUsuarioQuery.data?.data.productos ?? [];
     const q = historialProductoFilter.trim().toLowerCase();
@@ -264,50 +221,12 @@ export function ValesPage() {
 
   function openCreateCuentaModal(draftItemId: number) {
     setTargetDraftItemIdForCuenta(draftItemId);
-    setCentroCostoCreateId("");
-    setFuncionGastoCreateId("");
-    setSectorCreateId("");
     setIsCreateCuentaModalOpen(true);
   }
 
   function closeCreateCuentaModal() {
     setIsCreateCuentaModalOpen(false);
     setTargetDraftItemIdForCuenta(null);
-    setCentroCostoCreateId("");
-    setFuncionGastoCreateId("");
-    setSectorCreateId("");
-  }
-
-  function buildCuentaCodigoCompleto(centroId: number, funcionId: number, sectorId: number) {
-    const centro = centrosCosto.find((item) => item.id === centroId);
-    const funcion = funcionesGasto.find((item) => item.id === funcionId);
-    const sector = sectores.find((item) => item.id === sectorId);
-    return `${centro?.codigo ?? centroId}-${funcion?.codigo ?? funcionId}-${sector?.codigo ?? sectorId}`;
-  }
-
-  function handleCreateCuentaQuick(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const centroCostoId = Number(centroCostoCreateId);
-    const funcionGastoId = Number(funcionGastoCreateId);
-    const sectorId = Number(sectorCreateId);
-    if (!centroCostoId || !funcionGastoId || !sectorId) {
-      showError("Selecciona centro de costo, función de gasto y área/sector.");
-      return;
-    }
-    const codigoCompleto = buildCuentaCodigoCompleto(centroCostoId, funcionGastoId, sectorId);
-    createCuentaMutation.mutate(
-      { codigoCompleto, centroCostoId, funcionGastoId, sectorId },
-      {
-        onSuccess: (response) => {
-          if (targetDraftItemIdForCuenta !== null) {
-            updateDraftItem(targetDraftItemIdForCuenta, { cuentaId: String(response.data.id) });
-          }
-          showSuccess("Cuenta contable creada y seleccionada.");
-          closeCreateCuentaModal();
-        },
-        onError: (error) => showError(normalizeError(error, "No se pudo crear la cuenta contable."))
-      }
-    );
   }
 
   async function ensureProductoCuenta(productoId: number, cuentaId: number) {
@@ -718,58 +637,15 @@ export function ValesPage() {
         </div>
       ) : null}
 
-      {isCreateCuentaModalOpen ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-            <h3 className="text-lg font-bold">Crear cuenta contable rápida</h3>
-            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
-              Selecciona centro de costo, función de gasto y área/sector.
-            </p>
-            <form className="mt-3 space-y-3" onSubmit={handleCreateCuentaQuick}>
-              <AutocompleteSelect
-                value={centroCostoCreateId}
-                onChange={setCentroCostoCreateId}
-                options={centroCostoOptions}
-                placeholder="Centro de costo (código o nombre)"
-                className={inputClassName}
-                maxVisibleOptions={30}
-              />
-              <AutocompleteSelect
-                value={funcionGastoCreateId}
-                onChange={setFuncionGastoCreateId}
-                options={funcionGastoOptions}
-                placeholder="Función de gasto (código o nombre)"
-                className={inputClassName}
-                maxVisibleOptions={30}
-              />
-              <AutocompleteSelect
-                value={sectorCreateId}
-                onChange={setSectorCreateId}
-                options={sectorOptions}
-                placeholder="Área / Sector (código o nombre)"
-                className={inputClassName}
-                maxVisibleOptions={30}
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closeCreateCuentaModal}
-                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={createCuentaMutation.isPending}
-                  className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)]"
-                >
-                  {createCuentaMutation.isPending ? "Creando..." : "Crear y seleccionar"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+      <CreateCuentaModal
+        isOpen={isCreateCuentaModalOpen}
+        onClose={closeCreateCuentaModal}
+        onCreated={(cuentaId) => {
+          if (targetDraftItemIdForCuenta !== null) {
+            updateDraftItem(targetDraftItemIdForCuenta, { cuentaId: String(cuentaId) });
+          }
+        }}
+      />
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 text-lg font-bold">Vales recientes</h2>

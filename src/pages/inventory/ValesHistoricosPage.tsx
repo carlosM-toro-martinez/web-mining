@@ -25,10 +25,12 @@ import {
   useComprasQuery,
   useRecibirCompraMutation
 } from "@/features/compras/hooks/useCompras";
+import type { Compra, CompraItem } from "@/features/compras/model/compras.schema";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
+import { CreateCuentaModal } from "@/shared/ui/CreateCuentaModal";
 import { CreateProveedorModal } from "@/shared/ui/CreateProveedorModal";
 import { CreateProductoModal } from "@/shared/ui/CreateProductoModal";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -87,6 +89,77 @@ function formatNumber(value: number) {
   return value.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function getCompraItemCantidad(item: CompraItem) {
+  return item.cantidadRecibida || item.cantidadPedida;
+}
+
+function getCompraItemTotal(item: CompraItem) {
+  return getCompraItemCantidad(item) * item.precioUnit;
+}
+
+function getCompraTotal(compra: Compra) {
+  return compra.items.reduce((total, item) => total + getCompraItemTotal(item), 0);
+}
+
+function CompraItemsTable({ compra }: { compra: Compra }) {
+  return (
+    <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-border-soft)]">
+      <table className="w-full min-w-[660px] border-collapse text-left">
+        <thead className="bg-[var(--color-surface-container)]">
+          <tr>
+            <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Codigo
+            </th>
+            <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Producto
+            </th>
+            <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Cantidad
+            </th>
+            <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              P. Unit. Bs.
+            </th>
+            <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Total item Bs.
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--color-border-soft)]">
+          {compra.items.map((item) => (
+            <tr key={item.id} className="bg-[var(--color-surface-container-low)]/50">
+              <td className="px-3 py-2 font-mono text-[11px] text-[var(--color-on-surface-variant)]">
+                {item.producto?.codigo ?? "-"}
+              </td>
+              <td className="px-3 py-2 text-xs text-[var(--color-on-surface)]">
+                {item.producto?.nombre ?? "Producto"}
+              </td>
+              <td className="px-3 py-2 text-right text-xs text-[var(--color-on-surface)]">
+                {formatNumber(getCompraItemCantidad(item))}
+              </td>
+              <td className="px-3 py-2 text-right text-xs text-[var(--color-on-surface)]">
+                {formatNumber(item.precioUnit)}
+              </td>
+              <td className="px-3 py-2 text-right text-xs font-semibold text-[var(--color-on-surface)]">
+                {formatNumber(getCompraItemTotal(item))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="border-t border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]">
+          <tr>
+            <td colSpan={4} className="px-3 py-2 text-right text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface)]">
+              Total factura
+            </td>
+            <td className="px-3 py-2 text-right text-sm font-extrabold text-[var(--color-primary)]">
+              Bs. {formatNumber(getCompraTotal(compra))}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 export function ValesHistoricosPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
@@ -135,6 +208,8 @@ export function ValesHistoricosPage() {
   const [savingSaldoId, setSavingSaldoId] = useState<string | null>(null);
   const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
   const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
+  const [isCreateCuentaModalOpen, setIsCreateCuentaModalOpen] = useState(false);
+  const [targetDraftItemIdForCuenta, setTargetDraftItemIdForCuenta] = useState<number | null>(null);
   const [saldoSearchQuery, setSaldoSearchQuery] = useState("");
   const [saldoCurrentPage, setSaldoCurrentPage] = useState(1);
   const [previewAnio, setPreviewAnio] = useState(String(now.getFullYear()));
@@ -317,6 +392,16 @@ export function ValesHistoricosPage() {
     setDraftItems((current) =>
       current.length <= 1 ? current : current.filter((item) => item.id !== id)
     );
+  }
+
+  function openCreateCuentaModal(draftItemId: number) {
+    setTargetDraftItemIdForCuenta(draftItemId);
+    setIsCreateCuentaModalOpen(true);
+  }
+
+  function closeCreateCuentaModal() {
+    setIsCreateCuentaModalOpen(false);
+    setTargetDraftItemIdForCuenta(null);
   }
 
   function addCompraDraftItem() {
@@ -842,20 +927,21 @@ export function ValesHistoricosPage() {
                     <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
                     <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Proveedor</th>
                     <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Total</th>
                     <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border-soft)]">
                   {comprasHistoricasQuery.isLoading ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
+                      <td colSpan={6} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
                         Cargando compras...
                       </td>
                     </tr>
                   ) : null}
                   {!comprasHistoricasQuery.isLoading && (comprasHistoricasQuery.data?.data ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
+                      <td colSpan={6} className="px-3 py-3 text-center text-xs text-[var(--color-on-surface-variant)]">
                         Sin compras para el período.
                       </td>
                     </tr>
@@ -864,18 +950,14 @@ export function ValesHistoricosPage() {
                     <tr key={compra.id} className="align-top transition hover:bg-[var(--color-surface-container-highest)]">
                       <td className="px-3 py-2 text-xs">
                         <span className="font-semibold">{compra.numeroFactura ?? "-"}</span>
-                        <div className="mt-1 space-y-1 text-[11px] text-[var(--color-on-surface-variant)]">
-                          {compra.items.map((item) => (
-                            <div key={item.id}>
-                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
-                              {item.producto?.nombre ?? "Producto"}: {formatNumber(item.cantidadRecibida || item.cantidadPedida)} x Bs. {formatNumber(item.precioUnit)}
-                            </div>
-                          ))}
-                        </div>
+                        <CompraItemsTable compra={compra} />
                       </td>
                       <td className="px-3 py-2 text-xs">{compra.estado}</td>
                       <td className="px-3 py-2 text-xs">{compra.proveedor?.nombre ?? "-"}</td>
                       <td className="px-3 py-2 text-xs">{formatDateTime(compra.fechaOperacion ?? compra.createdAt)}</td>
+                      <td className="px-3 py-2 text-right text-xs font-bold text-[var(--color-primary)]">
+                        Bs. {formatNumber(getCompraTotal(compra))}
+                      </td>
                       <td className="px-3 py-2 text-right text-xs">
                         {canAnularHistorico && compra.estado !== "ANULADA" ? (
                           <button
@@ -950,7 +1032,7 @@ export function ValesHistoricosPage() {
           {draftItems.map((item, index) => (
             <div
               key={item.id}
-              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_1fr_auto]"
+              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_1fr_auto_auto]"
             >
               <AutocompleteSelect
                 value={item.productoId}
@@ -985,6 +1067,13 @@ export function ValesHistoricosPage() {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => openCreateCuentaModal(item.id)}
+                className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+              >
+                Nueva cuenta
+              </button>
               <button
                 type="button"
                 onClick={() => removeDraftItem(item.id)}
@@ -1770,36 +1859,44 @@ export function ValesHistoricosPage() {
                     {(comprasHistoricasQuery.data?.data ?? []).map((compra) => (
                       <div
                         key={compra.id}
-                        className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3"
+                        className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-4"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-bold">
-                              Factura {compra.numeroFactura ?? "-"} · {compra.estado}
-                            </p>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-extrabold text-[var(--color-on-surface)]">
+                                Factura {compra.numeroFactura ?? "-"}
+                              </p>
+                              <span className="rounded-full bg-[var(--color-primary)]/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]">
+                                {compra.estado}
+                              </span>
+                            </div>
                             <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
                               {compra.proveedor?.nombre ?? "Sin proveedor"} · {formatDateTime(compra.fechaOperacion ?? compra.createdAt)}
                             </p>
                           </div>
-                          {canAnularHistorico && compra.estado !== "ANULADA" ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleAnularCompraHistorica(compra.id)}
-                              disabled={anularCompraMutation.isPending}
-                              className="rounded-md border border-[var(--color-error)]/45 px-2 py-1 text-xs font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
-                            >
-                              Anular
-                            </button>
-                          ) : null}
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-right">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                                Total factura
+                              </p>
+                              <p className="mt-1 text-sm font-extrabold text-[var(--color-primary)]">
+                                Bs. {formatNumber(getCompraTotal(compra))}
+                              </p>
+                            </div>
+                            {canAnularHistorico && compra.estado !== "ANULADA" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleAnularCompraHistorica(compra.id)}
+                                disabled={anularCompraMutation.isPending}
+                                className="rounded-md border border-[var(--color-error)]/45 px-2 py-1 text-xs font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                              >
+                                Anular
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="mt-2 grid gap-1 text-xs text-[var(--color-on-surface-variant)]">
-                          {compra.items.map((item) => (
-                            <span key={item.id}>
-                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
-                              {item.producto?.nombre ?? "Producto"}: {formatNumber(item.cantidadRecibida || item.cantidadPedida)} x Bs. {formatNumber(item.precioUnit)}
-                            </span>
-                          ))}
-                        </div>
+                        <CompraItemsTable compra={compra} />
                       </div>
                     ))}
                     </div>
@@ -2212,6 +2309,15 @@ export function ValesHistoricosPage() {
       <CreateProveedorModal
         isOpen={isCreateProveedorModalOpen}
         onClose={() => setIsCreateProveedorModalOpen(false)}
+      />
+      <CreateCuentaModal
+        isOpen={isCreateCuentaModalOpen}
+        onClose={closeCreateCuentaModal}
+        onCreated={(cuentaId) => {
+          if (targetDraftItemIdForCuenta !== null) {
+            updateDraftItem(targetDraftItemIdForCuenta, { cuentaId: String(cuentaId) });
+          }
+        }}
       />
       <CreateProductoModal
         isOpen={isCreateProductoModalOpen}

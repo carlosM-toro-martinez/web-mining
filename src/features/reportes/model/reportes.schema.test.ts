@@ -139,6 +139,7 @@ describe("reportes.schema", () => {
                 codigo: "MAT",
                 nombre: "Materiales",
                 totalBsEntrada: 1275,
+                totalBsEntradaMenos13: 1109.25,
                 subGrupos: [
                   {
                     codigo: "MAT-ELE",
@@ -150,20 +151,24 @@ describe("reportes.schema", () => {
                         unidad: "m",
                         ingresoQty: 150,
                         precioUnit: 8.5,
-                        totalBsEntrada: 1275
+                        totalBsEntrada: 1275,
+                        totalBsEntradaMenos13: 1109.25
                       }
                     ]
                   }
                 ]
               }
             ],
-            totalGeneral: 1275
+            totalGeneral: 1275,
+            totalGeneralMenos13: 1109.25
           }
         ]
       }
     });
 
     expect(parsed.data.meses[0]?.grupos[0]?.totalBsEntrada).toBe(1275);
+    expect(parsed.data.meses[0]?.grupos[0]?.totalBsEntradaMenos13).toBe(1109.25);
+    expect(parsed.data.meses[0]?.totalGeneralMenos13).toBe(1109.25);
   });
 
   it("parses entradas de almacen with unified totalBs fields", () => {
@@ -272,6 +277,7 @@ describe("reportes.schema", () => {
                 codigo: "MAT",
                 nombre: "Materiales",
                 totalBsSalida: 680,
+                totalBsSalidaMenos13: 591.6,
                 subGrupos: [
                   {
                     codigo: "MAT-ELE",
@@ -283,19 +289,23 @@ describe("reportes.schema", () => {
                         unidad: "m",
                         salidaQty: 80,
                         precioUnit: 8.5,
-                        totalBsSalida: 680
+                        totalBsSalida: 680,
+                        totalBsSalidaMenos13: 591.6
                       }
                     ]
                   }
                 ]
               }
             ],
-            totalGeneral: 680
+            totalGeneral: 680,
+            totalGeneralMenos13: 591.6
           }
         ]
       }
     });
 
     expect(parsed.data.meses[0]?.grupos[0]?.totalBsSalida).toBe(680);
+    expect(parsed.data.meses[0]?.grupos[0]?.totalBsSalidaMenos13).toBe(591.6);
+    expect(parsed.data.meses[0]?.totalGeneralMenos13).toBe(591.6);
   });
 });

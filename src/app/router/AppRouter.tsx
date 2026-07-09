@@ -18,12 +18,14 @@ import { PedidosPage } from "@/pages/inventory/PedidosPage";
 import { InventarioImportPage } from "@/pages/inventory/InventarioImportPage";
 import { StockInicialEditorPage } from "@/pages/inventory/StockInicialEditorPage";
 import { InventoryOfflineMonitorPage } from "@/pages/inventory/InventoryOfflineMonitorPage";
+import { EppPage } from "@/pages/epp/EppPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
 import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { MapPage } from "@/pages/map/MapPage";
+import { AmbientalPage } from "@/pages/ambiental/AmbientalPage";
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
 import { PersonalHomePage } from "@/modules/employee/pages/PersonalHomePage";
 import { PersonalReportsPage } from "@/modules/employee/pages/PersonalReportsPage";
@@ -37,6 +39,7 @@ import { AdminRoute } from "@/app/router/guards/AdminRoute";
 import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
 import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
 import { PersonalRoute } from "@/app/router/guards/PersonalRoute";
+import { EppRoute } from "@/app/router/guards/EppRoute";
 
 export function AppRouter() {
   return (
@@ -96,7 +99,10 @@ export function AppRouter() {
           </Route>
 
           <Route path="/entregas" element={<Navigate to="/inventario/entregas" replace />} />
-          <Route path="/epp" element={<NotFoundPage />} />
+          <Route element={<EppRoute />}>
+            <Route path="/epp" element={<EppPage />} />
+          </Route>
+          <Route path="/ambiental" element={<AmbientalPage />} />
           <Route path="/ajustes" element={<NotFoundPage />} />
 
           <Route element={<AdminRoute />}>

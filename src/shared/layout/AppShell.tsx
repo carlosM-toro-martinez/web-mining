@@ -23,6 +23,8 @@ import {
   IdCard,
   PencilLine,
   CalendarClock,
+  HardHat,
+  Leaf,
   Moon,
   Sun
 } from "lucide-react";
@@ -53,14 +55,20 @@ export function AppShell() {
   const isSuperintendente = user?.role === "SUPERINTENDENTE";
   const isAdministrador = user?.role === "ADMINISTRADOR";
   const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
+  const canSeeEppRoute =
+    isAdmin || isAdministrador || isSuperintendente || user?.role === "TRABAJADOR";
 
   const topNavItems = useMemo(() => {
     const items: NavItem[] = [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }];
+    if (canSeeEppRoute) {
+      items.push({ label: "EPP", icon: HardHat, to: "/epp" });
+    }
+    items.push({ label: "Ambiental", icon: Leaf, to: "/ambiental" });
     if (canManageUsers) {
       items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
     return items;
-  }, [canManageUsers, isAdmin, isAdministrador, isSuperintendente]);
+  }, [canManageUsers, canSeeEppRoute]);
 
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventoryRoute) return [];
