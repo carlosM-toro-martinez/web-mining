@@ -124,6 +124,24 @@ export const anularCompraPayloadSchema = z.object({
   motivo: z.string().trim().min(1, "El motivo es obligatorio.")
 });
 
+export const actualizarCompraItemPrecioPayloadSchema = z.object({
+  precioUnit: numberLikeSchema.positive("Precio unitario invalido.")
+});
+
+export const actualizarCompraItemPrecioResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    itemId: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+    productoId: numberLikeSchema.int().positive(),
+    precioAnterior: numberLikeSchema.nonnegative(),
+    nuevoPrecioUnit: numberLikeSchema.nonnegative(),
+    cantidadRecibida: numberLikeSchema.nonnegative(),
+    subtotalAnterior: numberLikeSchema.nonnegative(),
+    subtotalNuevo: numberLikeSchema.nonnegative(),
+    movimientosActualizados: numberLikeSchema.int().nonnegative()
+  })
+});
+
 export const anularCompraResponseSchema = z.object({
   success: z.boolean().optional().default(true),
   data: z.object({
@@ -171,6 +189,9 @@ export const recibirCompraPayloadSchema = z.object({
 });
 
 export type AnulacionCompra = z.infer<typeof anulacionCompraSchema>;
+export type ActualizarCompraItemPrecioPayload = z.infer<
+  typeof actualizarCompraItemPrecioPayloadSchema
+>;
 export type AnularCompraPayload = z.infer<typeof anularCompraPayloadSchema>;
 export type Compra = z.infer<typeof compraSchema>;
 export type CompraItem = z.infer<typeof compraItemSchema>;

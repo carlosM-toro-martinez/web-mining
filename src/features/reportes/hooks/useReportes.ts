@@ -13,6 +13,7 @@ import {
   getEntradasAlmacenReport,
   getInventarioAlmacenReport,
   getSalidasAlmacenReport,
+  getSaldosInicialesReport,
   getStockReport,
   getValesReport
 } from "@/features/reportes/api/reportesApi";
@@ -147,6 +148,17 @@ export function useCuadroSuministrosReportQuery(
   return useQuery({
     queryKey: [...queryKeys.reportes.all, "cuadro-suministros", params] as const,
     queryFn: () => getCuadroSuministrosReport(params),
+    enabled
+  });
+}
+
+export function useSaldosInicialesReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "saldos-iniciales", params] as const,
+    queryFn: () => getSaldosInicialesReport(params),
     enabled
   });
 }

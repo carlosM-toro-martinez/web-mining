@@ -20,6 +20,7 @@ import {
   useValesQuery
 } from "@/features/vales/hooks/useVales";
 import {
+  useActualizarCompraItemPrecioMutation,
   useAnularCompraMutation,
   useCreateCompraMutation,
   useComprasQuery,
@@ -33,6 +34,7 @@ import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { CreateCuentaModal } from "@/shared/ui/CreateCuentaModal";
 import { CreateProveedorModal } from "@/shared/ui/CreateProveedorModal";
 import { CreateProductoModal } from "@/shared/ui/CreateProductoModal";
+import { queryKeys } from "@/shared/lib/queryKeys";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
@@ -55,9 +57,10 @@ interface CompraDraftItem {
 }
 
 function computeCompraPrecioUnit(item: CompraDraftItem): number {
-  if (!item.usePrecioGlobal) return Number(item.precioUnit);
-  const total = Number(item.precioGlobal);
   const qty = Number(item.cantidadPedida);
+  const treatAsTotal = item.usePrecioGlobal || (Number.isFinite(qty) && qty > 0 && qty < 1);
+  if (!treatAsTotal) return Number(item.precioUnit);
+  const total = Number(item.usePrecioGlobal ? item.precioGlobal : item.precioUnit);
   if (!qty || !Number.isFinite(total) || !Number.isFinite(qty)) return 0;
   return total / qty;
 }
@@ -101,7 +104,17 @@ function getCompraTotal(compra: Compra) {
   return compra.items.reduce((total, item) => total + getCompraItemTotal(item), 0);
 }
 
-function CompraItemsTable({ compra }: { compra: Compra }) {
+function CompraItemsTable({
+  compra,
+  canEditPrecio = false,
+  onEditPrecio,
+  savingItemId
+}: {
+  compra: Compra;
+  canEditPrecio?: boolean;
+  onEditPrecio?: (compra: Compra, item: CompraItem) => void;
+  savingItemId?: string | null;
+}) {
   return (
     <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-border-soft)]">
       <table className="w-full min-w-[660px] border-collapse text-left">
@@ -122,6 +135,11 @@ function CompraItemsTable({ compra }: { compra: Compra }) {
             <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
               Total item Bs.
             </th>
+            {canEditPrecio ? (
+              <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                Accion
+              </th>
+            ) : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--color-border-soft)]">
@@ -142,6 +160,18 @@ function CompraItemsTable({ compra }: { compra: Compra }) {
               <td className="px-3 py-2 text-right text-xs font-semibold text-[var(--color-on-surface)]">
                 {formatNumber(getCompraItemTotal(item))}
               </td>
+              {canEditPrecio ? (
+                <td className="px-3 py-2 text-right text-xs">
+                  <button
+                    type="button"
+                    onClick={() => onEditPrecio?.(compra, item)}
+                    disabled={savingItemId === item.id}
+                    className="rounded-md border border-[var(--color-border)] px-2 py-1 font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingItemId === item.id ? "Guardando..." : "Editar precio"}
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -153,6 +183,7 @@ function CompraItemsTable({ compra }: { compra: Compra }) {
             <td className="px-3 py-2 text-right text-sm font-extrabold text-[var(--color-primary)]">
               Bs. {formatNumber(getCompraTotal(compra))}
             </td>
+            {canEditPrecio ? <td /> : null}
           </tr>
         </tfoot>
       </table>
@@ -174,12 +205,15 @@ export function ValesHistoricosPage() {
   const createCompraMutation = useCreateCompraMutation();
   const recibirCompraMutation = useRecibirCompraMutation();
   const anularCompraMutation = useAnularCompraMutation();
+  const actualizarCompraItemPrecioMutation = useActualizarCompraItemPrecioMutation();
   const createCierreMesMutation = useCreateCierreMesMutation();
   const inicializarPeriodoMutation = useInicializarPeriodoHistoricoMutation();
   const updateSaldoMensualByIdMutation = useUpdateSaldoMensualByIdMutation();
   const canUseFlow =
     user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE" || user?.role === "ALMACENERO";
-  const canAnularHistorico = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const canAnularHistorico =
+    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "SUPERINTENDENTE";
+  const canEditCompraItemPrecio = user?.role === "ADMIN";
   const canManagePeriods = user?.role === "ADMIN";
   const canClosePeriod = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
 
@@ -232,6 +266,7 @@ export function ValesHistoricosPage() {
   const [historicoConsulta, setHistoricoConsulta] = useState<HistoricoConsultaParams | null>(null);
   const [compraHistoricoConsulta, setCompraHistoricoConsulta] =
     useState<HistoricoConsultaParams | null>(null);
+  const [savingCompraItemPrecioId, setSavingCompraItemPrecioId] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const usuarios = usersQuery.data?.data ?? [];
@@ -554,7 +589,7 @@ export function ValesHistoricosPage() {
 
   async function handleAnularValeHistorico(id: string) {
     if (!canAnularHistorico) {
-      showError("Solo ADMIN o SUPERINTENDENTE puede anular vales históricos.");
+      showError("Solo ADMIN, ALMACENERO o SUPERINTENDENTE puede anular vales históricos.");
       return;
     }
     const motivo = window.prompt("Motivo de anulación del vale histórico:");
@@ -576,7 +611,7 @@ export function ValesHistoricosPage() {
 
   async function handleAnularCompraHistorica(id: string) {
     if (!canAnularHistorico) {
-      showError("Solo ADMIN o SUPERINTENDENTE puede anular compras históricas.");
+      showError("Solo ADMIN, ALMACENERO o SUPERINTENDENTE puede anular compras históricas.");
       return;
     }
     const motivo = window.prompt("Motivo de anulación de la compra histórica:");
@@ -593,6 +628,45 @@ export function ValesHistoricosPage() {
       showSuccess(`Compra anulada. Contra-asientos generados: ${result.data.contraAsientos}.`);
     } catch (error) {
       showError(normalizeError(error, "No se pudo anular la compra histórica."));
+    }
+  }
+
+  async function handleEditarPrecioCompraItem(compra: Compra, item: CompraItem) {
+    if (!canEditCompraItemPrecio) {
+      showError("Solo ADMIN puede editar precios de items de compras históricas.");
+      return;
+    }
+
+    const productoNombre = item.producto?.nombre ?? item.producto?.codigo ?? "Producto";
+    const rawPrecio = window.prompt(
+      `Nuevo precio unitario para ${productoNombre}:`,
+      String(item.precioUnit)
+    );
+    if (rawPrecio === null) return;
+
+    const precioUnit = Number(rawPrecio.trim().replace(",", "."));
+    if (!Number.isFinite(precioUnit) || precioUnit <= 0) {
+      showError("Ingresa un precio unitario valido mayor a cero.");
+      return;
+    }
+
+    try {
+      setSavingCompraItemPrecioId(item.id);
+      const response = await actualizarCompraItemPrecioMutation.mutateAsync({
+        compraId: compra.id,
+        itemId: item.id,
+        payload: { precioUnit }
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
+      showSuccess(
+        `Precio actualizado: Bs. ${formatNumber(response.data.precioAnterior)} -> Bs. ${formatNumber(
+          response.data.nuevoPrecioUnit
+        )}. Movimientos actualizados: ${response.data.movimientosActualizados}.`
+      );
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo actualizar el precio del item."));
+    } finally {
+      setSavingCompraItemPrecioId(null);
     }
   }
 
@@ -950,7 +1024,12 @@ export function ValesHistoricosPage() {
                     <tr key={compra.id} className="align-top transition hover:bg-[var(--color-surface-container-highest)]">
                       <td className="px-3 py-2 text-xs">
                         <span className="font-semibold">{compra.numeroFactura ?? "-"}</span>
-                        <CompraItemsTable compra={compra} />
+                        <CompraItemsTable
+                          compra={compra}
+                          canEditPrecio={canEditCompraItemPrecio}
+                          onEditPrecio={handleEditarPrecioCompraItem}
+                          savingItemId={savingCompraItemPrecioId}
+                        />
                       </td>
                       <td className="px-3 py-2 text-xs">{compra.estado}</td>
                       <td className="px-3 py-2 text-xs">{compra.proveedor?.nombre ?? "-"}</td>
@@ -1188,11 +1267,18 @@ export function ValesHistoricosPage() {
             </div>
           ) : null}
 
-          {compraDraftItems.map((item, index) => (
-            <div
-              key={item.id}
-              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_130px_auto]"
-            >
+          {compraDraftItems.map((item, index) => {
+            const cantidad = Number(item.cantidadPedida);
+            const usarImporteTotal = item.usePrecioGlobal || (cantidad > 0 && cantidad < 1);
+            const importe = Number(item.usePrecioGlobal ? item.precioGlobal : item.precioUnit);
+            const precioUnitCalculado =
+              usarImporteTotal && cantidad > 0 && importe > 0 ? importe / cantidad : null;
+
+            return (
+              <div
+                key={item.id}
+                className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_130px_auto]"
+              >
               <AutocompleteSelect
                 value={item.productoId}
                 onChange={(nextValue) => updateCompraDraftItem(item.id, { productoId: nextValue })}
@@ -1229,13 +1315,18 @@ export function ValesHistoricosPage() {
                     )
                   }
                   className={inputClassName}
-                  placeholder={item.usePrecioGlobal ? "Total factura Bs." : "Precio unit. Bs."}
+                  placeholder={
+                    usarImporteTotal ? "Total factura Bs." : "Precio unit. Bs."
+                  }
                 />
-                {item.usePrecioGlobal ? (
+                {usarImporteTotal ? (
                   <p className="pl-1 text-[11px] font-semibold text-[var(--color-primary)]">
                     ={" "}
-                    {Number(item.cantidadPedida) > 0 && Number(item.precioGlobal) > 0
-                      ? `Bs. ${(Number(item.precioGlobal) / Number(item.cantidadPedida)).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} / unidad`
+                    {precioUnitCalculado
+                      ? `Bs. ${precioUnitCalculado.toLocaleString("es-BO", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 4
+                        })} / unidad`
                       : "ingresa cantidad y total"}
                   </p>
                 ) : null}
@@ -1262,11 +1353,12 @@ export function ValesHistoricosPage() {
                 type="button"
                 onClick={() => removeCompraDraftItem(item.id)}
                 className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-              >
-                Quitar
-              </button>
-            </div>
-          ))}
+                >
+                  Quitar
+                </button>
+              </div>
+            );
+          })}
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -1896,7 +1988,12 @@ export function ValesHistoricosPage() {
                             ) : null}
                           </div>
                         </div>
-                        <CompraItemsTable compra={compra} />
+                        <CompraItemsTable
+                          compra={compra}
+                          canEditPrecio={canEditCompraItemPrecio}
+                          onEditPrecio={handleEditarPrecioCompraItem}
+                          savingItemId={savingCompraItemPrecioId}
+                        />
                       </div>
                     ))}
                     </div>

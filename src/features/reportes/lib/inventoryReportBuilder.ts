@@ -9,12 +9,14 @@ import type {
   DiarioAlmacenesReportResponse,
   EntradasAlmacenReportResponse,
   InventarioAlmacenReportResponse,
+  SaldosInicialesReportResponse,
   SalidasAlmacenReportResponse
 } from "@/features/reportes/model/reportes.schema";
 
 export type InventoryReportType =
   | "balance-mensual"
   | "inventario-general"
+  | "saldos-iniciales"
   | "detalle-materiales"
   | "diario-almacenes"
   | "inventarios-suministros"
@@ -946,6 +948,11 @@ export const INVENTORY_REPORTS: Array<{
     description: "Detalle por grupo y subgrupo con cantidad, precio unitario y total."
   },
   {
+    type: "saldos-iniciales",
+    title: "Saldos Iniciales",
+    description: "Totales iniciales por mes, grupo y producto, indicando fuente corregida o calculada."
+  },
+  {
     type: "inventarios-suministros",
     title: "Inventarios Y Suministros",
     description: "Cuadro de compras por proveedor, factura, grupo y valor sin IVA."
@@ -1441,6 +1448,93 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
       { label: "Productos con movimiento", value: productCount },
       { label: "Total general", value: roundMoney(totalGeneral) },
       { label: "Total general -13%", value: roundMoney(totalGeneralMenos13) }
+    ]
+  };
+}
+
+export function buildSaldosInicialesApiReportDefinition(
+  response: SaldosInicialesReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = [];
+  let productCount = 0;
+
+  for (const periodo of data.meses) {
+    rows.push({
+      id: `periodo-saldos-iniciales-${periodo.anio}-${periodo.mes}`,
+      type: "group",
+      values: {
+        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+        codigo: "",
+        descripcion: `Productos: ${periodo.meta.totalProductos} | Corregidos: ${periodo.meta.corregidos} | Calculados: ${periodo.meta.calculados}`,
+        unidad: "",
+        saldoInicial: "",
+        precioUnit: "",
+        totalBsInicial: Number(periodo.totalGeneral.toFixed(2)),
+        fuente: ""
+      }
+    });
+
+    for (const grupo of periodo.grupos) {
+      rows.push({
+        id: `grupo-saldos-iniciales-${periodo.anio}-${periodo.mes}-${grupo.grupoCodigo ?? grupo.grupoNombre ?? "sg"}`,
+        type: "subtotal",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          codigo: grupo.grupoCodigo ?? "",
+          descripcion: grupo.grupoNombre ?? "Sin grupo",
+          unidad: "",
+          saldoInicial: "",
+          precioUnit: "",
+          totalBsInicial: Number(grupo.totalBsInicial.toFixed(2)),
+          fuente: "subtotal grupo"
+        }
+      });
+
+      for (const producto of grupo.productos) {
+        productCount += 1;
+        rows.push({
+          id: `producto-saldos-iniciales-${periodo.anio}-${periodo.mes}-${producto.codigo ?? productCount}`,
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            codigo: producto.codigo ?? "",
+            descripcion: producto.nombre ?? "",
+            unidad: producto.unidad ?? "",
+            saldoInicial: producto.saldoInicial,
+            precioUnit: Number(producto.precioUnit.toFixed(4)),
+            totalBsInicial: Number(producto.totalBsInicial.toFixed(2)),
+            fuente: producto.fuente
+          }
+        });
+      }
+    }
+  }
+
+  const totalGeneral = data.meses.reduce((sum, periodo) => sum + periodo.totalGeneral, 0);
+  const totalCorregidos = data.meses.reduce((sum, periodo) => sum + periodo.meta.corregidos, 0);
+  const totalCalculados = data.meses.reduce((sum, periodo) => sum + periodo.meta.calculados, 0);
+
+  return {
+    type: "saldos-iniciales",
+    title: "Saldos Iniciales",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo" },
+      { key: "codigo", label: "Codigo" },
+      { key: "descripcion", label: "Descripcion" },
+      { key: "unidad", label: "Unidad", align: "center" },
+      { key: "saldoInicial", label: "Saldo Inicial", align: "right" },
+      { key: "precioUnit", label: "P. Unit.", align: "right" },
+      { key: "totalBsInicial", label: "Total Bs. Inicial", align: "right" },
+      { key: "fuente", label: "Fuente" }
+    ],
+    rows,
+    summary: [
+      { label: "Meses", value: data.meses.length },
+      { label: "Productos", value: productCount },
+      { label: "Corregidos", value: totalCorregidos },
+      { label: "Calculados", value: totalCalculados },
+      { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
     ]
   };
 }

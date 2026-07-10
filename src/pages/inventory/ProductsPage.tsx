@@ -26,7 +26,10 @@ import {
   useProductosQuery,
   useUpdateProductoMutation
 } from "@/features/productos/hooks/useProductos";
-import { useRecalcularStockMutation } from "@/features/inventario-import/hooks/useInventarioImport";
+import {
+  useAjustarSaldoMensualTotalMutation,
+  useImportarAjusteInicialSaldoMensualExcelMutation
+} from "@/features/inventario-import/hooks/useInventarioImport";
 import type { Producto } from "@/features/productos/model/producto.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -42,6 +45,7 @@ const inputClassName =
 
 function normalizeError(error: unknown, fallbackMessage: string) {
   if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
   return fallbackMessage;
 }
 
@@ -80,7 +84,8 @@ export function ProductsPage() {
 
   const createProductoMutation = useCreateProductoMutation();
   const updateProductoMutation = useUpdateProductoMutation();
-  const recalcularStockMutation = useRecalcularStockMutation();
+  const ajustarSaldoTotalMutation = useAjustarSaldoMensualTotalMutation();
+  const importarAjusteInicialExcelMutation = useImportarAjusteInicialSaldoMensualExcelMutation();
 
   const grupos = categoriasQuery.data?.data ?? [];
   const subgruposPorGrupo = useMemo(
@@ -111,10 +116,15 @@ export function ProductsPage() {
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [rowCuentaSelection, setRowCuentaSelection] = useState<Record<number, string>>({});
-  const [isRecalcularModalOpen, setIsRecalcularModalOpen] = useState(false);
-  const [recalcularProductoId, setRecalcularProductoId] = useState("");
-  const [recalcularStockInicial, setRecalcularStockInicial] = useState("");
-  const [recalcularEliminarValeIds, setRecalcularEliminarValeIds] = useState("");
+  const [isAjusteTotalModalOpen, setIsAjusteTotalModalOpen] = useState(false);
+  const now = new Date();
+  const [ajusteProductoId, setAjusteProductoId] = useState("");
+  const [ajusteAnio, setAjusteAnio] = useState(String(now.getFullYear()));
+  const [ajusteMes, setAjusteMes] = useState(String(now.getMonth() + 1));
+  const [ajusteTotalBs, setAjusteTotalBs] = useState("");
+  const [ajusteTotalBsProm, setAjusteTotalBsProm] = useState("");
+  const [isAjusteMasivoImporting, setIsAjusteMasivoImporting] = useState(false);
+  const [ajusteMasivoStatus, setAjusteMasivoStatus] = useState("");
 
   const availableSubgrupos = grupoId ? (subgruposPorGrupo.get(Number(grupoId)) ?? []) : [];
   const filterSubgrupos = grupoDraft ? (subgruposPorGrupo.get(Number(grupoDraft)) ?? []) : [];
@@ -504,47 +514,111 @@ export function ProductsPage() {
     );
   }
 
-  function openRecalcularModal() {
-    setIsRecalcularModalOpen(true);
-    setRecalcularProductoId("");
-    setRecalcularStockInicial("");
-    setRecalcularEliminarValeIds("");
+  function openAjusteTotalModal() {
+    setIsAjusteTotalModalOpen(true);
+    setAjusteProductoId("");
+    setAjusteAnio(String(now.getFullYear()));
+    setAjusteMes(String(now.getMonth() + 1));
+    setAjusteTotalBs("");
+    setAjusteTotalBsProm("");
+    setAjusteMasivoStatus("");
   }
 
-  function handleRecalcularStock(event: FormEvent<HTMLFormElement>) {
+  function handleAjustarTotalHistorico(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (user?.role !== "ADMIN") {
       showError("Solo ADMIN puede usar esta correccion.");
       return;
     }
-    const productoId = Number(recalcularProductoId);
-    const stockInicial = Number(recalcularStockInicial);
-    if (!productoId || Number.isNaN(stockInicial) || stockInicial < 0) {
-      showError("Selecciona producto y stock inicial valido.");
+    const productoId = Number(ajusteProductoId);
+    const anio = Number(ajusteAnio);
+    const mes = Number(ajusteMes);
+    const totalBs = Number(ajusteTotalBs);
+    const totalBsProm = ajusteTotalBsProm.trim() ? Number(ajusteTotalBsProm) : undefined;
+    const selectedProduct = products.find((producto) => producto.id === productoId);
+
+    if (!productoId || !selectedProduct) {
+      showError("Selecciona un producto valido.");
       return;
     }
-    const eliminarValeIds = recalcularEliminarValeIds
-      .split(/[\s,;\n]+/)
-      .map((value) => value.trim())
-      .filter(Boolean);
+    if (!Number.isInteger(anio) || anio < 2000 || anio > 2100 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+      showError("Indica un año y mes validos.");
+      return;
+    }
+    if (!Number.isFinite(totalBs) || totalBs < 0) {
+      showError("Indica un total Bs. valido.");
+      return;
+    }
+    if (totalBsProm !== undefined && (!Number.isFinite(totalBsProm) || totalBsProm < 0)) {
+      showError("Indica un total promedio Bs. valido.");
+      return;
+    }
 
-    recalcularStockMutation.mutate(
+    ajustarSaldoTotalMutation.mutate(
       {
         productoId,
-        stockInicial,
-        eliminarValeIds: eliminarValeIds.length ? eliminarValeIds : undefined
+        productoCodigo: selectedProduct.codigo,
+        anio,
+        mes,
+        ajuste: {
+          totalBs,
+          totalBsProm
+        }
       },
       {
         onSuccess: (response) => {
           showSuccess(
-            `Recalculo aplicado. Stock final: ${response.data.stockFinal}. Movimientos recalculados: ${response.data.movimientosRecalculados}.`
+            `Total histórico ajustado. Antes: Bs. ${response.data.totalBsAnterior}. Nuevo: Bs. ${response.data.totalBsNuevo}.`
           );
-          setIsRecalcularModalOpen(false);
+          setIsAjusteTotalModalOpen(false);
         },
         onError: (error) =>
-          showError(normalizeError(error, "No se pudo recalcular el stock del producto."))
+          showError(normalizeError(error, "No se pudo ajustar el total histórico del producto."))
       }
     );
+  }
+
+  async function handleImportAjustesTotales(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (user?.role !== "ADMIN") {
+      showError("Solo ADMIN puede usar esta correccion.");
+      return;
+    }
+
+    const anio = Number(ajusteAnio);
+    const mes = Number(ajusteMes);
+    if (!Number.isInteger(anio) || anio < 2000 || anio > 2100 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+      showError("Indica un año y mes validos antes de importar.");
+      return;
+    }
+
+    try {
+      setIsAjusteMasivoImporting(true);
+      setAjusteMasivoStatus("Subiendo archivo...");
+      const response = await importarAjusteInicialExcelMutation.mutateAsync({ file, anio, mes });
+      const errors = response.data.resultados
+        .filter((resultado) => !resultado.ok)
+        .map(
+          (resultado) =>
+            `Fila ${resultado.fila}: ${resultado.codigo} - ${
+              resultado.error ?? "No se pudo aplicar el ajuste."
+            }`
+        );
+      setAjusteMasivoStatus("");
+      showSuccess(
+        `Importacion finalizada. Procesados: ${response.data.procesados}, exitosos: ${response.data.exitosos}, fallidos: ${response.data.fallidos}.`
+      );
+      if (errors.length) {
+        showError(errors.slice(0, 4).join(" | "));
+      }
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo procesar el archivo de ajustes."));
+    } finally {
+      setIsAjusteMasivoImporting(false);
+    }
   }
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
@@ -570,7 +644,7 @@ export function ProductsPage() {
             {user?.role === "ADMIN" ? (
               <button
                 type="button"
-                onClick={openRecalcularModal}
+                onClick={openAjusteTotalModal}
                 className="flex items-center gap-2 rounded-lg border border-[var(--color-error)]/55 px-4 py-2.5 text-sm font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
               >
                 Correccion historica
@@ -1178,22 +1252,52 @@ export function ProductsPage() {
         </div>
       ) : null}
 
-      {isRecalcularModalOpen && user?.role === "ADMIN" ? (
+      {isAjusteTotalModalOpen && user?.role === "ADMIN" ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-2xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-            <h3 className="text-lg font-bold">Recalcular stock historico</h3>
+            <h3 className="text-lg font-bold">Corregir total mensual historico</h3>
             <p className="mt-1 text-xs text-[var(--color-error)]">
-              Esta accion modifica el historial de movimientos. Usar solo para correcciones.
+              Esta accion ajusta el total Bs. del saldo mensual, incluso en periodos cerrados.
             </p>
-            <form className="mt-4 space-y-3" onSubmit={handleRecalcularStock}>
+            <form className="mt-4 space-y-3" onSubmit={handleAjustarTotalHistorico}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Año
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    value={ajusteAnio}
+                    onChange={(event) => setAjusteAnio(event.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Mes
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={ajusteMes}
+                    onChange={(event) => setAjusteMes(event.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                   Producto
                 </label>
                 <select
                   required
-                  value={recalcularProductoId}
-                  onChange={(event) => setRecalcularProductoId(event.target.value)}
+                  value={ajusteProductoId}
+                  onChange={(event) => setAjusteProductoId(event.target.value)}
                   className={inputClassName}
                 >
                   <option value="">Selecciona producto</option>
@@ -1204,45 +1308,84 @@ export function ProductsPage() {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Total Bs.
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ajusteTotalBs}
+                    onChange={(event) => setAjusteTotalBs(event.target.value)}
+                    className={inputClassName}
+                    placeholder="304413.49"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Total Bs. promedio
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ajusteTotalBsProm}
+                    onChange={(event) => setAjusteTotalBsProm(event.target.value)}
+                    className={inputClassName}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
                 <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                  Stock inicial corregido
+                  Ajuste masivo por Excel/CSV
                 </label>
                 <input
-                  required
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={recalcularStockInicial}
-                  onChange={(event) => setRecalcularStockInicial(event.target.value)}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleImportAjustesTotales}
+                  disabled={
+                    isAjusteMasivoImporting ||
+                    ajustarSaldoTotalMutation.isPending ||
+                    importarAjusteInicialExcelMutation.isPending
+                  }
                   className={inputClassName}
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                  IDs de vales a eliminar (opcional)
-                </label>
-                <textarea
-                  value={recalcularEliminarValeIds}
-                  onChange={(event) => setRecalcularEliminarValeIds(event.target.value)}
-                  className={`${inputClassName} min-h-24`}
-                  placeholder="uuid-1, uuid-2"
-                />
+                <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
+                  Columnas requeridas: codigo, totalBsInicial. Se aplicará al año y mes
+                  seleccionados arriba.
+                </p>
+                {ajusteMasivoStatus ? (
+                  <p className="mt-2 text-xs font-semibold text-[var(--color-primary)]">
+                    {ajusteMasivoStatus}
+                  </p>
+                ) : null}
               </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsRecalcularModalOpen(false)}
+                  onClick={() => setIsAjusteTotalModalOpen(false)}
                   className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={recalcularStockMutation.isPending}
+                  disabled={
+                    ajustarSaldoTotalMutation.isPending ||
+                    isAjusteMasivoImporting ||
+                    importarAjusteInicialExcelMutation.isPending
+                  }
                   className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  {recalcularStockMutation.isPending ? "Aplicando..." : "Aplicar correccion"}
+                  {ajustarSaldoTotalMutation.isPending ||
+                  isAjusteMasivoImporting ||
+                  importarAjusteInicialExcelMutation.isPending
+                    ? "Aplicando..."
+                    : "Aplicar correccion"}
                 </button>
               </div>
             </form>

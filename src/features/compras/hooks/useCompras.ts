@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  actualizarCompraItemPrecio,
   anularCompra,
   createCompra,
   getAnulacionesHistorial,
@@ -16,6 +17,7 @@ import {
   rollbackOptimisticStockAdjustments
 } from "@/features/inventory-offline/lib/stockOptimistic";
 import type {
+  ActualizarCompraItemPrecioPayload,
   AnularCompraPayload,
   Compra,
   ComprasQueryParams,
@@ -62,6 +64,28 @@ export function useAnularCompraMutation() {
         success: true,
         data: response.data.compra
       });
+    }
+  });
+}
+
+export function useActualizarCompraItemPrecioMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      compraId,
+      itemId,
+      payload
+    }: {
+      compraId: string;
+      itemId: string;
+      payload: ActualizarCompraItemPrecioPayload;
+    }) => actualizarCompraItemPrecio(compraId, itemId, payload),
+    onSuccess: async (_response, variables) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.movimientos.all });
+      await queryClient.invalidateQueries({ queryKey: ["inventario-import", "saldo-mensual"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.compras.detail(variables.compraId) });
     }
   });
 }

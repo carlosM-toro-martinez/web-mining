@@ -1,6 +1,8 @@
-import { getRequest, postRequest } from "@/shared/api/core/request";
+import { getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
+  actualizarCompraItemPrecioPayloadSchema,
+  actualizarCompraItemPrecioResponseSchema,
   anulacionesHistorialResponseSchema,
   anularCompraPayloadSchema,
   anularCompraResponseSchema,
@@ -10,6 +12,7 @@ import {
   createCompraPayloadSchema,
   recibirCompraPayloadSchema,
   recibirCompraResponseSchema,
+  type ActualizarCompraItemPrecioPayload,
   type AnularCompraPayload,
   type ComprasQueryParams,
   type CreateCompraPayload,
@@ -62,6 +65,19 @@ export async function anularCompra(id: string, payload: AnularCompraPayload) {
     url: apiEndpoints.compras.anular(id),
     body,
     schema: anularCompraResponseSchema
+  });
+}
+
+export async function actualizarCompraItemPrecio(
+  compraId: string,
+  itemId: string,
+  payload: ActualizarCompraItemPrecioPayload
+) {
+  const body = actualizarCompraItemPrecioPayloadSchema.parse(payload);
+  return patchRequest({
+    url: apiEndpoints.compras.itemPrecio(compraId, itemId),
+    body,
+    schema: actualizarCompraItemPrecioResponseSchema
   });
 }
 

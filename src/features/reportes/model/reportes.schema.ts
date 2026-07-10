@@ -559,6 +559,47 @@ export const cuadroSuministrosReportResponseSchema = z.object({
   })
 });
 
+const saldosInicialesProductoSchema = z.object({
+  codigo: z.string().optional().nullable(),
+  nombre: z.string().optional().nullable(),
+  unidad: z.string().optional().nullable(),
+  saldoInicial: numberLikeSchema,
+  precioUnit: numberLikeSchema,
+  totalBsInicial: numberLikeSchema,
+  fuente: z.enum(["corregido", "calculado"]).or(z.string().min(1))
+});
+
+const saldosInicialesGrupoSchema = z.object({
+  grupoCodigo: z.string().optional().nullable(),
+  grupoNombre: z.string().optional().nullable(),
+  totalBsInicial: numberLikeSchema,
+  productos: z.array(saldosInicialesProductoSchema).default([])
+});
+
+export const saldosInicialesReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int(),
+    mesInicio: numberLikeSchema.int(),
+    anioFin: numberLikeSchema.int(),
+    mesFin: numberLikeSchema.int(),
+    meses: z.array(
+      z.object({
+        anio: numberLikeSchema.int(),
+        mes: numberLikeSchema.int().min(1).max(12),
+        esCerrado: z.boolean().default(false),
+        meta: z.object({
+          totalProductos: numberLikeSchema.int().nonnegative(),
+          corregidos: numberLikeSchema.int().nonnegative(),
+          calculados: numberLikeSchema.int().nonnegative()
+        }),
+        grupos: z.array(saldosInicialesGrupoSchema).default([]),
+        totalGeneral: numberLikeSchema
+      })
+    )
+  })
+});
+
 const reporteUsuarioSchema = z
   .object({
     id: idLikeSchema,
@@ -753,5 +794,6 @@ export type SalidasAlmacenReportResponse = z.infer<typeof salidasAlmacenReportRe
 export type DetalleMaterialesReportResponse = z.infer<typeof detalleMaterialesReportResponseSchema>;
 export type DiarioAlmacenesReportResponse = z.infer<typeof diarioAlmacenesReportResponseSchema>;
 export type CuadroSuministrosReportResponse = z.infer<typeof cuadroSuministrosReportResponseSchema>;
+export type SaldosInicialesReportResponse = z.infer<typeof saldosInicialesReportResponseSchema>;
 export type AnulacionesEntradasReportResponse = z.infer<typeof anulacionesEntradasReportResponseSchema>;
 export type AnulacionesSalidasReportResponse = z.infer<typeof anulacionesSalidasReportResponseSchema>;

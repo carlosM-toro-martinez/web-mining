@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  ajustarSaldoMensualTotal,
   deleteSaldoMensualById,
   createCierreMes,
   getCierresMes,
@@ -8,6 +9,7 @@ import {
   getSaldoMensualPreview,
   inicializarPeriodoHistorico,
   importCatalogo,
+  importarAjusteInicialSaldoMensualExcel,
   recalcularStock,
   reiniciarStock,
   importSaldoMensual,
@@ -19,6 +21,7 @@ import {
 import type {
   RecalcularStockPayload,
   ReiniciarStockPayload,
+  SaldoMensualAjusteTotalPayload,
   SaldoMensualItemPatchPayload,
   SaldoMensualItemUpsertPayload,
   SaldoMensualPayload,
@@ -98,6 +101,24 @@ export function useUpdateSaldoMensualByIdMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string | number; payload: SaldoMensualItemPatchPayload }) =>
       updateSaldoMensualById(id, payload)
+  });
+}
+
+export function useAjustarSaldoMensualTotalMutation() {
+  return useMutation({
+    mutationFn: (payload: {
+      productoId?: number;
+      productoCodigo?: string;
+      anio: number;
+      mes: number;
+      ajuste: SaldoMensualAjusteTotalPayload;
+    }) => ajustarSaldoMensualTotal(payload)
+  });
+}
+
+export function useImportarAjusteInicialSaldoMensualExcelMutation() {
+  return useMutation({
+    mutationFn: importarAjusteInicialSaldoMensualExcel
   });
 }
 

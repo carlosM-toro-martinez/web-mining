@@ -10,6 +10,9 @@ import {
   recalcularStockPayloadSchema,
   recalcularStockResponseSchema,
   reiniciarStockPayloadSchema,
+  saldoMensualAjusteTotalPayloadSchema,
+  saldoMensualAjusteInicialExcelResponseSchema,
+  saldoMensualAjusteTotalResponseSchema,
   saldoMensualDeleteResponseSchema,
   saldoMensualItemPatchPayloadSchema,
   saldoMensualItemUpsertPayloadSchema,
@@ -24,6 +27,7 @@ import {
   type RecalcularStockPayload,
   type SaldoMensualItemPatchPayload,
   type SaldoMensualItemUpsertPayload,
+  type SaldoMensualAjusteTotalPayload,
   type SaldoMensualPayload,
   type SaldoMensualQuery,
   type SincronizarStockPayload,
@@ -135,6 +139,51 @@ export async function updateSaldoMensualById(id: string | number, payload: Saldo
     body: saldoMensualItemPatchPayloadSchema.parse(payload),
     schema: saldoMensualSingleResponseSchema
   });
+}
+
+export async function ajustarSaldoMensualTotal(payload: {
+  productoId?: number;
+  productoCodigo?: string;
+  anio: number;
+  mes: number;
+  ajuste: SaldoMensualAjusteTotalPayload;
+}) {
+  const saldos = await getSaldoMensual({ anio: payload.anio, mes: payload.mes });
+  const productoCodigo = payload.productoCodigo?.trim().toLowerCase();
+  const saldo = saldos.data.find(
+    (item) =>
+      (payload.productoId && item.productoId === payload.productoId) ||
+      (productoCodigo && item.productoCodigo.toLowerCase() === productoCodigo)
+  );
+
+  if (!saldo) {
+    throw new Error("No se encontró saldo mensual para el producto y período seleccionados.");
+  }
+
+  return patchRequest({
+    url: apiEndpoints.inventarioImport.saldoMensualAjusteTotal(saldo.id),
+    body: saldoMensualAjusteTotalPayloadSchema.parse(payload.ajuste),
+    schema: saldoMensualAjusteTotalResponseSchema
+  });
+}
+
+export async function importarAjusteInicialSaldoMensualExcel(payload: {
+  file: File;
+  anio: number;
+  mes: number;
+}) {
+  const parsed = saldoMensualQuerySchema.parse({ anio: payload.anio, mes: payload.mes });
+  const formData = new FormData();
+  formData.append("file", payload.file);
+  const response = await httpClient.post(
+    apiEndpoints.inventarioImport.saldoMensualAjusteInicialExcel,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      params: parsed
+    }
+  );
+  return saldoMensualAjusteInicialExcelResponseSchema.parse(response.data);
 }
 
 export async function deleteSaldoMensualById(id: string | number) {

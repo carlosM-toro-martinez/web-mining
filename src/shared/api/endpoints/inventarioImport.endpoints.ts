@@ -9,5 +9,8 @@ export const inventarioImportEndpoints = {
   saldoMensualInicializar: "/api/inventario-import/saldo-mensual/inicializar",
   saldoMensualPreview: "/api/inventario-import/saldo-mensual/preview",
   saldoMensualItem: "/api/inventario-import/saldo-mensual/item",
-  saldoMensualById: (id: string | number) => `/api/inventario-import/saldo-mensual/${id}`
+  saldoMensualById: (id: string | number) => `/api/inventario-import/saldo-mensual/${id}`,
+  saldoMensualAjusteTotal: (id: string | number) =>
+    `/api/inventario-import/saldo-mensual/${id}/ajuste-total`,
+  saldoMensualAjusteInicialExcel: "/api/inventario-import/saldo-mensual/ajuste-inicial/excel"
 } as const;

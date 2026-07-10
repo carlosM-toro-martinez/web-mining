@@ -20,6 +20,7 @@ import {
   valesReportQueryParamsSchema,
   valesReportResponseSchema,
   reportesQueryParamsSchema,
+  saldosInicialesReportResponseSchema,
   salidasAlmacenReportResponseSchema,
   type ReportesQueryParams,
   type ComprasReportQueryParams,
@@ -155,6 +156,14 @@ export async function getCuadroSuministrosReport(params: MonthlyRangeReportQuery
     url: apiEndpoints.reportes.cuadroSuministros,
     config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
     schema: cuadroSuministrosReportResponseSchema
+  });
+}
+
+export async function getSaldosInicialesReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.saldosIniciales,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: saldosInicialesReportResponseSchema
   });
 }
 

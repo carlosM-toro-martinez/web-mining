@@ -21,6 +21,7 @@ import {
   useComprasReportQuery,
   useEntradasAlmacenReportQuery,
   useInventarioAlmacenReportQuery,
+  useSaldosInicialesReportQuery,
   useSalidasAlmacenReportQuery,
   useStockReportQuery,
   useValesReportQuery
@@ -36,6 +37,7 @@ import {
   buildDiarioAlmacenesApiReportDefinition,
   buildEntradasAlmacenApiReportDefinition,
   buildInventarioAlmacenApiReportDefinition,
+  buildSaldosInicialesApiReportDefinition,
   buildSalidasAlmacenApiReportDefinition,
   INVENTORY_REPORTS,
   isInventoryReportType
@@ -102,6 +104,7 @@ const REPORT_GROUPS = [
       [
         "balance-mensual",
         "inventario-general",
+        "saldos-iniciales",
         "inventarios-suministros",
         "entradas-almacen",
         "salidas-almacen"
@@ -319,6 +322,10 @@ export function ReportesPage() {
     monthRangeParams,
     isAdminType && tipo === "inventario-general"
   );
+  const saldosInicialesQuery = useSaldosInicialesReportQuery(
+    monthRangeParams,
+    isAdminType && tipo === "saldos-iniciales"
+  );
   const entradasAlmacenQuery = useEntradasAlmacenReportQuery(
     monthRangeParams,
     isAdminType && tipo === "entradas-almacen"
@@ -420,6 +427,9 @@ export function ReportesPage() {
     if (tipo === "inventario-general" && inventarioAlmacenQuery.data) {
       return buildInventarioAlmacenApiReportDefinition(inventarioAlmacenQuery.data);
     }
+    if (tipo === "saldos-iniciales" && saldosInicialesQuery.data) {
+      return buildSaldosInicialesApiReportDefinition(saldosInicialesQuery.data);
+    }
     if (tipo === "entradas-almacen" && entradasAlmacenQuery.data) {
       return buildEntradasAlmacenApiReportDefinition(entradasAlmacenQuery.data);
     }
@@ -452,6 +462,7 @@ export function ReportesPage() {
     entradasAlmacenQuery.data,
     inventarioAlmacenQuery.data,
     isAdminType,
+    saldosInicialesQuery.data,
     salidasAlmacenQuery.data,
     tipo
   ]);
@@ -547,36 +558,39 @@ export function ReportesPage() {
       ? balanceMensualQuery
       : tipo === "inventario-general"
         ? inventarioAlmacenQuery
-        : tipo === "entradas-almacen"
-          ? entradasAlmacenQuery
-          : tipo === "salidas-almacen"
-            ? salidasAlmacenQuery
-            : tipo === "detalle-materiales"
-              ? detalleMaterialesQuery
-              : tipo === "costo-produccion"
+        : tipo === "saldos-iniciales"
+          ? saldosInicialesQuery
+          : tipo === "entradas-almacen"
+            ? entradasAlmacenQuery
+            : tipo === "salidas-almacen"
+              ? salidasAlmacenQuery
+              : tipo === "detalle-materiales"
                 ? detalleMaterialesQuery
-                : tipo === "diario-almacenes"
-                  ? diarioAlmacenesQuery
-                  : tipo === "movimiento-almacen"
+                : tipo === "costo-produccion"
+                  ? detalleMaterialesQuery
+                  : tipo === "diario-almacenes"
                     ? diarioAlmacenesQuery
-                    : tipo === "inventarios-suministros"
-                      ? cuadroSuministrosQuery
-                      : tipo === "anulaciones-entradas"
-                        ? anulacionesEntradasQuery
-                        : tipo === "anulaciones-salidas"
-                          ? anulacionesSalidasQuery
-                          : tipo === "stock-actual"
-                            ? stockQuery
-                            : tipo === "vales-resumen"
-                              ? valesResumenQuery
-                              : tipo === "compras-resumen"
-                                ? comprasResumenQuery
-                                : comprasResumenQuery;
+                    : tipo === "movimiento-almacen"
+                      ? diarioAlmacenesQuery
+                      : tipo === "inventarios-suministros"
+                        ? cuadroSuministrosQuery
+                        : tipo === "anulaciones-entradas"
+                          ? anulacionesEntradasQuery
+                          : tipo === "anulaciones-salidas"
+                            ? anulacionesSalidasQuery
+                            : tipo === "stock-actual"
+                              ? stockQuery
+                              : tipo === "vales-resumen"
+                                ? valesResumenQuery
+                                : tipo === "compras-resumen"
+                                  ? comprasResumenQuery
+                                  : comprasResumenQuery;
   const rawCurrentMeta =
     isLegacyType ||
     (isAdminType &&
       tipo !== "balance-mensual" &&
       tipo !== "inventario-general" &&
+      tipo !== "saldos-iniciales" &&
       tipo !== "entradas-almacen" &&
       tipo !== "salidas-almacen" &&
       tipo !== "detalle-materiales" &&
