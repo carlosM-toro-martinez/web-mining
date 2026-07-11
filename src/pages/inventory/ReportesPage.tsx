@@ -51,11 +51,33 @@ import {
   exportStockReportExcel,
   exportValesReportExcel
 } from "@/features/reportes/lib/reportesExport";
+import type {
+  CuadroSuministrosReportResponse,
+  DiarioAlmacenesReportResponse
+} from "@/features/reportes/model/reportes.schema";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+
+function cuadroGrupoKey(
+  grupo?: { codigo?: string | null; nombre?: string | null } | null
+) {
+  const codigo = (grupo?.codigo ?? "").trim();
+  const nombre = (grupo?.nombre ?? "").trim();
+  if (!codigo && !nombre) return "";
+  return `${codigo}|||${nombre}`;
+}
+
+function cuadroGrupoLabel(
+  grupo?: { codigo?: string | null; nombre?: string | null } | null
+) {
+  const codigo = (grupo?.codigo ?? "").trim();
+  const nombre = (grupo?.nombre ?? "").trim();
+  if (codigo && nombre) return `${codigo} - ${nombre}`;
+  return codigo || nombre || "Sin grupo";
+}
 
 type DateMode = "none" | "specific" | "range";
 type DataMode = "paged" | "all";
@@ -93,6 +115,326 @@ const API_REPORTS: Array<{ type: ApiReportType; title: string; description: stri
   }
 ];
 
+function formatBs(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  return value.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function movimientoMonthLabel(anio: number, mes: number) {
+  const date = new Date(anio, mes - 1, 1);
+  return date.toLocaleDateString("es-BO", { month: "long" }).toUpperCase();
+}
+
+function previousMonthEnd(anio: number, mes: number) {
+  const date = new Date(anio, mes - 1, 0);
+  const month = date.toLocaleDateString("es-BO", { month: "long" });
+  return `${date.getDate()} de ${month} de ${date.getFullYear()}`;
+}
+
+function reportCuentaTitulo(
+  cuenta: DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number]
+) {
+  const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
+  const sector = cuenta.sectorNombre ? `"${cuenta.sectorNombre.toUpperCase()}"` : "";
+  if (code.includes("100001000")) return "COSTO DE PRODUCCION - LIPEÑA";
+  if (code.includes("104001000")) return "COSTO MEDIO AMBIENTE";
+  if (code.includes("44002000") || code.includes("044002000")) return "OBRAS EN CONSTRUCCION LIPEÑA";
+  if (code.includes("67001097") || code.includes("67001098") || cuenta.esTransporte) {
+    return `COSTO COMB.TRANSPORTE${sector}`;
+  }
+  return `${(cuenta.centroCostoNombre ?? "").toUpperCase()} LIPEÑA`.trim();
+}
+
+function reportCuentaDisplay(value?: string | null) {
+  return (value ?? "").replace(/\s+/g, ",");
+}
+
+function reportLineaCuenta(linea: { subCentro?: string | null; subCuentas?: string[] }) {
+  return [linea.subCuentas?.join("-"), linea.subCentro].filter(Boolean).join("-");
+}
+
+type ReportDiarioCuenta = DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number];
+
+function reportSubCuentaDescripcion(subCuenta?: string) {
+  if (subCuenta === "1804") return "COSTO MINA";
+  if (subCuenta === "2801") return "MANTENIMIENTO";
+  if (subCuenta === "3401") return "ADMINISTRACION";
+  if (subCuenta === "3601") return "OBRAS EN CONSTRUCCION";
+  if (subCuenta === "4401") return "MAQUINARIA Y EQUIPO";
+  return "COSTO MINA";
+}
+
+function reportCuentaMayorKey(cuenta: ReportDiarioCuenta) {
+  const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
+  if (code.includes("100001000")) return "100001000";
+  if (code.includes("104001000")) return "104001000";
+  if (code.includes("44002000") || code.includes("044002000")) return "44002000";
+  if (code.includes("67001097")) return "67001097";
+  if (code.includes("67001098")) return "67001098";
+  return code || cuenta.codigoCompleto || cuenta.centroCostoNombre || "SIN-CUENTA";
+}
+
+function reportCuentaMayorCodigo(key: string) {
+  if (key === "100001000") return "100,001,000";
+  if (key === "104001000") return "104,001,000";
+  if (key === "44002000") return "44,002,000";
+  if (key === "67001097") return "67,001,097";
+  if (key === "67001098") return "67,001,098";
+  return key;
+}
+
+function normalizeReportCuentas(cuentas: ReportDiarioCuenta[]): ReportDiarioCuenta[] {
+  const grouped = new Map<string, ReportDiarioCuenta>();
+  for (const cuenta of cuentas) {
+    const key = reportCuentaMayorKey(cuenta);
+    const current = grouped.get(key);
+    const parts = (cuenta.codigoCompleto ?? "").match(/\d+/g) ?? [];
+    const fallbackLinea =
+      cuenta.lineas.length === 0 && key === "100001000" && parts.length >= 3
+        ? [
+            {
+              subCentro: parts[1] ?? "",
+              nombre: reportSubCuentaDescripcion(parts[0]),
+              importeBs: cuenta.totalBs,
+              subCuentas: parts[0] ? [parts[0]] : []
+            }
+          ]
+        : [];
+    const lineas = cuenta.lineas.length ? cuenta.lineas : fallbackLinea;
+
+    if (!current) {
+      grouped.set(key, {
+        ...cuenta,
+        codigoCompleto: reportCuentaMayorCodigo(key),
+        esTransporte: key === "67001097" || key === "67001098",
+        totalBs: cuenta.totalBs,
+        lineas: [...lineas]
+      });
+      continue;
+    }
+    current.totalBs += cuenta.totalBs;
+    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
+    current.lineas.push(...lineas);
+  }
+  return [...grouped.values()];
+}
+
+function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportResponse }) {
+  const periodo = response.data.meses[0];
+  if (!periodo) return null;
+  const month = movimientoMonthLabel(periodo.anio, periodo.mes);
+  const rows: Array<{
+    key: string;
+    descripcion: string;
+    parcial?: number | "";
+    cuenta?: string;
+    debe?: number | "";
+    haber?: number | "";
+    strong?: boolean;
+  }> = [
+    { key: "conta", descripcion: "CONTABILIZACION DIARIO ALMACENES MES:", strong: true },
+    { key: "mes", descripcion: `${month}-${periodo.anio}`, strong: true }
+  ];
+
+  normalizeReportCuentas(periodo.cuentasHaber).forEach((cuenta, cuentaIndex) => {
+    rows.push({
+      key: `cuenta-${cuentaIndex}`,
+      descripcion: reportCuentaTitulo(cuenta),
+      cuenta: reportCuentaDisplay(cuenta.codigoCompleto),
+      debe: cuenta.totalBs,
+      strong: true
+    });
+    rows.push({
+      key: `atencion-${cuentaIndex}`,
+      descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
+      parcial: cuenta.esTransporte ? cuenta.totalBs : "",
+      debe: cuenta.esTransporte ? cuenta.totalBs : ""
+    });
+    cuenta.lineas.forEach((linea, index) => {
+      rows.push({
+        key: `linea-${cuentaIndex}-${index}`,
+        descripcion: linea.nombre ?? "",
+        parcial: linea.importeBs,
+        cuenta: reportLineaCuenta(linea)
+      });
+    });
+  });
+
+  rows.push({
+    key: "inventario-haber",
+    descripcion: "INVENTARIO MATERIALES Y SUMINISTROS",
+    cuenta: "26.002.000",
+    haber: periodo.totalSalidasHaber,
+    strong: true
+  });
+  rows.push({ key: "segun-vales", descripcion: "Según Vales Salida Materiales" });
+  rows.push({
+    key: "total",
+    descripcion: "",
+    debe: periodo.totalSalidasHaber,
+    haber: periodo.totalSalidasHaber
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[760px] bg-white p-4 font-[Arial] text-black">
+        <div className="text-center text-[13px] font-bold underline">COMPROBANTE&nbsp;&nbsp; DE&nbsp;&nbsp; DIARIO</div>
+        <div className="text-center text-[16px] font-bold">DIARIO&nbsp;&nbsp; ALMACENES</div>
+        <div className="grid grid-cols-2 text-[12px]">
+          <span>
+            SECTOR: <strong className="italic">LIPEÑA</strong>
+          </span>
+          <span className="font-bold">MES:&nbsp; DE {month}&nbsp; {periodo.anio}</span>
+        </div>
+        <table className="mt-2 w-full border-collapse text-[10px]">
+          <thead>
+            <tr>
+              <th className="border border-black px-1 py-1 text-left">D E S C R I P C I O N</th>
+              <th className="border border-black px-1 py-1 text-right">PARCIALES<br />Bs.</th>
+              <th className="border border-black px-1 py-1 text-center">No&nbsp;&nbsp; DE&nbsp;&nbsp; CUENTA</th>
+              <th className="border border-black px-1 py-1 text-right">BOLIVIANOS<br />D E B E</th>
+              <th className="border border-black px-1 py-1 text-right">H A B E R</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className={`border border-black px-1 py-0.5 ${row.strong ? "font-bold underline" : ""}`}>
+                  {row.descripcion}
+                </td>
+                <td className="border border-black px-1 py-0.5 text-right">{formatBs(row.parcial || undefined)}</td>
+                <td className={`border border-black px-1 py-0.5 text-center ${row.strong ? "font-bold" : ""}`}>
+                  {row.cuenta ?? ""}
+                </td>
+                <td className="border border-black px-1 py-0.5 text-right">{formatBs(row.debe || undefined)}</td>
+                <td className="border border-black px-1 py-0.5 text-right">{formatBs(row.haber || undefined)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesReportResponse }) {
+  const periodo = response.data.meses[0];
+  if (!periodo) return null;
+  const month = movimientoMonthLabel(periodo.anio, periodo.mes);
+  const monthLower = month.toLowerCase();
+  const saldoFinal = periodo.totalInventarioDebe - periodo.totalSalidasHaber;
+  const rows: Array<{
+    key: string;
+    cargo?: string | null;
+    descripcion: string;
+    bs?: number | "";
+    debe?: number | "";
+    haber?: number | "";
+    strong?: boolean;
+  }> = [
+    {
+      key: "inventario",
+      cargo: "26 002 000",
+      descripcion: "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
+      debe: periodo.totalInventarioDebe,
+      strong: true
+    },
+    {
+      key: "saldo",
+      descripcion: `Saldo inventario al ${previousMonthEnd(periodo.anio, periodo.mes)}`,
+      bs: periodo.saldoInventarioAnterior
+    },
+    {
+      key: "compras",
+      descripcion: `Cuadro Mat.y Sumin. Lipeña mes ${monthLower} de ${periodo.anio}`,
+      bs: periodo.comprasSinIva ?? periodo.comprasImporteBs
+    }
+  ];
+
+  normalizeReportCuentas(periodo.cuentasHaber).forEach((cuenta, cuentaIndex) => {
+    rows.push({
+      key: `cuenta-${cuentaIndex}`,
+      cargo: cuenta.codigoCompleto,
+      descripcion: reportCuentaTitulo(cuenta),
+      bs: cuenta.esTransporte || cuenta.lineas.length ? "" : cuenta.totalBs,
+      haber: cuenta.totalBs,
+      strong: true
+    });
+    rows.push({
+      key: `atencion-${cuentaIndex}`,
+      descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
+      bs: cuenta.esTransporte ? cuenta.totalBs : ""
+    });
+    if (cuenta.lineas.length) {
+      cuenta.lineas.forEach((linea, index) => {
+        rows.push({
+          key: `linea-${cuentaIndex}-${index}`,
+          descripcion: `${linea.subCentro} - ${linea.nombre}`.trim(),
+          bs: linea.importeBs
+        });
+      });
+    }
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[760px] bg-white p-4 font-[Arial] text-black">
+        <div className="text-[11px] font-bold">Empresa Minera</div>
+        <div className="text-[11px] font-bold underline">MARTE S.R.L.</div>
+        <div className="text-[11px]">LIPEÑA</div>
+        <div className="mt-4 text-center text-[12px] underline">ALMACEN GENERAL LIPEÑA</div>
+        <div className="text-center text-[12px] underline">
+          MOVIMIENTO ALMACENES CORRESPONDIENTE MES DE {month} DE {periodo.anio}
+        </div>
+        <table className="mt-2 w-full border-collapse text-[10px]">
+          <thead>
+            <tr>
+              <th className="border border-black px-1 py-1 text-left">C A R G O</th>
+              <th className="border border-black px-1 py-1 text-left">D E S C R I P C I O N</th>
+              <th className="border border-black px-1 py-1 text-right">Bs</th>
+              <th className="border border-black px-1 py-1 text-right">DEBE<br />Bs.</th>
+              <th className="border border-black px-1 py-1 text-right">HABER<br />Bs.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className="border border-black px-1 py-0.5 align-top">{row.cargo ?? ""}</td>
+                <td className={`border border-black px-1 py-0.5 align-top ${row.strong ? "font-bold underline" : ""}`}>
+                  {row.descripcion}
+                </td>
+                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.bs || undefined)}</td>
+                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.debe || undefined)}</td>
+                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.haber || undefined)}</td>
+              </tr>
+            ))}
+            <tr>
+              <td className="px-1 py-0.5" colSpan={3}></td>
+              <td className="border border-black px-1 py-0.5 text-right">{formatBs(periodo.totalInventarioDebe)}</td>
+              <td className="border border-black px-1 py-0.5 text-right">{formatBs(periodo.totalSalidasHaber)}</td>
+            </tr>
+            <tr>
+              <td className="px-1 py-0.5" colSpan={3}>saldo al {new Date(periodo.anio, periodo.mes, 0).getDate()} de {monthLower} de {periodo.anio}</td>
+              <td className="border border-black px-1 py-0.5"></td>
+              <td className="border border-black px-1 py-0.5 text-right">{formatBs(saldoFinal)}</td>
+            </tr>
+            <tr>
+              <td className="px-1 py-0.5" colSpan={3}></td>
+              <td className="border border-black px-1 py-0.5 text-right">{formatBs(periodo.totalInventarioDebe)}</td>
+              <td className="border border-black px-1 py-0.5 text-right">{formatBs(periodo.totalInventarioDebe)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="mt-20 grid grid-cols-3 text-center text-[10px] font-bold">
+          <span>JEFE DE ALMACEN</span>
+          <span>JEFE DE OFICINAS</span>
+          <span>SUPDTE. GENERAL</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const REPORT_GROUPS = [
   {
     title: "Kardex",
@@ -114,7 +456,7 @@ const REPORT_GROUPS = [
   {
     title: "Contabilidad",
     reports: INVENTORY_REPORTS.filter((report) =>
-      ["diario-almacenes", "detalle-materiales", "costo-produccion", "movimiento-almacen"].includes(
+      ["diario-almacenes", "costo-produccion", "movimiento-almacen"].includes(
         report.type
       )
     )
@@ -226,6 +568,7 @@ export function ReportesPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [productoIdDraft, setProductoIdDraft] = useState("");
+  const [cuadroGrupoDraft, setCuadroGrupoDraft] = useState("");
   const [dateModeDraft, setDateModeDraft] = useState<DateMode>("range");
   const [fechaDraft, setFechaDraft] = useState("");
   const [fechaInicioDraft, setFechaInicioDraft] = useState(defaultFechaInicio);
@@ -233,6 +576,7 @@ export function ReportesPage() {
   const [dataModeDraft, setDataModeDraft] = useState<DataMode>("paged");
   const [estadoReporteDraft, setEstadoReporteDraft] = useState("");
   const [productoId, setProductoId] = useState("");
+  const [cuadroGrupo, setCuadroGrupo] = useState("");
   const [dateMode, setDateMode] = useState<DateMode>("range");
   const [fecha, setFecha] = useState("");
   const [fechaInicio, setFechaInicio] = useState(defaultFechaInicio);
@@ -244,6 +588,8 @@ export function ReportesPage() {
   useEffect(() => {
     setProductoIdDraft("");
     setProductoId("");
+    setCuadroGrupoDraft("");
+    setCuadroGrupo("");
     setPage(1);
     setExpandedCompraIds(new Set());
   }, [tipo]);
@@ -271,6 +617,7 @@ export function ReportesPage() {
     [proveedores]
   );
   const usesProveedorFilter = tipo === "compras-resumen";
+  const usesCuadroGrupoFilter = tipo === "inventarios-suministros";
   const primaryFilterOptions = usesProveedorFilter ? proveedorOptions : productoOptions;
   const primaryFilterLabel = usesProveedorFilter ? "Proveedor" : "Producto";
   const primaryFilterPlaceholder = usesProveedorFilter
@@ -346,6 +693,70 @@ export function ReportesPage() {
     monthRangeParams,
     isAdminType && tipo === "inventarios-suministros"
   );
+  const cuadroGrupoOptions = useMemo(() => {
+    const groups = new Map<string, { id: string; label: string; searchText: string }>();
+    for (const periodo of cuadroSuministrosQuery.data?.data.meses ?? []) {
+      for (const proveedor of periodo.proveedores) {
+        for (const compra of proveedor.compras) {
+          for (const item of compra.items) {
+            const id = cuadroGrupoKey(item.grupo);
+            if (!id || groups.has(id)) continue;
+            const label = cuadroGrupoLabel(item.grupo);
+            groups.set(id, {
+              id,
+              label,
+              searchText: `${item.grupo?.codigo ?? ""} ${item.grupo?.nombre ?? ""}`
+            });
+          }
+        }
+      }
+    }
+    return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [cuadroSuministrosQuery.data]);
+  const filteredCuadroSuministrosData = useMemo<CuadroSuministrosReportResponse | undefined>(() => {
+    const response = cuadroSuministrosQuery.data;
+    if (!response || !cuadroGrupo) return response;
+
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        meses: response.data.meses
+          .map((periodo) => {
+            const proveedores = periodo.proveedores
+              .map((proveedor) => {
+                const compras = proveedor.compras
+                  .map((compra) => {
+                    const items = compra.items.filter(
+                      (item) => cuadroGrupoKey(item.grupo) === cuadroGrupo
+                    );
+                    const subtotalBs = items.reduce((sum, item) => sum + item.importeBs, 0);
+                    return {
+                      ...compra,
+                      items,
+                      subtotalBs: Number(subtotalBs.toFixed(2))
+                    };
+                  })
+                  .filter((compra) => compra.items.length > 0);
+                const totalBs = compras.reduce((sum, compra) => sum + compra.subtotalBs, 0);
+                return {
+                  ...proveedor,
+                  compras,
+                  totalBs: Number(totalBs.toFixed(2))
+                };
+              })
+              .filter((proveedor) => proveedor.compras.length > 0);
+            const totalGeneral = proveedores.reduce((sum, proveedor) => sum + proveedor.totalBs, 0);
+            return {
+              ...periodo,
+              proveedores,
+              totalGeneral: Number(totalGeneral.toFixed(2))
+            };
+          })
+          .filter((periodo) => periodo.proveedores.length > 0)
+      }
+    };
+  }, [cuadroGrupo, cuadroSuministrosQuery.data]);
   const anulacionesEntradasQuery = useAnulacionesEntradasReportQuery(
     monthRangeParams,
     isAdminType && tipo === "anulaciones-entradas"
@@ -410,8 +821,10 @@ export function ReportesPage() {
   }, [legacyItems.length, limit, page]);
 
   const selectedProductLabel =
-    primaryFilterOptions.find((option) => option.id === productoId)?.label ??
-    primaryFilterPlaceholder;
+    usesCuadroGrupoFilter
+      ? (cuadroGrupoOptions.find((option) => option.id === cuadroGrupo)?.label ?? "Todos los grupos")
+      : (primaryFilterOptions.find((option) => option.id === productoId)?.label ??
+        primaryFilterPlaceholder);
   const selectedDateLabel =
     dateMode === "specific"
       ? fecha || "Sin fecha"
@@ -437,13 +850,13 @@ export function ReportesPage() {
       return buildSalidasAlmacenApiReportDefinition(salidasAlmacenQuery.data);
     }
     if ((tipo === "detalle-materiales" || tipo === "costo-produccion") && detalleMaterialesQuery.data) {
-      return buildDetalleMaterialesApiReportDefinition(detalleMaterialesQuery.data);
+      return buildDetalleMaterialesApiReportDefinition(detalleMaterialesQuery.data, tipo);
     }
     if ((tipo === "diario-almacenes" || tipo === "movimiento-almacen") && diarioAlmacenesQuery.data) {
-      return buildDiarioAlmacenesApiReportDefinition(diarioAlmacenesQuery.data);
+      return buildDiarioAlmacenesApiReportDefinition(diarioAlmacenesQuery.data, tipo);
     }
-    if (tipo === "inventarios-suministros" && cuadroSuministrosQuery.data) {
-      return buildCuadroSuministrosApiReportDefinition(cuadroSuministrosQuery.data);
+    if (tipo === "inventarios-suministros" && filteredCuadroSuministrosData) {
+      return buildCuadroSuministrosApiReportDefinition(filteredCuadroSuministrosData);
     }
     if (tipo === "anulaciones-entradas" && anulacionesEntradasQuery.data) {
       return buildAnulacionesEntradasApiReportDefinition(anulacionesEntradasQuery.data);
@@ -456,10 +869,10 @@ export function ReportesPage() {
     anulacionesEntradasQuery.data,
     anulacionesSalidasQuery.data,
     balanceMensualQuery.data,
-    cuadroSuministrosQuery.data,
     detalleMaterialesQuery.data,
     diarioAlmacenesQuery.data,
     entradasAlmacenQuery.data,
+    filteredCuadroSuministrosData,
     inventarioAlmacenQuery.data,
     isAdminType,
     saldosInicialesQuery.data,
@@ -471,6 +884,7 @@ export function ReportesPage() {
     event.preventDefault();
     setPage(1);
     setProductoId(productoIdDraft);
+    setCuadroGrupo(cuadroGrupoDraft);
     setDateMode(dateModeDraft);
     setFecha(fechaDraft);
     setFechaInicio(fechaInicioDraft);
@@ -482,6 +896,7 @@ export function ReportesPage() {
 
   function handleResetFilters() {
     setProductoIdDraft("");
+    setCuadroGrupoDraft("");
     setDateModeDraft("range");
     setFechaDraft("");
     setFechaInicioDraft(defaultFechaInicio);
@@ -489,6 +904,7 @@ export function ReportesPage() {
     setDataModeDraft("paged");
     setEstadoReporteDraft("");
     setProductoId("");
+    setCuadroGrupo("");
     setDateMode("range");
     setFecha("");
     setFechaInicio(defaultFechaInicio);
@@ -673,15 +1089,25 @@ export function ReportesPage() {
         >
           <div className="xl:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              {primaryFilterLabel}
+              {usesCuadroGrupoFilter ? "Grupo" : primaryFilterLabel}
             </label>
-            <AutocompleteSelect
-              value={productoIdDraft}
-              onChange={setProductoIdDraft}
-              options={primaryFilterOptions}
-              placeholder={primaryFilterPlaceholder}
-              className={inputClassName}
-            />
+            {usesCuadroGrupoFilter ? (
+              <AutocompleteSelect
+                value={cuadroGrupoDraft}
+                onChange={setCuadroGrupoDraft}
+                options={cuadroGrupoOptions}
+                placeholder="Todos los grupos"
+                className={inputClassName}
+              />
+            ) : (
+              <AutocompleteSelect
+                value={productoIdDraft}
+                onChange={setProductoIdDraft}
+                options={primaryFilterOptions}
+                placeholder={primaryFilterPlaceholder}
+                className={inputClassName}
+              />
+            )}
           </div>
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
@@ -817,7 +1243,8 @@ export function ReportesPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-[var(--color-on-surface-variant)]">
             <CalendarRange size={14} />
-            {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} | {primaryFilterLabel}:{" "}
+            {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} |{" "}
+            {usesCuadroGrupoFilter ? "Grupo" : primaryFilterLabel}:{" "}
             {selectedProductLabel}
           </div>
           <div className="flex items-center gap-2">
@@ -1227,6 +1654,54 @@ export function ReportesPage() {
               </div>
             ) : null}
           </div>
+        ) : tipo === "diario-almacenes" && diarioAlmacenesQuery.data ? (
+          <>
+            <DiarioAlmacenesPreview response={diarioAlmacenesQuery.data} />
+            {reportDefinition?.summary.length ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-on-surface-variant)]">
+                {reportDefinition.summary.map((item) => (
+                  <span
+                    key={item.label}
+                    className="rounded-full bg-[var(--color-surface-container-high)] px-3 py-1.5"
+                  >
+                    {item.label}:{" "}
+                    <strong className="text-[var(--color-on-surface)]">
+                      {typeof item.value === "number"
+                        ? item.value.toLocaleString("es-BO", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })
+                        : item.value}
+                    </strong>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </>
+        ) : tipo === "movimiento-almacen" && diarioAlmacenesQuery.data ? (
+          <>
+            <MovimientoAlmacenPreview response={diarioAlmacenesQuery.data} />
+            {reportDefinition?.summary.length ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-on-surface-variant)]">
+                {reportDefinition.summary.map((item) => (
+                  <span
+                    key={item.label}
+                    className="rounded-full bg-[var(--color-surface-container-high)] px-3 py-1.5"
+                  >
+                    {item.label}:{" "}
+                    <strong className="text-[var(--color-on-surface)]">
+                      {typeof item.value === "number"
+                        ? item.value.toLocaleString("es-BO", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })
+                        : item.value}
+                    </strong>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : reportDefinition ? (
           <>
             <div className="mb-2">

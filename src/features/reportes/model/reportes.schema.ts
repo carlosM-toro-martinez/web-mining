@@ -247,24 +247,33 @@ const balanceMensualTotalesSchema = z.object({
   saldoFinal: numberLikeSchema
 });
 
-export const balanceMensualReportResponseSchema = z.object({
-  success: z.boolean().optional(),
-  data: z.object({
-    anioInicio: numberLikeSchema.int(),
-    mesInicio: numberLikeSchema.int(),
-    anioFin: numberLikeSchema.int(),
-    mesFin: numberLikeSchema.int(),
-    meses: z.array(
-      z.object({
-        anio: numberLikeSchema.int(),
-        mes: numberLikeSchema.int().min(1).max(12),
-        esCerrado: z.boolean(),
-        grupos: z.array(balanceMensualGrupoSchema),
-        totales: balanceMensualTotalesSchema
-      })
-    )
-  })
+const balanceMensualReportDataSchema = z.object({
+  anioInicio: numberLikeSchema.int(),
+  mesInicio: numberLikeSchema.int(),
+  anioFin: numberLikeSchema.int(),
+  mesFin: numberLikeSchema.int(),
+  meses: z.array(
+    z.object({
+      anio: numberLikeSchema.int(),
+      mes: numberLikeSchema.int().min(1).max(12),
+      esCerrado: z.boolean(),
+      grupos: z.array(balanceMensualGrupoSchema),
+      totales: balanceMensualTotalesSchema
+    })
+  )
 });
+
+export const balanceMensualReportResponseSchema = z
+  .object({
+    success: z.boolean().optional(),
+    data: balanceMensualReportDataSchema
+  })
+  .or(
+    balanceMensualReportDataSchema.transform((data) => ({
+      success: true,
+      data
+    }))
+  );
 
 const inventarioAlmacenProductoSchema = z.object({
   codigo: z.string().optional().nullable(),
@@ -444,25 +453,57 @@ const detalleMaterialesSubtotalSchema = z.object({
   importeBs: numberLikeSchema
 });
 
-export const detalleMaterialesReportResponseSchema = z.object({
-  success: z.boolean().optional(),
-  data: z.object({
-    anioInicio: numberLikeSchema.int(),
-    mesInicio: numberLikeSchema.int(),
-    anioFin: numberLikeSchema.int(),
-    mesFin: numberLikeSchema.int(),
-    meses: z.array(
-      z.object({
-        anio: numberLikeSchema.int(),
-        mes: numberLikeSchema.int().min(1).max(12),
-        esCerrado: z.boolean().default(false),
-        lineas: z.array(detalleMaterialesLineaSchema).default([]),
-        subtotalesPorSubCentro: z.array(detalleMaterialesSubtotalSchema).default([]),
-        totalGeneral: numberLikeSchema
-      })
-    )
-  })
+const detalleMaterialesDetalleTransporteSchema = z.object({
+  productoNombre: z.string().optional().nullable().default(""),
+  unidad: z.string().optional().nullable().default(""),
+  cantidad: numberLikeSchema,
+  importeBs: numberLikeSchema,
+  vehiculo: z.string().optional().nullable()
 });
+
+const detalleMaterialesPorCuentaSchema = z.object({
+  codigoCompleto: z.string().optional().nullable().default(""),
+  centroCostoCodigo: z.string().optional().nullable(),
+  centroCostoNombre: z.string().optional().nullable(),
+  funcionGastoCodigo: z.string().optional().nullable(),
+  funcionGastoNombre: z.string().optional().nullable(),
+  vehiculo: z.string().optional().nullable(),
+  esTransporte: z.boolean().optional().default(false),
+  totalBs: numberLikeSchema,
+  totalCantidad: numberLikeSchema.optional(),
+  lineas: z.array(detalleMaterialesLineaSchema).optional().default([]),
+  detalles: z.array(detalleMaterialesDetalleTransporteSchema).optional().default([])
+});
+
+const detalleMaterialesReportDataSchema = z.object({
+  anioInicio: numberLikeSchema.int(),
+  mesInicio: numberLikeSchema.int(),
+  anioFin: numberLikeSchema.int(),
+  mesFin: numberLikeSchema.int(),
+  meses: z.array(
+    z.object({
+      anio: numberLikeSchema.int(),
+      mes: numberLikeSchema.int().min(1).max(12),
+      esCerrado: z.boolean().default(false),
+      lineas: z.array(detalleMaterialesLineaSchema).default([]),
+      subtotalesPorSubCentro: z.array(detalleMaterialesSubtotalSchema).default([]),
+      totalGeneral: numberLikeSchema,
+      porCuenta: z.array(detalleMaterialesPorCuentaSchema).optional().default([])
+    })
+  )
+});
+
+export const detalleMaterialesReportResponseSchema = z
+  .object({
+    success: z.boolean().optional(),
+    data: detalleMaterialesReportDataSchema
+  })
+  .or(
+    detalleMaterialesReportDataSchema.transform((data) => ({
+      success: true,
+      data
+    }))
+  );
 
 const diarioSubCentroSchema = z.object({
   cuentaId: idLikeSchema.optional().nullable(),
@@ -473,34 +514,73 @@ const diarioSubCentroSchema = z.object({
   totalBs: numberLikeSchema
 });
 
-const diarioCuentaHaberSchema = z.object({
-  centroCostoCodigo: z.string().optional().nullable(),
-  centroCostoNombre: z.string().optional().nullable(),
-  totalBs: numberLikeSchema,
-  subCentros: z.array(diarioSubCentroSchema).default([])
+const diarioDetalleTransporteSchema = z.object({
+  productoNombre: z.string().optional().nullable().default(""),
+  unidad: z.string().optional().nullable().default(""),
+  cantidad: numberLikeSchema,
+  importeBs: numberLikeSchema,
+  vehiculo: z.string().optional().nullable()
 });
 
-export const diarioAlmacenesReportResponseSchema = z.object({
-  success: z.boolean().optional(),
-  data: z.object({
-    anioInicio: numberLikeSchema.int(),
-    mesInicio: numberLikeSchema.int(),
-    anioFin: numberLikeSchema.int(),
-    mesFin: numberLikeSchema.int(),
-    meses: z.array(
-      z.object({
-        anio: numberLikeSchema.int(),
-        mes: numberLikeSchema.int().min(1).max(12),
-        esCerrado: z.boolean().default(false),
-        saldoInventarioAnterior: numberLikeSchema,
-        comprasImporteBs: numberLikeSchema,
-        totalInventarioDebe: numberLikeSchema,
-        cuentasHaber: z.array(diarioCuentaHaberSchema).default([]),
-        totalSalidasHaber: numberLikeSchema
-      })
-    )
-  })
+const diarioFuncionGastoSchema = z.object({
+  codigo: z.string().optional().nullable().default(""),
+  nombre: z.string().optional().nullable().default(""),
+  totalBs: numberLikeSchema
 });
+
+const diarioLineaSchema = z.object({
+  subCentro: z.string().optional().nullable().default(""),
+  nombre: z.string().optional().nullable().default(""),
+  importeBs: numberLikeSchema,
+  subCuentas: z.array(z.string()).optional().default([])
+});
+
+const diarioCuentaHaberSchema = z.object({
+  codigoCompleto: z.string().optional().nullable(),
+  centroCostoCodigo: z.string().optional().nullable(),
+  centroCostoNombre: z.string().optional().nullable(),
+  sectorNombre: z.string().optional().nullable(),
+  esTransporte: z.boolean().optional().default(false),
+  totalBs: numberLikeSchema,
+  totalCantidad: numberLikeSchema.optional(),
+  subCentros: z.array(diarioSubCentroSchema).optional().default([]),
+  funcionGastos: z.array(diarioFuncionGastoSchema).optional().default([]),
+  lineas: z.array(diarioLineaSchema).optional().default([]),
+  detalles: z.array(diarioDetalleTransporteSchema).optional().default([])
+});
+
+const diarioAlmacenesReportDataSchema = z.object({
+  anioInicio: numberLikeSchema.int(),
+  mesInicio: numberLikeSchema.int(),
+  anioFin: numberLikeSchema.int(),
+  mesFin: numberLikeSchema.int(),
+  meses: z.array(
+    z.object({
+      anio: numberLikeSchema.int(),
+      mes: numberLikeSchema.int().min(1).max(12),
+      esCerrado: z.boolean().default(false),
+      saldoInventarioAnterior: numberLikeSchema,
+      comprasImporteBs: numberLikeSchema,
+      comprasSinIva: numberLikeSchema.optional(),
+      totalInventarioDebe: numberLikeSchema,
+      sectoresHaber: z.array(z.unknown()).optional().default([]),
+      cuentasHaber: z.array(diarioCuentaHaberSchema).default([]),
+      totalSalidasHaber: numberLikeSchema
+    })
+  )
+});
+
+export const diarioAlmacenesReportResponseSchema = z
+  .object({
+    success: z.boolean().optional(),
+    data: diarioAlmacenesReportDataSchema
+  })
+  .or(
+    diarioAlmacenesReportDataSchema.transform((data) => ({
+      success: true,
+      data
+    }))
+  );
 
 const cuadroSuministrosItemSchema = z.object({
   productoId: idLikeSchema.optional().nullable(),

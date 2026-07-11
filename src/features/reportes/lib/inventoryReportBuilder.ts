@@ -48,6 +48,7 @@ export type InventoryReportDefinition = {
   columns: InventoryReportColumn[];
   rows: InventoryReportRow[];
   summary: Array<{ label: string; value: string | number }>;
+  sourceResponse?: unknown;
 };
 
 type BuildContext = {
@@ -585,11 +586,138 @@ function buildMovimientoAlmacen(items: EnrichedItem[], dateLabel: string): Inven
 }
 
 export function buildDetalleMaterialesApiReportDefinition(
-  response: DetalleMaterialesReportResponse
+  response: DetalleMaterialesReportResponse,
+  reportType: "detalle-materiales" | "costo-produccion" = "detalle-materiales"
 ): InventoryReportDefinition {
   const { data } = response;
   const rows: InventoryReportRow[] = [];
   let lineCount = 0;
+
+  if (reportType === "costo-produccion" && data.meses.some((periodo) => periodo.porCuenta.length)) {
+    for (const periodo of data.meses) {
+      rows.push({
+        id: `periodo-costo-produccion-${periodo.anio}-${periodo.mes}`,
+        type: "group",
+        values: {
+          periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+          seccion: "",
+          subCuenta: "",
+          subCentro: "",
+          detalle: "",
+          cantidad: "",
+          importeBs: "",
+          subtotalBs: ""
+        }
+      });
+
+      for (const cuenta of periodo.porCuenta) {
+        const sectionName = cuenta.esTransporte
+          ? cuenta.vehiculo ?? cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? "Transporte"
+          : cuenta.centroCostoNombre ?? cuenta.funcionGastoNombre ?? "Costo";
+        rows.push({
+          id: `cuenta-costo-${periodo.anio}-${periodo.mes}-${cuenta.codigoCompleto}-${sectionName}`,
+          type: "subtotal",
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            seccion: sectionName,
+            subCuenta: cuenta.codigoCompleto ?? "",
+            subCentro: "",
+            detalle: cuenta.esTransporte ? "DETALLE DE TRANSPORTE" : "DETALLE POR FUNCION DEL GASTO",
+            cantidad: cuenta.totalCantidad ?? "",
+            importeBs: "",
+            subtotalBs: Number(cuenta.totalBs.toFixed(2))
+          }
+        });
+
+        if (cuenta.esTransporte) {
+          cuenta.detalles.forEach((detalle, index) => {
+            lineCount += 1;
+            rows.push({
+              id: `detalle-transporte-${periodo.anio}-${periodo.mes}-${cuenta.codigoCompleto}-${index}`,
+              values: {
+                periodo: formatMonth(periodo.anio, periodo.mes),
+                seccion: sectionName,
+                subCuenta: "",
+                subCentro: detalle.unidad ?? "",
+                detalle: `${detalle.productoNombre ?? ""}${detalle.vehiculo ? ` - ${detalle.vehiculo}` : ""}`,
+                cantidad: detalle.cantidad,
+                importeBs: Number(detalle.importeBs.toFixed(2)),
+                subtotalBs: ""
+              }
+            });
+          });
+        } else {
+          const totalsBySubCentro = new Map<string, number>();
+          cuenta.lineas.forEach((linea) => {
+            const key = linea.subCentro ?? "";
+            totalsBySubCentro.set(key, (totalsBySubCentro.get(key) ?? 0) + linea.importeBs);
+          });
+          const lastIndexBySubCentro = new Map<string, number>();
+          cuenta.lineas.forEach((linea, index) => lastIndexBySubCentro.set(linea.subCentro ?? "", index));
+          cuenta.lineas.forEach((linea, index) => {
+            lineCount += 1;
+            const key = linea.subCentro ?? "";
+            rows.push({
+              id: `detalle-costo-${periodo.anio}-${periodo.mes}-${cuenta.codigoCompleto}-${index}`,
+              values: {
+                periodo: formatMonth(periodo.anio, periodo.mes),
+                seccion: sectionName,
+                subCuenta: linea.subCuenta ?? "",
+                subCentro: linea.subCentro ?? "",
+                detalle: linea.subCentroNombre ?? "",
+                cantidad: "",
+                importeBs: Number(linea.importeBs.toFixed(2)),
+                subtotalBs:
+                  lastIndexBySubCentro.get(key) === index
+                    ? Number((totalsBySubCentro.get(key) ?? linea.importeBs).toFixed(2))
+                    : ""
+              }
+            });
+          });
+        }
+      }
+
+      rows.push({
+        id: `total-costo-produccion-${periodo.anio}-${periodo.mes}`,
+        type: "total",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          seccion: "TOTAL GENERAL",
+          subCuenta: "",
+          subCentro: "",
+          detalle: "",
+          cantidad: "",
+          importeBs: "",
+          subtotalBs: Number(periodo.totalGeneral.toFixed(2))
+        }
+      });
+    }
+
+    const totalGeneral = data.meses.reduce((sum, periodo) => sum + periodo.totalGeneral, 0);
+    return {
+      type: "costo-produccion",
+      title: "Detalle De Materiales Costo De Produccion",
+      subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+      columns: [
+        { key: "periodo", label: "Periodo", align: "center" },
+        { key: "seccion", label: "Seccion" },
+        { key: "subCuenta", label: "Sub Cuenta", align: "center" },
+        { key: "subCentro", label: "Sub Centro / Unidad", align: "center" },
+        { key: "detalle", label: "Detalle" },
+        { key: "cantidad", label: "Cantidad", align: "right" },
+        { key: "importeBs", label: "Importe Bs.", align: "right" },
+        { key: "subtotalBs", label: "Sub Totales Funcion Del Gasto Bs.", align: "right" }
+      ],
+      rows,
+      summary: [
+        { label: "Meses", value: data.meses.length },
+        { label: "Secciones", value: data.meses.reduce((sum, periodo) => sum + periodo.porCuenta.length, 0) },
+        { label: "Lineas", value: lineCount },
+        { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
+      ],
+      sourceResponse: response
+    };
+  }
 
   for (const periodo of data.meses) {
     const subtotals = new Map(
@@ -693,12 +821,14 @@ export function buildDetalleMaterialesApiReportDefinition(
       { label: "Meses", value: data.meses.length },
       { label: "Lineas", value: lineCount },
       { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
-    ]
+    ],
+    sourceResponse: response
   };
 }
 
 export function buildDiarioAlmacenesApiReportDefinition(
-  response: DiarioAlmacenesReportResponse
+  response: DiarioAlmacenesReportResponse,
+  reportType: "diario-almacenes" | "movimiento-almacen" = "diario-almacenes"
 ): InventoryReportDefinition {
   const { data } = response;
   const rows: InventoryReportRow[] = [];
@@ -748,7 +878,7 @@ export function buildDiarioAlmacenesApiReportDefinition(
         periodo: "",
         cargos: "",
         descripcion: "Cuadro Mat. y Sumin. del mes",
-        parcialesBs: Number(periodo.comprasImporteBs.toFixed(2)),
+        parcialesBs: Number((periodo.comprasSinIva ?? periodo.comprasImporteBs).toFixed(2)),
         cuenta: "",
         debeBs: "",
         haberBs: ""
@@ -770,7 +900,16 @@ export function buildDiarioAlmacenesApiReportDefinition(
         }
       });
 
-      for (const subCentro of cuenta.subCentros) {
+      const funcionGastos = cuenta.funcionGastos.length
+        ? cuenta.funcionGastos.map((funcion) => ({
+            codigoCompleto: cuenta.codigoCompleto ?? "",
+            funcionGastoCodigo: funcion.codigo,
+            funcionGastoNombre: funcion.nombre,
+            totalBs: funcion.totalBs
+          }))
+        : cuenta.subCentros;
+
+      for (const subCentro of funcionGastos) {
         rows.push({
           id: `haber-sub-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}-${subCentro.codigoCompleto}-${subCentro.funcionGastoCodigo}`,
           values: {
@@ -805,8 +944,8 @@ export function buildDiarioAlmacenesApiReportDefinition(
   const totalHaber = data.meses.reduce((sum, periodo) => sum + periodo.totalSalidasHaber, 0);
 
   return {
-    type: "diario-almacenes",
-    title: "Diario Almacenes",
+    type: reportType,
+    title: reportType === "movimiento-almacen" ? "Movimiento Almacen" : "Diario Almacenes",
     subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
     columns: [
       { key: "periodo", label: "Periodo", align: "center" },
@@ -822,7 +961,8 @@ export function buildDiarioAlmacenesApiReportDefinition(
       { label: "Meses", value: data.meses.length },
       { label: "Total debe", value: Number(totalDebe.toFixed(2)) },
       { label: "Total haber", value: Number(totalHaber.toFixed(2)) }
-    ]
+    ],
+    sourceResponse: response
   };
 }
 
