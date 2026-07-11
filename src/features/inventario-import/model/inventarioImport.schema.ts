@@ -72,10 +72,17 @@ export const saldoMensualItemPatchPayloadSchema = z
     message: "Debes enviar al menos un campo para actualizar."
   });
 
-export const saldoMensualAjusteTotalPayloadSchema = z.object({
-  totalBs: numberLikeSchema.nonnegative(),
-  totalBsProm: numberLikeSchema.nonnegative().optional()
-});
+export const saldoMensualAjusteTotalPayloadSchema = z
+  .object({
+    totalBsInicial: numberLikeSchema.nonnegative().optional(),
+    precioUnit: numberLikeSchema.nonnegative().optional(),
+    saldoInicial: numberLikeSchema.nonnegative().optional(),
+    totalBs: numberLikeSchema.nonnegative().optional(),
+    totalBsProm: numberLikeSchema.nonnegative().optional()
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "Debes enviar al menos un campo de ajuste."
+  });
 
 export const saldoMensualQuerySchema = z.object({
   anio: numberLikeSchema.int().min(2000).max(2100),
@@ -154,10 +161,14 @@ export const saldoMensualAjusteTotalResponseSchema = z.object({
     productoNombre: z.string().optional().nullable(),
     anio: numberLikeSchema.int(),
     mes: numberLikeSchema.int(),
-    saldoFinal: numberLikeSchema,
-    precioUnit: numberLikeSchema,
-    totalBsAnterior: numberLikeSchema,
-    totalBsNuevo: numberLikeSchema,
+    camposActualizados: z.array(z.string()).optional().default([]),
+    mesesCascadeados: numberLikeSchema.int().nonnegative().optional(),
+    saldoFinal: numberLikeSchema.optional(),
+    saldoInicial: numberLikeSchema.optional(),
+    precioUnit: numberLikeSchema.optional(),
+    totalBsAnterior: numberLikeSchema.optional(),
+    totalBsNuevo: numberLikeSchema.optional(),
+    totalBsInicialNuevo: numberLikeSchema.optional().nullable(),
     totalBsPromNuevo: numberLikeSchema.optional().nullable()
   })
 });
@@ -174,6 +185,10 @@ export const saldoMensualAjusteInicialExcelResponseSchema = z.object({
           fila: numberLikeSchema.int().positive(),
           codigo: z.string().min(1),
           totalBsInicial: numberLikeSchema.nonnegative().optional(),
+          precioUnit: numberLikeSchema.nonnegative().optional(),
+          saldoInicial: numberLikeSchema.nonnegative().optional(),
+          totalBs: numberLikeSchema.nonnegative().optional(),
+          totalBsProm: numberLikeSchema.nonnegative().optional(),
           ok: z.boolean(),
           anterior: z.unknown().optional().nullable(),
           error: z.string().optional()

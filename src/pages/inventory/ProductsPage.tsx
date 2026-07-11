@@ -32,6 +32,7 @@ import {
 } from "@/features/inventario-import/hooks/useInventarioImport";
 import type { Producto } from "@/features/productos/model/producto.schema";
 import { ApiError } from "@/shared/api/core/apiError";
+import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import {
   downloadProductosCsvTemplate,
@@ -121,6 +122,9 @@ export function ProductsPage() {
   const [ajusteProductoId, setAjusteProductoId] = useState("");
   const [ajusteAnio, setAjusteAnio] = useState(String(now.getFullYear()));
   const [ajusteMes, setAjusteMes] = useState(String(now.getMonth() + 1));
+  const [ajusteSaldoInicial, setAjusteSaldoInicial] = useState("");
+  const [ajustePrecioUnit, setAjustePrecioUnit] = useState("");
+  const [ajusteTotalBsInicial, setAjusteTotalBsInicial] = useState("");
   const [ajusteTotalBs, setAjusteTotalBs] = useState("");
   const [ajusteTotalBsProm, setAjusteTotalBsProm] = useState("");
   const [isAjusteMasivoImporting, setIsAjusteMasivoImporting] = useState(false);
@@ -139,6 +143,15 @@ export function ProductsPage() {
   const cuentas = cuentasQuery.data?.data ?? [];
 
   const products = productosQuery.data?.data ?? [];
+  const ajusteProductoOptions = useMemo(
+    () =>
+      products.map((producto) => ({
+        id: String(producto.id),
+        label: `${producto.codigo} - ${producto.nombre}`,
+        searchText: `${producto.codigo} ${producto.nombre}`
+      })),
+    [products]
+  );
 
   const filteredProducts = useMemo(() => {
     const query = searchDraft.trim().toLowerCase();
@@ -519,6 +532,9 @@ export function ProductsPage() {
     setAjusteProductoId("");
     setAjusteAnio(String(now.getFullYear()));
     setAjusteMes(String(now.getMonth() + 1));
+    setAjusteSaldoInicial("");
+    setAjustePrecioUnit("");
+    setAjusteTotalBsInicial("");
     setAjusteTotalBs("");
     setAjusteTotalBsProm("");
     setAjusteMasivoStatus("");
@@ -533,8 +549,13 @@ export function ProductsPage() {
     const productoId = Number(ajusteProductoId);
     const anio = Number(ajusteAnio);
     const mes = Number(ajusteMes);
-    const totalBs = Number(ajusteTotalBs);
-    const totalBsProm = ajusteTotalBsProm.trim() ? Number(ajusteTotalBsProm) : undefined;
+    const ajusteValores = {
+      saldoInicial: ajusteSaldoInicial.trim() ? Number(ajusteSaldoInicial) : undefined,
+      precioUnit: ajustePrecioUnit.trim() ? Number(ajustePrecioUnit) : undefined,
+      totalBsInicial: ajusteTotalBsInicial.trim() ? Number(ajusteTotalBsInicial) : undefined,
+      totalBs: ajusteTotalBs.trim() ? Number(ajusteTotalBs) : undefined,
+      totalBsProm: ajusteTotalBsProm.trim() ? Number(ajusteTotalBsProm) : undefined
+    };
     const selectedProduct = products.find((producto) => producto.id === productoId);
 
     if (!productoId || !selectedProduct) {
@@ -545,12 +566,16 @@ export function ProductsPage() {
       showError("Indica un año y mes validos.");
       return;
     }
-    if (!Number.isFinite(totalBs) || totalBs < 0) {
-      showError("Indica un total Bs. valido.");
+    const ajusteEntries = Object.entries(ajusteValores).filter(([, value]) => value !== undefined);
+    if (!ajusteEntries.length) {
+      showError("Indica al menos un campo de ajuste.");
       return;
     }
-    if (totalBsProm !== undefined && (!Number.isFinite(totalBsProm) || totalBsProm < 0)) {
-      showError("Indica un total promedio Bs. valido.");
+    const invalidField = ajusteEntries.find(
+      ([, value]) => typeof value !== "number" || !Number.isFinite(value) || value < 0
+    );
+    if (invalidField) {
+      showError("Todos los valores de ajuste deben ser números validos mayores o iguales a cero.");
       return;
     }
 
@@ -560,16 +585,15 @@ export function ProductsPage() {
         productoCodigo: selectedProduct.codigo,
         anio,
         mes,
-        ajuste: {
-          totalBs,
-          totalBsProm
-        }
+        ajuste: Object.fromEntries(ajusteEntries)
       },
       {
         onSuccess: (response) => {
-          showSuccess(
-            `Total histórico ajustado. Antes: Bs. ${response.data.totalBsAnterior}. Nuevo: Bs. ${response.data.totalBsNuevo}.`
-          );
+          const detalleTotal =
+            response.data.totalBsAnterior !== undefined && response.data.totalBsNuevo !== undefined
+              ? ` Antes: Bs. ${response.data.totalBsAnterior}. Nuevo: Bs. ${response.data.totalBsNuevo}.`
+              : "";
+          showSuccess(`Ajuste histórico aplicado correctamente.${detalleTotal}`);
           setIsAjusteTotalModalOpen(false);
         },
         onError: (error) =>
@@ -1294,27 +1318,63 @@ export function ProductsPage() {
                 <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                   Producto
                 </label>
-                <select
-                  required
+                <AutocompleteSelect
                   value={ajusteProductoId}
-                  onChange={(event) => setAjusteProductoId(event.target.value)}
+                  onChange={setAjusteProductoId}
+                  options={ajusteProductoOptions}
+                  placeholder="Busca por código o nombre"
                   className={inputClassName}
-                >
-                  <option value="">Selecciona producto</option>
-                  {products.map((producto) => (
-                    <option key={producto.id} value={producto.id}>
-                      {producto.codigo} - {producto.nombre}
-                    </option>
-                  ))}
-                </select>
+                  maxVisibleOptions={40}
+                />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                    Total Bs.
+                    Saldo inicial
                   </label>
                   <input
-                    required
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={ajusteSaldoInicial}
+                    onChange={(event) => setAjusteSaldoInicial(event.target.value)}
+                    className={inputClassName}
+                    placeholder="31257"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Precio unitario
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.000001"
+                    value={ajustePrecioUnit}
+                    onChange={(event) => setAjustePrecioUnit(event.target.value)}
+                    className={inputClassName}
+                    placeholder="9.739094"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Total Bs. inicial
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ajusteTotalBsInicial}
+                    onChange={(event) => setAjusteTotalBsInicial(event.target.value)}
+                    className={inputClassName}
+                    placeholder="304413.49"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    Total Bs. cierre
+                  </label>
+                  <input
                     type="number"
                     min="0"
                     step="0.01"
@@ -1326,7 +1386,7 @@ export function ProductsPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                    Total Bs. promedio
+                    Total Bs. promedio cierre
                   </label>
                   <input
                     type="number"
@@ -1355,8 +1415,9 @@ export function ProductsPage() {
                   className={inputClassName}
                 />
                 <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
-                  Columnas requeridas: codigo, totalBsInicial. Se aplicará al año y mes
-                  seleccionados arriba.
+                  Columna requerida: codigo. Puedes incluir cualquier combinación de:
+                  totalBsInicial, precioUnit, saldoInicial, totalBs, totalBsProm. Se aplicará al
+                  año y mes seleccionados arriba.
                 </p>
                 {ajusteMasivoStatus ? (
                   <p className="mt-2 text-xs font-semibold text-[var(--color-primary)]">
