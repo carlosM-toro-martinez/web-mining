@@ -23,6 +23,7 @@ import {
   useInventarioAlmacenReportQuery,
   useSaldosInicialesReportQuery,
   useSalidasAlmacenReportQuery,
+  useSalidasDetalleReportQuery,
   useStockReportQuery,
   useValesReportQuery
 } from "@/features/reportes/hooks/useReportes";
@@ -39,6 +40,7 @@ import {
   buildInventarioAlmacenApiReportDefinition,
   buildSaldosInicialesApiReportDefinition,
   buildSalidasAlmacenApiReportDefinition,
+  buildSalidasDetalleApiReportDefinition,
   INVENTORY_REPORTS,
   isInventoryReportType
 } from "@/features/reportes/lib/inventoryReportBuilder";
@@ -465,7 +467,7 @@ const REPORT_GROUPS = [
     title: "Control y auditoria",
     reports: [
       ...INVENTORY_REPORTS.filter((report) =>
-        ["anulaciones-entradas", "anulaciones-salidas"].includes(report.type)
+        ["salidas-detalle", "anulaciones-entradas", "anulaciones-salidas"].includes(report.type)
       ),
       ...API_REPORTS
     ]
@@ -575,6 +577,11 @@ export function ReportesPage() {
   const [fechaFinDraft, setFechaFinDraft] = useState(defaultFechaFin);
   const [dataModeDraft, setDataModeDraft] = useState<DataMode>("paged");
   const [estadoReporteDraft, setEstadoReporteDraft] = useState("");
+  const [salidasCuentaIdDraft, setSalidasCuentaIdDraft] = useState("");
+  const [salidasFuncionDraft, setSalidasFuncionDraft] = useState("");
+  const [salidasSectorDraft, setSalidasSectorDraft] = useState("");
+  const [salidasCentroDraft, setSalidasCentroDraft] = useState("");
+  const [salidasSinCuentaDraft, setSalidasSinCuentaDraft] = useState(false);
   const [productoId, setProductoId] = useState("");
   const [cuadroGrupo, setCuadroGrupo] = useState("");
   const [dateMode, setDateMode] = useState<DateMode>("range");
@@ -583,6 +590,11 @@ export function ReportesPage() {
   const [fechaFin, setFechaFin] = useState(defaultFechaFin);
   const [dataMode, setDataMode] = useState<DataMode>("paged");
   const [estadoReporte, setEstadoReporte] = useState("");
+  const [salidasCuentaId, setSalidasCuentaId] = useState("");
+  const [salidasFuncion, setSalidasFuncion] = useState("");
+  const [salidasSector, setSalidasSector] = useState("");
+  const [salidasCentro, setSalidasCentro] = useState("");
+  const [salidasSinCuenta, setSalidasSinCuenta] = useState(false);
   const [expandedCompraIds, setExpandedCompraIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -590,6 +602,16 @@ export function ReportesPage() {
     setProductoId("");
     setCuadroGrupoDraft("");
     setCuadroGrupo("");
+    setSalidasCuentaIdDraft("");
+    setSalidasCuentaId("");
+    setSalidasFuncionDraft("");
+    setSalidasFuncion("");
+    setSalidasSectorDraft("");
+    setSalidasSector("");
+    setSalidasCentroDraft("");
+    setSalidasCentro("");
+    setSalidasSinCuentaDraft(false);
+    setSalidasSinCuenta(false);
     setPage(1);
     setExpandedCompraIds(new Set());
   }, [tipo]);
@@ -618,6 +640,7 @@ export function ReportesPage() {
   );
   const usesProveedorFilter = tipo === "compras-resumen";
   const usesCuadroGrupoFilter = tipo === "inventarios-suministros";
+  const usesSalidasDetalleFilter = tipo === "salidas-detalle";
   const primaryFilterOptions = usesProveedorFilter ? proveedorOptions : productoOptions;
   const primaryFilterLabel = usesProveedorFilter ? "Proveedor" : "Producto";
   const primaryFilterPlaceholder = usesProveedorFilter
@@ -661,6 +684,24 @@ export function ReportesPage() {
     () => monthRangeFromDates({ dateMode, fecha, fechaInicio, fechaFin }),
     [dateMode, fecha, fechaFin, fechaInicio]
   );
+  const salidasDetalleParams = useMemo(
+    () => ({
+      ...monthRangeParams,
+      cuentaId: salidasCuentaId ? Number(salidasCuentaId) : undefined,
+      funcionGastoCodigo: salidasFuncion || undefined,
+      sectorCodigo: salidasSector || undefined,
+      centroCostoCodigo: salidasCentro || undefined,
+      sinCuenta: salidasSinCuenta || undefined
+    }),
+    [
+      monthRangeParams,
+      salidasCentro,
+      salidasCuentaId,
+      salidasFuncion,
+      salidasSector,
+      salidasSinCuenta
+    ]
+  );
   const balanceMensualQuery = useBalanceMensualReportQuery(
     monthRangeParams,
     isAdminType && tipo === "balance-mensual"
@@ -680,6 +721,10 @@ export function ReportesPage() {
   const salidasAlmacenQuery = useSalidasAlmacenReportQuery(
     monthRangeParams,
     isAdminType && tipo === "salidas-almacen"
+  );
+  const salidasDetalleQuery = useSalidasDetalleReportQuery(
+    salidasDetalleParams,
+    isAdminType && tipo === "salidas-detalle"
   );
   const detalleMaterialesQuery = useDetalleMaterialesReportQuery(
     monthRangeParams,
@@ -821,7 +866,15 @@ export function ReportesPage() {
   }, [legacyItems.length, limit, page]);
 
   const selectedProductLabel =
-    usesCuadroGrupoFilter
+    usesSalidasDetalleFilter
+      ? [
+          salidasCuentaId ? `Cuenta ID ${salidasCuentaId}` : "",
+          salidasFuncion ? `Funcion ${salidasFuncion}` : "",
+          salidasCentro ? `Centro ${salidasCentro}` : "",
+          salidasSector ? `Sector ${salidasSector}` : "",
+          salidasSinCuenta ? "Solo sin cuenta" : ""
+        ].filter(Boolean).join(" | ") || "Todos"
+      : usesCuadroGrupoFilter
       ? (cuadroGrupoOptions.find((option) => option.id === cuadroGrupo)?.label ?? "Todos los grupos")
       : (primaryFilterOptions.find((option) => option.id === productoId)?.label ??
         primaryFilterPlaceholder);
@@ -848,6 +901,9 @@ export function ReportesPage() {
     }
     if (tipo === "salidas-almacen" && salidasAlmacenQuery.data) {
       return buildSalidasAlmacenApiReportDefinition(salidasAlmacenQuery.data);
+    }
+    if (tipo === "salidas-detalle" && salidasDetalleQuery.data) {
+      return buildSalidasDetalleApiReportDefinition(salidasDetalleQuery.data);
     }
     if ((tipo === "detalle-materiales" || tipo === "costo-produccion") && detalleMaterialesQuery.data) {
       return buildDetalleMaterialesApiReportDefinition(detalleMaterialesQuery.data, tipo);
@@ -877,6 +933,7 @@ export function ReportesPage() {
     isAdminType,
     saldosInicialesQuery.data,
     salidasAlmacenQuery.data,
+    salidasDetalleQuery.data,
     tipo
   ]);
 
@@ -891,6 +948,11 @@ export function ReportesPage() {
     setFechaFin(fechaFinDraft);
     setDataMode(dataModeDraft);
     setEstadoReporte(estadoReporteDraft);
+    setSalidasCuentaId(salidasCuentaIdDraft);
+    setSalidasFuncion(salidasFuncionDraft.trim());
+    setSalidasSector(salidasSectorDraft.trim());
+    setSalidasCentro(salidasCentroDraft.trim());
+    setSalidasSinCuenta(salidasSinCuentaDraft);
     setExpandedCompraIds(new Set());
   }
 
@@ -903,6 +965,11 @@ export function ReportesPage() {
     setFechaFinDraft(defaultFechaFin);
     setDataModeDraft("paged");
     setEstadoReporteDraft("");
+    setSalidasCuentaIdDraft("");
+    setSalidasFuncionDraft("");
+    setSalidasSectorDraft("");
+    setSalidasCentroDraft("");
+    setSalidasSinCuentaDraft(false);
     setProductoId("");
     setCuadroGrupo("");
     setDateMode("range");
@@ -911,6 +978,11 @@ export function ReportesPage() {
     setFechaFin(defaultFechaFin);
     setDataMode("paged");
     setEstadoReporte("");
+    setSalidasCuentaId("");
+    setSalidasFuncion("");
+    setSalidasSector("");
+    setSalidasCentro("");
+    setSalidasSinCuenta(false);
     setExpandedCompraIds(new Set());
     setPage(1);
     setLimit(50);
@@ -979,7 +1051,9 @@ export function ReportesPage() {
           : tipo === "entradas-almacen"
             ? entradasAlmacenQuery
             : tipo === "salidas-almacen"
-              ? salidasAlmacenQuery
+            ? salidasAlmacenQuery
+            : tipo === "salidas-detalle"
+              ? salidasDetalleQuery
               : tipo === "detalle-materiales"
                 ? detalleMaterialesQuery
                 : tipo === "costo-produccion"
@@ -1009,6 +1083,7 @@ export function ReportesPage() {
       tipo !== "saldos-iniciales" &&
       tipo !== "entradas-almacen" &&
       tipo !== "salidas-almacen" &&
+      tipo !== "salidas-detalle" &&
       tipo !== "detalle-materiales" &&
       tipo !== "costo-produccion" &&
       tipo !== "diario-almacenes" &&
@@ -1089,9 +1164,18 @@ export function ReportesPage() {
         >
           <div className="xl:col-span-2">
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              {usesCuadroGrupoFilter ? "Grupo" : primaryFilterLabel}
+              {usesSalidasDetalleFilter ? "Cuenta ID" : usesCuadroGrupoFilter ? "Grupo" : primaryFilterLabel}
             </label>
-            {usesCuadroGrupoFilter ? (
+            {usesSalidasDetalleFilter ? (
+              <input
+                type="number"
+                min={1}
+                value={salidasCuentaIdDraft}
+                onChange={(event) => setSalidasCuentaIdDraft(event.target.value)}
+                placeholder="Todas las cuentas"
+                className={inputClassName}
+              />
+            ) : usesCuadroGrupoFilter ? (
               <AutocompleteSelect
                 value={cuadroGrupoDraft}
                 onChange={setCuadroGrupoDraft}
@@ -1109,6 +1193,52 @@ export function ReportesPage() {
               />
             )}
           </div>
+          {usesSalidasDetalleFilter ? (
+            <>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Funcion gasto
+                </label>
+                <input
+                  value={salidasFuncionDraft}
+                  onChange={(event) => setSalidasFuncionDraft(event.target.value)}
+                  placeholder="Ej. 237"
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Centro costo
+                </label>
+                <input
+                  value={salidasCentroDraft}
+                  onChange={(event) => setSalidasCentroDraft(event.target.value)}
+                  placeholder="Ej. 1804"
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Sector
+                </label>
+                <input
+                  value={salidasSectorDraft}
+                  onChange={(event) => setSalidasSectorDraft(event.target.value.toUpperCase())}
+                  placeholder="Ej. PUN"
+                  className={inputClassName}
+                />
+              </div>
+              <label className="flex items-end gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm font-semibold text-[var(--color-on-surface)]">
+                <input
+                  type="checkbox"
+                  checked={salidasSinCuentaDraft}
+                  onChange={(event) => setSalidasSinCuentaDraft(event.target.checked)}
+                  className="h-4 w-4"
+                />
+                Solo sin cuenta
+              </label>
+            </>
+          ) : null}
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
               Modo de fecha
@@ -1244,7 +1374,7 @@ export function ReportesPage() {
           <div className="flex items-center gap-2 text-xs text-[var(--color-on-surface-variant)]">
             <CalendarRange size={14} />
             {dataMode === "all" ? "Modo: ver todo" : "Modo: paginado"} |{" "}
-            {usesCuadroGrupoFilter ? "Grupo" : primaryFilterLabel}:{" "}
+            {usesSalidasDetalleFilter ? "Filtros" : usesCuadroGrupoFilter ? "Grupo" : primaryFilterLabel}:{" "}
             {selectedProductLabel}
           </div>
           <div className="flex items-center gap-2">

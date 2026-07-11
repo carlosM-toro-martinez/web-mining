@@ -10,7 +10,8 @@ import type {
   EntradasAlmacenReportResponse,
   InventarioAlmacenReportResponse,
   SaldosInicialesReportResponse,
-  SalidasAlmacenReportResponse
+  SalidasAlmacenReportResponse,
+  SalidasDetalleReportResponse
 } from "@/features/reportes/model/reportes.schema";
 
 export type InventoryReportType =
@@ -22,6 +23,7 @@ export type InventoryReportType =
   | "inventarios-suministros"
   | "entradas-almacen"
   | "salidas-almacen"
+  | "salidas-detalle"
   | "anulaciones-entradas"
   | "anulaciones-salidas"
   | "costo-produccion"
@@ -1108,6 +1110,11 @@ export const INVENTORY_REPORTS: Array<{
     description: "Egresos por grupo, subgrupo y producto con cantidades y valorizacion."
   },
   {
+    type: "salidas-detalle",
+    title: "Salidas Detalle",
+    description: "Auditoria de salidas por cuenta, centro, funcion, sector y movimientos sin cuenta."
+  },
+  {
     type: "anulaciones-entradas",
     title: "Anulaciones De Entradas",
     description: "Compras anuladas con detalle de productos, motivo y usuario de anulacion."
@@ -1774,6 +1781,71 @@ function formatReportDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("es-BO");
+}
+
+export function buildSalidasDetalleApiReportDefinition(
+  response: SalidasDetalleReportResponse
+): InventoryReportDefinition {
+  const { data } = response;
+  const rows: InventoryReportRow[] = data.movimientos.map((movimiento, index) => ({
+    id: `salida-detalle-${movimiento.id}-${index}`,
+    values: {
+      periodo:
+        movimiento.periodoAnio && movimiento.periodoMes
+          ? formatMonth(movimiento.periodoAnio, movimiento.periodoMes)
+          : "",
+      fecha: formatReportDate(movimiento.fecha),
+      referencia: [movimiento.referencia, movimiento.referenciaId].filter(Boolean).join(" "),
+      codigo: movimiento.productoCodigo ?? "",
+      producto: movimiento.productoNombre ?? "",
+      unidad: movimiento.productoUnidad ?? "",
+      cantidad: Number(movimiento.cantidad.toFixed(2)),
+      precioUnit: movimiento.precioUnit ? Number(movimiento.precioUnit.toFixed(4)) : "",
+      salidaBs: Number(movimiento.salidaBs.toFixed(2)),
+      cuenta: movimiento.cuenta?.codigoCompleto ?? "SIN CUENTA",
+      centroCosto: [
+        movimiento.cuenta?.centroCostoCodigo,
+        movimiento.cuenta?.centroCostoNombre
+      ].filter(Boolean).join(" - "),
+      funcionGasto: [
+        movimiento.cuenta?.funcionGastoCodigo,
+        movimiento.cuenta?.funcionGastoNombre
+      ].filter(Boolean).join(" - "),
+      sector: [movimiento.cuenta?.sectorCodigo, movimiento.cuenta?.sectorNombre]
+        .filter(Boolean)
+        .join(" - "),
+      usuarioEntrega: movimiento.usuarioEntrega ?? ""
+    }
+  }));
+
+  return {
+    type: "salidas-detalle",
+    title: "Salidas Detalle",
+    subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
+    columns: [
+      { key: "periodo", label: "Periodo", align: "center" },
+      { key: "fecha", label: "Fecha" },
+      { key: "referencia", label: "Referencia" },
+      { key: "codigo", label: "Codigo", align: "center" },
+      { key: "producto", label: "Producto" },
+      { key: "unidad", label: "Unidad", align: "center" },
+      { key: "cantidad", label: "Cantidad", align: "right" },
+      { key: "precioUnit", label: "P. Unit.", align: "right" },
+      { key: "salidaBs", label: "Salida Bs.", align: "right" },
+      { key: "cuenta", label: "Cuenta", align: "center" },
+      { key: "centroCosto", label: "Centro Costo" },
+      { key: "funcionGasto", label: "Funcion Gasto" },
+      { key: "sector", label: "Sector" },
+      { key: "usuarioEntrega", label: "Entrega" }
+    ],
+    rows,
+    summary: [
+      { label: "Movimientos", value: data.totalMovimientos },
+      { label: "Sin cuenta", value: data.movimientosSinCuenta },
+      { label: "Total Bs.", value: Number(data.totalBs.toFixed(2)) }
+    ],
+    sourceResponse: response
+  };
 }
 
 export function buildAnulacionesEntradasApiReportDefinition(

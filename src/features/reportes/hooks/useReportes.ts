@@ -13,6 +13,7 @@ import {
   getEntradasAlmacenReport,
   getInventarioAlmacenReport,
   getSalidasAlmacenReport,
+  getSalidasDetalleReport,
   getSaldosInicialesReport,
   getStockReport,
   getValesReport
@@ -21,6 +22,7 @@ import type {
   ComprasReportQueryParams,
   MonthlyRangeReportQueryParams,
   ReportesQueryParams,
+  SalidasDetalleReportQueryParams,
   StockReportQueryParams,
   ValesReportQueryParams
 } from "@/features/reportes/model/reportes.schema";
@@ -115,6 +117,17 @@ export function useSalidasAlmacenReportQuery(
   return useQuery({
     queryKey: [...queryKeys.reportes.all, "salidas-almacen", params] as const,
     queryFn: () => getSalidasAlmacenReport(params),
+    enabled
+  });
+}
+
+export function useSalidasDetalleReportQuery(
+  params: SalidasDetalleReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "salidas-detalle", params] as const,
+    queryFn: () => getSalidasDetalleReport(params),
     enabled
   });
 }

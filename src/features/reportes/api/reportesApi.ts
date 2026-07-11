@@ -22,9 +22,12 @@ import {
   reportesQueryParamsSchema,
   saldosInicialesReportResponseSchema,
   salidasAlmacenReportResponseSchema,
+  salidasDetalleReportQueryParamsSchema,
+  salidasDetalleReportResponseSchema,
   type ReportesQueryParams,
   type ComprasReportQueryParams,
   type MonthlyRangeReportQueryParams,
+  type SalidasDetalleReportQueryParams,
   type StockReportQueryParams,
   type ValesReportQueryParams
 } from "@/features/reportes/model/reportes.schema";
@@ -135,6 +138,14 @@ export async function getSalidasAlmacenReport(params: MonthlyRangeReportQueryPar
     url: apiEndpoints.reportes.salidasAlmacen,
     config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
     schema: salidasAlmacenReportResponseSchema
+  });
+}
+
+export async function getSalidasDetalleReport(params: SalidasDetalleReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.salidasDetalle,
+    config: { params: cleanSimpleParams(params, salidasDetalleReportQueryParamsSchema.parse) },
+    schema: salidasDetalleReportResponseSchema
   });
 }
 
