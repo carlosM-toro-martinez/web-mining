@@ -1,0 +1,2834 @@
+{
+  "success": true,
+  "data": {
+    "anioInicio": 2025,
+    "mesInicio": 10,
+    "anioFin": 2025,
+    "mesFin": 10,
+    "meses": [
+      {
+        "anio": 2025,
+        "mes": 10,
+        "esCerrado": false,
+        "grupos": [
+          {
+            "codigo": "01",
+            "nombre": "COMBUSTIBLE EN GENERAL",
+            "totalBsSalida": 209657.13,
+            "totalBsSalidaMenos13": 182401.7,
+            "subGrupos": [
+              {
+                "codigo": "01-01",
+                "nombre": "Combustible Diesel",
+                "productos": [
+                  {
+                    "codigo": "01-01-0001",
+                    "nombre": "Diesel oil",
+                    "unidad": "Litros",
+                    "salidaQty": 20721,
+                    "precioUnit": 9.7391,
+                    "totalBsSalida": 201803.89
+                  },
+                  {
+                    "codigo": "01-01-0002",
+                    "nombre": "Gasolina",
+                    "unidad": "Litros",
+                    "salidaQty": 2311,
+                    "precioUnit": 3.3982,
+                    "totalBsSalida": 7853.24
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "02",
+            "nombre": "FILTROS EN GENERAL",
+            "totalBsSalida": 5886.42,
+            "totalBsSalidaMenos13": 5121.19,
+            "subGrupos": [
+              {
+                "codigo": "02-01",
+                "nombre": "Filtros de combustible en general",
+                "productos": [
+                  {
+                    "codigo": "02-01-0010",
+                    "nombre": "Filtro de combustible 320",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 1748.7,
+                    "totalBsSalida": 1748.7
+                  },
+                  {
+                    "codigo": "02-01-0022",
+                    "nombre": "Filtro de combustible  SFF 1723",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 69.6,
+                    "totalBsSalida": 69.6
+                  },
+                  {
+                    "codigo": "02-01-0023",
+                    "nombre": "Filtro de combustible BOSCH DB 0718",
+                    "unidad": "Pieza",
+                    "salidaQty": 2,
+                    "precioUnit": 104.4,
+                    "totalBsSalida": 208.8
+                  }
+                ]
+              },
+              {
+                "codigo": "02-02",
+                "nombre": "Filtros de Aceite",
+                "productos": [
+                  {
+                    "codigo": "02-02-0013",
+                    "nombre": "Filtro de aceite P 554071",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 117.45,
+                    "totalBsSalida": 117.45
+                  },
+                  {
+                    "codigo": "02-02-0014",
+                    "nombre": "Filtro de aceite P 559000",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 339.3,
+                    "totalBsSalida": 339.3
+                  },
+                  {
+                    "codigo": "02-02-0016",
+                    "nombre": "Filtro de aceite de motor 320",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 413.25,
+                    "totalBsSalida": 413.25
+                  },
+                  {
+                    "codigo": "02-02-0024",
+                    "nombre": "Filtro de aceite PSL 561",
+                    "unidad": "Pieza",
+                    "salidaQty": 4,
+                    "precioUnit": 65.555,
+                    "totalBsSalida": 262.22
+                  },
+                  {
+                    "codigo": "02-02-0044",
+                    "nombre": "Filtro de aceite separador SFW 2073",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 204.45,
+                    "totalBsSalida": 204.45
+                  },
+                  {
+                    "codigo": "02-02-0056",
+                    "nombre": "Filtro de aceite 7w2326",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 410,
+                    "totalBsSalida": 410
+                  }
+                ]
+              },
+              {
+                "codigo": "02-03",
+                "nombre": "Filtros de Aire",
+                "productos": [
+                  {
+                    "codigo": "02-03-0009",
+                    "nombre": "Filtro de Aire SFA 1829",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 1648.65,
+                    "totalBsSalida": 1648.65
+                  },
+                  {
+                    "codigo": "02-03-0013",
+                    "nombre": "Filtro de Aire AP 780",
+                    "unidad": "Pieza",
+                    "salidaQty": 2,
+                    "precioUnit": 87,
+                    "totalBsSalida": 174
+                  },
+                  {
+                    "codigo": "02-03-0049",
+                    "nombre": "FILTRO SEPARADOR DE AIRE ACEITE KV415-003",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              },
+              {
+                "codigo": "02-04",
+                "nombre": "Filtro hidraulico",
+                "productos": [
+                  {
+                    "codigo": "02-04-0020",
+                    "nombre": "Filtro trampera de agua CAT P 4415111",
+                    "unidad": "UND",
+                    "salidaQty": 1,
+                    "precioUnit": 290,
+                    "totalBsSalida": 290
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "05",
+            "nombre": "MAT.DE CONST. Y EQUIPO",
+            "totalBsSalida": 26254.36,
+            "totalBsSalidaMenos13": 22841.29,
+            "subGrupos": [
+              {
+                "codigo": "05",
+                "nombre": "MAT.DE CONST. Y EQUIPO",
+                "productos": [
+                  {
+                    "codigo": "05-01-0003",
+                    "nombre": "Alambre de Amarre",
+                    "unidad": "Kilos",
+                    "salidaQty": 37,
+                    "precioUnit": 21.3397,
+                    "totalBsSalida": 789.57
+                  },
+                  {
+                    "codigo": "05-01-0004",
+                    "nombre": "Lija metalica",
+                    "unidad": "Hojas",
+                    "salidaQty": 4,
+                    "precioUnit": 5.9288,
+                    "totalBsSalida": 23.72
+                  },
+                  {
+                    "codigo": "05-01-0010",
+                    "nombre": "Ventana metalica 50x50",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 403.07,
+                    "totalBsSalida": 1612.28
+                  },
+                  {
+                    "codigo": "05-01-0020",
+                    "nombre": "Cemento blanco",
+                    "unidad": "Kilos",
+                    "salidaQty": 50,
+                    "precioUnit": 11.4216,
+                    "totalBsSalida": 571.08
+                  },
+                  {
+                    "codigo": "05-01-0025",
+                    "nombre": "Piruliador",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 91.35,
+                    "totalBsSalida": 91.35
+                  },
+                  {
+                    "codigo": "05-01-0026",
+                    "nombre": "Baldes de construccion de plastico",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 21.96,
+                    "totalBsSalida": 87.84
+                  },
+                  {
+                    "codigo": "05-01-0028",
+                    "nombre": "Yeso",
+                    "unidad": "bolsa",
+                    "salidaQty": 151,
+                    "precioUnit": 25.6583,
+                    "totalBsSalida": 3874.4
+                  },
+                  {
+                    "codigo": "05-01-0031",
+                    "nombre": "Viguetas de cemento",
+                    "unidad": "Piezas",
+                    "salidaQty": 13,
+                    "precioUnit": 102.6385,
+                    "totalBsSalida": 1334.3
+                  }
+                ]
+              },
+              {
+                "codigo": "05-01",
+                "nombre": "MATERIAL DE CONSTRUCCION Y OTROS",
+                "productos": [
+                  {
+                    "codigo": "05-01-0007",
+                    "nombre": "LADRILLO DE 6 HUECOS",
+                    "unidad": "PIEZA",
+                    "salidaQty": 90,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "05-01-0008",
+                    "nombre": "CEMENTO DE CONSTRUCCION",
+                    "unidad": "BOLSA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "05-01-0018",
+                    "nombre": "CALAMINA TRAPOZOIDAL DIF. MEDIDAS",
+                    "unidad": "PIEZA",
+                    "salidaQty": 180,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "05-01-0022",
+                    "nombre": "Ceramica doble 60x60",
+                    "unidad": "Caja",
+                    "salidaQty": 172,
+                    "precioUnit": 103.8943,
+                    "totalBsSalida": 17869.82
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "06",
+            "nombre": "ACEITES ,GRASAS,LUBRICANTES",
+            "totalBsSalida": 29701.41,
+            "totalBsSalidaMenos13": 25840.23,
+            "subGrupos": [
+              {
+                "codigo": "06",
+                "nombre": "ACEITES ,GRASAS,LUBRICANTES",
+                "productos": [
+                  {
+                    "codigo": "06-01-0001",
+                    "nombre": "Aceite hidraulico 68",
+                    "unidad": "litros",
+                    "salidaQty": 40,
+                    "precioUnit": 40.8477,
+                    "totalBsSalida": 1633.91
+                  },
+                  {
+                    "codigo": "06-01-0002",
+                    "nombre": "Aceite shell rimula 15W40",
+                    "unidad": "Litros",
+                    "salidaQty": 100,
+                    "precioUnit": 92.11,
+                    "totalBsSalida": 9211
+                  },
+                  {
+                    "codigo": "06-01-0004",
+                    "nombre": "Aceite 80W90 IPIRANGA",
+                    "unidad": "Litros",
+                    "salidaQty": 2,
+                    "precioUnit": 38.4057,
+                    "totalBsSalida": 76.81
+                  },
+                  {
+                    "codigo": "06-01-0007",
+                    "nombre": "Aceite 5W30",
+                    "unidad": "Litros",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "06-01-0010",
+                    "nombre": "Liquido de freno d 1 ltr",
+                    "unidad": "Litros",
+                    "salidaQty": 2,
+                    "precioUnit": 90,
+                    "totalBsSalida": 180
+                  },
+                  {
+                    "codigo": "06-01-0011",
+                    "nombre": "Anticongelante",
+                    "unidad": "Litros",
+                    "salidaQty": 32,
+                    "precioUnit": 69.4357,
+                    "totalBsSalida": 2221.94
+                  },
+                  {
+                    "codigo": "06-01-0014",
+                    "nombre": "Agua destilada",
+                    "unidad": "Litros",
+                    "salidaQty": 2,
+                    "precioUnit": 12.8429,
+                    "totalBsSalida": 25.69
+                  },
+                  {
+                    "codigo": "06-01-0015",
+                    "nombre": "Aceite SAE 40",
+                    "unidad": "Litros",
+                    "salidaQty": 2,
+                    "precioUnit": 27.556,
+                    "totalBsSalida": 55.11
+                  },
+                  {
+                    "codigo": "06-01-0018",
+                    "nombre": "Liquido hidraulico",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 28.9489,
+                    "totalBsSalida": 28.95
+                  },
+                  {
+                    "codigo": "06-01-0020",
+                    "nombre": "Grasa de litio",
+                    "unidad": "Kilos",
+                    "salidaQty": 80,
+                    "precioUnit": 66.8026,
+                    "totalBsSalida": 5344.21
+                  },
+                  {
+                    "codigo": "06-02-0002",
+                    "nombre": "Foco Farol 12v",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 26.1,
+                    "totalBsSalida": 52.2
+                  },
+                  {
+                    "codigo": "06-02-0007",
+                    "nombre": "Silicona de tablero",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 24.6067,
+                    "totalBsSalida": 98.43
+                  },
+                  {
+                    "codigo": "06-02-0009",
+                    "nombre": "vipal de diferentes tamaños Parches",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 26.4093,
+                    "totalBsSalida": 26.41
+                  },
+                  {
+                    "codigo": "06-02-0010",
+                    "nombre": "Afloja todo vistony",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 47.85,
+                    "totalBsSalida": 239.25
+                  },
+                  {
+                    "codigo": "06-02-0011",
+                    "nombre": "Limpia contactos",
+                    "unidad": "Piezas",
+                    "salidaQty": 3,
+                    "precioUnit": 46.7836,
+                    "totalBsSalida": 140.35
+                  },
+                  {
+                    "codigo": "06-02-0037",
+                    "nombre": "Limpia inyectores spray motor gasolina",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 39.15,
+                    "totalBsSalida": 39.15
+                  },
+                  {
+                    "codigo": "06-02-0060",
+                    "nombre": "Mordaza de freno Hilux",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 8350,
+                    "totalBsSalida": 8350
+                  },
+                  {
+                    "codigo": "06-02-0082",
+                    "nombre": "Pastillas de preno LDO47-GA 56",
+                    "unidad": "Juego",
+                    "salidaQty": 1,
+                    "precioUnit": 320,
+                    "totalBsSalida": 320
+                  },
+                  {
+                    "codigo": "06-02-0105",
+                    "nombre": "Inyector",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 522,
+                    "totalBsSalida": 522
+                  }
+                ]
+              },
+              {
+                "codigo": "06-01",
+                "nombre": "ACEITE LUBRICANTE Y ADITIVOS",
+                "productos": [
+                  {
+                    "codigo": "06-01-0045",
+                    "nombre": "GRASA PARA RODAMIENTO",
+                    "unidad": "PIEZA",
+                    "salidaQty": 3,
+                    "precioUnit": 140,
+                    "totalBsSalida": 420
+                  }
+                ]
+              },
+              {
+                "codigo": "06-02",
+                "nombre": "ACCESORIOS MATERIALES P/ VEHICULOS",
+                "productos": [
+                  {
+                    "codigo": "06-02-0035",
+                    "nombre": "LIMPIA CARBURADOR",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "06-02-0043",
+                    "nombre": "BUJE DE MUELLE #2",
+                    "unidad": "PIEZA",
+                    "salidaQty": 12,
+                    "precioUnit": 15,
+                    "totalBsSalida": 180
+                  },
+                  {
+                    "codigo": "06-02-0070",
+                    "nombre": "GUARDAPOLVO P/ CILINDRO",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 15,
+                    "totalBsSalida": 60
+                  },
+                  {
+                    "codigo": "06-02-0106",
+                    "nombre": "TAPA DE RADIADOR TR-42",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 50,
+                    "totalBsSalida": 50
+                  },
+                  {
+                    "codigo": "06-02-0108",
+                    "nombre": "ABRASADERAS DE 3/4\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 5,
+                    "totalBsSalida": 10
+                  },
+                  {
+                    "codigo": "06-02-0109",
+                    "nombre": "MANGUERA DE 3/8\"",
+                    "unidad": "METRO",
+                    "salidaQty": 6,
+                    "precioUnit": 50,
+                    "totalBsSalida": 300
+                  },
+                  {
+                    "codigo": "06-02-0112",
+                    "nombre": "MANGUERA DE COMBUSTIBLE DE 3/4\"",
+                    "unidad": "METRO",
+                    "salidaQty": 1,
+                    "precioUnit": 60,
+                    "totalBsSalida": 60
+                  },
+                  {
+                    "codigo": "06-02-0113",
+                    "nombre": "MANGUERA DE COMBUSTIBLE DE 1/2\"",
+                    "unidad": "METRO",
+                    "salidaQty": 1,
+                    "precioUnit": 56,
+                    "totalBsSalida": 56
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "07",
+            "nombre": "ABRASIVOS EN GENERAL",
+            "totalBsSalida": 1124.33,
+            "totalBsSalidaMenos13": 978.17,
+            "subGrupos": [
+              {
+                "codigo": "07-01",
+                "nombre": "Piedra esmeril, fierros, brocas etc.",
+                "productos": [
+                  {
+                    "codigo": "07-01-0002",
+                    "nombre": "Disco de corte NORTON de 9\"",
+                    "unidad": "Pieza",
+                    "salidaQty": 3,
+                    "precioUnit": 29.7739,
+                    "totalBsSalida": 89.32
+                  },
+                  {
+                    "codigo": "07-01-0004",
+                    "nombre": "Disco de corte NORTON de 9\" 5/65x 7/8",
+                    "unidad": "pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 28.1333,
+                    "totalBsSalida": 28.13
+                  },
+                  {
+                    "codigo": "07-01-0009",
+                    "nombre": "Disco de desgaste de 9",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 46.98,
+                    "totalBsSalida": 46.98
+                  },
+                  {
+                    "codigo": "07-01-0010",
+                    "nombre": "Disco de corte p/madera de 60 dientes",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 959.9,
+                    "totalBsSalida": 959.9
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "08",
+            "nombre": "PINTURA, OCRE, OLEO",
+            "totalBsSalida": 1057.58,
+            "totalBsSalidaMenos13": 920.09,
+            "subGrupos": [
+              {
+                "codigo": "08",
+                "nombre": "PINTURA, OCRE, OLEO",
+                "productos": [
+                  {
+                    "codigo": "08-01-0001",
+                    "nombre": "Pintura sintetica Monopol de 3.5 Lts",
+                    "unidad": "Tarro",
+                    "salidaQty": 4,
+                    "precioUnit": 164.344,
+                    "totalBsSalida": 657.38
+                  },
+                  {
+                    "codigo": "08-01-0004",
+                    "nombre": "Pintura en spray",
+                    "unidad": "Pieza",
+                    "salidaQty": 23,
+                    "precioUnit": 17.4,
+                    "totalBsSalida": 400.2
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "09",
+            "nombre": "MATERIAL DE EFICIENCIA SEG. INDUSTRIAL",
+            "totalBsSalida": 4839,
+            "totalBsSalidaMenos13": 4209.93,
+            "subGrupos": [
+              {
+                "codigo": "09",
+                "nombre": "MATERIAL DE EFICIENCIA SEG. INDUSTRIAL",
+                "productos": [
+                  {
+                    "codigo": "09-01-0001",
+                    "nombre": "Guantes de cuero oscaria con friza",
+                    "unidad": "Par",
+                    "salidaQty": 4,
+                    "precioUnit": 53.96,
+                    "totalBsSalida": 215.84
+                  },
+                  {
+                    "codigo": "09-01-0004",
+                    "nombre": "Respirador 7502 de dos vias",
+                    "unidad": "Piezas",
+                    "salidaQty": 3,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "09-01-0008",
+                    "nombre": "Guantes de lana palma de goma ASATEX",
+                    "unidad": "Par",
+                    "salidaQty": 18,
+                    "precioUnit": 10.95,
+                    "totalBsSalida": 197.1
+                  },
+                  {
+                    "codigo": "09-01-0011",
+                    "nombre": "Lentes de seguridad claros y oscuros",
+                    "unidad": "Piezas",
+                    "salidaQty": 6,
+                    "precioUnit": 66.415,
+                    "totalBsSalida": 398.49
+                  },
+                  {
+                    "codigo": "09-01-0012",
+                    "nombre": "Botines de seguridad",
+                    "unidad": "Par",
+                    "salidaQty": 2,
+                    "precioUnit": 309.738,
+                    "totalBsSalida": 619.48
+                  },
+                  {
+                    "codigo": "09-01-0013",
+                    "nombre": "Overoles tipo buzo",
+                    "unidad": "Piezas",
+                    "salidaQty": 6,
+                    "precioUnit": 109.3782,
+                    "totalBsSalida": 656.27
+                  },
+                  {
+                    "codigo": "09-01-0014",
+                    "nombre": "Overol Termico",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 328.015,
+                    "totalBsSalida": 656.03
+                  },
+                  {
+                    "codigo": "09-01-0015",
+                    "nombre": "Botas de Goma punta de acero",
+                    "unidad": "Par",
+                    "salidaQty": 1,
+                    "precioUnit": 292.3222,
+                    "totalBsSalida": 292.32
+                  },
+                  {
+                    "codigo": "09-01-0016",
+                    "nombre": "Guantes de cuero palma reforzada",
+                    "unidad": "Par",
+                    "salidaQty": 7,
+                    "precioUnit": 27.4046,
+                    "totalBsSalida": 191.83
+                  },
+                  {
+                    "codigo": "09-01-0017",
+                    "nombre": "Protector auditivo",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 11.3851,
+                    "totalBsSalida": 11.39
+                  },
+                  {
+                    "codigo": "09-01-0018",
+                    "nombre": "Filtro tipo disco  2097",
+                    "unidad": "par",
+                    "salidaQty": 3,
+                    "precioUnit": 85.0378,
+                    "totalBsSalida": 255.11
+                  },
+                  {
+                    "codigo": "09-01-0020",
+                    "nombre": "Guantes latex",
+                    "unidad": "par",
+                    "salidaQty": 8,
+                    "precioUnit": 8.7,
+                    "totalBsSalida": 69.6
+                  },
+                  {
+                    "codigo": "09-01-0021",
+                    "nombre": "Carrileras para Casco",
+                    "unidad": "Piezas",
+                    "salidaQty": 8,
+                    "precioUnit": 23.4685,
+                    "totalBsSalida": 187.75
+                  },
+                  {
+                    "codigo": "09-01-0024",
+                    "nombre": "Casco tipo gorro blanco",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 65.25,
+                    "totalBsSalida": 326.25
+                  },
+                  {
+                    "codigo": "09-01-0029",
+                    "nombre": "Legionarios tipo sombrero",
+                    "unidad": "Piezas",
+                    "salidaQty": 7,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "09-01-0032",
+                    "nombre": "Porta lamparas p/ casco",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 8.7,
+                    "totalBsSalida": 34.8
+                  },
+                  {
+                    "codigo": "09-01-0044",
+                    "nombre": "Arnes de seguridad MSA",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 420.5,
+                    "totalBsSalida": 420.5
+                  },
+                  {
+                    "codigo": "09-01-0045",
+                    "nombre": "Guantes asatex con hilo engomado",
+                    "unidad": "Par",
+                    "salidaQty": 2,
+                    "precioUnit": 13.92,
+                    "totalBsSalida": 27.84
+                  },
+                  {
+                    "codigo": "09-01-0049",
+                    "nombre": "Tafilete p/ casco tipo jokey",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 60.9,
+                    "totalBsSalida": 60.9
+                  },
+                  {
+                    "codigo": "09-01-0054",
+                    "nombre": "Cinturon porta lampara con cabo de vida",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 217.5,
+                    "totalBsSalida": 217.5
+                  }
+                ]
+              },
+              {
+                "codigo": "09-01",
+                "nombre": "GUANTES, BOTAS Y OTROS",
+                "productos": [
+                  {
+                    "codigo": "09-01-0055",
+                    "nombre": "CINTA DE PRECAUCION",
+                    "unidad": "ROLLO",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "09-01-0060",
+                    "nombre": "CARTEL DE SEÑALIZACION",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "10",
+            "nombre": "CAÑERIAS EN GENERAL",
+            "totalBsSalida": 23407.1,
+            "totalBsSalidaMenos13": 20364.18,
+            "subGrupos": [
+              {
+                "codigo": "10",
+                "nombre": "CAÑERIAS EN GENERAL",
+                "productos": [
+                  {
+                    "codigo": "10-01-0001",
+                    "nombre": "Union patente de 2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 191.4683,
+                    "totalBsSalida": 382.94
+                  },
+                  {
+                    "codigo": "10-01-0002",
+                    "nombre": "Union patente de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 13.5938,
+                    "totalBsSalida": 13.59
+                  },
+                  {
+                    "codigo": "10-01-0005",
+                    "nombre": "Union patente de 3\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 12,
+                    "precioUnit": 761.5,
+                    "totalBsSalida": 9138
+                  },
+                  {
+                    "codigo": "10-01-0013",
+                    "nombre": "Codo de 2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 90.7275,
+                    "totalBsSalida": 453.64
+                  },
+                  {
+                    "codigo": "10-01-0021",
+                    "nombre": "Tee de 2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 7,
+                    "precioUnit": 128.635,
+                    "totalBsSalida": 900.45
+                  },
+                  {
+                    "codigo": "10-01-0022",
+                    "nombre": "Niple de 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 16.972,
+                    "totalBsSalida": 16.97
+                  },
+                  {
+                    "codigo": "10-01-0024",
+                    "nombre": "Reduccion de 1\" a 1/2\" tipo campana",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 16.0613,
+                    "totalBsSalida": 16.06
+                  },
+                  {
+                    "codigo": "10-01-0026",
+                    "nombre": "Niple de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 9.57,
+                    "totalBsSalida": 38.28
+                  },
+                  {
+                    "codigo": "10-01-0028",
+                    "nombre": "Cupla de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 10.44,
+                    "totalBsSalida": 10.44
+                  },
+                  {
+                    "codigo": "10-01-0031",
+                    "nombre": "Codos de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 15.66,
+                    "totalBsSalida": 31.32
+                  },
+                  {
+                    "codigo": "10-01-0035",
+                    "nombre": "Niple de 2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 3,
+                    "precioUnit": 78.1425,
+                    "totalBsSalida": 234.43
+                  },
+                  {
+                    "codigo": "10-02-0002",
+                    "nombre": "Union patente de 1\" de PVC",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 21.3761,
+                    "totalBsSalida": 21.38
+                  },
+                  {
+                    "codigo": "10-02-0008",
+                    "nombre": "Union Patente de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 14,
+                    "precioUnit": 10.1138,
+                    "totalBsSalida": 141.59
+                  },
+                  {
+                    "codigo": "10-02-0009",
+                    "nombre": "Codo de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 15,
+                    "precioUnit": 4.905,
+                    "totalBsSalida": 73.58
+                  },
+                  {
+                    "codigo": "10-02-0012",
+                    "nombre": "Niple de 3/4\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 3.045,
+                    "totalBsSalida": 6.09
+                  },
+                  {
+                    "codigo": "10-02-0013",
+                    "nombre": "Codo de 3/4\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 13.05,
+                    "totalBsSalida": 52.2
+                  },
+                  {
+                    "codigo": "10-02-0014",
+                    "nombre": "Niple de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 7,
+                    "precioUnit": 3.5443,
+                    "totalBsSalida": 24.81
+                  },
+                  {
+                    "codigo": "10-02-0016",
+                    "nombre": "Niple de 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 5.6532,
+                    "totalBsSalida": 5.65
+                  },
+                  {
+                    "codigo": "10-02-0017",
+                    "nombre": "Cupla de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 10,
+                    "precioUnit": 4.5365,
+                    "totalBsSalida": 45.37
+                  },
+                  {
+                    "codigo": "10-02-0019",
+                    "nombre": "Codo de 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 13.765,
+                    "totalBsSalida": 13.77
+                  },
+                  {
+                    "codigo": "10-02-0024",
+                    "nombre": "Tee de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 11,
+                    "precioUnit": 8.4866,
+                    "totalBsSalida": 93.35
+                  },
+                  {
+                    "codigo": "10-02-0026",
+                    "nombre": "Reduccion de 3/4\" a 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 5.7094,
+                    "totalBsSalida": 28.55
+                  },
+                  {
+                    "codigo": "10-02-0031",
+                    "nombre": "Reduccion de 3\" a 2\" tipo buje",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 56.55,
+                    "totalBsSalida": 56.55
+                  },
+                  {
+                    "codigo": "10-02-0033",
+                    "nombre": "Cupla de 3\" PVC",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 82.65,
+                    "totalBsSalida": 165.3
+                  },
+                  {
+                    "codigo": "10-03-0004",
+                    "nombre": "Semicodo de 4\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 25.9188,
+                    "totalBsSalida": 103.68
+                  },
+                  {
+                    "codigo": "10-03-0006",
+                    "nombre": "Y de 4\" a  2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 77.5,
+                    "totalBsSalida": 310
+                  },
+                  {
+                    "codigo": "10-03-0009",
+                    "nombre": "Semicodo de 2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 21,
+                    "totalBsSalida": 21
+                  },
+                  {
+                    "codigo": "10-03-0017",
+                    "nombre": "Material de desague",
+                    "unidad": "lote",
+                    "salidaQty": 1,
+                    "precioUnit": 10559.19,
+                    "totalBsSalida": 10559.19
+                  },
+                  {
+                    "codigo": "10-03-0020",
+                    "nombre": "Caja sifonada de 4x2 PVC",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 112.23,
+                    "totalBsSalida": 448.92
+                  }
+                ]
+              },
+              {
+                "codigo": "10-02",
+                "nombre": "ACCESORIO PARA CAÑERIA PVC",
+                "productos": [
+                  {
+                    "codigo": "10-02-0039",
+                    "nombre": "TAPON MACHO DE 1\" PVC",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "11",
+            "nombre": "LLAVE DE PASO",
+            "totalBsSalida": 1677.56,
+            "totalBsSalidaMenos13": 1459.48,
+            "subGrupos": [
+              {
+                "codigo": "11",
+                "nombre": "LLAVE DE PASO",
+                "productos": [
+                  {
+                    "codigo": "11-01-0001",
+                    "nombre": "Llave de paso de 1/2\" Tipo bola",
+                    "unidad": "Piezas",
+                    "salidaQty": 10,
+                    "precioUnit": 73.2632,
+                    "totalBsSalida": 732.63
+                  },
+                  {
+                    "codigo": "11-01-0003",
+                    "nombre": "Llave de paso de 1 \" tipo bola",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 115.767,
+                    "totalBsSalida": 231.53
+                  },
+                  {
+                    "codigo": "11-01-0006",
+                    "nombre": "Llave de paso de 3/4\" tipo cortina",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 130.5,
+                    "totalBsSalida": 261
+                  },
+                  {
+                    "codigo": "11-01-0012",
+                    "nombre": "Llave de paso para Duchas",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 113.1,
+                    "totalBsSalida": 452.4
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "12",
+            "nombre": "HERRAMIENTAS EN GENERAL",
+            "totalBsSalida": 98147.85,
+            "totalBsSalidaMenos13": 85388.63,
+            "subGrupos": [
+              {
+                "codigo": "12",
+                "nombre": "HERRAMIENTAS EN GENERAL",
+                "productos": [
+                  {
+                    "codigo": "12-02-0057",
+                    "nombre": "Interruptorres sobreesponer",
+                    "unidad": "Piezas",
+                    "salidaQty": 10,
+                    "precioUnit": 5.22,
+                    "totalBsSalida": 52.2
+                  },
+                  {
+                    "codigo": "12-02-0073",
+                    "nombre": "Material electrico y accesorios",
+                    "unidad": "juego",
+                    "salidaQty": 1,
+                    "precioUnit": 7705.6617,
+                    "totalBsSalida": 7705.66
+                  },
+                  {
+                    "codigo": "12-02-0074",
+                    "nombre": "Perno maquina de 1/4\"x1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 30,
+                    "precioUnit": 1.0875,
+                    "totalBsSalida": 32.63
+                  },
+                  {
+                    "codigo": "12-02-0084",
+                    "nombre": "Cable de acero de 5/16\" de 7 hebras",
+                    "unidad": "mtros",
+                    "salidaQty": 80,
+                    "precioUnit": 16.182,
+                    "totalBsSalida": 1294.56
+                  },
+                  {
+                    "codigo": "12-02-0093",
+                    "nombre": "Manguera led blanco y accesorios",
+                    "unidad": "lote",
+                    "salidaQty": 25,
+                    "precioUnit": 3201.6,
+                    "totalBsSalida": 80040
+                  },
+                  {
+                    "codigo": "12-04-0001",
+                    "nombre": "La Gotita",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 11.9647,
+                    "totalBsSalida": 11.96
+                  },
+                  {
+                    "codigo": "12-04-0002",
+                    "nombre": "Poxipol",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 21.75,
+                    "totalBsSalida": 43.5
+                  },
+                  {
+                    "codigo": "12-04-0003",
+                    "nombre": "Poxilina",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 23.9932,
+                    "totalBsSalida": 23.99
+                  },
+                  {
+                    "codigo": "12-04-0006",
+                    "nombre": "Sellamax",
+                    "unidad": "pomo",
+                    "salidaQty": 1,
+                    "precioUnit": 43.5,
+                    "totalBsSalida": 43.5
+                  },
+                  {
+                    "codigo": "12-04-0010",
+                    "nombre": "Silicona Mega Grey",
+                    "unidad": "Pomo",
+                    "salidaQty": 5,
+                    "precioUnit": 38.976,
+                    "totalBsSalida": 194.88
+                  }
+                ]
+              },
+              {
+                "codigo": "12-01",
+                "nombre": "HERRAMIENTAS EN GENERAL",
+                "productos": [
+                  {
+                    "codigo": "12-01-0001",
+                    "nombre": "Alicate universal SATA de 8\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 69.125,
+                    "totalBsSalida": 138.25
+                  },
+                  {
+                    "codigo": "12-01-0002",
+                    "nombre": "Flexometro TRUPER de 5 mts",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 49.0357,
+                    "totalBsSalida": 245.18
+                  },
+                  {
+                    "codigo": "12-01-0003",
+                    "nombre": "Pala arenera TRUPER",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 133.6033,
+                    "totalBsSalida": 267.21
+                  },
+                  {
+                    "codigo": "12-01-0004",
+                    "nombre": "Picota con mango TRAMONTINA",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 155.3267,
+                    "totalBsSalida": 310.65
+                  },
+                  {
+                    "codigo": "12-01-0006",
+                    "nombre": "Cepillo de acero manual",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 13.05,
+                    "totalBsSalida": 26.1
+                  },
+                  {
+                    "codigo": "12-01-0012",
+                    "nombre": "Brocas para metal de",
+                    "unidad": "Juego",
+                    "salidaQty": 1,
+                    "precioUnit": 154.7321,
+                    "totalBsSalida": 154.73
+                  },
+                  {
+                    "codigo": "12-01-0013",
+                    "nombre": "Alicates de punta",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 74.8823,
+                    "totalBsSalida": 74.88
+                  },
+                  {
+                    "codigo": "12-01-0021",
+                    "nombre": "Brochas de 3\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 35,
+                    "totalBsSalida": 35
+                  },
+                  {
+                    "codigo": "12-01-0023",
+                    "nombre": "Brochas de 2",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 25,
+                    "totalBsSalida": 25
+                  },
+                  {
+                    "codigo": "12-01-0025",
+                    "nombre": "RODILLO DE ESPONJA",
+                    "unidad": "PIEZA",
+                    "salidaQty": 3,
+                    "precioUnit": 48,
+                    "totalBsSalida": 144
+                  },
+                  {
+                    "codigo": "12-01-0028",
+                    "nombre": "Pistola para  Silicona",
+                    "unidad": "Piezas",
+                    "salidaQty": 3,
+                    "precioUnit": 67.86,
+                    "totalBsSalida": 203.58
+                  },
+                  {
+                    "codigo": "12-01-0032",
+                    "nombre": "Martillo de Carpintero",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 59.7333,
+                    "totalBsSalida": 119.47
+                  },
+                  {
+                    "codigo": "12-01-0033",
+                    "nombre": "Combo de 4  libras",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 118.086,
+                    "totalBsSalida": 118.09
+                  },
+                  {
+                    "codigo": "12-01-0035",
+                    "nombre": "Sierra mecanica",
+                    "unidad": "Hojas",
+                    "salidaQty": 3,
+                    "precioUnit": 9.6721,
+                    "totalBsSalida": 29.02
+                  },
+                  {
+                    "codigo": "12-01-0036",
+                    "nombre": "Cateador",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 620.6,
+                    "totalBsSalida": 620.6
+                  },
+                  {
+                    "codigo": "12-01-0044",
+                    "nombre": "Llave cresen de 12\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 127.765,
+                    "totalBsSalida": 127.77
+                  },
+                  {
+                    "codigo": "12-01-0046",
+                    "nombre": "Laves de auto perforantes",
+                    "unidad": "Piezas",
+                    "salidaQty": 3,
+                    "precioUnit": 10.62,
+                    "totalBsSalida": 31.86
+                  },
+                  {
+                    "codigo": "12-01-0051",
+                    "nombre": "Brocabarreno de 5/8\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 110.925,
+                    "totalBsSalida": 110.93
+                  },
+                  {
+                    "codigo": "12-01-0055",
+                    "nombre": "Carretillas Mineras",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 603.385,
+                    "totalBsSalida": 603.39
+                  },
+                  {
+                    "codigo": "12-01-0064",
+                    "nombre": "Escuadras Magneticas TRUPER",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 169.1333,
+                    "totalBsSalida": 169.13
+                  },
+                  {
+                    "codigo": "12-01-0082",
+                    "nombre": "Pico de Graseras",
+                    "unidad": "Juego",
+                    "salidaQty": 2,
+                    "precioUnit": 17.4,
+                    "totalBsSalida": 34.8
+                  },
+                  {
+                    "codigo": "12-01-0087",
+                    "nombre": "Acoples y conectores rapidos p/ mangueras",
+                    "unidad": "juego",
+                    "salidaQty": 1,
+                    "precioUnit": 43.5,
+                    "totalBsSalida": 43.5
+                  },
+                  {
+                    "codigo": "12-01-0088",
+                    "nombre": "pistolaa para sopletear",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 104.4,
+                    "totalBsSalida": 104.4
+                  },
+                  {
+                    "codigo": "12-01-0105",
+                    "nombre": "Grasera de 4 kilos",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 1363,
+                    "totalBsSalida": 1363
+                  },
+                  {
+                    "codigo": "12-01-0109",
+                    "nombre": "Amoladora de 4.1/2\" BOSCH",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 1609,
+                    "totalBsSalida": 1609
+                  },
+                  {
+                    "codigo": "12-01-0122",
+                    "nombre": "Letras de golpe",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 43.5,
+                    "totalBsSalida": 43.5
+                  },
+                  {
+                    "codigo": "12-01-0133",
+                    "nombre": "Calibrador de aire",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 66.12,
+                    "totalBsSalida": 66.12
+                  },
+                  {
+                    "codigo": "12-01-0145",
+                    "nombre": "GATA HIDRAULICA DE 32 TN.",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              },
+              {
+                "codigo": "12-02",
+                "nombre": "MATERIAL ELECTRICO",
+                "productos": [
+                  {
+                    "codigo": "12-02-0001",
+                    "nombre": "Cinta vulcanizante 3M",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 152.25,
+                    "totalBsSalida": 304.5
+                  },
+                  {
+                    "codigo": "12-02-0002",
+                    "nombre": "PILAS RECARGABLES",
+                    "unidad": "JUEGO",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0003",
+                    "nombre": "Cinta maskin de 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 3,
+                    "precioUnit": 10.3844,
+                    "totalBsSalida": 31.15
+                  },
+                  {
+                    "codigo": "12-02-0016",
+                    "nombre": "Cinta aislante de 3/4\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 14,
+                    "precioUnit": 24.495,
+                    "totalBsSalida": 342.93
+                  },
+                  {
+                    "codigo": "12-02-0022",
+                    "nombre": "Foco led de 30 w",
+                    "unidad": "Piezas",
+                    "salidaQty": 8,
+                    "precioUnit": 25.0073,
+                    "totalBsSalida": 200.06
+                  },
+                  {
+                    "codigo": "12-02-0023",
+                    "nombre": "Soquet de colgar de plastico",
+                    "unidad": "Piezas",
+                    "salidaQty": 10,
+                    "precioUnit": 4.485,
+                    "totalBsSalida": 44.85
+                  },
+                  {
+                    "codigo": "12-02-0024",
+                    "nombre": "enchufe macho clavija",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 6.5659,
+                    "totalBsSalida": 6.57
+                  },
+                  {
+                    "codigo": "12-02-0065",
+                    "nombre": "Jabalinas de 5/8\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 21.7525,
+                    "totalBsSalida": 87.01
+                  },
+                  {
+                    "codigo": "12-02-0083",
+                    "nombre": "Conector de jabalina",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 18.6883,
+                    "totalBsSalida": 74.75
+                  },
+                  {
+                    "codigo": "12-02-0085",
+                    "nombre": "Plato expandodo de acero",
+                    "unidad": "Piezas",
+                    "salidaQty": 6,
+                    "precioUnit": 111.36,
+                    "totalBsSalida": 668.16
+                  },
+                  {
+                    "codigo": "12-02-0099",
+                    "nombre": "ABRSADERA FINAL PARA RIEL DE 35MM",
+                    "unidad": "PIEZA",
+                    "salidaQty": 34,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0100",
+                    "nombre": "ABRAZADERA INTERMEDIA P/ RIEL",
+                    "unidad": "PIEZA",
+                    "salidaQty": 124,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0104",
+                    "nombre": "TUBO BERMAN DE 3/4\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 20,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0105",
+                    "nombre": "CONECTOR PARALELO DE 2 PERNOS",
+                    "unidad": "PIEZA",
+                    "salidaQty": 8,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0106",
+                    "nombre": "CRUZETA DE ALMENDRILLO DE 5 PIES",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0107",
+                    "nombre": "DISYUNTOR TERMOMAGNETICO DE 10 AMP",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0108",
+                    "nombre": "ESPIGA PUNTA PARA POSTE DE 28\" 1 3/8\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0109",
+                    "nombre": "FUSIBLE TIPO CHICOTILLO 3 K",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0111",
+                    "nombre": "PERNO DE ROSCA COMPLETA DE 5/8\"X22\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0112",
+                    "nombre": "SOPRTE PARA CABLE DE RIENDA OREJA DE MONO",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0113",
+                    "nombre": "TUBERIA ETB 2\"X 2MM",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0114",
+                    "nombre": "TUERCA OJAL DE 5/8\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0115",
+                    "nombre": "VARILLA DE ANCLAJE DE 5/8\"X1.50CM",
+                    "unidad": "PIEZA",
+                    "salidaQty": 5,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0117",
+                    "nombre": "ARANDELA CURVA CUADRADA DE 21/4X3/16X11/1",
+                    "unidad": "PIEZA",
+                    "salidaQty": 40,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0118",
+                    "nombre": "ARANDELA PLANA CUADRADA 21/4X3/16X11/1",
+                    "unidad": "PIEZA",
+                    "salidaQty": 12,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0119",
+                    "nombre": "MALLA DE PROTECCION ASCR 2 AWG",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0120",
+                    "nombre": "MALLA DE TENSION FL 2AWG",
+                    "unidad": "PIEZA",
+                    "salidaQty": 16,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0121",
+                    "nombre": "MALLA PREFOSMADA DE 5/16\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 12,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0122",
+                    "nombre": "PERNO MAQUINA DE 5/8\"X6\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0123",
+                    "nombre": "PERNO MAQUINA DE 5/8\"X12\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 26,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0124",
+                    "nombre": "PERNO MAQUINA DE 5/8\"X14\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0125",
+                    "nombre": "PERNO MAQUINA DE 5/8\"X16\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0126",
+                    "nombre": "PERNO OJAL DE 5/8\"X12\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0132",
+                    "nombre": "AISLADOR ESPIGA ANSI 56-4",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0133",
+                    "nombre": "SECIONADOR Y FISIBLE DE 27 KVA 100 AMP",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0134",
+                    "nombre": "RACK DE 1 VIA",
+                    "unidad": "PIEZA",
+                    "salidaQty": 8,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0137",
+                    "nombre": "CABLE DE ALUMINIO ASCR N° 2 AWG",
+                    "unidad": "METRO",
+                    "salidaQty": 500,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0138",
+                    "nombre": "CABLE DE ALUMINIO ASCR N° 4 AWG",
+                    "unidad": "METRO",
+                    "salidaQty": 540,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0139",
+                    "nombre": "PARARAYOS POLIMERICO DE 21 KVA 10 K",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0140",
+                    "nombre": "BALANCIN FG PLANO DE 3/16X1/4\"X30\"",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0142",
+                    "nombre": "AISLADOR POLIMERICO DE SUSPENSION 35 KVA",
+                    "unidad": "PIEZA",
+                    "salidaQty": 5,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0143",
+                    "nombre": "COPLA BL",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0144",
+                    "nombre": "COPLA FCL",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0145",
+                    "nombre": "GRAPA DE LINEA VIVA AWG 6 336 MCM",
+                    "unidad": "PIEZA",
+                    "salidaQty": 9,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0147",
+                    "nombre": "MALLA DE TENSION FL 4 AWG",
+                    "unidad": "PIEZA",
+                    "salidaQty": 8,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0148",
+                    "nombre": "MANILLA ZAPATILLA 4/0 AWG",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0152",
+                    "nombre": "TREPADORA PARA POSTE DE MADERA",
+                    "unidad": "PIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0154",
+                    "nombre": "CAUTIN DE 100 W",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0157",
+                    "nombre": "AISLADOR TIPO CARRETE DE PORCELANA 53-2",
+                    "unidad": "PIEZA",
+                    "salidaQty": 8,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "12-02-0161",
+                    "nombre": "CONECTOR EN PARALELO DE 1 PERNO",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              },
+              {
+                "codigo": "12-03",
+                "nombre": "MATERIAL DE SOLDADURA",
+                "productos": [
+                  {
+                    "codigo": "12-03-0009",
+                    "nombre": "Pasta para Soldar",
+                    "unidad": "Pomo",
+                    "salidaQty": 3,
+                    "precioUnit": 36.25,
+                    "totalBsSalida": 108.75
+                  }
+                ]
+              },
+              {
+                "codigo": "12-04",
+                "nombre": "PEGAMENTOS",
+                "productos": [
+                  {
+                    "codigo": "12-04-0004",
+                    "nombre": "Teflon fv.",
+                    "unidad": "Piezas",
+                    "salidaQty": 6,
+                    "precioUnit": 2.8468,
+                    "totalBsSalida": 17.08
+                  },
+                  {
+                    "codigo": "12-04-0008",
+                    "nombre": "PEGAMENTO PVC",
+                    "unidad": "PIEZA",
+                    "salidaQty": 3,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "13",
+            "nombre": "MATERIALES DE MAQUINA YT-27",
+            "totalBsSalida": 267.67,
+            "totalBsSalidaMenos13": 232.87,
+            "subGrupos": [
+              {
+                "codigo": "13",
+                "nombre": "MATERIALES DE MAQUINA YT-27",
+                "productos": [
+                  {
+                    "codigo": "13-01-0002",
+                    "nombre": "Abrazadera de 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 20.604,
+                    "totalBsSalida": 41.21
+                  },
+                  {
+                    "codigo": "13-02-0001",
+                    "nombre": "Garra de acople de 1/2\" con canuto",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 32.9685,
+                    "totalBsSalida": 131.87
+                  },
+                  {
+                    "codigo": "13-02-0006",
+                    "nombre": "Garra de acople rosca ext, de 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 23.6482,
+                    "totalBsSalida": 94.59
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "15",
+            "nombre": "CALLAPO Y MADERAS EN GENERAL",
+            "totalBsSalida": 0,
+            "totalBsSalidaMenos13": 0,
+            "subGrupos": [
+              {
+                "codigo": "15-01",
+                "nombre": "CALLAPO Y MADERAS EN GENERAL",
+                "productos": [
+                  {
+                    "codigo": "15-01-0006",
+                    "nombre": "TABLAS DE 1\"X30\"X4MTRS",
+                    "unidad": "PIEZA",
+                    "salidaQty": 20,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "16",
+            "nombre": "SACOS METALEROS Y BOLSAS",
+            "totalBsSalida": 234.27,
+            "totalBsSalidaMenos13": 203.81,
+            "subGrupos": [
+              {
+                "codigo": "16",
+                "nombre": "SACOS METALEROS Y BOLSAS",
+                "productos": [
+                  {
+                    "codigo": "16-01-0006",
+                    "nombre": "Bolsas de muestreo 20x35 cm",
+                    "unidad": "Piezas",
+                    "salidaQty": 300,
+                    "precioUnit": 0.7809,
+                    "totalBsSalida": 234.27
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "17",
+            "nombre": "GOMAS P/ VEHICULOS Y EQUIPOS",
+            "totalBsSalida": 0,
+            "totalBsSalidaMenos13": 0,
+            "subGrupos": [
+              {
+                "codigo": "17-01",
+                "nombre": "GOMAS PARA  VEHICULO Y VOLQUETAS",
+                "productos": [
+                  {
+                    "codigo": "17-01-0007",
+                    "nombre": "LLANTA RADIAL 315/80 R 22.5",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "18",
+            "nombre": "REPUESTOS PARA EQUIPOS EQUIPOS",
+            "totalBsSalida": 12120.84,
+            "totalBsSalidaMenos13": 10545.13,
+            "subGrupos": [
+              {
+                "codigo": "18",
+                "nombre": "REPUESTOS PARA EQUIPOS EQUIPOS",
+                "productos": [
+                  {
+                    "codigo": "18-01-0046",
+                    "nombre": "Uñeta p/ excavadora JHONDEERE",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 2424.168,
+                    "totalBsSalida": 12120.84
+                  }
+                ]
+              },
+              {
+                "codigo": "18-01",
+                "nombre": "Repuestos",
+                "productos": [
+                  {
+                    "codigo": "18-01-0057",
+                    "nombre": "UÑAS DE TRIPER",
+                    "unidad": "PIEZA",
+                    "salidaQty": 3,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "28",
+            "nombre": "COMPRESORAS Y PULMONES",
+            "totalBsSalida": 146160,
+            "totalBsSalidaMenos13": 127159.2,
+            "subGrupos": [
+              {
+                "codigo": "28",
+                "nombre": "COMPRESORAS Y PULMONES",
+                "productos": [
+                  {
+                    "codigo": "28-01-0001",
+                    "nombre": "Pulmones de 4200 y 4000 libras",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 73080,
+                    "totalBsSalida": 146160
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "44",
+            "nombre": "RODAMIENTOS Y RETENES",
+            "totalBsSalida": 800,
+            "totalBsSalidaMenos13": 696,
+            "subGrupos": [
+              {
+                "codigo": "44-01",
+                "nombre": "RODAMIENTOS A RODILLO",
+                "productos": [
+                  {
+                    "codigo": "44-01-0006",
+                    "nombre": "rodamiento LM 102949/10",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 290,
+                    "totalBsSalida": 580
+                  }
+                ]
+              },
+              {
+                "codigo": "44-03",
+                "nombre": "RETENES",
+                "productos": [
+                  {
+                    "codigo": "44-03-0013",
+                    "nombre": "RETEN 57X79",
+                    "unidad": "PIEZA",
+                    "salidaQty": 2,
+                    "precioUnit": 80,
+                    "totalBsSalida": 160
+                  },
+                  {
+                    "codigo": "44-03-0014",
+                    "nombre": "ORING DE 3 mm x 28",
+                    "unidad": "PIEZA",
+                    "salidaQty": 4,
+                    "precioUnit": 15,
+                    "totalBsSalida": 60
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "60",
+            "nombre": "PERNOS, TUERCAS, ARANDELAS Y CLAVOS",
+            "totalBsSalida": 1490.25,
+            "totalBsSalidaMenos13": 1296.52,
+            "subGrupos": [
+              {
+                "codigo": "60-01",
+                "nombre": "volandas",
+                "productos": [
+                  {
+                    "codigo": "60-01-0009",
+                    "nombre": "Volandas Planas de 3/4\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 4,
+                    "precioUnit": 1.74,
+                    "totalBsSalida": 6.96
+                  },
+                  {
+                    "codigo": "60-01-0020",
+                    "nombre": "Volandas de presion de 5/8\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 50,
+                    "precioUnit": 1.3046,
+                    "totalBsSalida": 65.23
+                  }
+                ]
+              },
+              {
+                "codigo": "60-02",
+                "nombre": "PERNOS",
+                "productos": [
+                  {
+                    "codigo": "60-02-0008",
+                    "nombre": "Perno de grado de 5/8\"x 2.1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 26,
+                    "precioUnit": 14.7612,
+                    "totalBsSalida": 383.79
+                  },
+                  {
+                    "codigo": "60-02-0018",
+                    "nombre": "Pernos de 1/4\" x 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 8,
+                    "precioUnit": 0.87,
+                    "totalBsSalida": 6.96
+                  },
+                  {
+                    "codigo": "60-02-0038",
+                    "nombre": "Pernos de 3/8\" x 1\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 6,
+                    "precioUnit": 1.1288,
+                    "totalBsSalida": 6.77
+                  },
+                  {
+                    "codigo": "60-02-0040",
+                    "nombre": "Pernos de 3/8\" x 1 1/2\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 13,
+                    "precioUnit": 1.609,
+                    "totalBsSalida": 20.92
+                  }
+                ]
+              },
+              {
+                "codigo": "60-03",
+                "nombre": "clavos",
+                "productos": [
+                  {
+                    "codigo": "60-03-0005",
+                    "nombre": "Clavos de 2.1/2\"",
+                    "unidad": "Kilos",
+                    "salidaQty": 6,
+                    "precioUnit": 30.6703,
+                    "totalBsSalida": 184.02
+                  },
+                  {
+                    "codigo": "60-03-0006",
+                    "nombre": "Clavos de 3\"",
+                    "unidad": "Kilos",
+                    "salidaQty": 20,
+                    "precioUnit": 26.5597,
+                    "totalBsSalida": 531.19
+                  },
+                  {
+                    "codigo": "60-03-0008",
+                    "nombre": "Clavos de 4\"",
+                    "unidad": "Kilos",
+                    "salidaQty": 5,
+                    "precioUnit": 20.0615,
+                    "totalBsSalida": 100.31
+                  },
+                  {
+                    "codigo": "60-03-0009",
+                    "nombre": "Clavos de 5\"",
+                    "unidad": "Kilos",
+                    "salidaQty": 9,
+                    "precioUnit": 18.2807,
+                    "totalBsSalida": 164.53
+                  },
+                  {
+                    "codigo": "60-03-0010",
+                    "nombre": "Clavos de 6\"",
+                    "unidad": "Kilos",
+                    "salidaQty": 1,
+                    "precioUnit": 19.5714,
+                    "totalBsSalida": 19.57
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "62",
+            "nombre": "MANGUERAS, CORREAS, EMPAQUETADURAS",
+            "totalBsSalida": 303.57,
+            "totalBsSalidaMenos13": 264.11,
+            "subGrupos": [
+              {
+                "codigo": "62",
+                "nombre": "MANGUERAS, CORREAS, EMPAQUETADURAS",
+                "productos": [
+                  {
+                    "codigo": "62-01-0002",
+                    "nombre": "Manguera de alta presion de 1\"",
+                    "unidad": "Metros",
+                    "salidaQty": 10,
+                    "precioUnit": 21.357,
+                    "totalBsSalida": 213.57
+                  },
+                  {
+                    "codigo": "62-02-0024",
+                    "nombre": "Correa de goma en \"V\" B-51",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 90,
+                    "totalBsSalida": 90
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "64",
+            "nombre": "CAÑERIAS Y ACCESORIOS",
+            "totalBsSalida": 868.78,
+            "totalBsSalidaMenos13": 755.84,
+            "subGrupos": [
+              {
+                "codigo": "64",
+                "nombre": "CAÑERIAS Y ACCESORIOS",
+                "productos": [
+                  {
+                    "codigo": "64-03-0003",
+                    "nombre": "Cañeria de 3/4\"x 6Mtrs",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 434.39,
+                    "totalBsSalida": 868.78
+                  }
+                ]
+              },
+              {
+                "codigo": "64-02",
+                "nombre": "POLITUBO DE 3\" TRICAPA",
+                "productos": [
+                  {
+                    "codigo": "64-02-0001",
+                    "nombre": "POLITUBO DE 1/2\"",
+                    "unidad": "ROLLO",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "68",
+            "nombre": "FIERROS Y PLANCHAS",
+            "totalBsSalida": 148.35,
+            "totalBsSalidaMenos13": 129.06,
+            "subGrupos": [
+              {
+                "codigo": "68",
+                "nombre": "FIERROS Y PLANCHAS",
+                "productos": [
+                  {
+                    "codigo": "68-03-0003",
+                    "nombre": "Tubo rectangular",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 148.3466,
+                    "totalBsSalida": 148.35
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "72",
+            "nombre": "MATERIAL DE HIGIENE Y SANITARIO",
+            "totalBsSalida": 1014.42,
+            "totalBsSalidaMenos13": 882.55,
+            "subGrupos": [
+              {
+                "codigo": "72",
+                "nombre": "MATERIAL DE HIGIENE Y SANITARIO",
+                "productos": [
+                  {
+                    "codigo": "72-01-0012",
+                    "nombre": "Aspersores",
+                    "unidad": "Piezas",
+                    "salidaQty": 11,
+                    "precioUnit": 92.22,
+                    "totalBsSalida": 1014.42
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "74",
+            "nombre": "SACOS METALEROS",
+            "totalBsSalida": 894.83,
+            "totalBsSalidaMenos13": 778.5,
+            "subGrupos": [
+              {
+                "codigo": "74",
+                "nombre": "SACOS METALEROS",
+                "productos": [
+                  {
+                    "codigo": "74-01-0006",
+                    "nombre": "Pita nilon de 1/2\"",
+                    "unidad": "Mtrs",
+                    "salidaQty": 40,
+                    "precioUnit": 22.3707,
+                    "totalBsSalida": 894.83
+                  }
+                ]
+              },
+              {
+                "codigo": "74-01",
+                "nombre": "KEPERINAS",
+                "productos": [
+                  {
+                    "codigo": "47-01-0010",
+                    "nombre": "KEPERINA",
+                    "unidad": "PIEZA",
+                    "salidaQty": 15,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "76",
+            "nombre": "MATERIAL DE CONSTR FERRETERIA EN GENERAL",
+            "totalBsSalida": 0,
+            "totalBsSalidaMenos13": 0,
+            "subGrupos": [
+              {
+                "codigo": "76",
+                "nombre": "MATERIAL DE CONSTR FERRETERIA EN GENERAL",
+                "productos": [
+                  {
+                    "codigo": "76-02-0009",
+                    "nombre": "Calamina plana n° 28",
+                    "unidad": "Piezas",
+                    "salidaQty": 5,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "80",
+            "nombre": "FERRETERIA EN GENERAL",
+            "totalBsSalida": 89677.44,
+            "totalBsSalidaMenos13": 78019.37,
+            "subGrupos": [
+              {
+                "codigo": "80",
+                "nombre": "FERRETERIA EN GENERAL",
+                "productos": [
+                  {
+                    "codigo": "80-01-0001",
+                    "nombre": "Nivel de mano de 12\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 124.7867,
+                    "totalBsSalida": 124.79
+                  },
+                  {
+                    "codigo": "80-01-0010",
+                    "nombre": "Malla olimpica",
+                    "unidad": "Rollo",
+                    "salidaQty": 13,
+                    "precioUnit": 1499.0769,
+                    "totalBsSalida": 19488
+                  },
+                  {
+                    "codigo": "80-01-0012",
+                    "nombre": "Vidrios dif. Medidas",
+                    "unidad": "Piezas",
+                    "salidaQty": 12,
+                    "precioUnit": 413.1067,
+                    "totalBsSalida": 4957.28
+                  },
+                  {
+                    "codigo": "80-01-0014",
+                    "nombre": "Piso flotante",
+                    "unidad": "Caja",
+                    "salidaQty": 72,
+                    "precioUnit": 356.7,
+                    "totalBsSalida": 25682.4
+                  },
+                  {
+                    "codigo": "80-02-0004",
+                    "nombre": "Chapa soprano de puerta",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 205.6333,
+                    "totalBsSalida": 411.27
+                  },
+                  {
+                    "codigo": "80-02-0005",
+                    "nombre": "Chapa de 3 golpes NEIKE",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 139.2,
+                    "totalBsSalida": 139.2
+                  },
+                  {
+                    "codigo": "80-02-0011",
+                    "nombre": "Chapa para muebles",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 10.44,
+                    "totalBsSalida": 10.44
+                  },
+                  {
+                    "codigo": "80-02-0013",
+                    "nombre": "Alfombra de alto trafico 1.5mm",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 130.5,
+                    "totalBsSalida": 130.5
+                  },
+                  {
+                    "codigo": "80-03-0001",
+                    "nombre": "Costaneras",
+                    "unidad": "Piezas",
+                    "salidaQty": 70,
+                    "precioUnit": 505.5937,
+                    "totalBsSalida": 35391.56
+                  },
+                  {
+                    "codigo": "80-03-0005",
+                    "nombre": "Gata hidraulica p/ tablero",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 1671,
+                    "totalBsSalida": 3342
+                  }
+                ]
+              },
+              {
+                "codigo": "80-03",
+                "nombre": "VARIOS",
+                "productos": [
+                  {
+                    "codigo": "80-03-0004",
+                    "nombre": "PERFILES CINTAS Y PLACAS",
+                    "unidad": "LOTE",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "85",
+            "nombre": "PINTURASMATERIAL DE ESCRITORIO",
+            "totalBsSalida": 9936.34,
+            "totalBsSalidaMenos13": 8644.62,
+            "subGrupos": [
+              {
+                "codigo": "85",
+                "nombre": "PINTURASMATERIAL DE ESCRITORIO",
+                "productos": [
+                  {
+                    "codigo": "85-01-0003",
+                    "nombre": "Revestimiento plastico exteriores de 25 klg.",
+                    "unidad": "Baldes",
+                    "salidaQty": 3,
+                    "precioUnit": 3312.1133,
+                    "totalBsSalida": 9936.34
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "94",
+            "nombre": "MATERIAL DE INGENIERIA",
+            "totalBsSalida": 560.74,
+            "totalBsSalidaMenos13": 487.84,
+            "subGrupos": [
+              {
+                "codigo": "94",
+                "nombre": "MATERIAL DE INGENIERIA",
+                "productos": [
+                  {
+                    "codigo": "94-01-0001",
+                    "nombre": "Lupa de aumento40x metalico",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 149.16,
+                    "totalBsSalida": 149.16
+                  },
+                  {
+                    "codigo": "94-01-0002",
+                    "nombre": "Porta lupa",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 109.09,
+                    "totalBsSalida": 109.09
+                  },
+                  {
+                    "codigo": "94-01-0003",
+                    "nombre": "Reglilas de mapeo",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 69.4238,
+                    "totalBsSalida": 69.42
+                  },
+                  {
+                    "codigo": "94-01-0004",
+                    "nombre": "Rayador normal",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 89.2625,
+                    "totalBsSalida": 89.26
+                  },
+                  {
+                    "codigo": "94-01-0009",
+                    "nombre": "Porta Cateadores",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 143.8125,
+                    "totalBsSalida": 143.81
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "codigo": "99",
+            "nombre": "MATERIAL DE ESCRITORIO",
+            "totalBsSalida": 2920.7,
+            "totalBsSalidaMenos13": 2541.01,
+            "subGrupos": [
+              {
+                "codigo": "99",
+                "nombre": "MATERIAL DE ESCRITORIO",
+                "productos": [
+                  {
+                    "codigo": "99-01-0003",
+                    "nombre": "Cuaderno Espiral t/Carta 100 hj",
+                    "unidad": "Pieza",
+                    "salidaQty": 1,
+                    "precioUnit": 18.125,
+                    "totalBsSalida": 18.13
+                  },
+                  {
+                    "codigo": "99-01-0006",
+                    "nombre": "Folder Amarillo t/Carta",
+                    "unidad": "Pieza",
+                    "salidaQty": 10,
+                    "precioUnit": 1.5238,
+                    "totalBsSalida": 15.24
+                  },
+                  {
+                    "codigo": "99-01-0007",
+                    "nombre": "Folder Amarillo t/Oficio",
+                    "unidad": "Pieza",
+                    "salidaQty": 39,
+                    "precioUnit": 1.6722,
+                    "totalBsSalida": 65.22
+                  },
+                  {
+                    "codigo": "99-01-0011",
+                    "nombre": "Papel Bon t/ Carta",
+                    "unidad": "paquete",
+                    "salidaQty": 7,
+                    "precioUnit": 126.935,
+                    "totalBsSalida": 888.55
+                  },
+                  {
+                    "codigo": "99-01-0012",
+                    "nombre": "Papel Bon t/ oficio",
+                    "unidad": "paquete",
+                    "salidaQty": 2,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "99-01-0013",
+                    "nombre": "Pedido Local",
+                    "unidad": "Block",
+                    "salidaQty": 2,
+                    "precioUnit": 26.1,
+                    "totalBsSalida": 52.2
+                  },
+                  {
+                    "codigo": "99-01-0014",
+                    "nombre": "Solicitud y Pago de Sobretiempos",
+                    "unidad": "Block",
+                    "salidaQty": 3,
+                    "precioUnit": 19.14,
+                    "totalBsSalida": 57.42
+                  },
+                  {
+                    "codigo": "99-01-0015",
+                    "nombre": "Parte Diario de Maquinarias pesadas",
+                    "unidad": "Block",
+                    "salidaQty": 5,
+                    "precioUnit": 20.8814,
+                    "totalBsSalida": 104.41
+                  },
+                  {
+                    "codigo": "99-01-0016",
+                    "nombre": "Muestreo",
+                    "unidad": "block",
+                    "salidaQty": 10,
+                    "precioUnit": 12.1803,
+                    "totalBsSalida": 121.8
+                  },
+                  {
+                    "codigo": "99-01-0018",
+                    "nombre": "Vale de Salida de Materiales",
+                    "unidad": "block",
+                    "salidaQty": 28,
+                    "precioUnit": 17.3438,
+                    "totalBsSalida": 485.63
+                  },
+                  {
+                    "codigo": "99-01-0019",
+                    "nombre": "Conocimiento de carga",
+                    "unidad": "Block",
+                    "salidaQty": 4,
+                    "precioUnit": 20.88,
+                    "totalBsSalida": 83.52
+                  },
+                  {
+                    "codigo": "99-01-0024",
+                    "nombre": "Resaltadores Dif. Colores",
+                    "unidad": "Pieza",
+                    "salidaQty": 2,
+                    "precioUnit": 2.088,
+                    "totalBsSalida": 4.18
+                  },
+                  {
+                    "codigo": "99-01-0027",
+                    "nombre": "Lapiz color Rojo",
+                    "unidad": "Pieza",
+                    "salidaQty": 4,
+                    "precioUnit": 2.03,
+                    "totalBsSalida": 8.12
+                  },
+                  {
+                    "codigo": "99-01-0028",
+                    "nombre": "Lapiz color negro",
+                    "unidad": "Pieza",
+                    "salidaQty": 3,
+                    "precioUnit": 2.5183,
+                    "totalBsSalida": 7.55
+                  },
+                  {
+                    "codigo": "99-01-0029",
+                    "nombre": "Boligrafos Dif. Colores",
+                    "unidad": "Pieza",
+                    "salidaQty": 20,
+                    "precioUnit": 7.5057,
+                    "totalBsSalida": 150.11
+                  },
+                  {
+                    "codigo": "99-01-0030",
+                    "nombre": "Marcadores acrilicos Dif. Colores",
+                    "unidad": "Pieza",
+                    "salidaQty": 4,
+                    "precioUnit": 5.0652,
+                    "totalBsSalida": 20.26
+                  },
+                  {
+                    "codigo": "99-01-0032",
+                    "nombre": "Archivador a Palanca t/ medio Oficio",
+                    "unidad": "Pieza",
+                    "salidaQty": 8,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "99-01-0033",
+                    "nombre": "Archivador a Palanca t/ Oficio",
+                    "unidad": "Pieza",
+                    "salidaQty": 12,
+                    "precioUnit": 38.984,
+                    "totalBsSalida": 467.81
+                  },
+                  {
+                    "codigo": "99-02-0001",
+                    "nombre": "Acofaster metalico",
+                    "unidad": "Cajita",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "99-02-0002",
+                    "nombre": "Clip Metalicos 28 mm",
+                    "unidad": "Cajita",
+                    "salidaQty": 1,
+                    "precioUnit": 4.35,
+                    "totalBsSalida": 4.35
+                  },
+                  {
+                    "codigo": "99-02-0004",
+                    "nombre": "Grapas Niqueladas de 24/6",
+                    "unidad": "Cajita",
+                    "salidaQty": 5,
+                    "precioUnit": 4.35,
+                    "totalBsSalida": 21.75
+                  },
+                  {
+                    "codigo": "99-02-0005",
+                    "nombre": "Escalimetro  de 30\"",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 34.8,
+                    "totalBsSalida": 69.6
+                  },
+                  {
+                    "codigo": "99-02-0008",
+                    "nombre": "Cinta de Embalaje",
+                    "unidad": "Rollo",
+                    "salidaQty": 8,
+                    "precioUnit": 14.4142,
+                    "totalBsSalida": 115.31
+                  },
+                  {
+                    "codigo": "99-02-0013",
+                    "nombre": "Estilete t/grande",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 12.465,
+                    "totalBsSalida": 12.47
+                  },
+                  {
+                    "codigo": "99-02-0014",
+                    "nombre": "Perforadora de Papel",
+                    "unidad": "Piezas",
+                    "salidaQty": 2,
+                    "precioUnit": 55.68,
+                    "totalBsSalida": 111.36
+                  },
+                  {
+                    "codigo": "99-02-0018",
+                    "nombre": "Corrector en cinta",
+                    "unidad": "Piezas",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "99-02-0037",
+                    "nombre": "Presintos de seguridad",
+                    "unidad": "Bolsa",
+                    "salidaQty": 2,
+                    "precioUnit": 17.854,
+                    "totalBsSalida": 35.71
+                  }
+                ]
+              },
+              {
+                "codigo": "99-01",
+                "nombre": "MATERIAL DE ESCRITORIO 01",
+                "productos": [
+                  {
+                    "codigo": "99-01-0001",
+                    "nombre": "LIBRETA DE BOLCILLO",
+                    "unidad": "PIEZA",
+                    "salidaQty": 6,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  },
+                  {
+                    "codigo": "99-01-0041",
+                    "nombre": "CUADERNO DE 1/2 OFICIO",
+                    "unidad": "PIEZA",
+                    "salidaQty": 8,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              },
+              {
+                "codigo": "99-02",
+                "nombre": "MATERIAL DE ECRITORIO -02",
+                "productos": [
+                  {
+                    "codigo": "99-02-0009",
+                    "nombre": "LLAVERO",
+                    "unidad": "UPIEZA",
+                    "salidaQty": 1,
+                    "precioUnit": 0,
+                    "totalBsSalida": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "totalGeneral": 669150.94,
+        "totalGeneralMenos13": 582161.32
+      }
+    ]
+  }
+}

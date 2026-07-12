@@ -158,6 +158,41 @@ function reportLineaCuenta(linea: { subCentro?: string | null; subCuentas?: stri
 
 type ReportDiarioCuenta = DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number];
 
+function reportMovimientoTitulo(cuenta: ReportDiarioCuenta) {
+  return (cuenta.sectorNombre ?? reportCuentaTitulo(cuenta)).toUpperCase();
+}
+
+function reportMovimientoOrderValue(cuenta: ReportDiarioCuenta) {
+  const code = reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
+  const order = ["22001008", "35001000", "44002000", "67001010", "67001009", "100001000", "104001000"];
+  const index = order.indexOf(code);
+  return index >= 0 ? index : order.length;
+}
+
+function sortMovimientoCuentas(cuentas: ReportDiarioCuenta[]) {
+  return [...cuentas].sort((a, b) => {
+    const orderDiff = reportMovimientoOrderValue(a) - reportMovimientoOrderValue(b);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
+  });
+}
+
+function groupMovimientoCuentas(cuentas: ReportDiarioCuenta[]) {
+  const grouped = new Map<string, ReportDiarioCuenta>();
+  cuentas.forEach((cuenta) => {
+    const key = reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, { ...cuenta, lineas: [...cuenta.lineas] });
+      return;
+    }
+    current.totalBs += cuenta.totalBs;
+    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
+    current.lineas.push(...cuenta.lineas);
+  });
+  return [...grouped.values()];
+}
+
 function reportSubCuentaDescripcion(subCuenta?: string) {
   if (subCuenta === "1804") return "COSTO MINA";
   if (subCuenta === "2801") return "MANTENIMIENTO";
@@ -427,17 +462,38 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
       key: "compras",
       descripcion: `Cuadro Mat.y Sumin. Lipeña mes ${monthLower} de ${periodo.anio}`,
       bs: periodo.comprasSinIva ?? periodo.comprasImporteBs
+    },
+    {
+      key: "liquidacion-provisional",
+      cargo: "87 002 000",
+      descripcion: "LIQUIDACION PROVISIONAL MATERIAL LIPEÑA",
+      haber: 0,
+      strong: true
+    },
+    {
+      key: "liquidacion-provisional-detalle",
+      descripcion: `Liquidacion Prov. Mat. Recibidos mes ${monthLower} de ${periodo.anio}`
+    },
+    {
+      key: "inventario-cancelacion",
+      cargo: "26 002 000",
+      descripcion: "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
+      strong: true
+    },
+    {
+      key: "inventario-cancelacion-detalle",
+      descripcion: "Cancelacion Liq. Provisional por Uf. Sig. anexos"
     }
   ];
 
   const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
   const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
 
-  normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup).forEach((cuenta, cuentaIndex) => {
+  sortMovimientoCuentas(groupMovimientoCuentas(normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup))).forEach((cuenta, cuentaIndex) => {
     rows.push({
       key: `cuenta-${cuentaIndex}`,
       cargo: cuenta.sectorCodigo ?? cuenta.codigoCompleto,
-      descripcion: reportCuentaTitulo(cuenta),
+      descripcion: reportMovimientoTitulo(cuenta),
       bs: cuenta.esTransporte || cuenta.lineas.length ? "" : cuenta.totalBs,
       haber: cuenta.totalBs,
       strong: true
@@ -485,9 +541,9 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
                 <td className={`border border-black px-1 py-0.5 align-top ${row.strong ? "font-bold underline" : ""}`}>
                   {row.descripcion}
                 </td>
-                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.bs || undefined)}</td>
-                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.debe || undefined)}</td>
-                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.haber || undefined)}</td>
+                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.bs === "" ? undefined : row.bs)}</td>
+                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.debe === "" ? undefined : row.debe)}</td>
+                <td className="border border-black px-1 py-0.5 text-right align-top">{formatBs(row.haber === "" ? undefined : row.haber)}</td>
               </tr>
             ))}
             <tr>

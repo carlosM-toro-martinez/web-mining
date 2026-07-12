@@ -879,6 +879,41 @@ function lineaCuentaDisplay(linea: { subCentro?: string | null; subCuentas?: str
 
 type DiarioCuenta = DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number];
 
+function cuentaMovimientoTitulo(cuenta: DiarioCuenta) {
+  return (cuenta.sectorNombre ?? cuentaHaberTitulo(cuenta)).toUpperCase();
+}
+
+function movimientoCuentaOrderValue(cuenta: DiarioCuenta) {
+  const code = cuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
+  const order = ["22001008", "35001000", "44002000", "67001010", "67001009", "100001000", "104001000"];
+  const index = order.indexOf(code);
+  return index >= 0 ? index : order.length;
+}
+
+function sortMovimientoCuentas(cuentas: DiarioCuenta[]) {
+  return [...cuentas].sort((a, b) => {
+    const orderDiff = movimientoCuentaOrderValue(a) - movimientoCuentaOrderValue(b);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
+  });
+}
+
+function groupMovimientoCuentas(cuentas: DiarioCuenta[]) {
+  const grouped = new Map<string, DiarioCuenta>();
+  cuentas.forEach((cuenta) => {
+    const key = cuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, { ...cuenta, lineas: [...cuenta.lineas] });
+      return;
+    }
+    current.totalBs += cuenta.totalBs;
+    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
+    current.lineas.push(...cuenta.lineas);
+  });
+  return [...grouped.values()];
+}
+
 function subCuentaDescripcion(subCuenta?: string) {
   if (subCuenta === "1804") return "COSTO MINA";
   if (subCuenta === "2801") return "MANTENIMIENTO";
@@ -1577,14 +1612,52 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
         "",
         ""
       ]
+    },
+    {
+      kind: "header",
+      values: [
+        "87 002 000",
+        "LIQUIDACION PROVISIONAL MATERIAL LIPEÑA",
+        "",
+        "",
+        0
+      ]
+    },
+    {
+      values: [
+        "",
+        `Liquidacion Prov. Mat. Recibidos mes ${monthName.toLowerCase()} de ${periodo.anio}`,
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      kind: "header",
+      values: [
+        "26 002 000",
+        "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      values: [
+        "",
+        "Cancelacion Liq. Provisional por Uf. Sig. anexos",
+        "",
+        "",
+        ""
+      ]
     }
   ];
 
   const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
   const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
 
-  for (const cuenta of normalizeDiarioCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)) {
-    const heading = cuentaHaberTitulo(cuenta);
+  for (const cuenta of sortMovimientoCuentas(groupMovimientoCuentas(normalizeDiarioCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)))) {
+    const heading = cuentaMovimientoTitulo(cuenta);
     rows.push({
       kind: "header",
       values: [
