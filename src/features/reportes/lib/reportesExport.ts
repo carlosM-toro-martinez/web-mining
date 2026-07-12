@@ -888,6 +888,59 @@ function subCuentaDescripcion(subCuenta?: string) {
   return "COSTO MINA";
 }
 
+function cuentaLookupKey(value?: string | null) {
+  return (value ?? "").replace(/[^\d]/g, "");
+}
+
+function nameLookupKey(value?: string | null) {
+  return `name:${(value ?? "").trim().toUpperCase()}`;
+}
+
+function buildFuncionGastoLookup(value: unknown, lookup = new Map<string, string>()) {
+  if (!value || typeof value !== "object") return lookup;
+  if (Array.isArray(value)) {
+    value.forEach((item) => buildFuncionGastoLookup(item, lookup));
+    return lookup;
+  }
+
+  const record = value as Record<string, unknown>;
+  const nombre = typeof record.funcionGastoNombre === "string" ? record.funcionGastoNombre : "";
+  const codigo = typeof record.funcionGastoCodigo === "string" ? record.funcionGastoCodigo : "";
+  const codigoCompleto = typeof record.codigoCompleto === "string" ? record.codigoCompleto : "";
+  if (nombre) {
+    if (codigoCompleto) lookup.set(cuentaLookupKey(codigoCompleto), nombre);
+    if (codigo && !lookup.has(codigo)) lookup.set(codigo, nombre);
+  }
+
+  Object.values(record).forEach((item) => buildFuncionGastoLookup(item, lookup));
+  return lookup;
+}
+
+function buildSectorCodigoLookup(value: unknown, lookup = new Map<string, string>(), currentSectorCodigo = "") {
+  if (!value || typeof value !== "object") return lookup;
+  if (Array.isArray(value)) {
+    value.forEach((item) => buildSectorCodigoLookup(item, lookup, currentSectorCodigo));
+    return lookup;
+  }
+
+  const record = value as Record<string, unknown>;
+  const sectorCodigo =
+    typeof record.sectorCodigo === "string" && record.sectorCodigo.trim()
+      ? record.sectorCodigo
+      : currentSectorCodigo;
+  const sectorNombre = typeof record.sectorNombre === "string" ? record.sectorNombre : "";
+  const codigoCompleto = typeof record.codigoCompleto === "string" ? record.codigoCompleto : "";
+
+  if (sectorCodigo) {
+    lookup.set(cuentaLookupKey(sectorCodigo), sectorCodigo);
+    if (sectorNombre) lookup.set(nameLookupKey(sectorNombre), sectorCodigo);
+    if (codigoCompleto) lookup.set(cuentaLookupKey(codigoCompleto), sectorCodigo);
+  }
+
+  Object.values(record).forEach((item) => buildSectorCodigoLookup(item, lookup, sectorCodigo));
+  return lookup;
+}
+
 function cuentaMayorKey(cuenta: DiarioCuenta) {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   if (code.includes("100001000")) return "100001000";
@@ -907,35 +960,55 @@ function cuentaMayorCodigo(key: string) {
   return key;
 }
 
-function normalizeDiarioCuentas(cuentas: DiarioCuenta[]): DiarioCuenta[] {
+function normalizeDiarioCuentas(
+  cuentas: DiarioCuenta[],
+  funcionLookup = new Map<string, string>(),
+  sectorLookup = new Map<string, string>()
+): DiarioCuenta[] {
   const grouped = new Map<string, DiarioCuenta>();
   for (const cuenta of cuentas) {
     const key = cuentaMayorKey(cuenta);
     const current = grouped.get(key);
     const parts = (cuenta.codigoCompleto ?? "").match(/\d+/g) ?? [];
+    const funcionNombre =
+      funcionLookup.get(cuentaLookupKey(cuenta.codigoCompleto)) ??
+      funcionLookup.get(parts[1] ?? "");
+    const sectorCodigo =
+      cuenta.sectorCodigo ??
+      sectorLookup.get(cuentaLookupKey(cuenta.codigoCompleto)) ??
+      sectorLookup.get(nameLookupKey(cuenta.sectorNombre)) ??
+      sectorLookup.get(key) ??
+      "";
     const fallbackLinea =
       cuenta.lineas.length === 0 && key === "100001000" && parts.length >= 3
         ? [
             {
               subCentro: parts[1] ?? "",
-              nombre: subCuentaDescripcion(parts[0]),
+              nombre: funcionNombre ?? subCuentaDescripcion(parts[0]),
               importeBs: cuenta.totalBs,
               subCuentas: parts[0] ? [parts[0]] : []
             }
           ]
         : [];
-    const lineas = cuenta.lineas.length ? cuenta.lineas : fallbackLinea;
+    const lineas = cuenta.lineas.length
+      ? cuenta.lineas.map((linea) => ({
+          ...linea,
+          nombre: linea.funcionGastoNombre ?? linea.nombre ?? ""
+        }))
+      : fallbackLinea;
 
     if (!current) {
       grouped.set(key, {
         ...cuenta,
         codigoCompleto: cuentaMayorCodigo(key),
+        sectorCodigo,
         esTransporte: key === "67001097" || key === "67001098",
         totalBs: cuenta.totalBs,
         lineas: [...lineas]
       });
       continue;
     }
+    if (!current.sectorCodigo && sectorCodigo) current.sectorCodigo = sectorCodigo;
     current.totalBs += cuenta.totalBs;
     current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     current.lineas.push(...lineas);
@@ -977,7 +1050,10 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
     { kind: "title", values: [`${monthName}-${periodo.anio}`, "", "", "", ""] }
   ];
 
-  for (const cuenta of normalizeDiarioCuentas(periodo.cuentasHaber)) {
+  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
+  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
+
+  for (const cuenta of normalizeDiarioCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)) {
     bodyRows.push({
       kind: "title",
       values: [
@@ -1055,6 +1131,37 @@ function getDetalleMaterialesSource(report: InventoryReportDefinition) {
 
 function getDiarioAlmacenesSource(report: InventoryReportDefinition) {
   return report.sourceResponse as DiarioAlmacenesReportResponse | undefined;
+}
+
+type CostoExportLinea = {
+  subCuenta?: string | null;
+  subCentro?: string | null;
+  subCentroNombre?: string | null;
+  importeBs: number;
+};
+
+function groupCostoLineas(lineas: CostoExportLinea[]) {
+  const grouped = new Map<string, CostoExportLinea>();
+  lineas.forEach((linea) => {
+    const subCuenta = linea.subCuenta ?? "";
+    const subCentro = linea.subCentro ?? "";
+    const key = `${subCuenta}|||${subCentro}`;
+    const current = grouped.get(key);
+    if (current) {
+      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
+      if (!current.subCentroNombre && linea.subCentroNombre) {
+        current.subCentroNombre = linea.subCentroNombre;
+      }
+      return;
+    }
+    grouped.set(key, {
+      ...linea,
+      subCuenta,
+      subCentro,
+      importeBs: Number(linea.importeBs.toFixed(2))
+    });
+  });
+  return [...grouped.values()];
 }
 
 function applyReportSheetBaseStyle(sheet: XLSX.WorkSheet, range: XLSX.Range, numericColumns: number[] = []) {
@@ -1224,6 +1331,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
       const meta = costoSheetMeta(sheetName);
       const title = meta.title;
       const codeLine = meta.codeLine;
+      const groupedLineas = meta.isTransport ? [] : groupCostoLineas(cuenta.lineas);
       const aoa: Array<Array<string | number | null>> = [];
       const merges: XLSX.Range[] = [];
 
@@ -1296,15 +1404,15 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(headerRow + 1, 4, "                   Bs.");
         put(headerRow + 1, 7, "FUNCION DEL GASTO  Bs.");
         const totalsBySubCentro = new Map<string, number>();
-        cuenta.lineas.forEach((linea) => {
+        groupedLineas.forEach((linea) => {
           const key = linea.subCentro ?? "";
           totalsBySubCentro.set(key, (totalsBySubCentro.get(key) ?? 0) + linea.importeBs);
         });
         const lastIndexBySubCentro = new Map<string, number>();
-        cuenta.lineas.forEach((linea, index) => lastIndexBySubCentro.set(linea.subCentro ?? "", index));
+        groupedLineas.forEach((linea, index) => lastIndexBySubCentro.set(linea.subCentro ?? "", index));
         let row = headerRow + 2;
         if (!isMainProduction) row += 1;
-        cuenta.lineas.forEach((linea, index) => {
+        groupedLineas.forEach((linea, index) => {
           const key = linea.subCentro ?? "";
           put(row, 1, linea.subCuenta ?? "");
           put(row, 2, linea.subCentro ?? "");
@@ -1408,7 +1516,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         const headerRow = sheetName === "LIPEÑA" ? 6 : 16;
         styleRange(sheet, { s: { r: headerRow, c: 1 }, e: { r: headerRow + 1, c: 7 } }, smallItalicHeader);
         const dataStart = headerRow + (sheetName === "LIPEÑA" ? 2 : 3);
-        const totalRow = dataStart + cuenta.lineas.length + 1;
+        const totalRow = dataStart + groupedLineas.length + 1;
         for (let col = 1; col <= 7; col += 1) {
           addBorder(headerRow, col, thinTop);
           addBorder(headerRow + 1, col, thinBottom);
@@ -1472,12 +1580,15 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
     }
   ];
 
-  for (const cuenta of normalizeDiarioCuentas(periodo.cuentasHaber)) {
+  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
+  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
+
+  for (const cuenta of normalizeDiarioCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)) {
     const heading = cuentaHaberTitulo(cuenta);
     rows.push({
       kind: "header",
       values: [
-        cuenta.codigoCompleto ?? "",
+        cuenta.sectorCodigo ?? cuenta.codigoCompleto ?? "",
         heading,
         cuenta.lineas.length || cuenta.esTransporte ? "" : asOptionalExcelNumber(cuenta.totalBs),
         "",

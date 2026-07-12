@@ -592,6 +592,8 @@ const diarioFuncionGastoSchema = z.object({
 const diarioLineaSchema = z.object({
   subCentro: z.string().optional().nullable().default(""),
   nombre: z.string().optional().nullable().default(""),
+  funcionGastoCodigo: z.string().optional().nullable(),
+  funcionGastoNombre: z.string().optional().nullable(),
   importeBs: numberLikeSchema,
   subCuentas: z.array(z.string()).optional().default([])
 });
@@ -600,6 +602,7 @@ const diarioCuentaHaberSchema = z.object({
   codigoCompleto: z.string().optional().nullable(),
   centroCostoCodigo: z.string().optional().nullable(),
   centroCostoNombre: z.string().optional().nullable(),
+  sectorCodigo: z.string().optional().nullable(),
   sectorNombre: z.string().optional().nullable(),
   esTransporte: z.boolean().optional().default(false),
   totalBs: numberLikeSchema,

@@ -55,6 +55,7 @@ import {
 } from "@/features/reportes/lib/reportesExport";
 import type {
   CuadroSuministrosReportResponse,
+  DetalleMaterialesReportResponse,
   DiarioAlmacenesReportResponse
 } from "@/features/reportes/model/reportes.schema";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -166,6 +167,59 @@ function reportSubCuentaDescripcion(subCuenta?: string) {
   return "COSTO MINA";
 }
 
+function reportCuentaLookupKey(value?: string | null) {
+  return (value ?? "").replace(/[^\d]/g, "");
+}
+
+function reportNameLookupKey(value?: string | null) {
+  return `name:${(value ?? "").trim().toUpperCase()}`;
+}
+
+function buildFuncionGastoLookup(value: unknown, lookup = new Map<string, string>()) {
+  if (!value || typeof value !== "object") return lookup;
+  if (Array.isArray(value)) {
+    value.forEach((item) => buildFuncionGastoLookup(item, lookup));
+    return lookup;
+  }
+
+  const record = value as Record<string, unknown>;
+  const nombre = typeof record.funcionGastoNombre === "string" ? record.funcionGastoNombre : "";
+  const codigo = typeof record.funcionGastoCodigo === "string" ? record.funcionGastoCodigo : "";
+  const codigoCompleto = typeof record.codigoCompleto === "string" ? record.codigoCompleto : "";
+  if (nombre) {
+    if (codigoCompleto) lookup.set(reportCuentaLookupKey(codigoCompleto), nombre);
+    if (codigo && !lookup.has(codigo)) lookup.set(codigo, nombre);
+  }
+
+  Object.values(record).forEach((item) => buildFuncionGastoLookup(item, lookup));
+  return lookup;
+}
+
+function buildSectorCodigoLookup(value: unknown, lookup = new Map<string, string>(), currentSectorCodigo = "") {
+  if (!value || typeof value !== "object") return lookup;
+  if (Array.isArray(value)) {
+    value.forEach((item) => buildSectorCodigoLookup(item, lookup, currentSectorCodigo));
+    return lookup;
+  }
+
+  const record = value as Record<string, unknown>;
+  const sectorCodigo =
+    typeof record.sectorCodigo === "string" && record.sectorCodigo.trim()
+      ? record.sectorCodigo
+      : currentSectorCodigo;
+  const sectorNombre = typeof record.sectorNombre === "string" ? record.sectorNombre : "";
+  const codigoCompleto = typeof record.codigoCompleto === "string" ? record.codigoCompleto : "";
+
+  if (sectorCodigo) {
+    lookup.set(reportCuentaLookupKey(sectorCodigo), sectorCodigo);
+    if (sectorNombre) lookup.set(reportNameLookupKey(sectorNombre), sectorCodigo);
+    if (codigoCompleto) lookup.set(reportCuentaLookupKey(codigoCompleto), sectorCodigo);
+  }
+
+  Object.values(record).forEach((item) => buildSectorCodigoLookup(item, lookup, sectorCodigo));
+  return lookup;
+}
+
 function reportCuentaMayorKey(cuenta: ReportDiarioCuenta) {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   if (code.includes("100001000")) return "100001000";
@@ -185,35 +239,55 @@ function reportCuentaMayorCodigo(key: string) {
   return key;
 }
 
-function normalizeReportCuentas(cuentas: ReportDiarioCuenta[]): ReportDiarioCuenta[] {
+function normalizeReportCuentas(
+  cuentas: ReportDiarioCuenta[],
+  funcionLookup = new Map<string, string>(),
+  sectorLookup = new Map<string, string>()
+): ReportDiarioCuenta[] {
   const grouped = new Map<string, ReportDiarioCuenta>();
   for (const cuenta of cuentas) {
     const key = reportCuentaMayorKey(cuenta);
     const current = grouped.get(key);
     const parts = (cuenta.codigoCompleto ?? "").match(/\d+/g) ?? [];
+    const funcionNombre =
+      funcionLookup.get(reportCuentaLookupKey(cuenta.codigoCompleto)) ??
+      funcionLookup.get(parts[1] ?? "");
+    const sectorCodigo =
+      cuenta.sectorCodigo ??
+      sectorLookup.get(reportCuentaLookupKey(cuenta.codigoCompleto)) ??
+      sectorLookup.get(reportNameLookupKey(cuenta.sectorNombre)) ??
+      sectorLookup.get(key) ??
+      "";
     const fallbackLinea =
       cuenta.lineas.length === 0 && key === "100001000" && parts.length >= 3
         ? [
             {
               subCentro: parts[1] ?? "",
-              nombre: reportSubCuentaDescripcion(parts[0]),
+              nombre: funcionNombre ?? reportSubCuentaDescripcion(parts[0]),
               importeBs: cuenta.totalBs,
               subCuentas: parts[0] ? [parts[0]] : []
             }
           ]
         : [];
-    const lineas = cuenta.lineas.length ? cuenta.lineas : fallbackLinea;
+    const lineas = cuenta.lineas.length
+      ? cuenta.lineas.map((linea) => ({
+          ...linea,
+          nombre: linea.funcionGastoNombre ?? linea.nombre ?? ""
+        }))
+      : fallbackLinea;
 
     if (!current) {
       grouped.set(key, {
         ...cuenta,
         codigoCompleto: reportCuentaMayorCodigo(key),
+        sectorCodigo,
         esTransporte: key === "67001097" || key === "67001098",
         totalBs: cuenta.totalBs,
         lineas: [...lineas]
       });
       continue;
     }
+    if (!current.sectorCodigo && sectorCodigo) current.sectorCodigo = sectorCodigo;
     current.totalBs += cuenta.totalBs;
     current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     current.lineas.push(...lineas);
@@ -238,7 +312,10 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
     { key: "mes", descripcion: `${month}-${periodo.anio}`, strong: true }
   ];
 
-  normalizeReportCuentas(periodo.cuentasHaber).forEach((cuenta, cuentaIndex) => {
+  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
+  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
+
+  normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup).forEach((cuenta, cuentaIndex) => {
     rows.push({
       key: `cuenta-${cuentaIndex}`,
       descripcion: reportCuentaTitulo(cuenta),
@@ -353,10 +430,13 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
     }
   ];
 
-  normalizeReportCuentas(periodo.cuentasHaber).forEach((cuenta, cuentaIndex) => {
+  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
+  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
+
+  normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup).forEach((cuenta, cuentaIndex) => {
     rows.push({
       key: `cuenta-${cuentaIndex}`,
-      cargo: cuenta.codigoCompleto,
+      cargo: cuenta.sectorCodigo ?? cuenta.codigoCompleto,
       descripcion: reportCuentaTitulo(cuenta),
       bs: cuenta.esTransporte || cuenta.lineas.length ? "" : cuenta.totalBs,
       haber: cuenta.totalBs,
@@ -431,6 +511,342 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
           <span>JEFE DE ALMACEN</span>
           <span>JEFE DE OFICINAS</span>
           <span>SUPDTE. GENERAL</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type CostoPeriodo = DetalleMaterialesReportResponse["data"]["meses"][number];
+type CostoCuenta = CostoPeriodo["porCuenta"][number];
+type CostoSheet = {
+  name: string;
+  title: string;
+  codeLine: string;
+  isTransport: boolean;
+  anio: number;
+  mes: number;
+  totalBs: number;
+  totalCantidad?: number;
+  lineas: CostoCuenta["lineas"];
+  detalles: CostoCuenta["detalles"];
+};
+
+function costoSheetName(cuenta: {
+  codigoCompleto?: string | null;
+  centroCostoNombre?: string | null;
+  funcionGastoNombre?: string | null;
+  vehiculo?: string | null;
+  esTransporte?: boolean;
+}) {
+  const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
+  const text = `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
+  if (code.includes("67001097") || text.includes("PUNTUALIDAD")) return "PUNTUALIDAD";
+  if (code.includes("67001098") || text.includes("EMUSA")) return "EMUSA";
+  if (code.includes("104001000") || text.includes("MEDIO AMBIENTE") || text.includes("M.A.")) return "MA-HSI (3)";
+  if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION")) return "CONSTRUCCION-25";
+  return "LIPEÑA";
+}
+
+function costoSheetMeta(sheetName: string) {
+  if (sheetName === "MA-HSI (3)") {
+    return {
+      title: "DETALLE DE MATERIALES  COSTO DE MEDIO AMBIENTE",
+      codeLine: "104,001,000 CTAS.CTES.M.A. HSI.",
+      isTransport: false
+    };
+  }
+  if (sheetName === "CONSTRUCCION-25") {
+    return {
+      title: "DETALLE DE MATERIALES  COSTO DE OBRAS EN CONSTRUCCION",
+      codeLine: "44,002,000 CTAS.CTES.OBRAS EN CONSTRUCCION",
+      isTransport: false
+    };
+  }
+  if (sheetName === "PUNTUALIDAD") {
+    return {
+      title: "DETALLE DE MATERIALES  COSTO DE TRANSPORTE PUNTUALIDAD",
+      codeLine: "67,001,097    CTAS.CTES.TRANSPORTE PUNTUALIDAD",
+      isTransport: true
+    };
+  }
+  if (sheetName === "EMUSA") {
+    return {
+      title: "DETALLE DE MATERIALES  COSTO DE TRANSPORTE EMUSA",
+      codeLine: "67,001,098    CTAS.CTES.TRANSPORTE EMUSA",
+      isTransport: true
+    };
+  }
+  return {
+    title: "DETALLE DE MATERIALES  COSTO DE PRODUCCION",
+    codeLine: "",
+    isTransport: false
+  };
+}
+
+function costoAccountParts(value?: string | null) {
+  const parts = (value ?? "").match(/\d+/g) ?? [];
+  return { subCuenta: parts[0] ?? "", subCentro: parts[1] ?? "" };
+}
+
+function groupCostoLineas(lineas: CostoCuenta["lineas"]): CostoCuenta["lineas"] {
+  const grouped = new Map<string, CostoCuenta["lineas"][number]>();
+  lineas.forEach((linea) => {
+    const subCuenta = linea.subCuenta ?? "";
+    const subCentro = linea.subCentro ?? "";
+    const key = `${subCuenta}|||${subCentro}`;
+    const current = grouped.get(key);
+    if (current) {
+      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
+      if (!current.subCentroNombre && linea.subCentroNombre) {
+        current.subCentroNombre = linea.subCentroNombre;
+      }
+      return;
+    }
+    grouped.set(key, {
+      ...linea,
+      subCuenta,
+      subCentro,
+      importeBs: Number(linea.importeBs.toFixed(2))
+    });
+  });
+  return [...grouped.values()];
+}
+
+function costoMonthPhrase(anio: number, mes: number) {
+  const month = movimientoMonthLabel(anio, mes);
+  return `EL MES "${month}" ${String(anio).replace(/^(\d)(\d{3})$/, "$1.$2")}`;
+}
+
+function costoMonthTitle(anio: number, mes: number) {
+  const month = movimientoMonthLabel(anio, mes).toLowerCase();
+  return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${anio}`;
+}
+
+function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet[] {
+  const sheets = new Map<string, CostoSheet>();
+  const periodo = response.data.meses[0];
+  if (!periodo) return [];
+  const cuentas = periodo.porCuenta.length
+    ? periodo.porCuenta
+    : [
+        {
+          codigoCompleto: "100 001 000",
+          centroCostoCodigo: "",
+          centroCostoNombre: "Costo de produccion",
+          funcionGastoCodigo: "",
+          funcionGastoNombre: "Produccion",
+          vehiculo: null,
+          esTransporte: false,
+          totalBs: periodo.totalGeneral,
+          totalCantidad: undefined,
+          lineas: periodo.lineas,
+          detalles: []
+        }
+      ];
+
+  for (const cuenta of cuentas) {
+    const name = costoSheetName(cuenta);
+    const meta = costoSheetMeta(name);
+    const current =
+      sheets.get(name) ??
+      ({
+        name,
+        ...meta,
+        anio: periodo.anio,
+        mes: periodo.mes,
+        totalBs: 0,
+        totalCantidad: undefined,
+        lineas: [],
+        detalles: []
+      } satisfies CostoSheet);
+    current.totalBs += cuenta.totalBs;
+    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
+    if (meta.isTransport) {
+      current.detalles.push(...cuenta.detalles);
+    } else {
+      current.lineas.push(...cuenta.lineas);
+      if (!cuenta.lineas.length && cuenta.detalles.length) {
+        const parts = costoAccountParts(cuenta.codigoCompleto);
+        cuenta.detalles.forEach((detalle) => {
+          current.lineas.push({
+            subCuenta: parts.subCuenta,
+            subCentro: parts.subCentro,
+            subCentroNombre: cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? "",
+            importeBs: detalle.importeBs
+          });
+        });
+      }
+    }
+    sheets.set(name, current);
+  }
+
+  const order = ["LIPEÑA", "MA-HSI (3)", "CONSTRUCCION-25", "PUNTUALIDAD", "EMUSA"];
+  return order.map((name) => sheets.get(name)).filter((sheet): sheet is CostoSheet => Boolean(sheet));
+}
+
+function CostoProduccionPreview({ response }: { response: DetalleMaterialesReportResponse }) {
+  const sheets = useMemo(() => buildCostoSheets(response), [response]);
+  const [activeName, setActiveName] = useState("");
+  const activeSheet = sheets.find((sheet) => sheet.name === activeName) ?? sheets[0];
+
+  useEffect(() => {
+    if (!sheets.length) return;
+    if (!sheets.some((sheet) => sheet.name === activeName)) setActiveName(sheets[0].name);
+  }, [activeName, sheets]);
+
+  if (!activeSheet) {
+    return (
+      <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-4 py-3 text-sm text-[var(--color-on-surface-variant)]">
+        Sin datos para costo de produccion.
+      </div>
+    );
+  }
+
+  const isMain = activeSheet.name === "LIPEÑA";
+  const headerRowOffset = isMain ? "mt-5" : "mt-20";
+  const groupedLineas = groupCostoLineas(activeSheet.lineas);
+  const totalsBySubCentro = new Map<string, number>();
+  groupedLineas.forEach((linea) => {
+    const key = linea.subCentro ?? "";
+    totalsBySubCentro.set(key, (totalsBySubCentro.get(key) ?? 0) + linea.importeBs);
+  });
+  const lastIndexBySubCentro = new Map<string, number>();
+  groupedLineas.forEach((linea, index) => lastIndexBySubCentro.set(linea.subCentro ?? "", index));
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {sheets.map((sheet) => (
+          <button
+            key={sheet.name}
+            type="button"
+            onClick={() => setActiveName(sheet.name)}
+            className={`rounded-md border px-3 py-1.5 text-xs font-bold ${
+              sheet.name === activeSheet.name
+                ? "border-[var(--color-primary)] bg-[var(--color-primary)]/14 text-[var(--color-primary)]"
+                : "border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)]"
+            }`}
+          >
+            {sheet.name}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-[var(--color-border-soft)] bg-white">
+        <div className="min-w-[920px] p-5 font-[Arial] text-black">
+          <div className={`${isMain ? "" : "mt-4"} text-[16px] font-bold`}>Empresa Minera</div>
+          <div className="text-[24px] font-bold underline">MARTE S.R.L.</div>
+          <div className={`${headerRowOffset} text-center font-bold underline`}>{activeSheet.title}</div>
+          <div className="text-center text-sm font-bold">LIPEÑA&nbsp;&nbsp;&nbsp;&nbsp;{costoMonthPhrase(activeSheet.anio, activeSheet.mes)}</div>
+          {activeSheet.codeLine ? (
+            <div className="mt-5 text-center text-[16px]">{activeSheet.codeLine}</div>
+          ) : null}
+
+          {activeSheet.isTransport ? (
+            <>
+              <p className="mt-12 max-w-[760px] text-[14px]">
+                Por lo siguiente: Por la provision de materiales de acuerdo al siguiente detalle correspondiente al
+                <br />
+                mes de&nbsp;&nbsp;&nbsp;&nbsp;{costoMonthTitle(activeSheet.anio, activeSheet.mes)}
+              </p>
+              <table className="mt-4 w-[640px] border-collapse text-[12px]">
+                <thead>
+                  <tr>
+                    <th className="border border-black px-1 py-1 italic">DETALLE</th>
+                    <th className="border border-black px-1 py-1 italic">UNIDAD</th>
+                    <th className="border border-black px-1 py-1 italic">CANTIDAD</th>
+                    <th className="border border-black px-1 py-1 italic">DEBE</th>
+                    <th className="border border-black px-1 py-1"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border-x border-black px-1 py-1" colSpan={5}>ALAMACEN GENERAL LIPEÑA</td>
+                  </tr>
+                  <tr><td className="border-x border-black py-4" colSpan={5}></td></tr>
+                  {activeSheet.detalles.map((detalle, index) => (
+                    <tr key={`${detalle.productoNombre}-${index}`}>
+                      <td className="border-x border-black px-1 py-0.5">{detalle.productoNombre ?? ""}</td>
+                      <td className="border-x border-black px-1 py-0.5 text-center">{detalle.unidad ?? ""}</td>
+                      <td className="border-x border-black px-1 py-0.5 text-right">{formatBs(detalle.cantidad).replace(",00", "")}</td>
+                      <td className="border-x border-black px-1 py-0.5 text-right">{formatBs(detalle.importeBs)}</td>
+                      <td className="border-x border-black px-1 py-0.5">{detalle.vehiculo ?? ""}</td>
+                    </tr>
+                  ))}
+                  <tr><td className="border-x border-black py-12" colSpan={5}></td></tr>
+                  <tr>
+                    <td className="border border-black px-1 py-1 text-center text-[16px]">TOTAL</td>
+                    <td className="border border-black"></td>
+                    <td className="border border-black px-1 py-1 text-right">{activeSheet.totalCantidad ? formatBs(activeSheet.totalCantidad).replace(",00", "") : ""}</td>
+                    <td className="border border-black px-1 py-1 text-right">{formatBs(activeSheet.totalBs)}</td>
+                    <td className="border border-black"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <>
+              <div className="mt-16 text-right text-xs">T-C. $us&nbsp;&nbsp;6,96</div>
+              <table className="mt-1 w-full border-collapse text-[12px]">
+                <thead>
+                  <tr>
+                    <th className="border-y border-black px-1 py-1 italic">SUB<br />CUENTA</th>
+                    <th className="border-y border-black px-1 py-1 italic">SUB<br />CENTRO</th>
+                    <th className="border-y border-black px-1 py-1"></th>
+                    <th className="border-y border-black px-1 py-1 italic">IMPORTE<br />Bs.</th>
+                    <th className="border-y border-black px-1 py-1"></th>
+                    <th className="border-y border-black px-1 py-1"></th>
+                    <th className="border-y border-black px-1 py-1 italic">SUB TOTALES DE<br />FUNCION DEL GASTO&nbsp;&nbsp;Bs.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedLineas.map((linea, index) => {
+                    const key = linea.subCentro ?? "";
+                    return (
+                      <tr key={`${linea.subCuenta}-${linea.subCentro}-${index}`}>
+                        <td className="px-1 py-0.5 text-center">{linea.subCuenta ?? ""}</td>
+                        <td className="px-1 py-0.5 text-center">{linea.subCentro ?? ""}</td>
+                        <td></td>
+                        <td className="px-1 py-0.5 text-right">{formatBs(linea.importeBs)}</td>
+                        <td></td>
+                        <td></td>
+                        <td className="px-1 py-0.5 text-right">
+                          {lastIndexBySubCentro.get(key) === index
+                            ? formatBs(totalsBySubCentro.get(key) ?? linea.importeBs)
+                            : ""}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr><td className="py-10" colSpan={7}></td></tr>
+                  <tr>
+                    <td className="border-t border-black" colSpan={3}></td>
+                    <td className="border-t border-black px-1 py-1 text-right">{formatBs(activeSheet.totalBs)}</td>
+                    <td colSpan={2}></td>
+                    <td className="border-t border-black px-1 py-1 text-right">{formatBs(activeSheet.totalBs)}</td>
+                  </tr>
+                  <tr><td className="py-5" colSpan={7}></td></tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td className="border-t border-black px-1 py-1 text-center">HOJA Nº 1</td>
+                    <td className="border-t border-black px-1 py-1 text-right">{formatBs(activeSheet.totalBs)}</td>
+                    <td colSpan={3}></td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td className="border-b border-black px-1 py-1 text-center text-[16px]">TOTAL</td>
+                    <td className="border-b border-black px-1 py-1 text-right">{formatBs(activeSheet.totalBs)}</td>
+                    <td colSpan={3}></td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+          <div className="mt-28 grid grid-cols-3 text-center text-[11px] font-bold">
+            <span>JEFE DE ALMACENES</span>
+            <span>JEFE DE OFICINAS</span>
+            <span>SUPDTE. GENERAL</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1811,6 +2227,30 @@ export function ReportesPage() {
         ) : tipo === "movimiento-almacen" && diarioAlmacenesQuery.data ? (
           <>
             <MovimientoAlmacenPreview response={diarioAlmacenesQuery.data} />
+            {reportDefinition?.summary.length ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-on-surface-variant)]">
+                {reportDefinition.summary.map((item) => (
+                  <span
+                    key={item.label}
+                    className="rounded-full bg-[var(--color-surface-container-high)] px-3 py-1.5"
+                  >
+                    {item.label}:{" "}
+                    <strong className="text-[var(--color-on-surface)]">
+                      {typeof item.value === "number"
+                        ? item.value.toLocaleString("es-BO", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })
+                        : item.value}
+                    </strong>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </>
+        ) : tipo === "costo-produccion" && detalleMaterialesQuery.data ? (
+          <>
+            <CostoProduccionPreview response={detalleMaterialesQuery.data} />
             {reportDefinition?.summary.length ? (
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-on-surface-variant)]">
                 {reportDefinition.summary.map((item) => (
