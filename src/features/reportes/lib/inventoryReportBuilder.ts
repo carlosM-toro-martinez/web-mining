@@ -91,6 +91,10 @@ function roundMoney(value: number) {
   return Number(value.toFixed(2));
 }
 
+function truncateMoney(value: number) {
+  return Math.trunc(value * 100) / 100;
+}
+
 function totalMenos13(value: number) {
   return roundMoney(value * 0.87);
 }
@@ -1194,10 +1198,10 @@ export function buildBalanceMensualApiReportDefinition(
         values: {
           periodo: formatMonth(periodo.anio, periodo.mes),
           grupo: `${grupo.grupoCodigo ?? "-"} - ${grupo.grupoNombre ?? "Sin grupo"}`,
-          saldoInicial: Number(grupo.saldoInicial.toFixed(2)),
-          ingresoMateriales: Number(grupo.ingresoMateriales.toFixed(2)),
-          salidaMateriales: Number(grupo.salidaMateriales.toFixed(2)),
-          saldoFinal: Number(grupo.saldoFinal.toFixed(2))
+          saldoInicial: truncateMoney(grupo.saldoInicial),
+          ingresoMateriales: truncateMoney(grupo.ingresoMateriales),
+          salidaMateriales: truncateMoney(grupo.salidaMateriales),
+          saldoFinal: truncateMoney(grupo.saldoFinal)
         }
       });
     }
@@ -1208,10 +1212,10 @@ export function buildBalanceMensualApiReportDefinition(
       values: {
         periodo: formatMonth(periodo.anio, periodo.mes),
         grupo: "TOTAL PERIODO",
-        saldoInicial: Number(periodo.totales.saldoInicial.toFixed(2)),
-        ingresoMateriales: Number(periodo.totales.ingresoMateriales.toFixed(2)),
-        salidaMateriales: Number(periodo.totales.salidaMateriales.toFixed(2)),
-        saldoFinal: Number(periodo.totales.saldoFinal.toFixed(2))
+        saldoInicial: truncateMoney(periodo.totales.saldoInicial),
+        ingresoMateriales: truncateMoney(periodo.totales.ingresoMateriales),
+        salidaMateriales: truncateMoney(periodo.totales.salidaMateriales),
+        saldoFinal: truncateMoney(periodo.totales.saldoFinal)
       }
     });
   }
@@ -1232,10 +1236,10 @@ export function buildBalanceMensualApiReportDefinition(
     values: {
       periodo: "RANGO",
       grupo: "TOTAL GENERAL",
-      saldoInicial: Number(totals.saldoInicial.toFixed(2)),
-      ingresoMateriales: Number(totals.ingresoMateriales.toFixed(2)),
-      salidaMateriales: Number(totals.salidaMateriales.toFixed(2)),
-      saldoFinal: Number(totals.saldoFinal.toFixed(2))
+      saldoInicial: truncateMoney(totals.saldoInicial),
+      ingresoMateriales: truncateMoney(totals.ingresoMateriales),
+      salidaMateriales: truncateMoney(totals.salidaMateriales),
+      saldoFinal: truncateMoney(totals.saldoFinal)
     }
   });
 
