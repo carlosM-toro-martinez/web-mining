@@ -5,6 +5,8 @@ import {
   importResultSchema,
   cierreMesListResponseSchema,
   cierreMesCreateResponseSchema,
+  ajusteProductosMesPayloadSchema,
+  ajusteProductosMesResponseSchema,
   cierreMesPayloadSchema,
   inicializarPeriodoPayloadSchema,
   recalcularStockPayloadSchema,
@@ -28,6 +30,7 @@ import {
   type SaldoMensualItemPatchPayload,
   type SaldoMensualItemUpsertPayload,
   type SaldoMensualAjusteTotalPayload,
+  type AjusteProductosMesPayload,
   type SaldoMensualPayload,
   type SaldoMensualQuery,
   type SincronizarStockPayload,
@@ -164,6 +167,14 @@ export async function ajustarSaldoMensualTotal(payload: {
     url: apiEndpoints.inventarioImport.saldoMensualAjusteTotal(saldo.id),
     body: saldoMensualAjusteTotalPayloadSchema.parse(payload.ajuste),
     schema: saldoMensualAjusteTotalResponseSchema
+  });
+}
+
+export async function ajustarProductosMes(payload: AjusteProductosMesPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.ajusteProductosMes,
+    body: ajusteProductosMesPayloadSchema.parse(payload),
+    schema: ajusteProductosMesResponseSchema
   });
 }
 

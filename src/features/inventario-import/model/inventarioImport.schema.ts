@@ -84,6 +84,41 @@ export const saldoMensualAjusteTotalPayloadSchema = z
     message: "Debes enviar al menos un campo de ajuste."
   });
 
+export const ajusteProductoMesItemPayloadSchema = z
+  .object({
+    productoId: numberLikeSchema.int().positive().optional(),
+    productoCodigo: z.string().trim().min(1).optional(),
+    precioUnit: numberLikeSchema.nonnegative().optional(),
+    saldoInicial: numberLikeSchema.nonnegative().optional(),
+    ingresoQty: numberLikeSchema.nonnegative().optional(),
+    salidaQty: numberLikeSchema.nonnegative().optional(),
+    saldoFinal: numberLikeSchema.nonnegative().optional(),
+    totalBsInicial: numberLikeSchema.nonnegative().optional(),
+    totalBs: numberLikeSchema.nonnegative().optional()
+  })
+  .refine((value) => Boolean(value.productoId || value.productoCodigo), {
+    message: "Debes enviar productoId o productoCodigo."
+  })
+  .refine(
+    (value) =>
+      [
+        value.precioUnit,
+        value.saldoInicial,
+        value.ingresoQty,
+        value.salidaQty,
+        value.saldoFinal,
+        value.totalBsInicial,
+        value.totalBs
+      ].some((field) => field !== undefined),
+    { message: "Debes enviar al menos un campo de ajuste." }
+  );
+
+export const ajusteProductosMesPayloadSchema = z.object({
+  anio: numberLikeSchema.int().min(2000).max(2100),
+  mes: numberLikeSchema.int().min(1).max(12),
+  productos: z.array(ajusteProductoMesItemPayloadSchema).min(1)
+});
+
 export const saldoMensualQuerySchema = z.object({
   anio: numberLikeSchema.int().min(2000).max(2100),
   mes: numberLikeSchema.int().min(1).max(12)
@@ -199,6 +234,20 @@ export const saldoMensualAjusteInicialExcelResponseSchema = z.object({
   })
 });
 
+export const ajusteProductosMesResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.array(
+    z.object({
+      productoId: numberLikeSchema.int().positive().optional(),
+      productoCodigo: z.string().optional(),
+      ok: z.boolean(),
+      accion: z.string().optional(),
+      error: z.string().optional(),
+      saldoMensual: z.record(z.string(), z.unknown()).optional()
+    })
+  )
+});
+
 export const saldoMensualDeleteResponseSchema = z.object({
   success: z.boolean().optional().default(true),
   data: z.object({
@@ -226,6 +275,8 @@ export type RecalcularStockPayload = z.infer<typeof recalcularStockPayloadSchema
 export type SaldoMensualItemUpsertPayload = z.infer<typeof saldoMensualItemUpsertPayloadSchema>;
 export type SaldoMensualItemPatchPayload = z.infer<typeof saldoMensualItemPatchPayloadSchema>;
 export type SaldoMensualAjusteTotalPayload = z.infer<typeof saldoMensualAjusteTotalPayloadSchema>;
+export type AjusteProductosMesPayload = z.infer<typeof ajusteProductosMesPayloadSchema>;
+export type AjusteProductosMesResponse = z.infer<typeof ajusteProductosMesResponseSchema>;
 export type SaldoMensualAjusteInicialExcelResponse = z.infer<
   typeof saldoMensualAjusteInicialExcelResponseSchema
 >;

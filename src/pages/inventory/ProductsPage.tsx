@@ -1,15 +1,12 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  Download,
   FileText,
-  FileSpreadsheet,
   PencilLine,
   Plus,
   Table2,
-  Tags,
-  Upload
+  Tags
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
@@ -28,16 +25,14 @@ import {
 } from "@/features/productos/hooks/useProductos";
 import {
   useAjustarSaldoMensualTotalMutation,
-  useImportarAjusteInicialSaldoMensualExcelMutation
+  useImportarAjusteInicialSaldoMensualExcelMutation,
+  useAjustarProductosMesMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
+import type { AjusteProductosMesPayload } from "@/features/inventario-import/model/inventarioImport.schema";
 import type { Producto } from "@/features/productos/model/producto.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
-import {
-  downloadProductosCsvTemplate,
-  downloadProductosExcelTemplate
-} from "@/shared/lib/importTemplates";
 import { normalizeSpreadsheetRow, readSpreadsheetSheets } from "@/shared/lib/spreadsheetImport";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -50,13 +45,48 @@ function normalizeError(error: unknown, fallbackMessage: string) {
   return fallbackMessage;
 }
 
+function parseSpreadsheetNumber(value: string) {
+  const raw = value.trim();
+  if (!raw) return undefined;
+  const normalized =
+    raw.includes(",") && raw.includes(".")
+      ? raw.lastIndexOf(",") > raw.lastIndexOf(".")
+        ? raw.replace(/\./g, "").replace(",", ".")
+        : raw.replace(/,/g, "")
+      : raw.replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function spreadsheetValue(row: Record<string, string>, keys: string[]) {
+  for (const key of keys) {
+    const value = row[key]?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function spreadsheetNumber(row: Record<string, string>, keys: string[]) {
+  const value = spreadsheetValue(row, keys);
+  return value ? parseSpreadsheetNumber(value) : undefined;
+}
+
+const ajusteExcelColumns = [
+  "codigo",
+  "precioUnit",
+  "saldoInicial",
+  "ingresoQty",
+  "salidaQty",
+  "saldoFinal",
+  "totalBsInicial",
+  "totalBs"
+];
+
 export function ProductsPage() {
   const { user } = useAuth();
   const canManage =
     user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "RECEPCIONISTA";
   const { showError, showSuccess } = useToast();
-  const importInputRef = useRef<HTMLInputElement | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
 
   const categoriasQuery = useCategoriasTreeQuery();
   const centrosCostoQuery = useCentrosCostoQuery();
@@ -87,6 +117,7 @@ export function ProductsPage() {
   const updateProductoMutation = useUpdateProductoMutation();
   const ajustarSaldoTotalMutation = useAjustarSaldoMensualTotalMutation();
   const importarAjusteInicialExcelMutation = useImportarAjusteInicialSaldoMensualExcelMutation();
+  const ajustarProductosMesMutation = useAjustarProductosMesMutation();
 
   const grupos = categoriasQuery.data?.data ?? [];
   const subgruposPorGrupo = useMemo(
@@ -118,6 +149,7 @@ export function ProductsPage() {
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [rowCuentaSelection, setRowCuentaSelection] = useState<Record<number, string>>({});
   const [isAjusteTotalModalOpen, setIsAjusteTotalModalOpen] = useState(false);
+  const [isAjusteProductosMesModalOpen, setIsAjusteProductosMesModalOpen] = useState(false);
   const now = new Date();
   const [ajusteProductoId, setAjusteProductoId] = useState("");
   const [ajusteAnio, setAjusteAnio] = useState(String(now.getFullYear()));
@@ -129,6 +161,10 @@ export function ProductsPage() {
   const [ajusteTotalBsProm, setAjusteTotalBsProm] = useState("");
   const [isAjusteMasivoImporting, setIsAjusteMasivoImporting] = useState(false);
   const [ajusteMasivoStatus, setAjusteMasivoStatus] = useState("");
+  const [ajusteProductosMesAnio, setAjusteProductosMesAnio] = useState(String(now.getFullYear()));
+  const [ajusteProductosMesMes, setAjusteProductosMesMes] = useState(String(now.getMonth() + 1));
+  const [isAjusteProductosMesImporting, setIsAjusteProductosMesImporting] = useState(false);
+  const [ajusteProductosMesStatus, setAjusteProductosMesStatus] = useState("");
 
   const availableSubgrupos = grupoId ? (subgruposPorGrupo.get(Number(grupoId)) ?? []) : [];
   const filterSubgrupos = grupoDraft ? (subgruposPorGrupo.get(Number(grupoDraft)) ?? []) : [];
@@ -379,138 +415,6 @@ export function ProductsPage() {
     });
   }
 
-  function openImportDialog() {
-    importInputRef.current?.click();
-  }
-
-  async function handleImportProducts(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    if (!canManage) {
-      showError("No tienes permisos para importar productos.");
-      return;
-    }
-
-    try {
-      setIsImporting(true);
-      const sheets = await readSpreadsheetSheets(file);
-      const sourceRows = sheets[0]?.rows ?? [];
-      if (!sourceRows.length) {
-        showError("El archivo no tiene filas para importar.");
-        return;
-      }
-
-      const rows = sourceRows.map((row) => normalizeSpreadsheetRow(row));
-
-      const groupCodeToId = new Map<string, number>();
-      const subgroupByKeyToId = new Map<string, number>();
-      for (const group of grupos) {
-        const groupCode = group.codigo.trim().toUpperCase();
-        groupCodeToId.set(groupCode, group.id);
-        for (const sub of group.children) {
-          const subCode = sub.codigo.trim().toUpperCase();
-          subgroupByKeyToId.set(`${groupCode}::${subCode}`, sub.id);
-        }
-      }
-
-      const centroCodeToId = new Map(
-        centrosCosto.map((centro) => [centro.codigo.trim().toUpperCase(), centro.id])
-      );
-      const funcionCodeToId = new Map(
-        funcionesGasto.map((funcion) => [funcion.codigo.trim().toUpperCase(), funcion.id])
-      );
-
-      let created = 0;
-      let skipped = 0;
-      let failed = 0;
-      const errors: string[] = [];
-
-      for (const [index, row] of rows.entries()) {
-        const codigo = (row.codigo || "").trim().toUpperCase();
-        const nombre = (row.nombre || "").trim();
-        const unidad = (row.unidad || "UND").trim().toUpperCase();
-        const codigoGrupo = (row.codigogrupo || "").trim().toUpperCase();
-        const codigoSubgrupo = (row.codigosubgrupo || "").trim().toUpperCase();
-        const codigoCentro = (row.codigocentrocosto || "").trim().toUpperCase();
-        const codigoFuncion = (row.codigofunciongasto || "").trim().toUpperCase();
-        const eppRaw = (row.esepp || "").trim().toLowerCase();
-        const esEpp = ["1", "si", "sí", "true", "x"].includes(eppRaw);
-        const rowLabel = `Fila ${index + 2}`;
-
-        if (
-          !codigo ||
-          !nombre ||
-          !codigoGrupo ||
-          !codigoSubgrupo ||
-          !codigoCentro ||
-          !codigoFuncion
-        ) {
-          failed += 1;
-          errors.push(`${rowLabel}: faltan campos obligatorios.`);
-          continue;
-        }
-
-        const grupoIdValue = groupCodeToId.get(codigoGrupo);
-        if (!grupoIdValue) {
-          failed += 1;
-          errors.push(`${rowLabel}: no existe el grupo ${codigoGrupo}.`);
-          continue;
-        }
-
-        const subgrupoIdValue = subgroupByKeyToId.get(`${codigoGrupo}::${codigoSubgrupo}`);
-        if (!subgrupoIdValue) {
-          failed += 1;
-          errors.push(
-            `${rowLabel}: no existe el subgrupo ${codigoSubgrupo} para el grupo ${codigoGrupo}.`
-          );
-          continue;
-        }
-
-        const centroCostoIdValue = centroCodeToId.get(codigoCentro);
-        const funcionGastoIdValue = funcionCodeToId.get(codigoFuncion);
-        if (!centroCostoIdValue || !funcionGastoIdValue) {
-          failed += 1;
-          errors.push(`${rowLabel}: centro o funcion de gasto no existen.`);
-          continue;
-        }
-
-        try {
-          await createProductoMutation.mutateAsync({
-            codigo,
-            nombre,
-            unidad,
-            grupoId: grupoIdValue,
-            subgrupoId: subgrupoIdValue,
-            centroCostoId: centroCostoIdValue,
-            funcionGastoId: funcionGastoIdValue,
-            esEpp
-          });
-          created += 1;
-        } catch (error) {
-          const message = normalizeError(error, "No se pudo crear el producto.");
-          if (message.toLowerCase().includes("ya existe")) {
-            skipped += 1;
-          } else {
-            failed += 1;
-            errors.push(`${rowLabel}: ${message}`);
-          }
-        }
-      }
-
-      showSuccess(
-        `Importacion completada. Creados: ${created}, omitidos: ${skipped}, errores: ${failed}.`
-      );
-      if (errors.length) {
-        showError(errors.slice(0, 3).join(" | "));
-      }
-    } catch (error) {
-      showError(normalizeError(error, "No se pudo procesar el archivo de productos."));
-    } finally {
-      setIsImporting(false);
-    }
-  }
   function handleAssignCuenta(productId: number) {
     const selected = rowCuentaSelection[productId];
     const parsedCuentaId = selected ? Number(selected) : null;
@@ -538,6 +442,13 @@ export function ProductsPage() {
     setAjusteTotalBs("");
     setAjusteTotalBsProm("");
     setAjusteMasivoStatus("");
+  }
+
+  function openAjusteProductosMesModal() {
+    setIsAjusteProductosMesModalOpen(true);
+    setAjusteProductosMesAnio(String(now.getFullYear()));
+    setAjusteProductosMesMes(String(now.getMonth() + 1));
+    setAjusteProductosMesStatus("");
   }
 
   function handleAjustarTotalHistorico(event: FormEvent<HTMLFormElement>) {
@@ -644,6 +555,97 @@ export function ProductsPage() {
       setIsAjusteMasivoImporting(false);
     }
   }
+
+  async function handleImportAjusteProductosMes(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (user?.role !== "ADMIN") {
+      showError("Solo ADMIN puede usar esta correccion.");
+      return;
+    }
+
+    const anio = Number(ajusteProductosMesAnio);
+    const mes = Number(ajusteProductosMesMes);
+    if (!Number.isInteger(anio) || anio < 2000 || anio > 2100 || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+      showError("Indica un año y mes validos antes de importar.");
+      return;
+    }
+
+    try {
+      setIsAjusteProductosMesImporting(true);
+      setAjusteProductosMesStatus("Leyendo archivo...");
+      const sheets = await readSpreadsheetSheets(file);
+      const sourceRows = sheets[0]?.rows ?? [];
+      if (!sourceRows.length) {
+        showError("El archivo no tiene filas para importar.");
+        return;
+      }
+
+      const productos: AjusteProductosMesPayload["productos"] = [];
+      const errors: string[] = [];
+      sourceRows.map((row) => normalizeSpreadsheetRow(row)).forEach((row, index) => {
+        const fila = index + 2;
+        const productoCodigo = spreadsheetValue(row, ["codigo", "productocodigo", "codigoproducto"]);
+        const productoId = spreadsheetNumber(row, ["productoid", "idproducto"]);
+        const item = {
+          productoCodigo: productoCodigo || undefined,
+          productoId,
+          precioUnit: spreadsheetNumber(row, ["preciounit", "preciounitario"]),
+          saldoInicial: spreadsheetNumber(row, ["saldoinicial"]),
+          ingresoQty: spreadsheetNumber(row, ["ingresoqty", "ingreso", "ingresos"]),
+          salidaQty: spreadsheetNumber(row, ["salidaqty", "salida", "salidas"]),
+          saldoFinal: spreadsheetNumber(row, ["saldofinal"]),
+          totalBsInicial: spreadsheetNumber(row, ["totalbsinicial"]),
+          totalBs: spreadsheetNumber(row, ["totalbs"])
+        };
+        const hasProduct = Boolean(item.productoCodigo || item.productoId);
+        const hasAdjustment = Object.entries(item).some(
+          ([key, value]) => key !== "productoCodigo" && key !== "productoId" && value !== undefined
+        );
+        if (!hasProduct && !hasAdjustment) return;
+        if (!hasProduct) {
+          errors.push(`Fila ${fila}: falta codigo.`);
+          return;
+        }
+        if (!hasAdjustment) {
+          errors.push(`Fila ${fila}: falta al menos un campo de ajuste.`);
+          return;
+        }
+        productos.push(item);
+      });
+
+      if (!productos.length) {
+        showError(errors[0] ?? "No se encontraron productos válidos para ajustar.");
+        return;
+      }
+
+      setAjusteProductosMesStatus("Aplicando ajustes...");
+      const response = await ajustarProductosMesMutation.mutateAsync({ anio, mes, productos });
+      const serverErrors = response.data
+        .filter((resultado) => !resultado.ok)
+        .map(
+          (resultado) =>
+            `${resultado.productoCodigo ?? resultado.productoId ?? "Producto"} - ${
+              resultado.error ?? "No se pudo aplicar el ajuste."
+            }`
+        );
+      const okCount = response.data.filter((resultado) => resultado.ok).length;
+      const failCount = serverErrors.length + errors.length;
+      setAjusteProductosMesStatus("");
+      showSuccess(
+        `Importacion finalizada. Procesados: ${productos.length}, exitosos: ${okCount}, fallidos: ${failCount}.`
+      );
+      if (errors.length || serverErrors.length) {
+        showError([...errors, ...serverErrors].slice(0, 4).join(" | "));
+      }
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo procesar el archivo de ajustes."));
+    } finally {
+      setIsAjusteProductosMesImporting(false);
+    }
+  }
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -666,39 +668,23 @@ export function ProductsPage() {
 
           <div className="page-toolbar flex items-center gap-3">
             {user?.role === "ADMIN" ? (
-              <button
-                type="button"
-                onClick={openAjusteTotalModal}
-                className="flex items-center gap-2 rounded-lg border border-[var(--color-error)]/55 px-4 py-2.5 text-sm font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
-              >
-                Correccion historica
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={openAjusteTotalModal}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--color-error)]/55 px-4 py-2.5 text-sm font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+                >
+                  Correccion historica
+                </button>
+                <button
+                  type="button"
+                  onClick={openAjusteProductosMesModal}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--color-primary)]/55 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+                >
+                  Ajuste productos mes
+                </button>
+              </>
             ) : null}
-            <button
-              type="button"
-              onClick={openImportDialog}
-              disabled={isImporting || !canManage}
-              className="flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-50"
-            >
-              <Upload size={16} />
-              {isImporting ? "Importando..." : "Importar CSV/Excel"}
-            </button>
-            <button
-              type="button"
-              onClick={downloadProductosCsvTemplate}
-              className="flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-            >
-              <Download size={16} />
-              Plantilla CSV
-            </button>
-            <button
-              type="button"
-              onClick={downloadProductosExcelTemplate}
-              className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/22"
-            >
-              <FileSpreadsheet size={16} />
-              Plantilla Excel
-            </button>
             <button
               type="button"
               onClick={() => showSuccess("Exportar PDF estara disponible en la siguiente fase.")}
@@ -717,14 +703,6 @@ export function ProductsPage() {
             </button>
           </div>
         </div>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={handleImportProducts}
-          className="hidden"
-        />
-
         <form
           className="grid grid-cols-1 gap-3 md:grid-cols-7"
           onSubmit={(event) => event.preventDefault()}
@@ -1450,6 +1428,76 @@ export function ProductsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+      {isAjusteProductosMesModalOpen && user?.role === "ADMIN" ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h3 className="text-lg font-bold">Ajuste productos por mes</h3>
+            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+              Sube un Excel para ajustar varios productos con el endpoint nuevo. Los campos no enviados se conservan en el servidor.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Año
+                </label>
+                <input
+                  required
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={ajusteProductosMesAnio}
+                  onChange={(event) => setAjusteProductosMesAnio(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  Mes
+                </label>
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={ajusteProductosMesMes}
+                  onChange={(event) => setAjusteProductosMesMes(event.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+            </div>
+            <div className="mt-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Excel de ajustes
+              </label>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleImportAjusteProductosMes}
+                disabled={isAjusteProductosMesImporting || ajustarProductosMesMutation.isPending}
+                className={inputClassName}
+              />
+              <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
+                Columnas: {ajusteExcelColumns.join(", ")}. Requerida: codigo. Puedes incluir solo
+                los campos que quieras ajustar.
+              </p>
+              {ajusteProductosMesStatus ? (
+                <p className="mt-2 text-xs font-semibold text-[var(--color-primary)]">
+                  {ajusteProductosMesStatus}
+                </p>
+              ) : null}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAjusteProductosMesModalOpen(false)}
+                className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

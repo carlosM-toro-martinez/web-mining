@@ -16,3 +16,9 @@ INVENTARIO_WORKFLOW.md
 historico-inventario.md
 BIOMETRIC_MODULE.md
 PERSONAL_MODULE.md
+inventario-almacen-general-2026-07-13.xlsx
+inventario-almacen.json
+inventario-analisis-resumen.txt
+inventario-analisis.csv
+analyze_inventory.py
+generate_inventory_excel.py

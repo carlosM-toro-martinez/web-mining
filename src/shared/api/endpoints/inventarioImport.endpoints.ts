@@ -12,5 +12,6 @@ export const inventarioImportEndpoints = {
   saldoMensualById: (id: string | number) => `/api/inventario-import/saldo-mensual/${id}`,
   saldoMensualAjusteTotal: (id: string | number) =>
     `/api/inventario-import/saldo-mensual/${id}/ajuste-total`,
-  saldoMensualAjusteInicialExcel: "/api/inventario-import/saldo-mensual/ajuste-inicial/excel"
+  saldoMensualAjusteInicialExcel: "/api/inventario-import/saldo-mensual/ajuste-inicial/excel",
+  ajusteProductosMes: "/api/inventario-import/ajuste-productos-mes"
 } as const;

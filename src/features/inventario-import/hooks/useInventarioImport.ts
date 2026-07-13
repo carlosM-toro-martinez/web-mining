@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  ajustarProductosMes,
   ajustarSaldoMensualTotal,
   deleteSaldoMensualById,
   createCierreMes,
@@ -20,6 +21,7 @@ import {
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
   RecalcularStockPayload,
+  AjusteProductosMesPayload,
   ReiniciarStockPayload,
   SaldoMensualAjusteTotalPayload,
   SaldoMensualItemPatchPayload,
@@ -113,6 +115,12 @@ export function useAjustarSaldoMensualTotalMutation() {
       mes: number;
       ajuste: SaldoMensualAjusteTotalPayload;
     }) => ajustarSaldoMensualTotal(payload)
+  });
+}
+
+export function useAjustarProductosMesMutation() {
+  return useMutation({
+    mutationFn: (payload: AjusteProductosMesPayload) => ajustarProductosMes(payload)
   });
 }
 
