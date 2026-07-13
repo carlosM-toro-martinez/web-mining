@@ -939,7 +939,7 @@ export function buildDiarioAlmacenesApiReportDefinition(
             descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
             parcialesBs: "",
             cuenta: sector.sectorCodigo ?? "",
-            debeBs: Number(sector.totalBs.toFixed(2)),
+            debeBs: shouldShowDiarioSectorDetails(sector) ? Number(sector.totalBs.toFixed(2)) : "",
             haberBs: ""
           }
         });

@@ -377,7 +377,7 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
         key: `sector-${sectorIndex}`,
         descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
         cuenta: sector.sectorCodigo ?? "",
-        debe: sector.totalBs,
+        debe: showDetails ? sector.totalBs : "",
         strong: true
       });
       rows.push({
