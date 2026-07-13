@@ -22,3 +22,6 @@ inventario-analisis-resumen.txt
 inventario-analisis.csv
 analyze_inventory.py
 generate_inventory_excel.py
+inventario-errores-resumen.txt
+inventario-errores.csv
+analyze_inventory_errors.py

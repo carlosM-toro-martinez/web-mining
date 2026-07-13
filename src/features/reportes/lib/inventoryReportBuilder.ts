@@ -60,6 +60,21 @@ type BuildContext = {
   dateLabel: string;
 };
 
+const MONTH_NAMES = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE"
+];
+
 type EnrichedItem = BinCardValoradoItem & {
   productCode: string;
   unit: string;
@@ -832,6 +847,35 @@ export function buildDetalleMaterialesApiReportDefinition(
   };
 }
 
+type DiarioPeriodo = DiarioAlmacenesReportResponse["data"]["meses"][number];
+type DiarioSectorHaber = DiarioPeriodo["sectoresHaber"][number];
+
+function reportCuentaKey(value?: string | null) {
+  return (value ?? "").replace(/[^\d]/g, "");
+}
+
+function diarioSectorOrderValue(sector: DiarioSectorHaber) {
+  const order = ["100001000", "35001000", "22001008", "104001000", "44002000", "67001010", "67001009"];
+  const index = order.indexOf(reportCuentaKey(sector.sectorCodigo));
+  return index >= 0 ? index : order.length;
+}
+
+function sortDiarioSectores(sectores: DiarioSectorHaber[]) {
+  return [...sectores].sort((a, b) => {
+    const orderDiff = diarioSectorOrderValue(a) - diarioSectorOrderValue(b);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
+  });
+}
+
+function cuentaDetalleDiario(centroCostoCodigo?: string | null, funcionGastoCodigo?: string | null) {
+  return [centroCostoCodigo, funcionGastoCodigo].filter(Boolean).join("-");
+}
+
+function shouldShowDiarioSectorDetails(sector: DiarioSectorHaber) {
+  return reportCuentaKey(sector.sectorCodigo) === "100001000";
+}
+
 export function buildDiarioAlmacenesApiReportDefinition(
   response: DiarioAlmacenesReportResponse,
   reportType: "diario-almacenes" | "movimiento-almacen" = "diario-almacenes"
@@ -840,128 +884,249 @@ export function buildDiarioAlmacenesApiReportDefinition(
   const rows: InventoryReportRow[] = [];
 
   for (const periodo of data.meses) {
-    rows.push({
-      id: `periodo-diario-${periodo.anio}-${periodo.mes}`,
-      type: "group",
-      values: {
-        periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
-        cargos: "",
-        descripcion: "",
-        parcialesBs: "",
-        cuenta: "",
-        debeBs: "",
-        haberBs: ""
-      }
-    });
-    rows.push({
-      id: `inventario-debe-${periodo.anio}-${periodo.mes}`,
-      type: "group",
-      values: {
-        periodo: formatMonth(periodo.anio, periodo.mes),
-        cargos: "26 002 000",
-        descripcion: "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
-        parcialesBs: "",
-        cuenta: "26.002.000",
-        debeBs: Number(periodo.totalInventarioDebe.toFixed(2)),
-        haberBs: ""
-      }
-    });
-    rows.push({
-      id: `saldo-anterior-${periodo.anio}-${periodo.mes}`,
-      values: {
-        periodo: "",
-        cargos: "",
-        descripcion: `Saldo inventario al  cierre anterior`,
-        parcialesBs: Number(periodo.saldoInventarioAnterior.toFixed(2)),
-        cuenta: "",
-        debeBs: "",
-        haberBs: ""
-      }
-    });
-    rows.push({
-      id: `compras-${periodo.anio}-${periodo.mes}`,
-      values: {
-        periodo: "",
-        cargos: "",
-        descripcion: "Cuadro Mat. y Sumin. del mes",
-        parcialesBs: Number((periodo.comprasSinIva ?? periodo.comprasImporteBs).toFixed(2)),
-        cuenta: "",
-        debeBs: "",
-        haberBs: ""
-      }
-    });
-
-    for (const cuenta of periodo.cuentasHaber) {
+    if (reportType !== "diario-almacenes") {
       rows.push({
-        id: `haber-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}`,
+        id: `periodo-diario-${periodo.anio}-${periodo.mes}`,
+        type: "group",
+        values: {
+          periodo: `${formatMonth(periodo.anio, periodo.mes)} ${periodo.esCerrado ? "(cerrado)" : "(abierto)"}`,
+          cargos: "",
+          descripcion: "",
+          parcialesBs: "",
+          cuenta: "",
+          debeBs: "",
+          haberBs: ""
+        }
+      });
+    }
+
+    if (reportType === "diario-almacenes" && periodo.sectoresHaber.length) {
+      rows.push({
+        id: `intro-diario-${periodo.anio}-${periodo.mes}`,
         type: "group",
         values: {
           periodo: formatMonth(periodo.anio, periodo.mes),
-          cargos: cuenta.centroCostoCodigo ?? "",
-          descripcion: cuenta.centroCostoNombre ?? "",
+          cargos: "",
+          descripcion: "CONTABILIZACION DIARIO ALMACENES MES:",
           parcialesBs: "",
-          cuenta: `${cuenta.centroCostoCodigo ?? ""}.000`.replace(/^\./, ""),
+          cuenta: "",
           debeBs: "",
-          haberBs: Number(cuenta.totalBs.toFixed(2))
+          haberBs: ""
+        }
+      });
+      rows.push({
+        id: `intro-mes-diario-${periodo.anio}-${periodo.mes}`,
+        type: "group",
+        values: {
+          periodo: "",
+          cargos: "",
+          descripcion: `${MONTH_NAMES[periodo.mes - 1]}-${periodo.anio}`,
+          parcialesBs: "",
+          cuenta: "",
+          debeBs: "",
+          haberBs: ""
         }
       });
 
-      const funcionGastos = cuenta.funcionGastos.length
-        ? cuenta.funcionGastos.map((funcion) => ({
-            codigoCompleto: cuenta.codigoCompleto ?? "",
-            funcionGastoCodigo: funcion.codigo,
-            funcionGastoNombre: funcion.nombre,
-            totalBs: funcion.totalBs
-          }))
-        : cuenta.subCentros;
-
-      for (const subCentro of funcionGastos) {
+      for (const sector of sortDiarioSectores(periodo.sectoresHaber)) {
+        const sectorKey = reportCuentaKey(sector.sectorCodigo);
         rows.push({
-          id: `haber-sub-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}-${subCentro.codigoCompleto}-${subCentro.funcionGastoCodigo}`,
+          id: `sector-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
+          type: "group",
           values: {
-            periodo: "",
+            periodo: formatMonth(periodo.anio, periodo.mes),
             cargos: "",
-            descripcion: `${subCentro.funcionGastoCodigo ?? ""} - ${subCentro.funcionGastoNombre ?? ""}`.trim(),
-            parcialesBs: Number(subCentro.totalBs.toFixed(2)),
-            cuenta: subCentro.codigoCompleto ?? "",
-            debeBs: "",
+            descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
+            parcialesBs: "",
+            cuenta: sector.sectorCodigo ?? "",
+            debeBs: Number(sector.totalBs.toFixed(2)),
             haberBs: ""
           }
         });
+        rows.push({
+          id: `sector-aten-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
+          values: {
+            periodo: "",
+            cargos: "",
+            descripcion: `Aten. Material mes de ${MONTH_NAMES[periodo.mes - 1]}- ${periodo.anio}`,
+            parcialesBs: shouldShowDiarioSectorDetails(sector) ? "" : Number(sector.totalBs.toFixed(2)),
+            cuenta: "",
+            debeBs: shouldShowDiarioSectorDetails(sector) ? "" : Number(sector.totalBs.toFixed(2)),
+            haberBs: ""
+          }
+        });
+
+        if (shouldShowDiarioSectorDetails(sector)) {
+          for (const centroCosto of sector.centroCostos) {
+            for (const subCuenta of centroCosto.subCuentas) {
+              rows.push({
+                id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${subCuenta.codigoCompleto ?? rows.length}`,
+                values: {
+                  periodo: "",
+                  cargos: "",
+                  descripcion: subCuenta.funcionGastoNombre ?? "",
+                  parcialesBs: Number(subCuenta.totalBs.toFixed(2)),
+                  cuenta: cuentaDetalleDiario(centroCosto.centroCostoCodigo, subCuenta.funcionGastoCodigo),
+                  debeBs: "",
+                  haberBs: ""
+                }
+              });
+            }
+          }
+        }
+      }
+    } else {
+      rows.push({
+        id: `inventario-debe-${periodo.anio}-${periodo.mes}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          cargos: "26 002 000",
+          descripcion: "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
+          parcialesBs: "",
+          cuenta: "26.002.000",
+          debeBs: Number(periodo.totalInventarioDebe.toFixed(2)),
+          haberBs: ""
+        }
+      });
+      rows.push({
+        id: `saldo-anterior-${periodo.anio}-${periodo.mes}`,
+        values: {
+          periodo: "",
+          cargos: "",
+          descripcion: `Saldo inventario al  cierre anterior`,
+          parcialesBs: Number(periodo.saldoInventarioAnterior.toFixed(2)),
+          cuenta: "",
+          debeBs: "",
+          haberBs: ""
+        }
+      });
+      rows.push({
+        id: `compras-${periodo.anio}-${periodo.mes}`,
+        values: {
+          periodo: "",
+          cargos: "",
+          descripcion: "Cuadro Mat. y Sumin. del mes",
+          parcialesBs: Number((periodo.comprasSinIva ?? periodo.comprasImporteBs).toFixed(2)),
+          cuenta: "",
+          debeBs: "",
+          haberBs: ""
+        }
+      });
+
+      for (const cuenta of periodo.cuentasHaber) {
+        rows.push({
+          id: `haber-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}`,
+          type: "group",
+          values: {
+            periodo: formatMonth(periodo.anio, periodo.mes),
+            cargos: cuenta.centroCostoCodigo ?? "",
+            descripcion: cuenta.centroCostoNombre ?? "",
+            parcialesBs: "",
+            cuenta: `${cuenta.centroCostoCodigo ?? ""}.000`.replace(/^\./, ""),
+            debeBs: "",
+            haberBs: Number(cuenta.totalBs.toFixed(2))
+          }
+        });
+
+        const funcionGastos = cuenta.funcionGastos.length
+          ? cuenta.funcionGastos.map((funcion) => ({
+              codigoCompleto: cuenta.codigoCompleto ?? "",
+              funcionGastoCodigo: funcion.codigo,
+              funcionGastoNombre: funcion.nombre,
+              totalBs: funcion.totalBs
+            }))
+          : cuenta.subCentros;
+
+        for (const subCentro of funcionGastos) {
+          rows.push({
+            id: `haber-sub-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}-${subCentro.codigoCompleto}-${subCentro.funcionGastoCodigo}`,
+            values: {
+              periodo: "",
+              cargos: "",
+              descripcion: `${subCentro.funcionGastoCodigo ?? ""} - ${subCentro.funcionGastoNombre ?? ""}`.trim(),
+              parcialesBs: Number(subCentro.totalBs.toFixed(2)),
+              cuenta: subCentro.codigoCompleto ?? "",
+              debeBs: "",
+              haberBs: ""
+            }
+          });
+        }
       }
     }
 
+    if (reportType === "diario-almacenes") {
+      rows.push({
+        id: `inventario-haber-diario-${periodo.anio}-${periodo.mes}`,
+        type: "group",
+        values: {
+          periodo: formatMonth(periodo.anio, periodo.mes),
+          cargos: "",
+          descripcion: "INVENTARIO MATERIALES Y SUMINISTROS",
+          parcialesBs: "",
+          cuenta: "26.002.000",
+          debeBs: "",
+          haberBs: Number(periodo.totalSalidasHaber.toFixed(2))
+        }
+      });
+      rows.push({
+        id: `inventario-haber-detalle-diario-${periodo.anio}-${periodo.mes}`,
+        values: {
+          periodo: "",
+          cargos: "",
+          descripcion: "Según Vales Salida Materiales",
+          parcialesBs: "",
+          cuenta: "",
+          debeBs: "",
+          haberBs: ""
+        }
+      });
+    }
     rows.push({
       id: `total-diario-${periodo.anio}-${periodo.mes}`,
       type: "total",
       values: {
         periodo: formatMonth(periodo.anio, periodo.mes),
         cargos: "",
-        descripcion: "TOTALES",
+        descripcion: "",
         parcialesBs: "",
         cuenta: "",
-        debeBs: Number(periodo.totalInventarioDebe.toFixed(2)),
+        debeBs: Number(
+          (reportType === "diario-almacenes" ? periodo.totalSalidasHaber : periodo.totalInventarioDebe).toFixed(2)
+        ),
         haberBs: Number(periodo.totalSalidasHaber.toFixed(2))
       }
     });
   }
 
-  const totalDebe = data.meses.reduce((sum, periodo) => sum + periodo.totalInventarioDebe, 0);
+  const totalDebe = data.meses.reduce(
+    (sum, periodo) => sum + (reportType === "diario-almacenes" ? periodo.totalSalidasHaber : periodo.totalInventarioDebe),
+    0
+  );
   const totalHaber = data.meses.reduce((sum, periodo) => sum + periodo.totalSalidasHaber, 0);
 
   return {
     type: reportType,
     title: reportType === "movimiento-almacen" ? "Movimiento Almacen" : "Diario Almacenes",
     subtitle: `Correspondiente a: ${formatRangeLabel(data)}`,
-    columns: [
-      { key: "periodo", label: "Periodo", align: "center" },
-      { key: "cargos", label: "Cargos", align: "center" },
-      { key: "descripcion", label: "Descripcion" },
-      { key: "parcialesBs", label: "Parciales Bs.", align: "right" },
-      { key: "cuenta", label: "No De Cuenta", align: "center" },
-      { key: "debeBs", label: "Debe Bs.", align: "right" },
-      { key: "haberBs", label: "Haber Bs.", align: "right" }
-    ],
+    columns:
+      reportType === "diario-almacenes"
+        ? [
+            { key: "descripcion", label: "Descripcion" },
+            { key: "parcialesBs", label: "Parciales Bs.", align: "right" },
+            { key: "cuenta", label: "No De Cuenta", align: "center" },
+            { key: "debeBs", label: "Debe Bs.", align: "right" },
+            { key: "haberBs", label: "Haber Bs.", align: "right" }
+          ]
+        : [
+            { key: "periodo", label: "Periodo", align: "center" },
+            { key: "cargos", label: "Cargos", align: "center" },
+            { key: "descripcion", label: "Descripcion" },
+            { key: "parcialesBs", label: "Parciales Bs.", align: "right" },
+            { key: "cuenta", label: "No De Cuenta", align: "center" },
+            { key: "debeBs", label: "Debe Bs.", align: "right" },
+            { key: "haberBs", label: "Haber Bs.", align: "right" }
+          ],
     rows,
     summary: [
       { label: "Meses", value: data.meses.length },

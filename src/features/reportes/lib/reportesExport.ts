@@ -1053,88 +1053,25 @@ function normalizeDiarioCuentas(
 
 function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
   const source = getDiarioAlmacenesSource(report);
-  if (!source?.data.meses.length) {
-    const rows = report.rows
-      .filter((row) => row.type !== "group" || row.values.descripcion)
-      .map((row) => [
-        valueOf(row, "cargos"),
+  const periodo = source?.data.meses[0];
+  const monthName = periodo ? MONTH_NAMES[periodo.mes - 1] : "";
+  const bodyRows: Array<{ kind?: "title" | "total"; values: Array<string | number> }> = report.rows
+    .filter((row) => row.values.descripcion || row.values.debeBs || row.values.haberBs)
+    .map((row) => ({
+      kind: row.type === "group" ? "title" : row.type === "total" ? "total" : undefined,
+      values: [
         valueOf(row, "descripcion"),
         valueOf(row, "parcialesBs"),
         valueOf(row, "cuenta"),
         valueOf(row, "debeBs"),
         valueOf(row, "haberBs")
-      ]);
-    const aoa: Array<Array<string | number>> = [
-      ["COMPROBANTE  DE  DIARIO"],
-      ["DIARIO  ALMACENES"],
-      ["SECTOR:  LIPEÑA", monthLabelFromSubtitle(report.subtitle)],
-      [],
-      ["D E S C R I P C I O N", "PARCIALES\nBs.", "No  DE CUENTA", "BOLIVIANOS\nD E B E", "BOLIVIANOS\nH A B E R"],
-      ...rows
-    ];
-    const sheet = XLSX.utils.aoa_to_sheet(aoa);
-    sheet["!cols"] = [{ wch: 46 }, { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 15 }];
-    appendAndSaveStyledSheet({ sheet, sheetName: "Diario Almacenes", fileToken: "diario-almacenes" });
-    return;
-  }
-
-  const periodo = source.data.meses[0];
-  const monthName = MONTH_NAMES[periodo.mes - 1];
-  const bodyRows: Array<{ kind?: "title" | "total"; values: Array<string | number> }> = [
-    { kind: "title", values: ["CONTABILIZACION DIARIO ALMACENES MES:", "", "", "", ""] },
-    { kind: "title", values: [`${monthName}-${periodo.anio}`, "", "", "", ""] }
-  ];
-
-  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
-  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
-
-  for (const cuenta of normalizeDiarioCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)) {
-    bodyRows.push({
-      kind: "title",
-      values: [
-        cuentaHaberTitulo(cuenta),
-        "",
-        cuentaContableDisplay(cuenta.codigoCompleto),
-        asExcelNumber(cuenta.totalBs),
-        ""
       ]
-    });
-    bodyRows.push({
-      values: [`Aten. Material mes de ${monthName}- ${periodo.anio}`, cuenta.esTransporte ? asExcelNumber(cuenta.totalBs) : "", "", cuenta.esTransporte ? asExcelNumber(cuenta.totalBs) : "", ""]
-    });
-    cuenta.lineas.forEach((linea) => {
-      bodyRows.push({
-        values: [
-          linea.nombre ?? "",
-          asExcelNumber(linea.importeBs),
-          lineaCuentaDisplay(linea),
-          "",
-          ""
-        ]
-      });
-    });
-  }
-
-  bodyRows.push({
-    kind: "title",
-    values: [
-      "INVENTARIO MATERIALES Y SUMINISTROS",
-      "",
-      "26.002.000",
-      "",
-      asExcelNumber(periodo.totalSalidasHaber)
-    ]
-  });
-  bodyRows.push({ values: ["Según Vales Salida Materiales", "", "", "", ""] });
-  bodyRows.push({
-    kind: "total",
-    values: ["", "", "", asExcelNumber(periodo.totalSalidasHaber), asExcelNumber(periodo.totalSalidasHaber)]
-  });
+    }));
 
   const aoa: Array<Array<string | number>> = [
     ["COMPROBANTE  DE  DIARIO"],
     ["DIARIO  ALMACENES"],
-    ["SECTOR:  LIPEÑA", `MES:  DE ${monthName}  ${periodo.anio}`],
+    ["SECTOR:  LIPEÑA", periodo ? `MES:  DE ${monthName}  ${periodo.anio}` : monthLabelFromSubtitle(report.subtitle)],
     [],
     ["D E S C R I P C I O N", "PARCIALES\nBs.", "No  DE CUENTA", "BOLIVIANOS\nD E B E", "BOLIVIANOS\nH A B E R"],
     ...bodyRows.map((row) => row.values)

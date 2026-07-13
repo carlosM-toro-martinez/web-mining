@@ -157,6 +157,7 @@ function reportLineaCuenta(linea: { subCentro?: string | null; subCuentas?: stri
 }
 
 type ReportDiarioCuenta = DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number];
+type ReportDiarioSector = DiarioAlmacenesReportResponse["data"]["meses"][number]["sectoresHaber"][number];
 
 function reportMovimientoTitulo(cuenta: ReportDiarioCuenta) {
   return (cuenta.sectorNombre ?? reportCuentaTitulo(cuenta)).toUpperCase();
@@ -208,6 +209,28 @@ function reportCuentaLookupKey(value?: string | null) {
 
 function reportNameLookupKey(value?: string | null) {
   return `name:${(value ?? "").trim().toUpperCase()}`;
+}
+
+function reportDiarioSectorOrderValue(sector: ReportDiarioSector) {
+  const order = ["100001000", "35001000", "22001008", "104001000", "44002000", "67001010", "67001009"];
+  const index = order.indexOf(reportCuentaLookupKey(sector.sectorCodigo));
+  return index >= 0 ? index : order.length;
+}
+
+function sortDiarioSectores(sectores: ReportDiarioSector[]) {
+  return [...sectores].sort((a, b) => {
+    const orderDiff = reportDiarioSectorOrderValue(a) - reportDiarioSectorOrderValue(b);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
+  });
+}
+
+function shouldShowDiarioSectorDetails(sector: ReportDiarioSector) {
+  return reportCuentaLookupKey(sector.sectorCodigo) === "100001000";
+}
+
+function reportDiarioDetalleCuenta(centroCostoCodigo?: string | null, funcionGastoCodigo?: string | null) {
+  return [centroCostoCodigo, funcionGastoCodigo].filter(Boolean).join("-");
 }
 
 function buildFuncionGastoLookup(value: unknown, lookup = new Map<string, string>()) {
@@ -347,32 +370,64 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
     { key: "mes", descripcion: `${month}-${periodo.anio}`, strong: true }
   ];
 
-  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
-  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
-
-  normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup).forEach((cuenta, cuentaIndex) => {
-    rows.push({
-      key: `cuenta-${cuentaIndex}`,
-      descripcion: reportCuentaTitulo(cuenta),
-      cuenta: reportCuentaDisplay(cuenta.codigoCompleto),
-      debe: cuenta.totalBs,
-      strong: true
-    });
-    rows.push({
-      key: `atencion-${cuentaIndex}`,
-      descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
-      parcial: cuenta.esTransporte ? cuenta.totalBs : "",
-      debe: cuenta.esTransporte ? cuenta.totalBs : ""
-    });
-    cuenta.lineas.forEach((linea, index) => {
+  if (periodo.sectoresHaber.length) {
+    sortDiarioSectores(periodo.sectoresHaber).forEach((sector, sectorIndex) => {
+      const showDetails = shouldShowDiarioSectorDetails(sector);
       rows.push({
-        key: `linea-${cuentaIndex}-${index}`,
-        descripcion: linea.nombre ?? "",
-        parcial: linea.importeBs,
-        cuenta: reportLineaCuenta(linea)
+        key: `sector-${sectorIndex}`,
+        descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
+        cuenta: sector.sectorCodigo ?? "",
+        debe: sector.totalBs,
+        strong: true
+      });
+      rows.push({
+        key: `atencion-${sectorIndex}`,
+        descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
+        parcial: showDetails ? "" : sector.totalBs,
+        debe: showDetails ? "" : sector.totalBs
+      });
+
+      if (showDetails) {
+        sector.centroCostos.forEach((centroCosto, centroIndex) => {
+          centroCosto.subCuentas.forEach((subCuenta, subIndex) => {
+            rows.push({
+              key: `linea-sector-${sectorIndex}-${centroIndex}-${subIndex}`,
+              descripcion: subCuenta.funcionGastoNombre ?? "",
+              parcial: subCuenta.totalBs,
+              cuenta: reportDiarioDetalleCuenta(centroCosto.centroCostoCodigo, subCuenta.funcionGastoCodigo)
+            });
+          });
+        });
+      }
+    });
+  } else {
+    const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
+    const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
+
+    normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup).forEach((cuenta, cuentaIndex) => {
+      rows.push({
+        key: `cuenta-${cuentaIndex}`,
+        descripcion: reportCuentaTitulo(cuenta),
+        cuenta: reportCuentaDisplay(cuenta.codigoCompleto),
+        debe: cuenta.totalBs,
+        strong: true
+      });
+      rows.push({
+        key: `atencion-${cuentaIndex}`,
+        descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
+        parcial: cuenta.esTransporte ? cuenta.totalBs : "",
+        debe: cuenta.esTransporte ? cuenta.totalBs : ""
+      });
+      cuenta.lineas.forEach((linea, index) => {
+        rows.push({
+          key: `linea-${cuentaIndex}-${index}`,
+          descripcion: linea.nombre ?? "",
+          parcial: linea.importeBs,
+          cuenta: reportLineaCuenta(linea)
+        });
       });
     });
-  });
+  }
 
   rows.push({
     key: "inventario-haber",

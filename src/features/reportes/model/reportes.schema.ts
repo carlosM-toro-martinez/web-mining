@@ -613,6 +613,29 @@ const diarioCuentaHaberSchema = z.object({
   detalles: z.array(diarioDetalleTransporteSchema).optional().default([])
 });
 
+const diarioSectorSubCuentaSchema = z.object({
+  cuentaId: idLikeSchema.optional().nullable(),
+  codigoCompleto: z.string().optional().nullable(),
+  funcionGastoCodigo: z.string().optional().nullable(),
+  funcionGastoNombre: z.string().optional().nullable(),
+  totalBs: numberLikeSchema
+});
+
+const diarioSectorCentroCostoSchema = z.object({
+  centroCostoCodigo: z.string().optional().nullable(),
+  centroCostoNombre: z.string().optional().nullable(),
+  totalBs: numberLikeSchema,
+  subCuentas: z.array(diarioSectorSubCuentaSchema).optional().default([])
+});
+
+const diarioSectorHaberSchema = z.object({
+  sectorId: idLikeSchema.optional().nullable(),
+  sectorCodigo: z.string().optional().nullable(),
+  sectorNombre: z.string().optional().nullable(),
+  totalBs: numberLikeSchema,
+  centroCostos: z.array(diarioSectorCentroCostoSchema).optional().default([])
+});
+
 const diarioAlmacenesReportDataSchema = z.object({
   anioInicio: numberLikeSchema.int(),
   mesInicio: numberLikeSchema.int(),
@@ -627,7 +650,7 @@ const diarioAlmacenesReportDataSchema = z.object({
       comprasImporteBs: numberLikeSchema,
       comprasSinIva: numberLikeSchema.optional(),
       totalInventarioDebe: numberLikeSchema,
-      sectoresHaber: z.array(z.unknown()).optional().default([]),
+      sectoresHaber: z.array(diarioSectorHaberSchema).optional().default([]),
       cuentasHaber: z.array(diarioCuentaHaberSchema).default([]),
       totalSalidasHaber: numberLikeSchema
     })
