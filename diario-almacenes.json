@@ -10,28 +10,28 @@
         "anio": 2025,
         "mes": 10,
         "esCerrado": false,
-        "saldoInventarioAnterior": 2390107.08,
+        "saldoInventarioAnterior": 2401487.31,
         "comprasImporteBs": 944988.86,
         "comprasSinIva": 822140.31,
-        "totalInventarioDebe": 3212247.39,
+        "totalInventarioDebe": 3223627.62,
         "sectoresHaber": [
           {
             "sectorId": 8,
             "sectorCodigo": "22 001 008",
             "sectorNombre": "TRANSPORTISTAS VARIOS COMBUSTIBLE",
-            "totalBs": 31586.5,
+            "totalBs": 5290.93,
             "centroCostos": [
               {
                 "centroCostoCodigo": "2801",
                 "centroCostoNombre": "MANTENIMIENTO",
-                "totalBs": 31586.5,
+                "totalBs": 5290.93,
                 "subCuentas": [
                   {
                     "cuentaId": 61,
                     "codigoCompleto": "2801-236-22 001 008",
                     "funcionGastoCodigo": "236",
                     "funcionGastoNombre": "COMBUSTIBLES",
-                    "totalBs": 31586.5
+                    "totalBs": 5290.93
                   }
                 ]
               }
@@ -63,19 +63,19 @@
             "sectorId": 5,
             "sectorCodigo": "44 002 000",
             "sectorNombre": "OBRAS EN CONSTRUCCION LIPEÑA",
-            "totalBs": 88322.18,
+            "totalBs": 71839.15,
             "centroCostos": [
               {
                 "centroCostoCodigo": "3601",
                 "centroCostoNombre": "VARIOS",
-                "totalBs": 88322.18,
+                "totalBs": 71839.15,
                 "subCuentas": [
                   {
                     "cuentaId": 108,
                     "codigoCompleto": "3601-240-44 002 000",
                     "funcionGastoCodigo": "240",
                     "funcionGastoNombre": "OTROS MATERIALES DE CONSTRUCCION",
-                    "totalBs": 88322.18
+                    "totalBs": 71839.15
                   }
                 ]
               }
@@ -129,33 +129,33 @@
             "sectorId": 1,
             "sectorCodigo": "100 001 000",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
-            "totalBs": 496157.46,
+            "totalBs": 437374.2,
             "centroCostos": [
               {
                 "centroCostoCodigo": "1804",
                 "centroCostoNombre": "COSTO MINA",
-                "totalBs": 12025.45,
+                "totalBs": 11860.99,
                 "subCuentas": [
                   {
                     "cuentaId": 93,
                     "codigoCompleto": "1804-209-100 001 000",
                     "funcionGastoCodigo": "209",
                     "funcionGastoNombre": "CAÑERIAS, TUBOS Y ACCESORIOS",
-                    "totalBs": 2633.34
+                    "totalBs": 2651.2
                   },
                   {
                     "cuentaId": 19,
                     "codigoCompleto": "1804-219-100 001 000",
                     "funcionGastoCodigo": "219",
                     "funcionGastoNombre": "SACOS METALEROS",
-                    "totalBs": 234.27
+                    "totalBs": 456.75
                   },
                   {
                     "cuentaId": 88,
                     "codigoCompleto": "1804-228-100 001 000",
                     "funcionGastoCodigo": "228",
                     "funcionGastoNombre": "PALAS-PICOTAS Y ACCESORIOS",
-                    "totalBs": 577.86
+                    "totalBs": 667.41
                   },
                   {
                     "cuentaId": 71,
@@ -169,7 +169,7 @@
                     "codigoCompleto": "1804-230-100 001 000",
                     "funcionGastoCodigo": "230",
                     "funcionGastoNombre": "OVEROLES",
-                    "totalBs": 328.02
+                    "totalBs": 330.6
                   },
                   {
                     "cuentaId": 53,
@@ -183,14 +183,14 @@
                     "codigoCompleto": "1804-234-100 001 000",
                     "funcionGastoCodigo": "234",
                     "funcionGastoNombre": "OTROS EQUIPOS DE SEGURIDAD",
-                    "totalBs": 948.14
+                    "totalBs": 1035.98
                   },
                   {
                     "cuentaId": 54,
                     "codigoCompleto": "1804-235-100 001 000",
                     "funcionGastoCodigo": "235",
                     "funcionGastoNombre": "VESTUARIO PERSONAL",
-                    "totalBs": 528.49
+                    "totalBs": 565.5
                   },
                   {
                     "cuentaId": 8,
@@ -204,7 +204,7 @@
                     "codigoCompleto": "1804-237-100 001 000",
                     "funcionGastoCodigo": "237",
                     "funcionGastoNombre": "LUBRICANTES-GRASAS-ANTICONGELANTES-ACEITES",
-                    "totalBs": 55.11
+                    "totalBs": 60.9
                   },
                   {
                     "cuentaId": 95,
@@ -232,21 +232,21 @@
                     "codigoCompleto": "1804-253-100 001 000",
                     "funcionGastoCodigo": "253",
                     "funcionGastoNombre": "MATERIALES VARIOS",
-                    "totalBs": 1668.45
+                    "totalBs": 1030.99
                   },
                   {
                     "cuentaId": 20,
                     "codigoCompleto": "1804-257-100 001 000",
                     "funcionGastoCodigo": "257",
                     "funcionGastoNombre": "MATERIAL DE ESCRITORIO",
-                    "totalBs": 30.02
+                    "totalBs": 39.93
                   }
                 ]
               },
               {
                 "centroCostoCodigo": "2801",
                 "centroCostoNombre": "MANTENIMIENTO",
-                "totalBs": 311143.63,
+                "totalBs": 249778.99,
                 "subCuentas": [
                   {
                     "cuentaId": 90,
@@ -260,28 +260,28 @@
                     "codigoCompleto": "2801-209-100 001 000",
                     "funcionGastoCodigo": "209",
                     "funcionGastoNombre": "CAÑERIAS, TUBOS Y ACCESORIOS",
-                    "totalBs": 4612.5
+                    "totalBs": 4641.45
                   },
                   {
                     "cuentaId": 105,
                     "codigoCompleto": "2801-223-100 001 000",
                     "funcionGastoCodigo": "223",
                     "funcionGastoNombre": "CORREAS",
-                    "totalBs": 90
+                    "totalBs": 78.3
                   },
                   {
                     "cuentaId": 73,
                     "codigoCompleto": "2801-229-100 001 000",
                     "funcionGastoCodigo": "229",
                     "funcionGastoNombre": "HERRAMIENTAS Y ACCESORIOS",
-                    "totalBs": 5038.09
+                    "totalBs": 4784.03
                   },
                   {
                     "cuentaId": 76,
                     "codigoCompleto": "2801-230-100 001 000",
                     "funcionGastoCodigo": "230",
                     "funcionGastoNombre": "OVEROLES",
-                    "totalBs": 765.53
+                    "totalBs": 1026.6
                   },
                   {
                     "cuentaId": 70,
@@ -295,21 +295,21 @@
                     "codigoCompleto": "2801-235-100 001 000",
                     "funcionGastoCodigo": "235",
                     "funcionGastoNombre": "VESTUARIO PERSONAL",
-                    "totalBs": 309.74
+                    "totalBs": 217.5
                   },
                   {
                     "cuentaId": 4,
                     "codigoCompleto": "2801-236-100 001 000",
                     "funcionGastoCodigo": "236",
                     "funcionGastoNombre": "COMBUSTIBLES",
-                    "totalBs": 101968.38
+                    "totalBs": 128263.95
                   },
                   {
                     "cuentaId": 42,
                     "codigoCompleto": "2801-237-100 001 000",
                     "funcionGastoCodigo": "237",
                     "funcionGastoNombre": "LUBRICANTES-GRASAS-ANTICONGELANTES-ACEITES",
-                    "totalBs": 17426.55
+                    "totalBs": 20058.84
                   },
                   {
                     "cuentaId": 103,
@@ -323,28 +323,28 @@
                     "codigoCompleto": "2801-241-100 001 000",
                     "funcionGastoCodigo": "241",
                     "funcionGastoNombre": "ABRAZADERAS-NIPLES-PERNOS",
-                    "totalBs": 2774.37
+                    "totalBs": 2328.34
                   },
                   {
                     "cuentaId": 40,
                     "codigoCompleto": "2801-242-100 001 000",
                     "funcionGastoCodigo": "242",
                     "funcionGastoNombre": "FILTROS EN GENERAL",
-                    "totalBs": 26886.42
+                    "totalBs": 24013.22
                   },
                   {
                     "cuentaId": 49,
                     "codigoCompleto": "2801-243-100 001 000",
                     "funcionGastoCodigo": "243",
                     "funcionGastoNombre": "DISCOS DE CORTE",
-                    "totalBs": 89.32
+                    "totalBs": 143.55
                   },
                   {
                     "cuentaId": 86,
                     "codigoCompleto": "2801-246-100 001 000",
                     "funcionGastoCodigo": "246",
                     "funcionGastoNombre": "MATERIAL ELECTRICO",
-                    "totalBs": 125823.71
+                    "totalBs": 40290.64
                   },
                   {
                     "cuentaId": 62,
@@ -358,35 +358,35 @@
                     "codigoCompleto": "2801-248-100 001 000",
                     "funcionGastoCodigo": "248",
                     "funcionGastoNombre": "REPUESTOS PARA VEHICULOS",
-                    "totalBs": 8049.21
+                    "totalBs": 7020.9
                   },
                   {
                     "cuentaId": 44,
                     "codigoCompleto": "2801-253-100 001 000",
                     "funcionGastoCodigo": "253",
                     "funcionGastoNombre": "MATERIALES VARIOS",
-                    "totalBs": 16032.77
+                    "totalBs": 15550.73
                   },
                   {
                     "cuentaId": 16,
                     "codigoCompleto": "2801-257-100 001 000",
                     "funcionGastoCodigo": "257",
                     "funcionGastoNombre": "MATERIAL DE ESCRITORIO",
-                    "totalBs": 793.5
+                    "totalBs": 877.4
                   }
                 ]
               },
               {
                 "centroCostoCodigo": "3401",
                 "centroCostoNombre": "ADMINISTRACION",
-                "totalBs": 6099.48,
+                "totalBs": 5938.88,
                 "subCuentas": [
                   {
                     "cuentaId": 74,
                     "codigoCompleto": "3401-229-100 001 000",
                     "funcionGastoCodigo": "229",
                     "funcionGastoNombre": "HERRAMIENTAS Y ACCESORIOS",
-                    "totalBs": 667.82
+                    "totalBs": 658.75
                   },
                   {
                     "cuentaId": 79,
@@ -400,42 +400,42 @@
                     "codigoCompleto": "3401-234-100 001 000",
                     "funcionGastoCodigo": "234",
                     "funcionGastoNombre": "OTROS EQUIPOS DE SEGURIDAD",
-                    "totalBs": 626.18
+                    "totalBs": 1072.02
                   },
                   {
                     "cuentaId": 107,
                     "codigoCompleto": "3401-246-100 001 000",
                     "funcionGastoCodigo": "246",
                     "funcionGastoNombre": "MATERIAL ELECTRICO",
-                    "totalBs": 220
+                    "totalBs": 191.4
                   },
                   {
                     "cuentaId": 69,
                     "codigoCompleto": "3401-253-100 001 000",
                     "funcionGastoCodigo": "253",
                     "funcionGastoNombre": "MATERIALES VARIOS",
-                    "totalBs": 1866.62
+                    "totalBs": 1585.62
                   },
                   {
                     "cuentaId": 21,
                     "codigoCompleto": "3401-257-100 001 000",
                     "funcionGastoCodigo": "257",
                     "funcionGastoNombre": "MATERIAL DE ESCRITORIO",
-                    "totalBs": 2392.62
+                    "totalBs": 2104.84
                   }
                 ]
               },
               {
                 "centroCostoCodigo": "3601",
                 "centroCostoNombre": "VARIOS",
-                "totalBs": 129131.29,
+                "totalBs": 127641.89,
                 "subCuentas": [
                   {
                     "cuentaId": 92,
                     "codigoCompleto": "3601-209-100 001 000",
                     "funcionGastoCodigo": "209",
                     "funcionGastoNombre": "CAÑERIAS, TUBOS Y ACCESORIOS",
-                    "totalBs": 1581.73
+                    "totalBs": 1573.57
                   },
                   {
                     "cuentaId": 82,
@@ -449,14 +449,14 @@
                     "codigoCompleto": "3601-229-100 001 000",
                     "funcionGastoCodigo": "229",
                     "funcionGastoNombre": "HERRAMIENTAS Y ACCESORIOS",
-                    "totalBs": 3906.54
+                    "totalBs": 3845.95
                   },
                   {
                     "cuentaId": 39,
                     "codigoCompleto": "3601-234-100 001 000",
                     "funcionGastoCodigo": "234",
                     "funcionGastoNombre": "OTROS EQUIPOS DE SEGURIDAD",
-                    "totalBs": 135.3
+                    "totalBs": 179.22
                   },
                   {
                     "cuentaId": 26,
@@ -470,28 +470,21 @@
                     "codigoCompleto": "3601-238-100 001 000",
                     "funcionGastoCodigo": "238",
                     "funcionGastoNombre": "CLAVOS EN GENERAL",
-                    "totalBs": 559.93
+                    "totalBs": 467
                   },
                   {
                     "cuentaId": 64,
                     "codigoCompleto": "3601-239-100 001 000",
                     "funcionGastoCodigo": "239",
                     "funcionGastoNombre": "CEMENTO-ESTUCO",
-                    "totalBs": 3874.4
+                    "totalBs": 3875.42
                   },
                   {
                     "cuentaId": 63,
                     "codigoCompleto": "3601-240-100 001 000",
                     "funcionGastoCodigo": "240",
                     "funcionGastoNombre": "OTROS MATERIALES DE CONSTRUCCION",
-                    "totalBs": 109481.27
-                  },
-                  {
-                    "cuentaId": 98,
-                    "codigoCompleto": "3601-241-100 001 000",
-                    "funcionGastoCodigo": "241",
-                    "funcionGastoNombre": "ABRAZADERAS-NIPLES-PERNOS",
-                    "totalBs": 10.88
+                    "totalBs": 108776.4
                   },
                   {
                     "cuentaId": 66,
@@ -505,28 +498,28 @@
                     "codigoCompleto": "3601-246-100 001 000",
                     "funcionGastoCodigo": "246",
                     "funcionGastoNombre": "MATERIAL ELECTRICO",
-                    "totalBs": 264.85
+                    "totalBs": 264.04
                   },
                   {
                     "cuentaId": 51,
                     "codigoCompleto": "3601-253-100 001 000",
                     "funcionGastoCodigo": "253",
                     "funcionGastoNombre": "MATERIALES VARIOS",
-                    "totalBs": 7829.82
+                    "totalBs": 7175.54
                   },
                   {
                     "cuentaId": 57,
                     "codigoCompleto": "3601-257-100 001 000",
                     "funcionGastoCodigo": "257",
                     "funcionGastoNombre": "MATERIAL DE ESCRITORIO",
-                    "totalBs": 31.34
+                    "totalBs": 29.52
                   }
                 ]
               },
               {
                 "centroCostoCodigo": "4401",
                 "centroCostoNombre": "TRANSPORTE",
-                "totalBs": 37757.61,
+                "totalBs": 42153.46,
                 "subCuentas": [
                   {
                     "cuentaId": 7,
@@ -540,7 +533,7 @@
                     "codigoCompleto": "4401-237-100 001 000",
                     "funcionGastoCodigo": "237",
                     "funcionGastoNombre": "LUBRICANTES-GRASAS-ANTICONGELANTES-ACEITES",
-                    "totalBs": 2778.92
+                    "totalBs": 7294.47
                   },
                   {
                     "cuentaId": 96,
@@ -554,7 +547,7 @@
                     "codigoCompleto": "4401-248-100 001 000",
                     "funcionGastoCodigo": "248",
                     "funcionGastoNombre": "REPUESTOS PARA VEHICULOS",
-                    "totalBs": 9766.32
+                    "totalBs": 9646.61
                   },
                   {
                     "cuentaId": 75,
@@ -571,26 +564,26 @@
             "sectorId": 2,
             "sectorCodigo": "104 001 000",
             "sectorNombre": "COSTO MEDIO AMBIENTE",
-            "totalBs": 7315.85,
+            "totalBs": 7177.28,
             "centroCostos": [
               {
                 "centroCostoCodigo": "3101",
                 "centroCostoNombre": "MEDIO AMBIENTE",
-                "totalBs": 6895.35,
+                "totalBs": 6756.78,
                 "subCuentas": [
                   {
                     "cuentaId": 89,
                     "codigoCompleto": "3101-209-104 001 000",
                     "funcionGastoCodigo": "209",
                     "funcionGastoNombre": "CAÑERIAS, TUBOS Y ACCESORIOS",
-                    "totalBs": 4666.17
+                    "totalBs": 4578
                   },
                   {
                     "cuentaId": 72,
                     "codigoCompleto": "3101-229-104 001 000",
                     "funcionGastoCodigo": "229",
                     "funcionGastoNombre": "HERRAMIENTAS Y ACCESORIOS",
-                    "totalBs": 240.7
+                    "totalBs": 239.52
                   },
                   {
                     "cuentaId": 104,
@@ -604,14 +597,14 @@
                     "codigoCompleto": "3101-253-104 001 000",
                     "funcionGastoCodigo": "253",
                     "funcionGastoNombre": "MATERIALES VARIOS",
-                    "totalBs": 1808.43
+                    "totalBs": 1823.5
                   },
                   {
                     "cuentaId": 58,
                     "codigoCompleto": "3101-257-104 001 000",
                     "funcionGastoCodigo": "257",
                     "funcionGastoNombre": "MATERIAL DE ESCRITORIO",
-                    "totalBs": 126.94
+                    "totalBs": 62.64
                   }
                 ]
               },
@@ -632,7 +625,7 @@
             ]
           }
         ],
-        "totalSalidasHaber": 817994.01,
+        "totalSalidasHaber": 716293.58,
         "cuentasHaber": [
           {
             "codigoCompleto": "1804-209-100 001 000",
@@ -640,8 +633,8 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 2633.34,
-            "totalCantidad": 17
+            "totalBs": 2651.2,
+            "totalCantidad": 16
           },
           {
             "codigoCompleto": "1804-219-100 001 000",
@@ -649,7 +642,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 234.27,
+            "totalBs": 456.75,
             "totalCantidad": 300
           },
           {
@@ -658,7 +651,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 577.86,
+            "totalBs": 667.41,
             "totalCantidad": 4
           },
           {
@@ -676,7 +669,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 328.02,
+            "totalBs": 330.6,
             "totalCantidad": 1
           },
           {
@@ -694,7 +687,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 948.14,
+            "totalBs": 1035.98,
             "totalCantidad": 24
           },
           {
@@ -703,7 +696,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 528.49,
+            "totalBs": 565.5,
             "totalCantidad": 3
           },
           {
@@ -721,7 +714,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 55.11,
+            "totalBs": 60.9,
             "totalCantidad": 2
           },
           {
@@ -757,7 +750,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 1668.45,
+            "totalBs": 1030.99,
             "totalCantidad": 77
           },
           {
@@ -766,7 +759,7 @@
             "centroCostoNombre": "COSTO MINA",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 30.02,
+            "totalBs": 39.93,
             "totalCantidad": 3
           },
           {
@@ -793,7 +786,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 4612.5,
+            "totalBs": 4641.45,
             "totalCantidad": 7
           },
           {
@@ -802,7 +795,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 90,
+            "totalBs": 78.3,
             "totalCantidad": 1
           },
           {
@@ -811,7 +804,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 5038.09,
+            "totalBs": 4784.03,
             "totalCantidad": 67
           },
           {
@@ -820,7 +813,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 765.53,
+            "totalBs": 1026.6,
             "totalCantidad": 5
           },
           {
@@ -838,7 +831,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 309.74,
+            "totalBs": 217.5,
             "totalCantidad": 1
           },
           {
@@ -847,8 +840,8 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 101968.38,
-            "totalCantidad": 10470
+            "totalBs": 128263.95,
+            "totalCantidad": 13170
           },
           {
             "codigoCompleto": "2801-236-22 001 008",
@@ -856,8 +849,8 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "TRANSPORTISTAS VARIOS COMBUSTIBLE",
             "esTransporte": true,
-            "totalBs": 31586.5,
-            "totalCantidad": 3324
+            "totalBs": 5290.93,
+            "totalCantidad": 624
           },
           {
             "codigoCompleto": "2801-237-100 001 000",
@@ -865,7 +858,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 17426.55,
+            "totalBs": 20058.84,
             "totalCantidad": 241
           },
           {
@@ -883,8 +876,8 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 2774.37,
-            "totalCantidad": 186
+            "totalBs": 2328.34,
+            "totalCantidad": 178
           },
           {
             "codigoCompleto": "2801-242-100 001 000",
@@ -892,8 +885,8 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 26886.42,
-            "totalCantidad": 18
+            "totalBs": 24013.22,
+            "totalCantidad": 17
           },
           {
             "codigoCompleto": "2801-243-100 001 000",
@@ -901,7 +894,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 89.32,
+            "totalBs": 143.55,
             "totalCantidad": 3
           },
           {
@@ -910,8 +903,8 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 125823.71,
-            "totalCantidad": 1448
+            "totalBs": 40290.64,
+            "totalCantidad": 1283
           },
           {
             "codigoCompleto": "2801-247-100 001 000",
@@ -928,7 +921,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 8049.21,
+            "totalBs": 7020.9,
             "totalCantidad": 7
           },
           {
@@ -937,8 +930,8 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 16032.77,
-            "totalCantidad": 25
+            "totalBs": 15550.73,
+            "totalCantidad": 23.4
           },
           {
             "codigoCompleto": "2801-257-100 001 000",
@@ -946,7 +939,7 @@
             "centroCostoNombre": "MANTENIMIENTO",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 793.5,
+            "totalBs": 877.4,
             "totalCantidad": 42
           },
           {
@@ -955,7 +948,7 @@
             "centroCostoNombre": "MEDIO AMBIENTE",
             "sectorNombre": "COSTO MEDIO AMBIENTE",
             "esTransporte": true,
-            "totalBs": 4666.17,
+            "totalBs": 4578,
             "totalCantidad": 63
           },
           {
@@ -964,7 +957,7 @@
             "centroCostoNombre": "MEDIO AMBIENTE",
             "sectorNombre": "COSTO MEDIO AMBIENTE",
             "esTransporte": true,
-            "totalBs": 240.7,
+            "totalBs": 239.52,
             "totalCantidad": 13
           },
           {
@@ -982,7 +975,7 @@
             "centroCostoNombre": "MEDIO AMBIENTE",
             "sectorNombre": "COSTO MEDIO AMBIENTE",
             "esTransporte": true,
-            "totalBs": 1808.43,
+            "totalBs": 1823.5,
             "totalCantidad": 31
           },
           {
@@ -991,7 +984,7 @@
             "centroCostoNombre": "MEDIO AMBIENTE",
             "sectorNombre": "COSTO MEDIO AMBIENTE",
             "esTransporte": true,
-            "totalBs": 126.94,
+            "totalBs": 62.64,
             "totalCantidad": 1
           },
           {
@@ -1000,7 +993,7 @@
             "centroCostoNombre": "ADMINISTRACION",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 667.82,
+            "totalBs": 658.75,
             "totalCantidad": 4
           },
           {
@@ -1018,7 +1011,7 @@
             "centroCostoNombre": "ADMINISTRACION",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 626.18,
+            "totalBs": 1072.02,
             "totalCantidad": 28
           },
           {
@@ -1027,7 +1020,7 @@
             "centroCostoNombre": "ADMINISTRACION",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 220,
+            "totalBs": 191.4,
             "totalCantidad": 1
           },
           {
@@ -1036,8 +1029,8 @@
             "centroCostoNombre": "ADMINISTRACION",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 1866.62,
-            "totalCantidad": 25
+            "totalBs": 1585.62,
+            "totalCantidad": 20
           },
           {
             "codigoCompleto": "3401-257-100 001 000",
@@ -1045,8 +1038,8 @@
             "centroCostoNombre": "ADMINISTRACION",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 2392.62,
-            "totalCantidad": 152
+            "totalBs": 2104.84,
+            "totalCantidad": 140
           },
           {
             "codigoCompleto": "3601-209-100 001 000",
@@ -1054,7 +1047,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 1581.73,
+            "totalBs": 1573.57,
             "totalCantidad": 40
           },
           {
@@ -1072,7 +1065,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 3906.54,
+            "totalBs": 3845.95,
             "totalCantidad": 16
           },
           {
@@ -1081,7 +1074,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 135.3,
+            "totalBs": 179.22,
             "totalCantidad": 14
           },
           {
@@ -1108,7 +1101,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 559.93,
+            "totalBs": 467,
             "totalCantidad": 22
           },
           {
@@ -1117,7 +1110,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 3874.4,
+            "totalBs": 3875.42,
             "totalCantidad": 151
           },
           {
@@ -1126,8 +1119,8 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 109481.27,
-            "totalCantidad": 515
+            "totalBs": 108776.4,
+            "totalCantidad": 514
           },
           {
             "codigoCompleto": "3601-240-44 002 000",
@@ -1135,17 +1128,8 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "OBRAS EN CONSTRUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 88322.18,
+            "totalBs": 71839.15,
             "totalCantidad": 185
-          },
-          {
-            "codigoCompleto": "3601-241-100 001 000",
-            "centroCostoCodigo": "3601",
-            "centroCostoNombre": "VARIOS",
-            "sectorNombre": "COSTO PRODUCCION LIPEÑA",
-            "esTransporte": true,
-            "totalBs": 10.88,
-            "totalCantidad": 10
           },
           {
             "codigoCompleto": "3601-243-100 001 000",
@@ -1162,7 +1146,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 264.85,
+            "totalBs": 264.04,
             "totalCantidad": 21
           },
           {
@@ -1171,8 +1155,8 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 7829.82,
-            "totalCantidad": 71
+            "totalBs": 7175.54,
+            "totalCantidad": 46
           },
           {
             "codigoCompleto": "3601-257-100 001 000",
@@ -1180,7 +1164,7 @@
             "centroCostoNombre": "VARIOS",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 31.34,
+            "totalBs": 29.52,
             "totalCantidad": 2
           },
           {
@@ -1216,7 +1200,7 @@
             "centroCostoNombre": "TRANSPORTE",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 2778.92,
+            "totalBs": 7294.47,
             "totalCantidad": 37
           },
           {
@@ -1234,8 +1218,8 @@
             "centroCostoNombre": "TRANSPORTE",
             "sectorNombre": "COSTO PRODUCCION LIPEÑA",
             "esTransporte": true,
-            "totalBs": 9766.32,
-            "totalCantidad": 30
+            "totalBs": 9646.61,
+            "totalCantidad": 28
           },
           {
             "codigoCompleto": "4401-253-100 001 000",

@@ -3,6 +3,8 @@ import { httpClient } from "@/shared/api/core/httpClient";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   importResultSchema,
+  ajustarPreciosSinIvaPayloadSchema,
+  ajustarPreciosSinIvaResponseSchema,
   cierreMesListResponseSchema,
   cierreMesCreateResponseSchema,
   ajusteProductosMesPayloadSchema,
@@ -11,6 +13,7 @@ import {
   inicializarPeriodoPayloadSchema,
   recalcularStockPayloadSchema,
   recalcularStockResponseSchema,
+  diagnosticoPreciosResponseSchema,
   reiniciarStockPayloadSchema,
   saldoMensualAjusteTotalPayloadSchema,
   saldoMensualAjusteInicialExcelResponseSchema,
@@ -27,6 +30,7 @@ import {
   stockInicialPayloadSchema,
   type ReiniciarStockPayload,
   type RecalcularStockPayload,
+  type AjustarPreciosSinIvaPayload,
   type SaldoMensualItemPatchPayload,
   type SaldoMensualItemUpsertPayload,
   type SaldoMensualAjusteTotalPayload,
@@ -175,6 +179,23 @@ export async function ajustarProductosMes(payload: AjusteProductosMesPayload) {
     url: apiEndpoints.inventarioImport.ajusteProductosMes,
     body: ajusteProductosMesPayloadSchema.parse(payload),
     schema: ajusteProductosMesResponseSchema
+  });
+}
+
+export async function ajustarPreciosSinIva(payload: AjustarPreciosSinIvaPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.ajustarPreciosSinIva,
+    body: ajustarPreciosSinIvaPayloadSchema.parse(payload),
+    schema: ajustarPreciosSinIvaResponseSchema
+  });
+}
+
+export async function getDiagnosticoPrecios(params: SaldoMensualQuery) {
+  const parsed = saldoMensualQuerySchema.parse(params);
+  return getRequest({
+    url: apiEndpoints.inventarioImport.diagnosticoPrecios,
+    config: { params: parsed },
+    schema: diagnosticoPreciosResponseSchema
   });
 }
 

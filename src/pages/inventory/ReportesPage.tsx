@@ -165,9 +165,16 @@ function reportMovimientoTitulo(cuenta: ReportDiarioCuenta) {
 
 function reportMovimientoOrderValue(cuenta: ReportDiarioCuenta) {
   const code = reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
-  const order = ["22001008", "35001000", "44002000", "67001010", "67001009", "100001000", "104001000"];
+  const order = ["22001008", "22001009", "67001009", "22001010", "67001010", "35001000", "44002000", "100001000", "104001000"];
   const index = order.indexOf(code);
   return index >= 0 ? index : order.length;
+}
+
+function reportMovimientoCargo(cuenta: ReportDiarioCuenta) {
+  const code = reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
+  if (code === "67001009") return "22 001 009";
+  if (code === "67001010") return "22 001 010";
+  return cuenta.sectorCodigo ?? cuenta.codigoCompleto;
 }
 
 function sortMovimientoCuentas(cuentas: ReportDiarioCuenta[]) {
@@ -192,6 +199,50 @@ function groupMovimientoCuentas(cuentas: ReportDiarioCuenta[]) {
     current.lineas.push(...cuenta.lineas);
   });
   return [...grouped.values()];
+}
+
+function isCostoProduccionCuenta(cuenta: ReportDiarioCuenta) {
+  return reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto) === "100001000";
+}
+
+function sortCodeValue(value?: string | null) {
+  const parsed = Number((value ?? "").replace(/[^\d]/g, ""));
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function movimientoLineasPorFuncion(cuenta: ReportDiarioCuenta) {
+  if (!isCostoProduccionCuenta(cuenta)) {
+    return cuenta.lineas.map((linea) => ({
+      codigo: linea.funcionGastoCodigo ?? linea.subCentro ?? "",
+      nombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
+      importeBs: linea.importeBs
+    }));
+  }
+
+  const grouped = new Map<string, { codigo: string; nombre: string; importeBs: number }>();
+  cuenta.lineas.forEach((linea) => {
+    const codigo = linea.funcionGastoCodigo ?? linea.subCentro ?? "";
+    const key = codigo || linea.nombre || "SIN-FUNCION";
+    const current = grouped.get(key);
+    if (current) {
+      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
+      if (!current.nombre && (linea.funcionGastoNombre ?? linea.nombre)) {
+        current.nombre = linea.funcionGastoNombre ?? linea.nombre ?? "";
+      }
+      return;
+    }
+    grouped.set(key, {
+      codigo,
+      nombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
+      importeBs: Number(linea.importeBs.toFixed(2))
+    });
+  });
+
+  return [...grouped.values()].sort((a, b) => {
+    const codeDiff = sortCodeValue(a.codigo) - sortCodeValue(b.codigo);
+    if (codeDiff !== 0) return codeDiff;
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
 }
 
 function reportSubCuentaDescripcion(subCuenta?: string) {
@@ -547,7 +598,7 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
   sortMovimientoCuentas(groupMovimientoCuentas(normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup))).forEach((cuenta, cuentaIndex) => {
     rows.push({
       key: `cuenta-${cuentaIndex}`,
-      cargo: cuenta.sectorCodigo ?? cuenta.codigoCompleto,
+      cargo: reportMovimientoCargo(cuenta),
       descripcion: reportMovimientoTitulo(cuenta),
       bs: cuenta.esTransporte || cuenta.lineas.length ? "" : cuenta.totalBs,
       haber: cuenta.totalBs,
@@ -558,11 +609,12 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
       descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
       bs: cuenta.esTransporte ? cuenta.totalBs : ""
     });
-    if (cuenta.lineas.length) {
-      cuenta.lineas.forEach((linea, index) => {
+    const lineas = movimientoLineasPorFuncion(cuenta);
+    if (lineas.length) {
+      lineas.forEach((linea, index) => {
         rows.push({
           key: `linea-${cuentaIndex}-${index}`,
-          descripcion: `${linea.subCentro} - ${linea.nombre}`.trim(),
+          descripcion: `${linea.codigo} - ${linea.nombre}`.trim(),
           bs: linea.importeBs
         });
       });
@@ -700,6 +752,145 @@ function costoAccountParts(value?: string | null) {
   return { subCuenta: parts[0] ?? "", subCentro: parts[1] ?? "" };
 }
 
+function normalizeAccountCode(value?: string | null) {
+  return (value ?? "").replace(/[^\d]/g, "");
+}
+
+function belongsToCostoProduccionDetalle(cuenta: {
+  codigoCompleto?: string | null;
+  sectorCodigo?: string | null;
+  centroCostoNombre?: string | null;
+  funcionGastoNombre?: string | null;
+  sectorNombre?: string | null;
+  vehiculo?: string | null;
+}) {
+  const sheetName = costoSheetName({
+    codigoCompleto: cuenta.sectorCodigo ?? cuenta.codigoCompleto,
+    centroCostoNombre: cuenta.sectorNombre ?? cuenta.centroCostoNombre,
+    funcionGastoNombre: cuenta.funcionGastoNombre,
+    vehiculo: cuenta.vehiculo ?? cuenta.sectorNombre
+  });
+  if (sheetName !== "LIPEÑA") return true;
+  return normalizeAccountCode(cuenta.sectorCodigo ?? cuenta.codigoCompleto).includes("100001000");
+}
+
+function detalleMaterialesFromDiario(response: DiarioAlmacenesReportResponse): DetalleMaterialesReportResponse {
+  return {
+    success: response.success,
+    data: {
+      anioInicio: response.data.anioInicio,
+      mesInicio: response.data.mesInicio,
+      anioFin: response.data.anioFin,
+      mesFin: response.data.mesFin,
+      meses: response.data.meses.map((periodo) => {
+        const cantidadPorCodigo = new Map(
+          periodo.cuentasHaber.map((cuenta) => [normalizeAccountCode(cuenta.codigoCompleto), cuenta.totalCantidad ?? 0])
+        );
+        const lineas: CostoCuenta["lineas"] = [];
+        const subtotales = new Map<string, { subCentro: string; nombre: string; importeBs: number }>();
+        const porCuentaDesdeSectores = periodo.sectoresHaber.filter(belongsToCostoProduccionDetalle).map((sector) => {
+          const cuentaLineas: CostoCuenta["lineas"] = [];
+          const detalles: CostoCuenta["detalles"] = [];
+          for (const centro of sector.centroCostos) {
+            for (const subCuenta of centro.subCuentas) {
+              const importeBs = Number(subCuenta.totalBs ?? 0);
+              const linea = {
+                subCuenta: centro.centroCostoCodigo ?? "",
+                subCentro: subCuenta.funcionGastoCodigo ?? "",
+                subCentroNombre: subCuenta.funcionGastoNombre ?? centro.centroCostoNombre ?? "",
+                importeBs
+              };
+              cuentaLineas.push(linea);
+              lineas.push(linea);
+              const subtotalKey = linea.subCentro;
+              if (subtotalKey) {
+                const current = subtotales.get(subtotalKey);
+                subtotales.set(subtotalKey, {
+                  subCentro: subtotalKey,
+                  nombre: current?.nombre || linea.subCentroNombre || "",
+                  importeBs: Number(((current?.importeBs ?? 0) + importeBs).toFixed(2))
+                });
+              }
+              detalles.push({
+                productoNombre: subCuenta.funcionGastoNombre ?? centro.centroCostoNombre ?? sector.sectorNombre ?? "",
+                unidad: "",
+                cantidad: cantidadPorCodigo.get(normalizeAccountCode(subCuenta.codigoCompleto)) ?? 0,
+                importeBs,
+                vehiculo: sector.sectorNombre ?? ""
+              });
+            }
+          }
+          return {
+            codigoCompleto: sector.sectorCodigo ?? "",
+            centroCostoCodigo: sector.sectorCodigo ?? "",
+            centroCostoNombre: sector.sectorNombre ?? "",
+            funcionGastoCodigo: "",
+            funcionGastoNombre: sector.sectorNombre ?? "",
+            vehiculo: sector.sectorNombre ?? "",
+            esTransporte: costoSheetMeta(costoSheetName({
+              codigoCompleto: sector.sectorCodigo,
+              centroCostoNombre: sector.sectorNombre,
+              funcionGastoNombre: sector.sectorNombre,
+              vehiculo: sector.sectorNombre
+            })).isTransport,
+            totalBs: sector.totalBs,
+            totalCantidad: detalles.reduce((sum, detalle) => sum + (detalle.cantidad ?? 0), 0),
+            lineas: cuentaLineas,
+            detalles
+          };
+        });
+        const porCuentaDesdeCuentas = periodo.cuentasHaber.filter(belongsToCostoProduccionDetalle).map((cuenta) => {
+          const cuentaLineas: CostoCuenta["lineas"] = cuenta.lineas.map((linea) => {
+            const mapped = {
+              subCuenta: linea.subCuentas.join("-"),
+              subCentro: linea.subCentro,
+              subCentroNombre: linea.funcionGastoNombre ?? linea.nombre,
+              importeBs: linea.importeBs
+            };
+            lineas.push(mapped);
+            const subtotalKey = mapped.subCentro ?? "";
+            if (subtotalKey) {
+              const current = subtotales.get(subtotalKey);
+              subtotales.set(subtotalKey, {
+                subCentro: subtotalKey,
+                nombre: current?.nombre || mapped.subCentroNombre || "",
+                importeBs: Number(((current?.importeBs ?? 0) + mapped.importeBs).toFixed(2))
+              });
+            }
+            return mapped;
+          });
+          return {
+            codigoCompleto: cuenta.sectorCodigo ?? cuenta.codigoCompleto ?? "",
+            centroCostoCodigo: cuenta.sectorCodigo ?? cuenta.codigoCompleto ?? "",
+            centroCostoNombre: cuenta.sectorNombre ?? cuenta.centroCostoNombre ?? "",
+            funcionGastoCodigo: "",
+            funcionGastoNombre: cuenta.sectorNombre ?? cuenta.centroCostoNombre ?? "",
+            vehiculo: cuenta.sectorNombre ?? "",
+            esTransporte: cuenta.esTransporte,
+            totalBs: cuenta.totalBs,
+            totalCantidad: cuenta.totalCantidad,
+            lineas: cuentaLineas,
+            detalles: cuenta.detalles
+          };
+        });
+        const porCuenta = porCuentaDesdeSectores.length ? porCuentaDesdeSectores : porCuentaDesdeCuentas;
+
+        return {
+          anio: periodo.anio,
+          mes: periodo.mes,
+          esCerrado: periodo.esCerrado,
+          lineas,
+          subtotalesPorSubCentro: [...subtotales.values()].sort(
+            (a, b) => sortCodeValue(a.subCentro) - sortCodeValue(b.subCentro)
+          ),
+          totalGeneral: Number(porCuenta.reduce((sum, cuenta) => sum + cuenta.totalBs, 0).toFixed(2)),
+          porCuenta
+        };
+      })
+    }
+  };
+}
+
 function groupCostoLineas(lineas: CostoCuenta["lineas"]): CostoCuenta["lineas"] {
   const grouped = new Map<string, CostoCuenta["lineas"][number]>();
   lineas.forEach((linea) => {
@@ -721,7 +912,13 @@ function groupCostoLineas(lineas: CostoCuenta["lineas"]): CostoCuenta["lineas"] 
       importeBs: Number(linea.importeBs.toFixed(2))
     });
   });
-  return [...grouped.values()];
+  return [...grouped.values()].sort((a, b) => {
+    const subCentroDiff = sortCodeValue(a.subCentro) - sortCodeValue(b.subCentro);
+    if (subCentroDiff !== 0) return subCentroDiff;
+    const subCuentaDiff = sortCodeValue(a.subCuenta) - sortCodeValue(b.subCuenta);
+    if (subCuentaDiff !== 0) return subCuentaDiff;
+    return (a.subCentroNombre ?? "").localeCompare(b.subCentroNombre ?? "", "es");
+  });
 }
 
 function costoMonthPhrase(anio: number, mes: number) {
@@ -1255,11 +1452,15 @@ export function ReportesPage() {
   );
   const detalleMaterialesQuery = useDetalleMaterialesReportQuery(
     monthRangeParams,
-    isAdminType && (tipo === "detalle-materiales" || tipo === "costo-produccion")
+    isAdminType && tipo === "detalle-materiales"
   );
   const diarioAlmacenesQuery = useDiarioAlmacenesReportQuery(
     monthRangeParams,
-    isAdminType && (tipo === "diario-almacenes" || tipo === "movimiento-almacen")
+    isAdminType && (tipo === "diario-almacenes" || tipo === "movimiento-almacen" || tipo === "costo-produccion")
+  );
+  const costoProduccionData = useMemo(
+    () => (diarioAlmacenesQuery.data ? detalleMaterialesFromDiario(diarioAlmacenesQuery.data) : undefined),
+    [diarioAlmacenesQuery.data]
   );
   const cuadroSuministrosQuery = useCuadroSuministrosReportQuery(
     monthRangeParams,
@@ -1432,8 +1633,11 @@ export function ReportesPage() {
     if (tipo === "salidas-detalle" && salidasDetalleQuery.data) {
       return buildSalidasDetalleApiReportDefinition(salidasDetalleQuery.data);
     }
-    if ((tipo === "detalle-materiales" || tipo === "costo-produccion") && detalleMaterialesQuery.data) {
+    if (tipo === "detalle-materiales" && detalleMaterialesQuery.data) {
       return buildDetalleMaterialesApiReportDefinition(detalleMaterialesQuery.data, tipo);
+    }
+    if (tipo === "costo-produccion" && costoProduccionData) {
+      return buildDetalleMaterialesApiReportDefinition(costoProduccionData, tipo);
     }
     if ((tipo === "diario-almacenes" || tipo === "movimiento-almacen") && diarioAlmacenesQuery.data) {
       return buildDiarioAlmacenesApiReportDefinition(diarioAlmacenesQuery.data, tipo);
@@ -1452,6 +1656,7 @@ export function ReportesPage() {
     anulacionesEntradasQuery.data,
     anulacionesSalidasQuery.data,
     balanceMensualQuery.data,
+    costoProduccionData,
     detalleMaterialesQuery.data,
     diarioAlmacenesQuery.data,
     entradasAlmacenQuery.data,
@@ -1584,7 +1789,7 @@ export function ReportesPage() {
               : tipo === "detalle-materiales"
                 ? detalleMaterialesQuery
                 : tipo === "costo-produccion"
-                  ? detalleMaterialesQuery
+                  ? diarioAlmacenesQuery
                   : tipo === "diario-almacenes"
                     ? diarioAlmacenesQuery
                     : tipo === "movimiento-almacen"
@@ -2359,9 +2564,9 @@ export function ReportesPage() {
               </div>
             ) : null}
           </>
-        ) : tipo === "costo-produccion" && detalleMaterialesQuery.data ? (
+        ) : tipo === "costo-produccion" && costoProduccionData ? (
           <>
-            <CostoProduccionPreview response={detalleMaterialesQuery.data} />
+            <CostoProduccionPreview response={costoProduccionData} />
             {reportDefinition?.summary.length ? (
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-on-surface-variant)]">
                 {reportDefinition.summary.map((item) => (

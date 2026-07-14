@@ -18,6 +18,7 @@ import { PedidosPage } from "@/pages/inventory/PedidosPage";
 import { InventarioImportPage } from "@/pages/inventory/InventarioImportPage";
 import { StockInicialEditorPage } from "@/pages/inventory/StockInicialEditorPage";
 import { InventoryOfflineMonitorPage } from "@/pages/inventory/InventoryOfflineMonitorPage";
+import { AjustesPage } from "@/pages/inventory/AjustesPage";
 import { EppPage } from "@/pages/epp/EppPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterUserPage } from "@/pages/auth/RegisterUserPage";
@@ -85,6 +86,7 @@ export function AppRouter() {
             />
             <Route path="/inventario/reportes/:tipo" element={<ReportesPage />} />
             <Route path="/inventario/proveedores" element={<ProveedoresPage />} />
+            <Route path="/inventario/ajustes" element={<AjustesPage />} />
             <Route element={<WarehouseOpsRoute />}>
               <Route path="/inventario/entregas" element={<EntregasPage />} />
               <Route

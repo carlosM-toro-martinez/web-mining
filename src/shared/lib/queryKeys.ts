@@ -71,7 +71,8 @@ export const queryKeys = {
   proveedores: {
     all: ["proveedores"] as const,
     list: (params: { page: number; limit: number; search?: string }) =>
-      [...queryKeys.proveedores.all, "list", params] as const
+      [...queryKeys.proveedores.all, "list", params] as const,
+    detail: (id: number) => [...queryKeys.proveedores.all, "detail", id] as const
   },
   reportes: {
     all: ["reportes"] as const,

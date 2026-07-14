@@ -126,10 +126,10 @@ const cards = [
   },
   {
     title: "Ajustes",
-    description: "Configuraciones operativas y parametros del modulo inventario.",
-    to: "/ajustes",
+    description: "Diagnostico de precios y ajustes operativos del modulo inventario.",
+    to: "/inventario/ajustes",
     icon: Settings,
-    available: false
+    available: true
   }
 ] as const;
 

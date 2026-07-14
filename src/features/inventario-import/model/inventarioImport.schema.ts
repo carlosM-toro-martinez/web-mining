@@ -143,6 +143,7 @@ export const cierreMesPayloadSchema = z.object({
 });
 
 export const inicializarPeriodoPayloadSchema = cierreMesPayloadSchema;
+export const ajustarPreciosSinIvaPayloadSchema = cierreMesPayloadSchema;
 
 export const cierreMesCreateResponseSchema = z.object({
   success: z.boolean().optional().default(true),
@@ -248,6 +249,82 @@ export const ajusteProductosMesResponseSchema = z.object({
   )
 });
 
+export const ajustarPreciosSinIvaResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    message: z.string().optional(),
+    data: z.unknown().optional()
+  })
+  .passthrough();
+
+export const diagnosticoPreciosItemSchema = z
+  .object({
+    id: z.union([z.string(), numberLikeSchema]).optional(),
+    productoId: numberLikeSchema.int().positive().optional(),
+    productoCodigo: z.string().optional(),
+    codigo: z.string().optional(),
+    productoNombre: z.string().optional().nullable(),
+    nombre: z.string().optional().nullable(),
+    unidad: z.string().optional().nullable(),
+    grupo: z.string().optional().nullable(),
+    grupoNombre: z.string().optional().nullable(),
+    subGrupo: z.string().optional().nullable(),
+    subgrupo: z.string().optional().nullable(),
+    subGrupoNombre: z.string().optional().nullable(),
+    anio: numberLikeSchema.int().optional(),
+    mes: numberLikeSchema.int().optional(),
+    saldoFinal: numberLikeSchema.optional(),
+    precioUnit: numberLikeSchema.optional(),
+    precioUnitProm: numberLikeSchema.optional(),
+    totalBs: numberLikeSchema.optional()
+  })
+  .passthrough();
+
+const diagnosticoPreciosDataSchema = z
+  .union([
+    z.array(diagnosticoPreciosItemSchema),
+    z
+      .object({
+        periodo: z.string().optional(),
+        totalProductos: numberLikeSchema.int().nonnegative().optional(),
+        sinPrecioCount: numberLikeSchema.int().nonnegative().optional(),
+        sinPromCount: numberLikeSchema.int().nonnegative().optional(),
+        sinPrecio: z.array(diagnosticoPreciosItemSchema).optional(),
+        sinProm: z.array(diagnosticoPreciosItemSchema).optional(),
+        productos: z.array(diagnosticoPreciosItemSchema).optional(),
+        items: z.array(diagnosticoPreciosItemSchema).optional(),
+        resultados: z.array(diagnosticoPreciosItemSchema).optional()
+      })
+      .passthrough()
+  ])
+  .transform((value) => {
+    if (Array.isArray(value)) {
+      return {
+        periodo: undefined,
+        totalProductos: value.length,
+        sinPrecioCount: value.length,
+        sinPromCount: 0,
+        sinPrecio: value,
+        sinProm: []
+      };
+    }
+    const sinPrecio = value.sinPrecio ?? value.productos ?? value.items ?? value.resultados ?? [];
+    const sinProm = value.sinProm ?? [];
+    return {
+      periodo: value.periodo,
+      totalProductos: value.totalProductos ?? sinPrecio.length + sinProm.length,
+      sinPrecioCount: value.sinPrecioCount ?? sinPrecio.length,
+      sinPromCount: value.sinPromCount ?? sinProm.length,
+      sinPrecio,
+      sinProm
+    };
+  });
+
+export const diagnosticoPreciosResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: diagnosticoPreciosDataSchema
+});
+
 export const saldoMensualDeleteResponseSchema = z.object({
   success: z.boolean().optional().default(true),
   data: z.object({
@@ -277,6 +354,10 @@ export type SaldoMensualItemPatchPayload = z.infer<typeof saldoMensualItemPatchP
 export type SaldoMensualAjusteTotalPayload = z.infer<typeof saldoMensualAjusteTotalPayloadSchema>;
 export type AjusteProductosMesPayload = z.infer<typeof ajusteProductosMesPayloadSchema>;
 export type AjusteProductosMesResponse = z.infer<typeof ajusteProductosMesResponseSchema>;
+export type AjustarPreciosSinIvaPayload = z.infer<typeof ajustarPreciosSinIvaPayloadSchema>;
+export type AjustarPreciosSinIvaResponse = z.infer<typeof ajustarPreciosSinIvaResponseSchema>;
+export type DiagnosticoPreciosItem = z.infer<typeof diagnosticoPreciosItemSchema>;
+export type DiagnosticoPreciosResponse = z.infer<typeof diagnosticoPreciosResponseSchema>;
 export type SaldoMensualAjusteInicialExcelResponse = z.infer<
   typeof saldoMensualAjusteInicialExcelResponseSchema
 >;

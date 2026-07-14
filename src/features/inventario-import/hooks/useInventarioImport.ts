@@ -1,10 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ajustarProductosMes,
+  ajustarPreciosSinIva,
   ajustarSaldoMensualTotal,
   deleteSaldoMensualById,
   createCierreMes,
   getCierresMes,
+  getDiagnosticoPrecios,
   getSaldoMensual,
   getSaldoMensualById,
   getSaldoMensualPreview,
@@ -20,6 +22,7 @@ import {
   upsertSaldoMensualItem
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
+  AjustarPreciosSinIvaPayload,
   RecalcularStockPayload,
   AjusteProductosMesPayload,
   ReiniciarStockPayload,
@@ -121,6 +124,20 @@ export function useAjustarSaldoMensualTotalMutation() {
 export function useAjustarProductosMesMutation() {
   return useMutation({
     mutationFn: (payload: AjusteProductosMesPayload) => ajustarProductosMes(payload)
+  });
+}
+
+export function useAjustarPreciosSinIvaMutation() {
+  return useMutation({
+    mutationFn: (payload: AjustarPreciosSinIvaPayload) => ajustarPreciosSinIva(payload)
+  });
+}
+
+export function useDiagnosticoPreciosQuery(params: SaldoMensualQuery, enabled: boolean) {
+  return useQuery({
+    queryKey: ["inventario-import", "diagnostico-precios", params],
+    queryFn: () => getDiagnosticoPrecios(params),
+    enabled
   });
 }
 
