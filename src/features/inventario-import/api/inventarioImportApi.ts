@@ -14,6 +14,7 @@ import {
   recalcularStockPayloadSchema,
   recalcularStockResponseSchema,
   diagnosticoPreciosResponseSchema,
+  diagnosticoSaldosResponseSchema,
   reiniciarStockPayloadSchema,
   saldoMensualAjusteTotalPayloadSchema,
   saldoMensualAjusteInicialExcelResponseSchema,
@@ -196,6 +197,15 @@ export async function getDiagnosticoPrecios(params: SaldoMensualQuery) {
     url: apiEndpoints.inventarioImport.diagnosticoPrecios,
     config: { params: parsed },
     schema: diagnosticoPreciosResponseSchema
+  });
+}
+
+export async function getDiagnosticoSaldos(params: SaldoMensualQuery) {
+  const parsed = saldoMensualQuerySchema.parse(params);
+  return getRequest({
+    url: apiEndpoints.inventarioImport.diagnosticoSaldos,
+    config: { params: parsed },
+    schema: diagnosticoSaldosResponseSchema
   });
 }
 

@@ -325,6 +325,65 @@ export const diagnosticoPreciosResponseSchema = z.object({
   data: diagnosticoPreciosDataSchema
 });
 
+const diagnosticoSaldosMetricSchema = z
+  .object({
+    saldoMensual: numberLikeSchema.optional(),
+    movimientos: numberLikeSchema.optional(),
+    calculado: numberLikeSchema.optional(),
+    diferencia: numberLikeSchema.optional(),
+    ok: z.boolean().optional()
+  })
+  .passthrough();
+
+export const diagnosticoSaldosItemSchema = z
+  .object({
+    id: z.union([z.string(), numberLikeSchema]).optional(),
+    productoId: numberLikeSchema.int().positive().optional(),
+    productoCodigo: z.string().optional(),
+    codigo: z.string().optional(),
+    productoNombre: z.string().optional().nullable(),
+    nombre: z.string().optional().nullable(),
+    saldoInicial: numberLikeSchema.optional(),
+    salidaQty: diagnosticoSaldosMetricSchema.optional(),
+    saldoFinal: diagnosticoSaldosMetricSchema.optional(),
+    problemas: z.array(z.string()).optional().default([])
+  })
+  .passthrough();
+
+export const diagnosticoSaldosDataSchema = z
+  .object({
+    periodo: z.string().optional(),
+    totalProductos: numberLikeSchema.int().nonnegative().optional(),
+    productosOk: numberLikeSchema.int().nonnegative().optional(),
+    discrepanciasCount: numberLikeSchema.int().nonnegative().optional(),
+    discrepancias: z.array(diagnosticoSaldosItemSchema).optional(),
+    productos: z.array(diagnosticoSaldosItemSchema).optional(),
+    items: z.array(diagnosticoSaldosItemSchema).optional(),
+    resultados: z.array(diagnosticoSaldosItemSchema).optional()
+  })
+  .passthrough()
+  .transform((value) => {
+    const discrepancias = value.discrepancias ?? value.productos ?? value.items ?? value.resultados ?? [];
+    return {
+      ...value,
+      totalProductos: value.totalProductos ?? discrepancias.length,
+      productosOk: value.productosOk ?? Math.max((value.totalProductos ?? discrepancias.length) - discrepancias.length, 0),
+      discrepanciasCount: value.discrepanciasCount ?? discrepancias.length,
+      discrepancias
+    };
+  });
+
+export const diagnosticoSaldosResponseSchema = z.preprocess(
+  (value) => {
+    if (value && typeof value === "object" && "data" in value) return value;
+    return { success: true, data: value };
+  },
+  z.object({
+    success: z.boolean().optional().default(true),
+    data: diagnosticoSaldosDataSchema
+  })
+);
+
 export const saldoMensualDeleteResponseSchema = z.object({
   success: z.boolean().optional().default(true),
   data: z.object({
@@ -358,6 +417,8 @@ export type AjustarPreciosSinIvaPayload = z.infer<typeof ajustarPreciosSinIvaPay
 export type AjustarPreciosSinIvaResponse = z.infer<typeof ajustarPreciosSinIvaResponseSchema>;
 export type DiagnosticoPreciosItem = z.infer<typeof diagnosticoPreciosItemSchema>;
 export type DiagnosticoPreciosResponse = z.infer<typeof diagnosticoPreciosResponseSchema>;
+export type DiagnosticoSaldosItem = z.infer<typeof diagnosticoSaldosItemSchema>;
+export type DiagnosticoSaldosResponse = z.infer<typeof diagnosticoSaldosResponseSchema>;
 export type SaldoMensualAjusteInicialExcelResponse = z.infer<
   typeof saldoMensualAjusteInicialExcelResponseSchema
 >;

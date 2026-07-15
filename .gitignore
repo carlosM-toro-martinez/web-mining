@@ -27,3 +27,6 @@ inventario-errores.csv
 analyze_inventory_errors.py
 5 BALANCE SEPT-2025.xlsx
 INV. ALMACEN LIPEÑA 2025.xlsx
+secundario.xlsx
+principal.xlsx
+compare_principal_secundario.py

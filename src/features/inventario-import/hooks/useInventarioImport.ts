@@ -7,6 +7,7 @@ import {
   createCierreMes,
   getCierresMes,
   getDiagnosticoPrecios,
+  getDiagnosticoSaldos,
   getSaldoMensual,
   getSaldoMensualById,
   getSaldoMensualPreview,
@@ -137,6 +138,14 @@ export function useDiagnosticoPreciosQuery(params: SaldoMensualQuery, enabled: b
   return useQuery({
     queryKey: ["inventario-import", "diagnostico-precios", params],
     queryFn: () => getDiagnosticoPrecios(params),
+    enabled
+  });
+}
+
+export function useDiagnosticoSaldosQuery(params: SaldoMensualQuery, enabled: boolean) {
+  return useQuery({
+    queryKey: ["inventario-import", "diagnostico-saldos", params],
+    queryFn: () => getDiagnosticoSaldos(params),
     enabled
   });
 }
