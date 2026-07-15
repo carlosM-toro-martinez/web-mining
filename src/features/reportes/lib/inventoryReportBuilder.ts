@@ -106,10 +106,6 @@ function roundMoney(value: number) {
   return Number(value.toFixed(2));
 }
 
-function truncateMoney(value: number) {
-  return Math.trunc(value * 100) / 100;
-}
-
 function totalMenos13(value: number) {
   return roundMoney(value * 0.87);
 }
@@ -1363,7 +1359,7 @@ export function buildBalanceMensualApiReportDefinition(
         values: {
           periodo: formatMonth(periodo.anio, periodo.mes),
           grupo: `${grupo.grupoCodigo ?? "-"} - ${grupo.grupoNombre ?? "Sin grupo"}`,
-          saldoInicial: truncateMoney(grupo.saldoInicial),
+          saldoInicial: roundMoney(grupo.saldoInicial),
           ingresoMateriales: roundMoney(grupo.ingresoMateriales),
           salidaMateriales: roundMoney(grupo.salidaMateriales),
           saldoFinal: roundMoney(grupo.saldoFinal)
