@@ -642,41 +642,132 @@ function numberFormatRange(sheet: XLSX.WorkSheet, startRow: number, endRow: numb
 
 function exportBalanceMensualStyledExcel(report: InventoryReportDefinition) {
   const dataRows = report.rows.filter((row) => row.values.grupo);
+  const periodValue = String(
+    report.rows.find((row) => row.values.periodo)?.values.periodo ?? report.subtitle ?? ""
+  );
+  const periodMatch = /(\d{1,2})\/(\d{4})/.exec(periodValue);
+  const periodMonth = periodMatch ? Number(periodMatch[1]) : undefined;
+  const periodYear = periodMatch ? Number(periodMatch[2]) : undefined;
+  const dateLabel = (date: Date) =>
+    `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+  const startDateLabel =
+    periodMonth && periodYear ? dateLabel(new Date(periodYear, periodMonth - 1, 0)) : "";
+  const endDateLabel = periodMonth && periodYear ? dateLabel(new Date(periodYear, periodMonth, 0)) : "";
+  const periodSubtitle =
+    periodMonth && periodYear
+      ? `CORRESPONDIENTE AL MES DE ${MONTH_NAMES[Math.max(0, Math.min(11, periodMonth - 1))]}  ${periodYear}`
+      : monthLabelFromSubtitle(report.subtitle);
+  const groupLabel = (value: string | number) => {
+    const raw = String(value ?? "").trim();
+    if (/^TOTAL/i.test(raw)) return raw;
+    const code = raw.match(/\d+/)?.[0] ?? raw;
+    return code ? code.padStart(2, "0") : raw;
+  };
   const rows = dataRows.map((row) => [
-    String(valueOf(row, "grupo")).replace(/^0?/, ""),
+    groupLabel(valueOf(row, "grupo")),
     valueOf(row, "saldoInicial"),
     valueOf(row, "ingresoMateriales"),
     valueOf(row, "salidaMateriales"),
     valueOf(row, "saldoFinal")
   ]);
   const aoa: Array<Array<string | number>> = [
-    ["Empresa Minera"],
-    ["MARTE S.R.L."],
-    ["BALANCE MENSUAL DE ALMACENES LIPEÑA"],
-    [monthLabelFromSubtitle(report.subtitle)],
+    ["Empresa Minera", "", "", "", ""],
+    ["MARTE S.R.L.", "", "", "", ""],
     [],
-    ["GRUPO", "SALDO AL", "INGRESO\nMATERIALES", "SALIDA\nMATERIALES", "SALDO AL"],
+    ["BALANCE MENSUAL DE ALMACENES LIPEÑA", "", "", "", ""],
+    [periodSubtitle, "", "", "", ""],
+    [],
+    [
+      "GRUPO",
+      `SALDO  AL\n${startDateLabel}`,
+      "INGRESO\nMATERIALES",
+      "SALIDA\nMATERIALES",
+      `SALDO  AL\n${endDateLabel}`
+    ],
     ...rows
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  const headerRow = 6;
+  const bodyStartRow = 7;
+  const bodyEndRow = bodyStartRow + rows.length - 1;
+  const black = { rgb: "000000" };
+  const thin = { style: "thin", color: black };
+  const dotted = { style: "dotted", color: black };
+  const bodyBorder = {
+    top: dotted,
+    bottom: dotted,
+    left: thin,
+    right: thin
+  };
+  const tableFont = { name: "Arial", sz: 10 };
   sheet["!merges"] = [
-    { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } }
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } }
   ];
-  sheet["!cols"] = [{ wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
-  setCellStyle(sheet, "A1", { font: { bold: true, sz: 16 } });
-  setCellStyle(sheet, "A2", { font: { bold: true, sz: 24, underline: true } });
-  styleRange(sheet, { s: { r: 2, c: 0 }, e: { r: 3, c: 4 } }, excelTitleStyle);
-  styleRange(sheet, { s: { r: 5, c: 0 }, e: { r: 5, c: 4 } }, excelHeaderStyle);
-  styleRange(sheet, { s: { r: 6, c: 0 }, e: { r: 5 + rows.length, c: 4 } }, excelBodyStyle);
-  numberFormatRange(sheet, 6, 5 + rows.length, [1, 2, 3, 4]);
+  sheet["!cols"] = [{ wch: 10 }, { wch: 19 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
+  sheet["!rows"] = [
+    { hpt: 23 },
+    { hpt: 34 },
+    { hpt: 8 },
+    { hpt: 19 },
+    { hpt: 19 },
+    { hpt: 8 },
+    { hpt: 31 },
+    ...rows.map(() => ({ hpt: 16 }))
+  ];
+  sheet["!margins"] = { left: 0.25, right: 0.25, top: 0.45, bottom: 0.35, header: 0.2, footer: 0.2 };
+  sheet["!pageSetup"] = { orientation: "portrait", fitToWidth: 1, fitToHeight: 0 };
+  setCellStyle(sheet, "A1", { font: { name: "Arial", bold: true, sz: 18 } });
+  setCellStyle(sheet, "A2", { font: { name: "Arial", bold: true, sz: 28, underline: true } });
+  styleRange(sheet, { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } }, {
+    font: { name: "Arial", bold: true, sz: 11 },
+    alignment: { horizontal: "center", vertical: "center" }
+  });
+  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } }, {
+    font: { name: "Arial", bold: true, sz: 11, underline: true },
+    alignment: { horizontal: "center", vertical: "center" }
+  });
+  styleRange(sheet, { s: { r: headerRow, c: 0 }, e: { r: headerRow, c: 4 } }, {
+    font: { name: "Arial", bold: true, sz: 10 },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    border: excelThinBorder
+  });
+  setCellStyle(sheet, cellAddress(headerRow, 4), {
+    font: { name: "Arial", bold: true, sz: 10 },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    border: excelThinBorder,
+    fill: { fgColor: { rgb: "BFBFBF" } }
+  });
+  if (rows.length) {
+    styleRange(sheet, { s: { r: bodyStartRow, c: 0 }, e: { r: bodyEndRow, c: 4 } }, {
+      font: tableFont,
+      alignment: { vertical: "center", wrapText: true },
+      border: bodyBorder
+    });
+    styleRange(sheet, { s: { r: bodyStartRow, c: 0 }, e: { r: bodyEndRow, c: 0 } }, {
+      font: tableFont,
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bodyBorder
+    });
+    styleRange(sheet, { s: { r: bodyStartRow, c: 1 }, e: { r: bodyEndRow, c: 4 } }, {
+      font: tableFont,
+      alignment: { horizontal: "right", vertical: "center" },
+      border: bodyBorder
+    });
+  }
+  numberFormatRange(sheet, bodyStartRow, bodyEndRow, [1, 2, 3, 4]);
   dataRows.forEach((row, index) => {
     if (!row.type) return;
     const fill = row.type === "total" ? "FFE699" : "F2F2F2";
     styleRange(
       sheet,
-      { s: { r: 6 + index, c: 0 }, e: { r: 6 + index, c: 4 } },
-      { ...excelBodyStyle, font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: fill } } },
+      { s: { r: bodyStartRow + index, c: 0 }, e: { r: bodyStartRow + index, c: 4 } },
+      {
+        font: { name: "Arial", bold: true, sz: 10 },
+        alignment: { vertical: "center", wrapText: true },
+        border: excelThinBorder,
+        fill: { fgColor: { rgb: fill } }
+      },
       new Set([1, 2, 3, 4])
     );
   });
