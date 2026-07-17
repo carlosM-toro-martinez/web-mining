@@ -14,6 +14,7 @@ export const reportesEndpoints = {
   detalleMateriales: "/api/reportes/detalle-materiales",
   diarioAlmacenes: "/api/reportes/diario-almacenes",
   cuadroSuministros: "/api/reportes/cuadro-suministros",
+  comprasConSaldoInicial: "/api/reportes/compras-con-saldo-inicial",
   saldosIniciales: "/api/reportes/saldos-iniciales",
   anulacionesEntradas: "/api/reportes/anulaciones-entradas",
   anulacionesSalidas: "/api/reportes/anulaciones-salidas"

@@ -767,6 +767,49 @@ export const saldosInicialesReportResponseSchema = z.object({
   })
 });
 
+const compraConSaldoInicialCompraSchema = z.object({
+  fecha: z.string().optional().nullable(),
+  numeroFactura: z.string().optional().nullable(),
+  proveedor: z.string().optional().nullable(),
+  cantidad: numberLikeSchema,
+  precioUnit: numberLikeSchema,
+  importeBs: numberLikeSchema
+});
+
+const compraConSaldoInicialProductoSchema = z.object({
+  codigo: z.string().optional().nullable(),
+  nombre: z.string().optional().nullable(),
+  saldoInicialQty: numberLikeSchema,
+  saldoInicialBs: numberLikeSchema,
+  compras: z.array(compraConSaldoInicialCompraSchema).default([]),
+  totalCompradoBs: numberLikeSchema
+});
+
+const compraConSaldoInicialGrupoSchema = z.object({
+  grupoCodigo: z.string().optional().nullable(),
+  grupoNombre: z.string().optional().nullable(),
+  productos: z.array(compraConSaldoInicialProductoSchema).default([]),
+  totalBs: numberLikeSchema
+});
+
+export const comprasConSaldoInicialReportResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.object({
+    anioInicio: numberLikeSchema.int().optional(),
+    mesInicio: numberLikeSchema.int().min(1).max(12).optional(),
+    anioFin: numberLikeSchema.int().optional(),
+    mesFin: numberLikeSchema.int().min(1).max(12).optional(),
+    meses: z.array(
+      z.object({
+        anio: numberLikeSchema.int(),
+        mes: numberLikeSchema.int().min(1).max(12),
+        grupos: z.array(compraConSaldoInicialGrupoSchema).default([]),
+        totalGeneral: numberLikeSchema
+      })
+    )
+  })
+});
+
 const reporteUsuarioSchema = z
   .object({
     id: idLikeSchema,
@@ -964,5 +1007,8 @@ export type DetalleMaterialesReportResponse = z.infer<typeof detalleMaterialesRe
 export type DiarioAlmacenesReportResponse = z.infer<typeof diarioAlmacenesReportResponseSchema>;
 export type CuadroSuministrosReportResponse = z.infer<typeof cuadroSuministrosReportResponseSchema>;
 export type SaldosInicialesReportResponse = z.infer<typeof saldosInicialesReportResponseSchema>;
+export type ComprasConSaldoInicialReportResponse = z.infer<typeof comprasConSaldoInicialReportResponseSchema>;
+export type CompraConSaldoInicialGrupo = ComprasConSaldoInicialReportResponse["data"]["meses"][number]["grupos"][number];
+export type CompraConSaldoInicialProducto = CompraConSaldoInicialGrupo["productos"][number];
 export type AnulacionesEntradasReportResponse = z.infer<typeof anulacionesEntradasReportResponseSchema>;
 export type AnulacionesSalidasReportResponse = z.infer<typeof anulacionesSalidasReportResponseSchema>;

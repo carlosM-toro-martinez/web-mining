@@ -7,6 +7,7 @@ import {
   binCardValoradoResponseSchema,
   balanceMensualReportResponseSchema,
   comprasProveedorReportResponseSchema,
+  comprasConSaldoInicialReportResponseSchema,
   comprasReportQueryParamsSchema,
   comprasReportResponseSchema,
   cuadroSuministrosReportResponseSchema,
@@ -170,6 +171,14 @@ export async function getCuadroSuministrosReport(params: MonthlyRangeReportQuery
     url: apiEndpoints.reportes.cuadroSuministros,
     config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
     schema: cuadroSuministrosReportResponseSchema
+  });
+}
+
+export async function getComprasConSaldoInicialReport(params: MonthlyRangeReportQueryParams) {
+  return getRequest({
+    url: apiEndpoints.reportes.comprasConSaldoInicial,
+    config: { params: cleanSimpleParams(params, monthlyRangeReportQueryParamsSchema.parse) },
+    schema: comprasConSaldoInicialReportResponseSchema
   });
 }
 

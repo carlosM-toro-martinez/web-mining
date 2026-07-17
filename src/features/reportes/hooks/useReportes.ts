@@ -6,6 +6,7 @@ import {
   getBinCard,
   getBinCardValorado,
   getComprasProveedorReport,
+  getComprasConSaldoInicialReport,
   getComprasReport,
   getCuadroSuministrosReport,
   getDetalleMaterialesReport,
@@ -161,6 +162,17 @@ export function useCuadroSuministrosReportQuery(
   return useQuery({
     queryKey: [...queryKeys.reportes.all, "cuadro-suministros", params] as const,
     queryFn: () => getCuadroSuministrosReport(params),
+    enabled
+  });
+}
+
+export function useComprasConSaldoInicialReportQuery(
+  params: MonthlyRangeReportQueryParams,
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: [...queryKeys.reportes.all, "compras-con-saldo-inicial", params] as const,
+    queryFn: () => getComprasConSaldoInicialReport(params),
     enabled
   });
 }

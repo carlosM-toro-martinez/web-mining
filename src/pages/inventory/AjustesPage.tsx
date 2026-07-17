@@ -2,15 +2,23 @@ import { FormEvent, useMemo, useState } from "react";
 import { AlertTriangle, Loader2, Play, Search, Settings2 } from "lucide-react";
 import {
   useAjustarPreciosSinIvaMutation,
+  useBackfillCppMutation,
   useDiagnosticoPreciosQuery,
   useDiagnosticoSaldosQuery
 } from "@/features/inventario-import/hooks/useInventarioImport";
+import { useComprasConSaldoInicialReportQuery } from "@/features/reportes/hooks/useReportes";
 import type {
   AjustarPreciosSinIvaResponse,
+  BackfillCppResponse,
   DiagnosticoPreciosItem,
   DiagnosticoSaldosItem,
   SaldoMensualQuery
 } from "@/features/inventario-import/model/inventarioImport.schema";
+import type {
+  CompraConSaldoInicialGrupo,
+  CompraConSaldoInicialProducto,
+  MonthlyRangeReportQueryParams
+} from "@/features/reportes/model/reportes.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -48,6 +56,33 @@ function saldoProductName(item: DiagnosticoSaldosItem) {
   return item.productoNombre ?? item.nombre ?? "-";
 }
 
+function comprasGrupoKey(grupo: CompraConSaldoInicialGrupo) {
+  const codigo = (grupo.grupoCodigo ?? "").trim();
+  const nombre = (grupo.grupoNombre ?? "").trim();
+  return `${codigo}|||${nombre}`;
+}
+
+function comprasGrupoLabel(grupo: CompraConSaldoInicialGrupo) {
+  const codigo = (grupo.grupoCodigo ?? "").trim();
+  const nombre = (grupo.grupoNombre ?? "").trim();
+  if (codigo && nombre) return `${codigo} - ${nombre}`;
+  return codigo || nombre || "Sin grupo";
+}
+
+function comprasProductoSearchText(
+  producto: CompraConSaldoInicialProducto,
+  grupo: CompraConSaldoInicialGrupo
+) {
+  return `${producto.codigo ?? ""} ${producto.nombre ?? ""} ${grupo.grupoCodigo ?? ""} ${grupo.grupoNombre ?? ""}`.toLowerCase();
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("es-BO");
+}
+
 function responseSummary(response: AjustarPreciosSinIvaResponse | undefined) {
   if (!response) return "";
   const data = response.data;
@@ -69,6 +104,7 @@ export function AjustesPage() {
   const now = new Date();
   const { showError, showSuccess } = useToast();
   const ajustarPreciosSinIvaMutation = useAjustarPreciosSinIvaMutation();
+  const backfillCppMutation = useBackfillCppMutation();
 
   const [diagnosticoAnio, setDiagnosticoAnio] = useState(String(now.getFullYear()));
   const [diagnosticoMes, setDiagnosticoMes] = useState(String(now.getMonth() + 1));
@@ -77,9 +113,19 @@ export function AjustesPage() {
   const [saldosAnio, setSaldosAnio] = useState(String(now.getFullYear()));
   const [saldosMes, setSaldosMes] = useState(String(now.getMonth() + 1));
   const [saldosParams, setSaldosParams] = useState<SaldoMensualQuery | null>(null);
+  const [comprasAnioInicio, setComprasAnioInicio] = useState(String(now.getFullYear()));
+  const [comprasMesInicio, setComprasMesInicio] = useState(String(now.getMonth() + 1));
+  const [comprasAnioFin, setComprasAnioFin] = useState(String(now.getFullYear()));
+  const [comprasMesFin, setComprasMesFin] = useState(String(now.getMonth() + 1));
+  const [comprasParams, setComprasParams] = useState<MonthlyRangeReportQueryParams | null>(null);
+  const [comprasGrupo, setComprasGrupo] = useState("");
+  const [comprasSearch, setComprasSearch] = useState("");
   const [ajusteAnio, setAjusteAnio] = useState(String(now.getFullYear()));
   const [ajusteMes, setAjusteMes] = useState(String(now.getMonth() + 1));
   const [ajusteResponse, setAjusteResponse] = useState<AjustarPreciosSinIvaResponse | null>(null);
+  const [cppAnio, setCppAnio] = useState(String(now.getFullYear()));
+  const [cppMes, setCppMes] = useState(String(now.getMonth() + 1));
+  const [cppResponse, setCppResponse] = useState<BackfillCppResponse | null>(null);
 
   const activeDiagnosticoParams = diagnosticoParams ?? {
     anio: Number(diagnosticoAnio),
@@ -91,13 +137,54 @@ export function AjustesPage() {
     mes: Number(saldosMes)
   };
   const saldosQuery = useDiagnosticoSaldosQuery(activeSaldosParams, Boolean(saldosParams));
+  const activeComprasParams = comprasParams ?? {
+    anioInicio: Number(comprasAnioInicio),
+    mesInicio: Number(comprasMesInicio),
+    anioFin: Number(comprasAnioFin),
+    mesFin: Number(comprasMesFin)
+  };
+  const comprasConSaldoQuery = useComprasConSaldoInicialReportQuery(
+    activeComprasParams,
+    Boolean(comprasParams)
+  );
 
   const diagnosticoData = diagnosticoQuery.data?.data;
   const saldosData = saldosQuery.data?.data;
+  const comprasConSaldoData = comprasConSaldoQuery.data?.data;
   const saldosRows = saldosData?.discrepancias ?? [];
   const diagnosticoRows = useMemo(
     () => (diagnosticoTab === "sinPrecio" ? diagnosticoData?.sinPrecio ?? [] : diagnosticoData?.sinProm ?? []),
     [diagnosticoData?.sinPrecio, diagnosticoData?.sinProm, diagnosticoTab]
+  );
+  const comprasGrupoOptions = useMemo(() => {
+    const groups = new Map<string, { id: string; label: string }>();
+    for (const mes of comprasConSaldoData?.meses ?? []) {
+      for (const grupo of mes.grupos) {
+        const id = comprasGrupoKey(grupo);
+        if (!groups.has(id)) groups.set(id, { id, label: comprasGrupoLabel(grupo) });
+      }
+    }
+    return [...groups.values()].sort((a, b) => {
+      const aCode = Number(a.label.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
+      const bCode = Number(b.label.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
+      return aCode - bCode || a.label.localeCompare(b.label);
+    });
+  }, [comprasConSaldoData?.meses]);
+  const comprasRows = useMemo(() => {
+    const search = comprasSearch.trim().toLowerCase();
+    return (comprasConSaldoData?.meses ?? []).flatMap((mes) =>
+      mes.grupos
+        .filter((grupo) => !comprasGrupo || comprasGrupoKey(grupo) === comprasGrupo)
+        .flatMap((grupo) =>
+          grupo.productos
+            .filter((producto) => !search || comprasProductoSearchText(producto, grupo).includes(search))
+            .map((producto) => ({ mes, grupo, producto }))
+        )
+    );
+  }, [comprasConSaldoData?.meses, comprasGrupo, comprasSearch]);
+  const comprasFiltradasTotal = useMemo(
+    () => comprasRows.reduce((sum, row) => sum + row.producto.totalCompradoBs, 0),
+    [comprasRows]
   );
 
   function parsePeriodo(anioValue: string, mesValue: string) {
@@ -114,6 +201,21 @@ export function AjustesPage() {
       return null;
     }
     return { anio, mes };
+  }
+
+  function parseRangoMensual() {
+    const inicio = parsePeriodo(comprasAnioInicio, comprasMesInicio);
+    const fin = parsePeriodo(comprasAnioFin, comprasMesFin);
+    if (!inicio || !fin) return null;
+    const inicioKey = inicio.anio * 12 + inicio.mes;
+    const finKey = fin.anio * 12 + fin.mes;
+    if (inicioKey > finKey) return null;
+    return {
+      anioInicio: inicio.anio,
+      mesInicio: inicio.mes,
+      anioFin: fin.anio,
+      mesFin: fin.mes
+    };
   }
 
   function handleDiagnosticoSubmit(event: FormEvent<HTMLFormElement>) {
@@ -148,6 +250,34 @@ export function AjustesPage() {
     });
   }
 
+  function handleBackfillCppSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const periodo = parsePeriodo(cppAnio, cppMes);
+    if (!periodo) {
+      showError("Indica un año y mes válidos para ejecutar el backfill CPP.");
+      return;
+    }
+
+    setCppResponse(null);
+    backfillCppMutation.mutate(periodo, {
+      onSuccess: (response) => {
+        setCppResponse(response);
+        const data = response.data;
+        const productos = data?.productosProcessados ?? data?.productosProcesados;
+        const resumen = [
+          productos !== undefined ? `productos: ${productos}` : null,
+          data?.movimientosActualizados !== undefined
+            ? `movimientos: ${data.movimientosActualizados}`
+            : null,
+          data?.saldosActualizados !== undefined ? `saldos: ${data.saldosActualizados}` : null,
+          data?.errores?.length ? `errores: ${data.errores.length}` : null
+        ].filter(Boolean);
+        showSuccess(resumen.length ? `Backfill CPP ejecutado · ${resumen.join(" · ")}` : "Backfill CPP ejecutado.");
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo ejecutar el backfill CPP."))
+    });
+  }
+
   function handleSaldosSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const periodo = parsePeriodo(saldosAnio, saldosMes);
@@ -158,6 +288,24 @@ export function AjustesPage() {
     setSaldosParams(periodo);
     if (saldosParams?.anio === periodo.anio && saldosParams.mes === periodo.mes) {
       void saldosQuery.refetch();
+    }
+  }
+
+  function handleComprasConSaldoSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const rango = parseRangoMensual();
+    if (!rango) {
+      showError("Indica un rango mensual válido para consultar compras con saldo inicial.");
+      return;
+    }
+    setComprasParams(rango);
+    if (
+      comprasParams?.anioInicio === rango.anioInicio &&
+      comprasParams.mesInicio === rango.mesInicio &&
+      comprasParams.anioFin === rango.anioFin &&
+      comprasParams.mesFin === rango.mesFin
+    ) {
+      void comprasConSaldoQuery.refetch();
     }
   }
 
@@ -420,7 +568,302 @@ export function AjustesPage() {
             </pre>
           </div>
         </article>
+
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold">Backfill CPP</h2>
+            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
+              Recalcula el CPP del mes, actualiza movimientos y deja el saldo mensual consistente con compras sin IVA.
+            </p>
+          </div>
+
+          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleBackfillCppSubmit}>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                Año
+              </label>
+              <input
+                type="number"
+                min={2000}
+                max={2100}
+                value={cppAnio}
+                onChange={(event) => setCppAnio(event.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                Mes
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={cppMes}
+                onChange={(event) => setCppMes(event.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={backfillCppMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold text-[var(--color-on-primary)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {backfillCppMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+                Ejecutar backfill CPP
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-4 rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/10 p-3 text-sm text-[var(--color-on-surface)]">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 text-[var(--color-warning)]" />
+              <p className="text-[var(--color-on-surface-variant)]">
+                Ejecuta los meses en orden cronológico. El CPP de un mes depende del precio promedio del mes anterior.
+              </p>
+            </div>
+          </div>
+
+          {backfillCppMutation.isError ? (
+            <div className="mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
+              {normalizeError(backfillCppMutation.error, "No se pudo ejecutar el backfill CPP.")}
+            </div>
+          ) : null}
+
+          <div className="mt-5">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Respuesta
+            </h3>
+            <pre className="max-h-[420px] overflow-auto rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] p-3 text-xs leading-relaxed text-[var(--color-on-surface)]">
+              {cppResponse ? JSON.stringify(cppResponse, null, 2) : "Sin ejecución todavía."}
+            </pre>
+          </div>
+        </article>
       </div>
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">Compras con saldo inicial</h2>
+            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
+              Productos que tienen saldo inicial mayor a cero y compras dentro del período.
+            </p>
+          </div>
+          {comprasParams ? (
+            <span className="rounded-full bg-[var(--color-primary)]/12 px-3 py-1 text-xs font-bold text-[var(--color-primary)]">
+              {String(comprasParams.mesInicio).padStart(2, "0")}/{comprasParams.anioInicio} -{" "}
+              {String(comprasParams.mesFin).padStart(2, "0")}/{comprasParams.anioFin}
+            </span>
+          ) : null}
+        </div>
+
+        <form
+          className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-5"
+          onSubmit={handleComprasConSaldoSubmit}
+        >
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Año inicio
+            </label>
+            <input
+              type="number"
+              min={2000}
+              max={2100}
+              value={comprasAnioInicio}
+              onChange={(event) => setComprasAnioInicio(event.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Mes inicio
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={comprasMesInicio}
+              onChange={(event) => setComprasMesInicio(event.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Año fin
+            </label>
+            <input
+              type="number"
+              min={2000}
+              max={2100}
+              value={comprasAnioFin}
+              onChange={(event) => setComprasAnioFin(event.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Mes fin
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={comprasMesFin}
+              onChange={(event) => setComprasMesFin(event.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={comprasConSaldoQuery.isFetching}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {comprasConSaldoQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+              Consultar
+            </button>
+          </div>
+        </form>
+
+        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.4fr]">
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Grupo
+            </label>
+            <select
+              value={comprasGrupo}
+              onChange={(event) => setComprasGrupo(event.target.value)}
+              disabled={!comprasConSaldoData || comprasConSaldoQuery.isFetching}
+              className={inputClassName}
+            >
+              <option value="">Todos los grupos</option>
+              {comprasGrupoOptions.map((grupo) => (
+                <option key={grupo.id} value={grupo.id}>
+                  {grupo.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Buscar producto
+            </label>
+            <input
+              value={comprasSearch}
+              onChange={(event) => setComprasSearch(event.target.value)}
+              placeholder="Código o nombre"
+              disabled={!comprasConSaldoData || comprasConSaldoQuery.isFetching}
+              className={inputClassName}
+            />
+          </div>
+        </div>
+
+        {comprasConSaldoQuery.isError ? (
+          <div className="mb-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
+            {normalizeError(comprasConSaldoQuery.error, "No se pudo consultar compras con saldo inicial.")}
+          </div>
+        ) : null}
+
+        {comprasConSaldoData ? (
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                Meses
+              </p>
+              <p className="mt-1 text-2xl font-extrabold">{comprasConSaldoData.meses.length}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                Productos filtrados
+              </p>
+              <p className="mt-1 text-2xl font-extrabold">{comprasRows.length}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-success)]/25 bg-[var(--color-success)]/8 p-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                Total comprado Bs.
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-[var(--color-success)]">
+                {formatNumber(comprasFiltradasTotal)}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
+          <div className="max-h-[620px] overflow-auto">
+            <table className="min-w-full border-collapse text-sm">
+              <thead className="sticky top-0 bg-[var(--color-surface-container-highest)] text-left text-xs uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                <tr>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Periodo</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Grupo</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo inicial</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo Bs.</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Comprado Bs.</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Compras</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!comprasParams ? (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                      Consulta un rango para ver productos con saldo inicial y compras.
+                    </td>
+                  </tr>
+                ) : comprasConSaldoQuery.isFetching ? (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                      Cargando compras con saldo inicial...
+                    </td>
+                  </tr>
+                ) : comprasRows.length ? (
+                  comprasRows.map(({ mes, grupo, producto }) => (
+                    <tr
+                      key={`${mes.anio}-${mes.mes}-${comprasGrupoKey(grupo)}-${producto.codigo ?? producto.nombre}`}
+                      className="border-b border-[var(--color-border-soft)] align-top last:border-0"
+                    >
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {String(mes.mes).padStart(2, "0")}/{mes.anio}
+                      </td>
+                      <td className="min-w-[160px] px-3 py-2">{comprasGrupoLabel(grupo)}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{producto.codigo ?? "-"}</td>
+                      <td className="min-w-[220px] px-3 py-2 font-medium">{producto.nombre ?? "-"}</td>
+                      <td className="px-3 py-2 text-right">{formatNumber(producto.saldoInicialQty)}</td>
+                      <td className="px-3 py-2 text-right">{formatNumber(producto.saldoInicialBs)}</td>
+                      <td className="px-3 py-2 text-right font-semibold">{formatNumber(producto.totalCompradoBs)}</td>
+                      <td className="min-w-[360px] px-3 py-2">
+                        <div className="space-y-1 text-xs text-[var(--color-on-surface-variant)]">
+                          {producto.compras.map((compra, index) => (
+                            <div
+                              key={`${compra.numeroFactura ?? "sf"}-${compra.fecha ?? "sf"}-${index}`}
+                              className="rounded-md bg-[var(--color-surface-container-low)] px-2 py-1"
+                            >
+                              <span className="font-semibold text-[var(--color-on-surface)]">
+                                {compra.numeroFactura ?? "Sin factura"}
+                              </span>{" "}
+                              · {formatDate(compra.fecha)} · {compra.proveedor ?? "Sin proveedor"} · Cant.{" "}
+                              {formatNumber(compra.cantidad)} · P.U. {formatNumber(compra.precioUnit, 4)} · Bs.{" "}
+                              {formatNumber(compra.importeBs)}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                      Sin productos para los filtros seleccionados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

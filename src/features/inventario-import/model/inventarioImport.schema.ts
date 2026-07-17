@@ -144,6 +144,7 @@ export const cierreMesPayloadSchema = z.object({
 
 export const inicializarPeriodoPayloadSchema = cierreMesPayloadSchema;
 export const ajustarPreciosSinIvaPayloadSchema = cierreMesPayloadSchema;
+export const backfillCppPayloadSchema = cierreMesPayloadSchema;
 
 export const cierreMesCreateResponseSchema = z.object({
   success: z.boolean().optional().default(true),
@@ -254,6 +255,26 @@ export const ajustarPreciosSinIvaResponseSchema = z
     success: z.boolean().optional().default(true),
     message: z.string().optional(),
     data: z.unknown().optional()
+  })
+  .passthrough();
+
+export const backfillCppResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    message: z.string().optional(),
+    data: z
+      .object({
+        anio: numberLikeSchema.int().optional(),
+        mes: numberLikeSchema.int().optional(),
+        productosProcessados: numberLikeSchema.int().nonnegative().optional(),
+        productosProcesados: numberLikeSchema.int().nonnegative().optional(),
+        movimientosActualizados: numberLikeSchema.int().nonnegative().optional(),
+        saldosActualizados: numberLikeSchema.int().nonnegative().optional(),
+        detalle: z.array(z.record(z.string(), z.unknown())).optional().default([]),
+        errores: z.array(z.unknown()).optional().default([])
+      })
+      .passthrough()
+      .optional()
   })
   .passthrough();
 
@@ -415,6 +436,8 @@ export type AjusteProductosMesPayload = z.infer<typeof ajusteProductosMesPayload
 export type AjusteProductosMesResponse = z.infer<typeof ajusteProductosMesResponseSchema>;
 export type AjustarPreciosSinIvaPayload = z.infer<typeof ajustarPreciosSinIvaPayloadSchema>;
 export type AjustarPreciosSinIvaResponse = z.infer<typeof ajustarPreciosSinIvaResponseSchema>;
+export type BackfillCppPayload = z.infer<typeof backfillCppPayloadSchema>;
+export type BackfillCppResponse = z.infer<typeof backfillCppResponseSchema>;
 export type DiagnosticoPreciosItem = z.infer<typeof diagnosticoPreciosItemSchema>;
 export type DiagnosticoPreciosResponse = z.infer<typeof diagnosticoPreciosResponseSchema>;
 export type DiagnosticoSaldosItem = z.infer<typeof diagnosticoSaldosItemSchema>;

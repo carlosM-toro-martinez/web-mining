@@ -161,6 +161,7 @@ export const createCompraPayloadSchema = z.object({
   numeroFactura: z.string().trim().min(1).optional(),
   observacion: z.string().trim().optional(),
   fechaOperacion: z.string().datetime().optional(),
+  tieneIva: z.boolean().optional(),
   items: z
     .array(
       z.object({

@@ -253,6 +253,7 @@ export function ValesHistoricosPage() {
   const [proveedorId, setProveedorId] = useState("");
   const [fechaOperacionCompra, setFechaOperacionCompra] = useState("");
   const [numeroFacturaCompra, setNumeroFacturaCompra] = useState("");
+  const [compraSinIva, setCompraSinIva] = useState(false);
   const [compraDraftItems, setCompraDraftItems] = useState<CompraDraftItem[]>([
     { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
   ]);
@@ -771,6 +772,7 @@ export function ValesHistoricosPage() {
         proveedorId: proveedorIdNum,
         numeroFactura: numeroFacturaCompra.trim() || undefined,
         fechaOperacion: `${fechaOperacionCompra}T00:00:00.000Z`,
+        tieneIva: !compraSinIva,
         items: parsedItems
       });
       const cantidadesRecibidas = Object.fromEntries(
@@ -788,6 +790,7 @@ export function ValesHistoricosPage() {
       setProveedorId("");
       setFechaOperacionCompra("");
       setNumeroFacturaCompra("");
+      setCompraSinIva(false);
       setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }]);
       setNextCompraDraftItemId(2);
     } catch (error) {
@@ -830,14 +833,18 @@ export function ValesHistoricosPage() {
     }
 
     try {
-      const created = await createValeMutation.mutateAsync({
+      const createValePayload = {
         solicitanteId: solicitanteIdNum,
         fechaOperacion: `${fechaOperacion}T00:00:00.000Z`,
         items: parsedItems.map((item) => ({
           productoId: item.productoId,
           cantidadSolicitada: item.cantidadSolicitada
         }))
-      });
+      };
+
+      console.log("[ValesHistoricos] POST /api/vales payload", createValePayload);
+      const created = await createValeMutation.mutateAsync(createValePayload);
+      console.log("[ValesHistoricos] POST /api/vales response", created);
 
       const cantidadesEntregadas = Object.fromEntries(
         (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
@@ -853,10 +860,17 @@ export function ValesHistoricosPage() {
         return;
       }
 
-      await entregarValeMutation.mutateAsync({
+      const entregarValePayload = {
         id: created.data.id,
         payload: { cantidadesEntregadas, cuentaIds }
-      });
+      };
+
+      console.log(
+        `[ValesHistoricos] POST /api/vales/${created.data.id}/entregar payload`,
+        entregarValePayload.payload
+      );
+      const delivered = await entregarValeMutation.mutateAsync(entregarValePayload);
+      console.log(`[ValesHistoricos] POST /api/vales/${created.data.id}/entregar response`, delivered);
 
       showSuccess(
         isPeriodoCerrado
@@ -1266,7 +1280,7 @@ export function ValesHistoricosPage() {
           Registrar compra histórica
         </h2>
         <form className="space-y-3" onSubmit={handleCreateAndReceiveCompraHistorica}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Proveedor
@@ -1319,6 +1333,15 @@ export function ValesHistoricosPage() {
                 placeholder="FAC-2025-001"
               />
             </div>
+            <label className="flex min-h-[70px] items-center gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2.5 text-sm font-semibold text-[var(--color-on-surface)]">
+              <input
+                type="checkbox"
+                checked={compraSinIva}
+                onChange={(event) => setCompraSinIva(event.target.checked)}
+                className="h-4 w-4 accent-[var(--color-primary)]"
+              />
+              <span>Sin IVA</span>
+            </label>
           </div>
 
           {isPeriodoCerradoCompra ? (

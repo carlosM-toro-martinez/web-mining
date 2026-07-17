@@ -5,6 +5,7 @@ import {
   ajustarSaldoMensualTotal,
   deleteSaldoMensualById,
   createCierreMes,
+  ejecutarBackfillCpp,
   getCierresMes,
   getDiagnosticoPrecios,
   getDiagnosticoSaldos,
@@ -24,6 +25,7 @@ import {
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
   AjustarPreciosSinIvaPayload,
+  BackfillCppPayload,
   RecalcularStockPayload,
   AjusteProductosMesPayload,
   ReiniciarStockPayload,
@@ -131,6 +133,12 @@ export function useAjustarProductosMesMutation() {
 export function useAjustarPreciosSinIvaMutation() {
   return useMutation({
     mutationFn: (payload: AjustarPreciosSinIvaPayload) => ajustarPreciosSinIva(payload)
+  });
+}
+
+export function useBackfillCppMutation() {
+  return useMutation({
+    mutationFn: (payload: BackfillCppPayload) => ejecutarBackfillCpp(payload)
   });
 }
 

@@ -599,7 +599,7 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
   if (!periodo) return null;
   const month = movimientoMonthLabel(periodo.anio, periodo.mes);
   const monthLower = month.toLowerCase();
-  const saldoFinal = periodo.totalInventarioDebe - periodo.totalSalidasHaber - 0.01;
+  const saldoFinal = periodo.totalInventarioDebe - periodo.totalSalidasHaber;
   const rows: Array<{
     key: string;
     cargo?: string | null;

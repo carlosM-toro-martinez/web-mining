@@ -15,6 +15,8 @@ import {
   recalcularStockResponseSchema,
   diagnosticoPreciosResponseSchema,
   diagnosticoSaldosResponseSchema,
+  backfillCppPayloadSchema,
+  backfillCppResponseSchema,
   reiniciarStockPayloadSchema,
   saldoMensualAjusteTotalPayloadSchema,
   saldoMensualAjusteInicialExcelResponseSchema,
@@ -32,6 +34,7 @@ import {
   type ReiniciarStockPayload,
   type RecalcularStockPayload,
   type AjustarPreciosSinIvaPayload,
+  type BackfillCppPayload,
   type SaldoMensualItemPatchPayload,
   type SaldoMensualItemUpsertPayload,
   type SaldoMensualAjusteTotalPayload,
@@ -188,6 +191,14 @@ export async function ajustarPreciosSinIva(payload: AjustarPreciosSinIvaPayload)
     url: apiEndpoints.inventarioImport.ajustarPreciosSinIva,
     body: ajustarPreciosSinIvaPayloadSchema.parse(payload),
     schema: ajustarPreciosSinIvaResponseSchema
+  });
+}
+
+export async function ejecutarBackfillCpp(payload: BackfillCppPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.backfillCpp,
+    body: backfillCppPayloadSchema.parse(payload),
+    schema: backfillCppResponseSchema
   });
 }
 
