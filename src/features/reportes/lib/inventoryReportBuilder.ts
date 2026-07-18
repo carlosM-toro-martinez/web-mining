@@ -846,6 +846,28 @@ export function buildDetalleMaterialesApiReportDefinition(
 type DiarioPeriodo = DiarioAlmacenesReportResponse["data"]["meses"][number];
 type DiarioSectorHaber = DiarioPeriodo["sectoresHaber"][number];
 
+function diarioSectorLineas(sector: DiarioSectorHaber) {
+  const centroCostos = sector.centroCostos ?? [];
+  const funcionGastos = sector.funcionGastos ?? [];
+  const desdeCentros = centroCostos.flatMap((centroCosto) =>
+    (centroCosto.subCuentas ?? []).map((subCuenta) => ({
+      id: subCuenta.codigoCompleto ?? `${centroCosto.centroCostoCodigo ?? ""}-${subCuenta.funcionGastoCodigo ?? ""}`,
+      centroCostoCodigo: centroCosto.centroCostoCodigo ?? "",
+      funcionGastoCodigo: subCuenta.funcionGastoCodigo ?? "",
+      funcionGastoNombre: subCuenta.funcionGastoNombre ?? centroCosto.centroCostoNombre ?? "",
+      totalBs: subCuenta.totalBs
+    }))
+  );
+  if (desdeCentros.length) return desdeCentros;
+  return funcionGastos.map((funcionGasto) => ({
+    id: funcionGasto.codigo ?? "",
+    centroCostoCodigo: "",
+    funcionGastoCodigo: funcionGasto.codigo ?? "",
+    funcionGastoNombre: funcionGasto.nombre ?? "",
+    totalBs: funcionGasto.totalBs
+  }));
+}
+
 function reportCuentaKey(value?: string | null) {
   return (value ?? "").replace(/[^\d]/g, "");
 }
@@ -857,11 +879,7 @@ function diarioSectorOrderValue(sector: DiarioSectorHaber) {
 }
 
 function sortDiarioSectores(sectores: DiarioSectorHaber[]) {
-  return [...sectores].sort((a, b) => {
-    const orderDiff = diarioSectorOrderValue(a) - diarioSectorOrderValue(b);
-    if (orderDiff !== 0) return orderDiff;
-    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
-  });
+  return sectores;
 }
 
 function cuentaDetalleDiario(centroCostoCodigo?: string | null, funcionGastoCodigo?: string | null) {
@@ -953,21 +971,19 @@ export function buildDiarioAlmacenesApiReportDefinition(
         });
 
         if (shouldShowDiarioSectorDetails(sector)) {
-          for (const centroCosto of sector.centroCostos) {
-            for (const subCuenta of centroCosto.subCuentas) {
-              rows.push({
-                id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${subCuenta.codigoCompleto ?? rows.length}`,
-                values: {
-                  periodo: "",
-                  cargos: "",
-                  descripcion: subCuenta.funcionGastoNombre ?? "",
-                  parcialesBs: Number(subCuenta.totalBs.toFixed(2)),
-                  cuenta: cuentaDetalleDiario(centroCosto.centroCostoCodigo, subCuenta.funcionGastoCodigo),
-                  debeBs: "",
-                  haberBs: ""
-                }
-              });
-            }
+          for (const linea of diarioSectorLineas(sector)) {
+            rows.push({
+              id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${linea.id || rows.length}`,
+              values: {
+                periodo: "",
+                cargos: "",
+                descripcion: linea.funcionGastoNombre,
+                parcialesBs: Number(linea.totalBs.toFixed(2)),
+                cuenta: cuentaDetalleDiario(linea.centroCostoCodigo, linea.funcionGastoCodigo),
+                debeBs: "",
+                haberBs: ""
+              }
+            });
           }
         }
       }

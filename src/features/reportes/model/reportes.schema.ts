@@ -517,9 +517,10 @@ const detalleMaterialesSubtotalSchema = z.object({
 const detalleMaterialesDetalleTransporteSchema = z.object({
   productoNombre: z.string().optional().nullable().default(""),
   unidad: z.string().optional().nullable().default(""),
-  cantidad: numberLikeSchema,
+  cantidad: numberLikeSchema.optional().default(0),
   importeBs: numberLikeSchema,
-  vehiculo: z.string().optional().nullable()
+  vehiculo: z.string().optional().nullable(),
+  destino: z.string().optional().nullable()
 });
 
 const detalleMaterialesPorCuentaSchema = z.object({
@@ -578,16 +579,46 @@ const diarioSubCentroSchema = z.object({
 const diarioDetalleTransporteSchema = z.object({
   productoNombre: z.string().optional().nullable().default(""),
   unidad: z.string().optional().nullable().default(""),
-  cantidad: numberLikeSchema,
+  cantidad: numberLikeSchema.optional().default(0),
   importeBs: numberLikeSchema,
-  vehiculo: z.string().optional().nullable()
+  vehiculo: z.string().optional().nullable(),
+  destino: z.string().optional().nullable()
 });
 
-const diarioFuncionGastoSchema = z.object({
-  codigo: z.string().optional().nullable().default(""),
-  nombre: z.string().optional().nullable().default(""),
-  totalBs: numberLikeSchema
-});
+const diarioSectorDetalleMaterialSchema = z
+  .object({
+    productoNombre: z.string().optional().nullable(),
+    nombre: z.string().optional().nullable(),
+    detalle: z.string().optional().nullable(),
+    unidad: z.string().optional().nullable().default(""),
+    cantidad: numberLikeSchema.optional().default(0),
+    importeBs: numberLikeSchema.optional(),
+    debeBs: numberLikeSchema.optional(),
+    vehiculo: z.string().optional().nullable(),
+    destino: z.string().optional().nullable()
+  })
+  .transform((value) => ({
+    productoNombre: value.productoNombre ?? value.nombre ?? value.detalle ?? "",
+    unidad: value.unidad ?? "",
+    cantidad: value.cantidad,
+    importeBs: value.importeBs ?? value.debeBs ?? 0,
+    vehiculo: value.vehiculo ?? value.destino ?? "",
+    destino: value.destino ?? value.vehiculo ?? ""
+  }));
+
+const diarioFuncionGastoSchema = z
+  .object({
+    codigo: z.string().optional().nullable(),
+    nombre: z.string().optional().nullable(),
+    funcionGastoCodigo: z.string().optional().nullable(),
+    funcionGastoNombre: z.string().optional().nullable(),
+    totalBs: numberLikeSchema
+  })
+  .transform((value) => ({
+    codigo: value.codigo ?? value.funcionGastoCodigo ?? "",
+    nombre: value.nombre ?? value.funcionGastoNombre ?? "",
+    totalBs: value.totalBs
+  }));
 
 const diarioLineaSchema = z.object({
   subCentro: z.string().optional().nullable().default(""),
@@ -628,12 +659,45 @@ const diarioSectorCentroCostoSchema = z.object({
   subCuentas: z.array(diarioSectorSubCuentaSchema).optional().default([])
 });
 
+const diarioSectorValeLineaSchema = z.object({
+  productoId: numberLikeSchema.optional().nullable(),
+  nombre: z.string().optional().nullable().default(""),
+  unidad: z.string().optional().nullable().default(""),
+  cantidad: numberLikeSchema.optional().default(0),
+  precioUnit: numberLikeSchema.optional().nullable(),
+  importeBs: numberLikeSchema.optional().default(0)
+});
+
+const diarioSectorValeSchema = z.object({
+  id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
+  fechaOperacion: z.string().optional().nullable(),
+  solicitante: z
+    .object({
+      id: numberLikeSchema.optional().nullable(),
+      nombre: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  superintendente: z
+    .object({
+      id: numberLikeSchema.optional().nullable(),
+      nombre: z.string().optional().nullable()
+    })
+    .optional()
+    .nullable(),
+  totalBs: numberLikeSchema.optional().default(0),
+  lineas: z.array(diarioSectorValeLineaSchema).optional().default([])
+});
+
 const diarioSectorHaberSchema = z.object({
   sectorId: idLikeSchema.optional().nullable(),
   sectorCodigo: z.string().optional().nullable(),
   sectorNombre: z.string().optional().nullable(),
   totalBs: numberLikeSchema,
-  centroCostos: z.array(diarioSectorCentroCostoSchema).optional().default([])
+  funcionGastos: z.array(diarioFuncionGastoSchema).optional().default([]),
+  centroCostos: z.array(diarioSectorCentroCostoSchema).optional().default([]),
+  detalles: z.array(diarioSectorDetalleMaterialSchema).optional().default([]),
+  vales: z.array(diarioSectorValeSchema).optional().default([])
 });
 
 const diarioAlmacenesReportDataSchema = z.object({
@@ -650,6 +714,8 @@ const diarioAlmacenesReportDataSchema = z.object({
       comprasImporteBs: numberLikeSchema,
       comprasSinIva: numberLikeSchema.optional(),
       totalInventarioDebe: numberLikeSchema,
+      saldoInventarioFinal: numberLikeSchema.optional(),
+      saldoFinal: numberLikeSchema.optional(),
       sectoresHaber: z.array(diarioSectorHaberSchema).optional().default([]),
       cuentasHaber: z.array(diarioCuentaHaberSchema).default([]),
       totalSalidasHaber: numberLikeSchema

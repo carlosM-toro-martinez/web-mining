@@ -534,6 +534,10 @@ export function ValesHistoricosPage() {
       showError("Debes indicar año y mes válidos.");
       return;
     }
+    const confirmed = window.confirm(
+      `Vas a cerrar definitivamente el período ${String(mes).padStart(2, "0")}/${anio}. Esta acción fija los saldos mensuales y no se puede deshacer. ¿Deseas continuar?`
+    );
+    if (!confirmed) return;
     try {
       const response = await createCierreMesMutation.mutateAsync({ anio, mes });
       await queryClient.invalidateQueries({ queryKey: ["inventario-import", "cierre-mes"] });
@@ -553,6 +557,10 @@ export function ValesHistoricosPage() {
       showError("Debes indicar año y mes válidos para inicializar.");
       return;
     }
+    const confirmed = window.confirm(
+      `Vas a inicializar el período histórico ${String(mes).padStart(2, "0")}/${anio}. Úsalo solo una vez por período. ¿Deseas continuar?`
+    );
+    if (!confirmed) return;
     try {
       await inicializarPeriodoMutation.mutateAsync({ anio, mes });
       await queryClient.invalidateQueries({ queryKey: ["inventario-import", "saldo-mensual"] });

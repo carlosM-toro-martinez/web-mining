@@ -166,14 +166,31 @@ function costoSheetName(cuenta: {
 }) {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   const text = `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
-  if (code.includes("67001097") || text.includes("PUNTUALIDAD")) return "PUNTUALIDAD";
-  if (code.includes("67001098") || text.includes("EMUSA")) return "EMUSA";
+  if (code.includes("22001008") || text.includes("TRANSPORTISTAS VARIOS") || text.includes("TRANSPORTE VARIOS"))
+    return "DETALLE TRANSPORTE";
+  if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA")) return "EMUSA";
+  if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD")) return "PUNTUALIDAD";
+  if (code.includes("35001000") || text.includes("MAQUINARIAS")) return "MAQUINARIA Y EQUIPO";
   if (code.includes("104001000") || text.includes("MEDIO AMBIENTE") || text.includes("M.A.")) return "MA-HSI (3)";
   if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION")) return "CONSTRUCCION-25";
   return "LIPEÑA";
 }
 
 function costoSheetMeta(sheetName: string) {
+  if (sheetName === "DETALLE TRANSPORTE") {
+    return {
+      title: "DETALLE DE MATERIALES  TRANSPORTE VARIO COMBUSTIBLE",
+      codeLine: "22,001,008    CTAS.CTES.TRANSPORTE VARIOS COMBUSTIBLE",
+      isTransport: true
+    };
+  }
+  if (sheetName === "MAQUINARIA Y EQUIPO") {
+    return {
+      title: "DETALLE DE MATERIALES  MAQUINARIAS Y EQUIPOS LIPEÑA",
+      codeLine: "35,001,000    CTAS.CTES.MAQUINARIAS Y EQUIPOS LIPEÑA",
+      isTransport: true
+    };
+  }
   if (sheetName === "MA-HSI (3)") {
     return {
       title: "DETALLE DE MATERIALES  COSTO DE MEDIO AMBIENTE",
@@ -186,6 +203,13 @@ function costoSheetMeta(sheetName: string) {
       title: "DETALLE DE MATERIALES  COSTO DE OBRAS EN CONSTRUCCION",
       codeLine: "44,002,000 CTAS.CTES.OBRAS EN CONSTRUCCION",
       isTransport: false
+    };
+  }
+  if (sheetName === "OBRAS EN CONSTRUCCION") {
+    return {
+      title: "DETALLE DE MATERIALES  OBRAS EN CONSTRUCCION LIPEÑA",
+      codeLine: "44,002,000    CTAS.CTES.OBRAS EN CONSTRUCCION LIPEÑA",
+      isTransport: true
     };
   }
   if (sheetName === "PUNTUALIDAD") {
@@ -215,6 +239,32 @@ function costoAccountParts(value?: string | null) {
     subCuenta: parts[0] ?? "",
     subCentro: parts[1] ?? ""
   };
+}
+
+function costoDetalleResumenLabel(cuenta: {
+  lineas: Array<{ subCentroNombre?: string | null }>;
+  funcionGastoNombre?: string | null;
+  centroCostoNombre?: string | null;
+}) {
+  return (
+    cuenta.lineas.find((linea) => Boolean(linea.subCentroNombre))?.subCentroNombre ??
+    cuenta.funcionGastoNombre ??
+    cuenta.centroCostoNombre ??
+    ""
+  ).toUpperCase();
+}
+
+function costoDetalleResumenDestinatario(cuenta: {
+  funcionGastoNombre?: string | null;
+  centroCostoNombre?: string | null;
+  vehiculo?: string | null;
+}) {
+  return (
+    cuenta.funcionGastoNombre ??
+    cuenta.centroCostoNombre ??
+    cuenta.vehiculo ??
+    ""
+  ).toUpperCase();
 }
 
 function saveSimpleWorkbook(params: {
@@ -431,7 +481,8 @@ function styleRange(
   sheet: XLSX.WorkSheet,
   range: XLSX.Range,
   style: Record<string, unknown>,
-  numericColumns: Set<number> = new Set()
+  numericColumns: Set<number> = new Set(),
+  numberFormat = "#,##0.00"
 ) {
   for (let row = range.s.r; row <= range.e.r; row += 1) {
     for (let col = range.s.c; col <= range.e.c; col += 1) {
@@ -439,7 +490,7 @@ function styleRange(
       const current = sheet[address];
       setCellStyle(sheet, address, {
         ...style,
-        ...(numericColumns.has(col) && typeof current?.v === "number" ? { numFmt: "#,##0.00" } : {})
+        ...(numericColumns.has(col) && typeof current?.v === "number" ? { numFmt: numberFormat } : {})
       });
     }
   }
@@ -629,12 +680,18 @@ function valueOf(row: { values: Record<string, string | number> }, key: string) 
   return row.values[key] ?? "";
 }
 
-function numberFormatRange(sheet: XLSX.WorkSheet, startRow: number, endRow: number, columns: number[]) {
+function numberFormatRange(
+  sheet: XLSX.WorkSheet,
+  startRow: number,
+  endRow: number,
+  columns: number[],
+  numberFormat = "#,##0.00"
+) {
   for (let row = startRow; row <= endRow; row += 1) {
     for (const col of columns) {
       const address = cellAddress(row, col);
       if (sheet[address] && typeof sheet[address].v === "number") {
-        sheet[address].s = { ...(sheet[address].s ?? {}), numFmt: "#,##0.00" };
+        sheet[address].s = { ...(sheet[address].s ?? {}), numFmt: numberFormat };
       }
     }
   }
@@ -969,6 +1026,53 @@ function lineaCuentaDisplay(linea: { subCentro?: string | null; subCuentas?: str
 }
 
 type DiarioCuenta = DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number];
+type DiarioSector = DiarioAlmacenesReportResponse["data"]["meses"][number]["sectoresHaber"][number];
+
+function diarioSectorLineas(sector: DiarioSector) {
+  const centroCostos = sector.centroCostos ?? [];
+  const funcionGastos = sector.funcionGastos ?? [];
+  const desdeCentros = centroCostos.flatMap((centroCosto) =>
+    (centroCosto.subCuentas ?? []).map((subCuenta) => ({
+      centroCostoCodigo: centroCosto.centroCostoCodigo ?? "",
+      centroCostoNombre: centroCosto.centroCostoNombre ?? "",
+      funcionGastoCodigo: subCuenta.funcionGastoCodigo ?? "",
+      funcionGastoNombre: subCuenta.funcionGastoNombre ?? centroCosto.centroCostoNombre ?? "",
+      totalBs: subCuenta.totalBs
+    }))
+  );
+  if (desdeCentros.length) return desdeCentros;
+  return funcionGastos.map((funcionGasto) => ({
+    centroCostoCodigo: "",
+    centroCostoNombre: "",
+    funcionGastoCodigo: funcionGasto.codigo ?? "",
+    funcionGastoNombre: funcionGasto.nombre ?? "",
+    totalBs: funcionGasto.totalBs
+  }));
+}
+
+function diarioSectoresToCuentas(sectores: DiarioSector[]): DiarioCuenta[] {
+  return sectores.map((sector) => ({
+    codigoCompleto: sector.sectorCodigo,
+    centroCostoCodigo: sector.centroCostos?.[0]?.centroCostoCodigo ?? null,
+    centroCostoNombre: sector.centroCostos?.[0]?.centroCostoNombre ?? null,
+    sectorCodigo: sector.sectorCodigo,
+    sectorNombre: sector.sectorNombre,
+    esTransporte: true,
+    totalBs: sector.totalBs,
+    totalCantidad: undefined,
+    subCentros: [],
+    funcionGastos: [],
+    lineas: diarioSectorLineas(sector).map((linea) => ({
+      subCentro: linea.funcionGastoCodigo,
+      nombre: linea.funcionGastoNombre,
+      funcionGastoCodigo: linea.funcionGastoCodigo,
+      funcionGastoNombre: linea.funcionGastoNombre,
+      importeBs: linea.totalBs,
+      subCuentas: linea.centroCostoCodigo ? [linea.centroCostoCodigo] : []
+    })),
+    detalles: []
+  }));
+}
 
 function cuentaMovimientoTitulo(cuenta: DiarioCuenta) {
   return (cuenta.sectorNombre ?? cuentaHaberTitulo(cuenta)).toUpperCase();
@@ -1005,8 +1109,6 @@ function groupMovimientoCuentas(cuentas: DiarioCuenta[]) {
       grouped.set(key, { ...cuenta, lineas: [...cuenta.lineas] });
       return;
     }
-    current.totalBs += cuenta.totalBs;
-    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     current.lineas.push(...cuenta.lineas);
   });
   return [...grouped.values()];
@@ -1022,38 +1124,17 @@ function sortCodigoFuncion(value?: string | null) {
 }
 
 function movimientoLineasPorFuncion(cuenta: DiarioCuenta) {
-  if (!isCostoProduccionCuenta(cuenta)) {
-    return cuenta.lineas.map((linea) => ({
+  return cuenta.lineas
+    .map((linea) => ({
       codigo: linea.funcionGastoCodigo ?? linea.subCentro ?? "",
       nombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
       importeBs: linea.importeBs
-    }));
-  }
-
-  const grouped = new Map<string, { codigo: string; nombre: string; importeBs: number }>();
-  cuenta.lineas.forEach((linea) => {
-    const codigo = linea.funcionGastoCodigo ?? linea.subCentro ?? "";
-    const key = codigo || linea.nombre || "SIN-FUNCION";
-    const current = grouped.get(key);
-    if (current) {
-      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
-      if (!current.nombre && (linea.funcionGastoNombre ?? linea.nombre)) {
-        current.nombre = linea.funcionGastoNombre ?? linea.nombre ?? "";
-      }
-      return;
-    }
-    grouped.set(key, {
-      codigo,
-      nombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
-      importeBs: Number(linea.importeBs.toFixed(2))
+    }))
+    .sort((a, b) => {
+      const codeDiff = sortCodigoFuncion(a.codigo) - sortCodigoFuncion(b.codigo);
+      if (codeDiff !== 0) return codeDiff;
+      return a.nombre.localeCompare(b.nombre, "es");
     });
-  });
-
-  return [...grouped.values()].sort((a, b) => {
-    const codeDiff = sortCodigoFuncion(a.codigo) - sortCodigoFuncion(b.codigo);
-    if (codeDiff !== 0) return codeDiff;
-    return a.nombre.localeCompare(b.nombre, "es");
-  });
 }
 
 function subCuentaDescripcion(subCuenta?: string) {
@@ -1186,8 +1267,6 @@ function normalizeDiarioCuentas(
       continue;
     }
     if (!current.sectorCodigo && sectorCodigo) current.sectorCodigo = sectorCodigo;
-    current.totalBs += cuenta.totalBs;
-    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     current.lineas.push(...lineas);
   }
   return [...grouped.values()];
@@ -1227,7 +1306,13 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
   sheet["!cols"] = [{ wch: 45 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
   styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 4 } }, excelTitleStyle);
   styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } }, excelHeaderStyle);
-  styleRange(sheet, { s: { r: 5, c: 0 }, e: { r: 4 + bodyRows.length, c: 4 } }, excelBodyStyle, new Set([1, 3, 4]));
+  styleRange(
+    sheet,
+    { s: { r: 5, c: 0 }, e: { r: 4 + bodyRows.length, c: 4 } },
+    excelBodyStyle,
+    new Set([1, 3, 4]),
+    "#,##0.00"
+  );
   bodyRows.forEach((row, index) => {
     if (row.kind === "title" || row.kind === "total") {
       styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: 4 } }, {
@@ -1255,27 +1340,7 @@ type CostoExportLinea = {
 };
 
 function groupCostoLineas(lineas: CostoExportLinea[]) {
-  const grouped = new Map<string, CostoExportLinea>();
-  lineas.forEach((linea) => {
-    const subCuenta = linea.subCuenta ?? "";
-    const subCentro = linea.subCentro ?? "";
-    const key = `${subCuenta}|||${subCentro}`;
-    const current = grouped.get(key);
-    if (current) {
-      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
-      if (!current.subCentroNombre && linea.subCentroNombre) {
-        current.subCentroNombre = linea.subCentroNombre;
-      }
-      return;
-    }
-    grouped.set(key, {
-      ...linea,
-      subCuenta,
-      subCentro,
-      importeBs: Number(linea.importeBs.toFixed(2))
-    });
-  });
-  return [...grouped.values()].sort((a, b) => {
+  return [...lineas].sort((a, b) => {
     const subCentroDiff = sortCodigoFuncion(a.subCentro) - sortCodigoFuncion(b.subCentro);
     if (subCentroDiff !== 0) return subCentroDiff;
     const subCuentaDiff = sortCodigoFuncion(a.subCuenta) - sortCodigoFuncion(b.subCuenta);
@@ -1284,7 +1349,12 @@ function groupCostoLineas(lineas: CostoExportLinea[]) {
   });
 }
 
-function applyReportSheetBaseStyle(sheet: XLSX.WorkSheet, range: XLSX.Range, numericColumns: number[] = []) {
+function applyReportSheetBaseStyle(
+  sheet: XLSX.WorkSheet,
+  range: XLSX.Range,
+  numericColumns: number[] = [],
+  numberFormat = "#,##0.00"
+) {
   const numericSet = new Set(numericColumns);
   styleRange(
     sheet,
@@ -1294,7 +1364,8 @@ function applyReportSheetBaseStyle(sheet: XLSX.WorkSheet, range: XLSX.Range, num
       alignment: { vertical: "center", wrapText: true },
       border: excelThinBorder
     },
-    numericSet
+    numericSet,
+    numberFormat
   );
 }
 
@@ -1393,6 +1464,8 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         esTransporte: boolean;
         totalBs: number;
         totalCantidad?: number;
+        summaryLabel?: string;
+        summaryDestinatario?: string;
         lineas: Array<{
           subCuenta?: string | null;
           subCentro?: string | null;
@@ -1405,6 +1478,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
           cantidad: number;
           importeBs: number;
           vehiculo?: string | null;
+          destino?: string | null;
         }>;
       }
     >();
@@ -1412,40 +1486,72 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
     for (const cuenta of cuentas) {
       const sheetName = costoSheetName(cuenta);
       const meta = costoSheetMeta(sheetName);
-      const current = groupedCuentas.get(sheetName) ?? {
+      const current = groupedCuentas.get(sheetName);
+      const sheet = current ?? {
         codigoCompleto: "",
         centroCostoNombre: "",
         funcionGastoNombre: "",
         vehiculo: null,
         esTransporte: meta.isTransport,
-        totalBs: 0,
-        totalCantidad: undefined,
+        totalBs: cuenta.totalBs,
+        totalCantidad: cuenta.totalCantidad,
+        summaryLabel: costoDetalleResumenLabel(cuenta),
+        summaryDestinatario: costoDetalleResumenDestinatario(cuenta),
         lineas: [],
         detalles: []
       };
-      current.totalBs += cuenta.totalBs;
-      current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
       if (meta.isTransport) {
-        current.detalles.push(...cuenta.detalles);
+        sheet.detalles.push(...cuenta.detalles);
       } else {
-        current.lineas.push(...cuenta.lineas);
+        sheet.lineas.push(...cuenta.lineas);
         if (!cuenta.lineas.length && cuenta.detalles.length) {
           const parts = costoAccountParts(cuenta.codigoCompleto);
           cuenta.detalles.forEach((detalle) => {
-            current.lineas.push({
+            sheet.lineas.push({
               subCuenta: parts.subCuenta,
               subCentro: parts.subCentro,
-              subCentroNombre: cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? "",
+              subCentroNombre: cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? detalle.destino ?? "",
               importeBs: detalle.importeBs
             });
           });
         }
       }
-      groupedCuentas.set(sheetName, current);
+      groupedCuentas.set(sheetName, sheet);
+
+      if (sheetName === "CONSTRUCCION-25" && cuenta.detalles.length) {
+        const detailSheetName = "OBRAS EN CONSTRUCCION";
+        const detailMeta = costoSheetMeta(detailSheetName);
+        const detailCurrent = groupedCuentas.get(detailSheetName);
+        const detailSheet = detailCurrent ?? {
+          codigoCompleto: "",
+          centroCostoNombre: "",
+          funcionGastoNombre: "",
+          vehiculo: null,
+          esTransporte: detailMeta.isTransport,
+          totalBs: cuenta.totalBs,
+          totalCantidad: cuenta.totalCantidad,
+          summaryLabel: costoDetalleResumenLabel(cuenta),
+          summaryDestinatario: costoDetalleResumenDestinatario(cuenta),
+          lineas: [],
+          detalles: []
+        };
+        detailSheet.detalles.push(...cuenta.detalles);
+        groupedCuentas.set(detailSheetName, detailSheet);
+      }
     }
 
-    const orderedSheetNames = ["LIPEÑA", "MA-HSI (3)", "CONSTRUCCION-25", "PUNTUALIDAD", "EMUSA"];
-    for (const sheetName of orderedSheetNames) {
+    const orderedSheetNames = [
+      "LIPEÑA",
+      "MA-HSI (3)",
+      "CONSTRUCCION-25",
+      "PUNTUALIDAD",
+      "EMUSA",
+      "OBRAS EN CONSTRUCCION",
+      "MAQUINARIA Y EQUIPO",
+      "DETALLE TRANSPORTE"
+    ];
+    const remainingSheetNames = [...groupedCuentas.keys()].filter((sheetName) => !orderedSheetNames.includes(sheetName));
+    for (const sheetName of [...orderedSheetNames, ...remainingSheetNames]) {
       const cuenta = groupedCuentas.get(sheetName);
       if (!cuenta) continue;
       const meta = costoSheetMeta(sheetName);
@@ -1479,14 +1585,20 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(headerRow, 2, "UNIDAD");
         put(headerRow, 3, "CANTIDAD");
         put(headerRow, 4, "DEBE");
+        put(headerRow, 5, "DESTINATARIO");
         put(headerRow + 1, 1, "ALAMACEN GENERAL LIPEÑA");
         let row = 22;
+        put(row, 1, cuenta.summaryLabel ?? "");
+        put(row, 3, asOptionalExcelNumber(cuenta.totalCantidad));
+        put(row, 4, asExcelNumber(cuenta.totalBs));
+        put(row, 5, cuenta.summaryDestinatario ?? "");
+        row += 1;
         for (const detalle of cuenta.detalles) {
           put(row, 1, detalle.productoNombre ?? "");
           put(row, 2, detalle.unidad ?? "");
           put(row, 3, asOptionalExcelNumber(detalle.cantidad));
           put(row, 4, asOptionalExcelNumber(detalle.importeBs));
-          put(row, 5, detalle.vehiculo ?? "");
+          put(row, 5, detalle.vehiculo ?? detalle.destino ?? "");
           row += 1;
         }
         const totalRow = Math.max(row + 5, sheetName === "PUNTUALIDAD" ? 32 : 31);
@@ -1615,7 +1727,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         const headerRow = sheetName === "PUNTUALIDAD" ? 18 : 17;
         const boxTop = headerRow - 1;
         const totalRow = Math.max(
-          22 + cuenta.detalles.length + 5,
+          22 + cuenta.detalles.length + 6,
           sheetName === "PUNTUALIDAD" ? 32 : 31
         );
         styleRange(sheet, { s: { r: headerRow, c: 1 }, e: { r: headerRow, c: 4 } }, smallItalicHeader);
@@ -1738,10 +1850,7 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
     }
   ];
 
-  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
-  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
-
-  for (const cuenta of sortMovimientoCuentas(groupMovimientoCuentas(normalizeDiarioCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)))) {
+  for (const cuenta of sortMovimientoCuentas(diarioSectoresToCuentas(periodo.sectoresHaber))) {
     const heading = cuentaMovimientoTitulo(cuenta);
     rows.push({
       kind: "header",
@@ -1767,13 +1876,13 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
     }
   }
 
-  const saldoFinal = periodo.totalInventarioDebe - periodo.totalSalidasHaber;
+  const saldoFinal = periodo.saldoInventarioFinal ?? periodo.saldoFinal;
   rows.push({
     kind: "total",
     values: ["", "", "", asExcelNumber(periodo.totalInventarioDebe), asExcelNumber(periodo.totalSalidasHaber)]
   });
   rows.push({
-    values: ["", `saldo al ${new Date(periodo.anio, periodo.mes, 0).getDate()} de ${monthName.toLowerCase()} de ${periodo.anio}`, "", "", asExcelNumber(saldoFinal)]
+    values: ["", `saldo al ${new Date(periodo.anio, periodo.mes, 0).getDate()} de ${monthName.toLowerCase()} de ${periodo.anio}`, "", "", asOptionalExcelNumber(saldoFinal)]
   });
   rows.push({
     kind: "total",

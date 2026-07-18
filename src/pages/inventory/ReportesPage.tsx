@@ -163,6 +163,52 @@ type ReportDiarioCuenta =
 type ReportDiarioSector =
   DiarioAlmacenesReportResponse["data"]["meses"][number]["sectoresHaber"][number];
 
+function diarioSectorLineas(sector: ReportDiarioSector) {
+  const centroCostos = sector.centroCostos ?? [];
+  const funcionGastos = sector.funcionGastos ?? [];
+  const desdeCentros = centroCostos.flatMap((centroCosto) =>
+    (centroCosto.subCuentas ?? []).map((subCuenta) => ({
+      centroCostoCodigo: centroCosto.centroCostoCodigo ?? "",
+      centroCostoNombre: centroCosto.centroCostoNombre ?? "",
+      funcionGastoCodigo: subCuenta.funcionGastoCodigo ?? "",
+      funcionGastoNombre: subCuenta.funcionGastoNombre ?? centroCosto.centroCostoNombre ?? "",
+      totalBs: subCuenta.totalBs
+    }))
+  );
+  if (desdeCentros.length) return desdeCentros;
+  return funcionGastos.map((funcionGasto) => ({
+    centroCostoCodigo: "",
+    centroCostoNombre: "",
+    funcionGastoCodigo: funcionGasto.codigo ?? "",
+    funcionGastoNombre: funcionGasto.nombre ?? "",
+    totalBs: funcionGasto.totalBs
+  }));
+}
+
+function diarioSectoresToReportCuentas(sectores: ReportDiarioSector[]): ReportDiarioCuenta[] {
+  return sectores.map((sector) => ({
+    codigoCompleto: sector.sectorCodigo,
+    centroCostoCodigo: sector.centroCostos?.[0]?.centroCostoCodigo ?? null,
+    centroCostoNombre: sector.centroCostos?.[0]?.centroCostoNombre ?? null,
+    sectorCodigo: sector.sectorCodigo,
+    sectorNombre: sector.sectorNombre,
+    esTransporte: true,
+    totalBs: sector.totalBs,
+    totalCantidad: undefined,
+    subCentros: [],
+    funcionGastos: [],
+    lineas: diarioSectorLineas(sector).map((linea) => ({
+      subCentro: linea.funcionGastoCodigo,
+      nombre: linea.funcionGastoNombre,
+      funcionGastoCodigo: linea.funcionGastoCodigo,
+      funcionGastoNombre: linea.funcionGastoNombre,
+      importeBs: linea.totalBs,
+      subCuentas: linea.centroCostoCodigo ? [linea.centroCostoCodigo] : []
+    })),
+    detalles: []
+  }));
+}
+
 function reportMovimientoTitulo(cuenta: ReportDiarioCuenta) {
   return (cuenta.sectorNombre ?? reportCuentaTitulo(cuenta)).toUpperCase();
 }
@@ -208,8 +254,6 @@ function groupMovimientoCuentas(cuentas: ReportDiarioCuenta[]) {
       grouped.set(key, { ...cuenta, lineas: [...cuenta.lineas] });
       return;
     }
-    current.totalBs += cuenta.totalBs;
-    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     current.lineas.push(...cuenta.lineas);
   });
   return [...grouped.values()];
@@ -225,38 +269,17 @@ function sortCodeValue(value?: string | null) {
 }
 
 function movimientoLineasPorFuncion(cuenta: ReportDiarioCuenta) {
-  if (!isCostoProduccionCuenta(cuenta)) {
-    return cuenta.lineas.map((linea) => ({
+  return cuenta.lineas
+    .map((linea) => ({
       codigo: linea.funcionGastoCodigo ?? linea.subCentro ?? "",
       nombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
       importeBs: linea.importeBs
-    }));
-  }
-
-  const grouped = new Map<string, { codigo: string; nombre: string; importeBs: number }>();
-  cuenta.lineas.forEach((linea) => {
-    const codigo = linea.funcionGastoCodigo ?? linea.subCentro ?? "";
-    const key = codigo || linea.nombre || "SIN-FUNCION";
-    const current = grouped.get(key);
-    if (current) {
-      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
-      if (!current.nombre && (linea.funcionGastoNombre ?? linea.nombre)) {
-        current.nombre = linea.funcionGastoNombre ?? linea.nombre ?? "";
-      }
-      return;
-    }
-    grouped.set(key, {
-      codigo,
-      nombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
-      importeBs: Number(linea.importeBs.toFixed(2))
+    }))
+    .sort((a, b) => {
+      const codeDiff = sortCodeValue(a.codigo) - sortCodeValue(b.codigo);
+      if (codeDiff !== 0) return codeDiff;
+      return a.nombre.localeCompare(b.nombre, "es");
     });
-  });
-
-  return [...grouped.values()].sort((a, b) => {
-    const codeDiff = sortCodeValue(a.codigo) - sortCodeValue(b.codigo);
-    if (codeDiff !== 0) return codeDiff;
-    return a.nombre.localeCompare(b.nombre, "es");
-  });
 }
 
 function reportSubCuentaDescripcion(subCuenta?: string) {
@@ -291,11 +314,7 @@ function reportDiarioSectorOrderValue(sector: ReportDiarioSector) {
 }
 
 function sortDiarioSectores(sectores: ReportDiarioSector[]) {
-  return [...sectores].sort((a, b) => {
-    const orderDiff = reportDiarioSectorOrderValue(a) - reportDiarioSectorOrderValue(b);
-    if (orderDiff !== 0) return orderDiff;
-    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
-  });
+  return sectores;
 }
 
 function shouldShowDiarioSectorDetails(sector: ReportDiarioSector) {
@@ -426,8 +445,6 @@ function normalizeReportCuentas(
       continue;
     }
     if (!current.sectorCodigo && sectorCodigo) current.sectorCodigo = sectorCodigo;
-    current.totalBs += cuenta.totalBs;
-    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     current.lineas.push(...lineas);
   }
   return [...grouped.values()];
@@ -468,17 +485,15 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
       });
 
       if (showDetails) {
-        sector.centroCostos.forEach((centroCosto, centroIndex) => {
-          centroCosto.subCuentas.forEach((subCuenta, subIndex) => {
-            rows.push({
-              key: `linea-sector-${sectorIndex}-${centroIndex}-${subIndex}`,
-              descripcion: subCuenta.funcionGastoNombre ?? "",
-              parcial: subCuenta.totalBs,
-              cuenta: reportDiarioDetalleCuenta(
-                centroCosto.centroCostoCodigo,
-                subCuenta.funcionGastoCodigo
-              )
-            });
+        diarioSectorLineas(sector).forEach((linea, lineIndex) => {
+          rows.push({
+            key: `linea-sector-${sectorIndex}-${lineIndex}`,
+            descripcion: linea.funcionGastoNombre,
+            parcial: linea.totalBs,
+            cuenta: reportDiarioDetalleCuenta(
+              linea.centroCostoCodigo,
+              linea.funcionGastoCodigo
+            )
           });
         });
       }
@@ -599,7 +614,7 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
   if (!periodo) return null;
   const month = movimientoMonthLabel(periodo.anio, periodo.mes);
   const monthLower = month.toLowerCase();
-  const saldoFinal = periodo.totalInventarioDebe - periodo.totalSalidasHaber;
+  const saldoFinal = periodo.saldoInventarioFinal ?? periodo.saldoFinal;
   const rows: Array<{
     key: string;
     cargo?: string | null;
@@ -649,14 +664,7 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
     }
   ];
 
-  const funcionLookup = buildFuncionGastoLookup(periodo.sectoresHaber);
-  const sectorLookup = buildSectorCodigoLookup(periodo.sectoresHaber);
-
-  sortMovimientoCuentas(
-    groupMovimientoCuentas(
-      normalizeReportCuentas(periodo.cuentasHaber, funcionLookup, sectorLookup)
-    )
-  ).forEach((cuenta, cuentaIndex) => {
+  sortMovimientoCuentas(diarioSectoresToReportCuentas(periodo.sectoresHaber)).forEach((cuenta, cuentaIndex) => {
     rows.push({
       key: `cuenta-${cuentaIndex}`,
       cargo: reportMovimientoCargo(cuenta),
@@ -779,6 +787,8 @@ type CostoSheet = {
   mes: number;
   totalBs: number;
   totalCantidad?: number;
+  summaryLabel?: string;
+  summaryDestinatario?: string;
   lineas: CostoCuenta["lineas"];
   detalles: CostoCuenta["detalles"];
 };
@@ -793,8 +803,12 @@ function costoSheetName(cuenta: {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   const text =
     `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
-  if (code.includes("67001097") || text.includes("PUNTUALIDAD")) return "PUNTUALIDAD";
-  if (code.includes("67001098") || text.includes("EMUSA")) return "EMUSA";
+  if (code.includes("22001008") || text.includes("TRANSPORTISTAS VARIOS") || text.includes("TRANSPORTE VARIOS"))
+    return "DETALLE TRANSPORTE";
+  if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA")) return "EMUSA";
+  if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD"))
+    return "PUNTUALIDAD";
+  if (code.includes("35001000") || text.includes("MAQUINARIAS")) return "MAQUINARIA Y EQUIPO";
   if (code.includes("104001000") || text.includes("MEDIO AMBIENTE") || text.includes("M.A."))
     return "MA-HSI (3)";
   if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION"))
@@ -803,6 +817,20 @@ function costoSheetName(cuenta: {
 }
 
 function costoSheetMeta(sheetName: string) {
+  if (sheetName === "DETALLE TRANSPORTE") {
+    return {
+      title: "DETALLE DE MATERIALES  TRANSPORTE VARIO COMBUSTIBLE",
+      codeLine: "22,001,008    CTAS.CTES.TRANSPORTE VARIOS COMBUSTIBLE",
+      isTransport: true
+    };
+  }
+  if (sheetName === "MAQUINARIA Y EQUIPO") {
+    return {
+      title: "DETALLE DE MATERIALES  MAQUINARIAS Y EQUIPOS LIPEÑA",
+      codeLine: "35,001,000    CTAS.CTES.MAQUINARIAS Y EQUIPOS LIPEÑA",
+      isTransport: true
+    };
+  }
   if (sheetName === "MA-HSI (3)") {
     return {
       title: "DETALLE DE MATERIALES  COSTO DE MEDIO AMBIENTE",
@@ -815,6 +843,13 @@ function costoSheetMeta(sheetName: string) {
       title: "DETALLE DE MATERIALES  COSTO DE OBRAS EN CONSTRUCCION",
       codeLine: "44,002,000 CTAS.CTES.OBRAS EN CONSTRUCCION",
       isTransport: false
+    };
+  }
+  if (sheetName === "OBRAS EN CONSTRUCCION") {
+    return {
+      title: "DETALLE DE MATERIALES  OBRAS EN CONSTRUCCION LIPEÑA",
+      codeLine: "44,002,000    CTAS.CTES.OBRAS EN CONSTRUCCION LIPEÑA",
+      isTransport: true
     };
   }
   if (sheetName === "PUNTUALIDAD") {
@@ -843,6 +878,24 @@ function costoAccountParts(value?: string | null) {
   return { subCuenta: parts[0] ?? "", subCentro: parts[1] ?? "" };
 }
 
+function costoDetalleResumenLabel(cuenta: CostoCuenta) {
+  return (
+    cuenta.lineas.find((linea) => Boolean(linea.subCentroNombre))?.subCentroNombre ??
+    cuenta.funcionGastoNombre ??
+    cuenta.centroCostoNombre ??
+    ""
+  ).toUpperCase();
+}
+
+function costoDetalleResumenDestinatario(cuenta: CostoCuenta) {
+  return (
+    cuenta.funcionGastoNombre ??
+    cuenta.centroCostoNombre ??
+    cuenta.vehiculo ??
+    ""
+  ).toUpperCase();
+}
+
 function normalizeAccountCode(value?: string | null) {
   return (value ?? "").replace(/[^\d]/g, "");
 }
@@ -865,6 +918,43 @@ function belongsToCostoProduccionDetalle(cuenta: {
   return normalizeAccountCode(cuenta.sectorCodigo ?? cuenta.codigoCompleto).includes("100001000");
 }
 
+function sectorMatchesCuenta(sector: ReportDiarioSector, cuenta: ReportDiarioCuenta) {
+  const sectorCode = normalizeAccountCode(sector.sectorCodigo);
+  const cuentaSectorCode = normalizeAccountCode(cuenta.sectorCodigo);
+  const cuentaCode = normalizeAccountCode(cuenta.codigoCompleto);
+  if (sectorCode && (cuentaSectorCode === sectorCode || cuentaCode.endsWith(sectorCode))) return true;
+  return Boolean(
+    sector.sectorNombre &&
+      cuenta.sectorNombre &&
+      sector.sectorNombre.trim().toUpperCase() === cuenta.sectorNombre.trim().toUpperCase()
+  );
+}
+
+function costoLineasFromCuentaHaber(
+  cuenta: ReportDiarioCuenta,
+  funcionNombreLookup: Map<string, string>
+) {
+  if (cuenta.lineas.length) {
+    return cuenta.lineas.map((linea) => ({
+      subCuenta: linea.subCuentas.join("-") || cuenta.centroCostoCodigo || "",
+      subCentro: linea.funcionGastoCodigo ?? linea.subCentro ?? "",
+      subCentroNombre: linea.funcionGastoNombre ?? linea.nombre ?? "",
+      importeBs: linea.importeBs
+    }));
+  }
+  const parts = cuenta.codigoCompleto?.match(/\d+/g) ?? [];
+  const subCuenta = cuenta.centroCostoCodigo ?? parts[0] ?? "";
+  const subCentro = parts[1] ?? "";
+  return [
+    {
+      subCuenta,
+      subCentro,
+      subCentroNombre: funcionNombreLookup.get(subCentro) ?? cuenta.centroCostoNombre ?? "",
+      importeBs: cuenta.totalBs
+    }
+  ];
+}
+
 function detalleMaterialesFromDiario(
   response: DiarioAlmacenesReportResponse
 ): DetalleMaterialesReportResponse {
@@ -876,56 +966,75 @@ function detalleMaterialesFromDiario(
       anioFin: response.data.anioFin,
       mesFin: response.data.mesFin,
       meses: response.data.meses.map((periodo) => {
-        const cantidadPorCodigo = new Map(
-          periodo.cuentasHaber.map((cuenta) => [
-            normalizeAccountCode(cuenta.codigoCompleto),
-            cuenta.totalCantidad ?? 0
-          ])
-        );
         const lineas: CostoCuenta["lineas"] = [];
-        const subtotales = new Map<
-          string,
-          { subCentro: string; nombre: string; importeBs: number }
-        >();
-        const porCuentaDesdeSectores = periodo.sectoresHaber
+        const subtotalesPorSubCentro: Array<{ subCentro: string; nombre: string; importeBs: number }> = [];
+        const porCuenta = periodo.sectoresHaber
           .filter(belongsToCostoProduccionDetalle)
           .map((sector) => {
             const cuentaLineas: CostoCuenta["lineas"] = [];
             const detalles: CostoCuenta["detalles"] = [];
-            for (const centro of sector.centroCostos) {
-              for (const subCuenta of centro.subCuentas) {
-                const importeBs = Number(subCuenta.totalBs ?? 0);
-                const linea = {
-                  subCuenta: centro.centroCostoCodigo ?? "",
-                  subCentro: subCuenta.funcionGastoCodigo ?? "",
-                  subCentroNombre: subCuenta.funcionGastoNombre ?? centro.centroCostoNombre ?? "",
-                  importeBs
-                };
-                cuentaLineas.push(linea);
-                lineas.push(linea);
-                const subtotalKey = linea.subCentro;
-                if (subtotalKey) {
-                  const current = subtotales.get(subtotalKey);
-                  subtotales.set(subtotalKey, {
-                    subCentro: subtotalKey,
-                    nombre: current?.nombre || linea.subCentroNombre || "",
-                    importeBs: Number(((current?.importeBs ?? 0) + importeBs).toFixed(2))
-                  });
-                }
+            const detallesDesdeVales =
+              sector.vales?.flatMap((vale) =>
+                (vale.lineas ?? []).map((linea) => ({
+                  productoNombre: linea.nombre ?? "",
+                  unidad: linea.unidad ?? "",
+                  cantidad: linea.cantidad ?? 0,
+                  importeBs: vale.totalBs ?? linea.importeBs ?? 0,
+                  vehiculo: vale.solicitante?.nombre ?? ""
+                }))
+              ) ?? [];
+            const detallesDesdeEndpoint =
+              sector.detalles?.map((detalle) => ({
+                productoNombre: detalle.productoNombre ?? "",
+                unidad: detalle.unidad ?? "",
+                cantidad: detalle.cantidad ?? 0,
+                importeBs: detalle.importeBs ?? 0,
+                vehiculo: detalle.vehiculo ?? detalle.destino ?? sector.sectorNombre ?? ""
+              })) ?? [];
+            const detallesExplicitos = detallesDesdeVales.length
+              ? detallesDesdeVales
+              : detallesDesdeEndpoint;
+            const funcionNombreLookup = new Map(
+              diarioSectorLineas(sector).map((linea) => [
+                linea.funcionGastoCodigo,
+                linea.funcionGastoNombre
+              ])
+            );
+            const detalleLineas = periodo.cuentasHaber
+              .filter((cuenta) => sectorMatchesCuenta(sector, cuenta))
+              .flatMap((cuenta) => costoLineasFromCuentaHaber(cuenta, funcionNombreLookup));
+            const sectorLineas = detalleLineas.length
+              ? detalleLineas
+              : diarioSectorLineas(sector).map((linea) => ({
+                  subCuenta: linea.centroCostoCodigo,
+                  subCentro: linea.funcionGastoCodigo,
+                  subCentroNombre: linea.funcionGastoNombre,
+                  importeBs: linea.totalBs
+                }));
+
+            for (const linea of sectorLineas) {
+              const importeBs = Number(linea.importeBs ?? 0);
+              cuentaLineas.push(linea);
+              lineas.push(linea);
+              subtotalesPorSubCentro.push({
+                subCentro: linea.subCentro,
+                nombre: linea.subCentroNombre ?? "",
+                importeBs
+              });
+              if (!detallesExplicitos.length) {
                 detalles.push({
                   productoNombre:
-                    subCuenta.funcionGastoNombre ??
-                    centro.centroCostoNombre ??
+                    linea.subCentroNombre ??
                     sector.sectorNombre ??
                     "",
                   unidad: "",
-                  cantidad:
-                    cantidadPorCodigo.get(normalizeAccountCode(subCuenta.codigoCompleto)) ?? 0,
+                  cantidad: 0,
                   importeBs,
                   vehiculo: sector.sectorNombre ?? ""
                 });
               }
             }
+            if (detallesExplicitos.length) detalles.push(...detallesExplicitos);
             return {
               codigoCompleto: sector.sectorCodigo ?? "",
               centroCostoCodigo: sector.sectorCodigo ?? "",
@@ -942,62 +1051,21 @@ function detalleMaterialesFromDiario(
                 })
               ).isTransport,
               totalBs: sector.totalBs,
-              totalCantidad: detalles.reduce((sum, detalle) => sum + (detalle.cantidad ?? 0), 0),
+              totalCantidad: detalles.length
+                ? detalles.reduce((sum, detalle) => sum + (detalle.cantidad ?? 0), 0)
+                : undefined,
               lineas: cuentaLineas,
               detalles
             };
           });
-        const porCuentaDesdeCuentas = periodo.cuentasHaber
-          .filter(belongsToCostoProduccionDetalle)
-          .map((cuenta) => {
-            const cuentaLineas: CostoCuenta["lineas"] = cuenta.lineas.map((linea) => {
-              const mapped = {
-                subCuenta: linea.subCuentas.join("-"),
-                subCentro: linea.subCentro,
-                subCentroNombre: linea.funcionGastoNombre ?? linea.nombre,
-                importeBs: linea.importeBs
-              };
-              lineas.push(mapped);
-              const subtotalKey = mapped.subCentro ?? "";
-              if (subtotalKey) {
-                const current = subtotales.get(subtotalKey);
-                subtotales.set(subtotalKey, {
-                  subCentro: subtotalKey,
-                  nombre: current?.nombre || mapped.subCentroNombre || "",
-                  importeBs: Number(((current?.importeBs ?? 0) + mapped.importeBs).toFixed(2))
-                });
-              }
-              return mapped;
-            });
-            return {
-              codigoCompleto: cuenta.sectorCodigo ?? cuenta.codigoCompleto ?? "",
-              centroCostoCodigo: cuenta.sectorCodigo ?? cuenta.codigoCompleto ?? "",
-              centroCostoNombre: cuenta.sectorNombre ?? cuenta.centroCostoNombre ?? "",
-              funcionGastoCodigo: "",
-              funcionGastoNombre: cuenta.sectorNombre ?? cuenta.centroCostoNombre ?? "",
-              vehiculo: cuenta.sectorNombre ?? "",
-              esTransporte: cuenta.esTransporte,
-              totalBs: cuenta.totalBs,
-              totalCantidad: cuenta.totalCantidad,
-              lineas: cuentaLineas,
-              detalles: cuenta.detalles
-            };
-          });
-        const porCuenta = porCuentaDesdeSectores.length
-          ? porCuentaDesdeSectores
-          : porCuentaDesdeCuentas;
 
         return {
           anio: periodo.anio,
           mes: periodo.mes,
           esCerrado: periodo.esCerrado,
           lineas,
-          subtotalesPorSubCentro: [...subtotales.values()].sort(
-            (a, b) => sortCodeValue(a.subCentro) - sortCodeValue(b.subCentro)
-          ),
-          totalGeneral: Number(
-            porCuenta.reduce((sum, cuenta) => sum + cuenta.totalBs, 0).toFixed(2)
-          ),
+          subtotalesPorSubCentro,
+          totalGeneral: periodo.totalSalidasHaber,
           porCuenta
         };
       })
@@ -1006,27 +1074,7 @@ function detalleMaterialesFromDiario(
 }
 
 function groupCostoLineas(lineas: CostoCuenta["lineas"]): CostoCuenta["lineas"] {
-  const grouped = new Map<string, CostoCuenta["lineas"][number]>();
-  lineas.forEach((linea) => {
-    const subCuenta = linea.subCuenta ?? "";
-    const subCentro = linea.subCentro ?? "";
-    const key = `${subCuenta}|||${subCentro}`;
-    const current = grouped.get(key);
-    if (current) {
-      current.importeBs = Number((current.importeBs + linea.importeBs).toFixed(2));
-      if (!current.subCentroNombre && linea.subCentroNombre) {
-        current.subCentroNombre = linea.subCentroNombre;
-      }
-      return;
-    }
-    grouped.set(key, {
-      ...linea,
-      subCuenta,
-      subCentro,
-      importeBs: Number(linea.importeBs.toFixed(2))
-    });
-  });
-  return [...grouped.values()].sort((a, b) => {
+  return [...lineas].sort((a, b) => {
     const subCentroDiff = sortCodeValue(a.subCentro) - sortCodeValue(b.subCentro);
     if (subCentroDiff !== 0) return subCentroDiff;
     const subCuentaDiff = sortCodeValue(a.subCuenta) - sortCodeValue(b.subCuenta);
@@ -1070,44 +1118,77 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
   for (const cuenta of cuentas) {
     const name = costoSheetName(cuenta);
     const meta = costoSheetMeta(name);
-    const current =
-      sheets.get(name) ??
+    const current = sheets.get(name);
+    const sheet =
+      current ??
       ({
         name,
         ...meta,
         anio: periodo.anio,
         mes: periodo.mes,
-        totalBs: 0,
-        totalCantidad: undefined,
+        totalBs: cuenta.totalBs,
+        totalCantidad: cuenta.totalCantidad,
+        summaryLabel: costoDetalleResumenLabel(cuenta),
+        summaryDestinatario: costoDetalleResumenDestinatario(cuenta),
         lineas: [],
         detalles: []
       } satisfies CostoSheet);
-    current.totalBs += cuenta.totalBs;
-    current.totalCantidad = (current.totalCantidad ?? 0) + (cuenta.totalCantidad ?? 0);
     if (meta.isTransport) {
-      current.detalles.push(...cuenta.detalles);
+      sheet.detalles.push(...cuenta.detalles);
     } else {
-      current.lineas.push(...cuenta.lineas);
+      sheet.lineas.push(...cuenta.lineas);
       if (!cuenta.lineas.length && cuenta.detalles.length) {
         const parts = costoAccountParts(cuenta.codigoCompleto);
         cuenta.detalles.forEach((detalle) => {
-          current.lineas.push({
+          sheet.lineas.push({
             subCuenta: parts.subCuenta,
             subCentro: parts.subCentro,
             subCentroNombre:
-              cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? "",
+              cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? detalle.destino ?? "",
             importeBs: detalle.importeBs
           });
         });
       }
     }
-    sheets.set(name, current);
+    sheets.set(name, sheet);
+
+    if (name === "CONSTRUCCION-25" && cuenta.detalles.length) {
+      const detailName = "OBRAS EN CONSTRUCCION";
+      const detailMeta = costoSheetMeta(detailName);
+      const detailSheet =
+        sheets.get(detailName) ??
+        ({
+          name: detailName,
+          ...detailMeta,
+          anio: periodo.anio,
+          mes: periodo.mes,
+          totalBs: cuenta.totalBs,
+          totalCantidad: cuenta.totalCantidad,
+          summaryLabel: costoDetalleResumenLabel(cuenta),
+          summaryDestinatario: costoDetalleResumenDestinatario(cuenta),
+          lineas: [],
+          detalles: []
+        } satisfies CostoSheet);
+      detailSheet.detalles.push(...cuenta.detalles);
+      sheets.set(detailName, detailSheet);
+    }
   }
 
-  const order = ["LIPEÑA", "MA-HSI (3)", "CONSTRUCCION-25", "PUNTUALIDAD", "EMUSA"];
-  return order
+  const order = [
+    "LIPEÑA",
+    "MA-HSI (3)",
+    "CONSTRUCCION-25",
+    "PUNTUALIDAD",
+    "EMUSA",
+    "OBRAS EN CONSTRUCCION",
+    "MAQUINARIA Y EQUIPO",
+    "DETALLE TRANSPORTE"
+  ];
+  const orderedSheets = order
     .map((name) => sheets.get(name))
     .filter((sheet): sheet is CostoSheet => Boolean(sheet));
+  const remainingSheets = [...sheets.values()].filter((sheet) => !order.includes(sheet.name));
+  return [...orderedSheets, ...remainingSheets];
 }
 
 function CostoProduccionPreview({ response }: { response: DetalleMaterialesReportResponse }) {
@@ -1186,7 +1267,7 @@ function CostoProduccionPreview({ response }: { response: DetalleMaterialesRepor
                     <th className="border border-black px-1 py-1 italic">UNIDAD</th>
                     <th className="border border-black px-1 py-1 italic">CANTIDAD</th>
                     <th className="border border-black px-1 py-1 italic">DEBE</th>
-                    <th className="border border-black px-1 py-1"></th>
+                    <th className="border border-black px-1 py-1">DESTINATARIO</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1197,6 +1278,21 @@ function CostoProduccionPreview({ response }: { response: DetalleMaterialesRepor
                   </tr>
                   <tr>
                     <td className="border-x border-black py-4" colSpan={5}></td>
+                  </tr>
+                  <tr>
+                    <td className="border-x border-black px-1 py-0.5 text-center">
+                      {activeSheet.summaryLabel ?? ""}
+                    </td>
+                    <td className="border-x border-black px-1 py-0.5"></td>
+                    <td className="border-x border-black px-1 py-0.5 text-right">
+                      {activeSheet.totalCantidad != null ? formatBs(activeSheet.totalCantidad).replace(",00", "") : ""}
+                    </td>
+                    <td className="border-x border-black px-1 py-0.5 text-right">
+                      {formatBs(activeSheet.totalBs)}
+                    </td>
+                    <td className="border-x border-black px-1 py-0.5">
+                      {activeSheet.summaryDestinatario ?? ""}
+                    </td>
                   </tr>
                   {activeSheet.detalles.map((detalle, index) => (
                     <tr key={`${detalle.productoNombre}-${index}`}>
@@ -1213,7 +1309,7 @@ function CostoProduccionPreview({ response }: { response: DetalleMaterialesRepor
                         {formatBs(detalle.importeBs)}
                       </td>
                       <td className="border-x border-black px-1 py-0.5">
-                        {detalle.vehiculo ?? ""}
+                        {detalle.vehiculo ?? detalle.destino ?? ""}
                       </td>
                     </tr>
                   ))}
@@ -1633,10 +1729,10 @@ export function ReportesPage() {
   );
   const costoProduccionData = useMemo(
     () =>
-      diarioAlmacenesQuery.data
+      tipo === "costo-produccion" && diarioAlmacenesQuery.data
         ? detalleMaterialesFromDiario(diarioAlmacenesQuery.data)
         : undefined,
-    [diarioAlmacenesQuery.data]
+    [diarioAlmacenesQuery.data, tipo]
   );
   const cuadroSuministrosQuery = useCuadroSuministrosReportQuery(
     monthRangeParams,

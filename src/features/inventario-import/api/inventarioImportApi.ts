@@ -198,6 +198,7 @@ export async function ejecutarBackfillCpp(payload: BackfillCppPayload) {
   return postRequest({
     url: apiEndpoints.inventarioImport.backfillCpp,
     body: backfillCppPayloadSchema.parse(payload),
+    config: { timeout: 0 },
     schema: backfillCppResponseSchema
   });
 }
@@ -257,6 +258,7 @@ export async function createCierreMes(payload: CierreMesPayload) {
   return postRequest({
     url: apiEndpoints.inventarioImport.cierreMes,
     body: cierreMesPayloadSchema.parse(payload),
+    config: { timeout: 0 },
     schema: cierreMesCreateResponseSchema
   });
 }
