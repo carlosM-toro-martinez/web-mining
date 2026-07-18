@@ -741,6 +741,7 @@ const cuadroSuministrosItemSchema = z.object({
   unidad: z.string().optional().nullable(),
   cantidad: numberLikeSchema,
   precioUnit: numberLikeSchema.optional().nullable(),
+  precioUnitMenos13: numberLikeSchema.optional().nullable(),
   importeBs: numberLikeSchema,
   importeSinIVA: numberLikeSchema,
   grupo: z
@@ -757,7 +758,8 @@ const cuadroSuministrosCompraSchema = z.object({
   numeroFactura: z.string().optional().nullable(),
   fechaOperacion: z.string().optional().nullable(),
   items: z.array(cuadroSuministrosItemSchema).default([]),
-  subtotalBs: numberLikeSchema
+  subtotalBs: numberLikeSchema,
+  subtotalSinIVA: numberLikeSchema.optional()
 });
 
 const cuadroSuministrosProveedorSchema = z.object({
@@ -770,7 +772,8 @@ const cuadroSuministrosProveedorSchema = z.object({
     .optional()
     .nullable(),
   compras: z.array(cuadroSuministrosCompraSchema).default([]),
-  totalBs: numberLikeSchema
+  totalBs: numberLikeSchema,
+  totalSinIVA: numberLikeSchema.optional()
 });
 
 export const cuadroSuministrosReportResponseSchema = z.object({
@@ -786,7 +789,10 @@ export const cuadroSuministrosReportResponseSchema = z.object({
         mes: numberLikeSchema.int().min(1).max(12),
         esCerrado: z.boolean().default(false),
         proveedores: z.array(cuadroSuministrosProveedorSchema).default([]),
-        totalGeneral: numberLikeSchema
+        totalGeneral: numberLikeSchema,
+        totalGeneralSinIVA: numberLikeSchema.optional(),
+        totalSinIVA: numberLikeSchema.optional(),
+        totalGeneralMenos13: numberLikeSchema.optional()
       })
     )
   })

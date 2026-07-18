@@ -873,13 +873,27 @@ function reportCuentaKey(value?: string | null) {
 }
 
 function diarioSectorOrderValue(sector: DiarioSectorHaber) {
-  const order = ["100001000", "35001000", "22001008", "104001000", "44002000", "67001010", "67001009"];
+  const order = [
+    "22001008",
+    "35001000",
+    "44002000",
+    "22001010",
+    "67001010",
+    "22001009",
+    "67001009",
+    "100001000",
+    "104001000"
+  ];
   const index = order.indexOf(reportCuentaKey(sector.sectorCodigo));
   return index >= 0 ? index : order.length;
 }
 
 function sortDiarioSectores(sectores: DiarioSectorHaber[]) {
-  return sectores;
+  return [...sectores].sort((a, b) => {
+    const orderDiff = diarioSectorOrderValue(a) - diarioSectorOrderValue(b);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
+  });
 }
 
 function cuentaDetalleDiario(centroCostoCodigo?: string | null, funcionGastoCodigo?: string | null) {
@@ -1027,6 +1041,7 @@ export function buildDiarioAlmacenesApiReportDefinition(
       });
 
       for (const cuenta of periodo.cuentasHaber) {
+        const isCostoProduccion = reportCuentaKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto) === "100001000";
         rows.push({
           id: `haber-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}`,
           type: "group",
@@ -1034,10 +1049,22 @@ export function buildDiarioAlmacenesApiReportDefinition(
             periodo: formatMonth(periodo.anio, periodo.mes),
             cargos: cuenta.centroCostoCodigo ?? "",
             descripcion: cuenta.centroCostoNombre ?? "",
-            parcialesBs: "",
+            parcialesBs: isCostoProduccion ? "" : Number(cuenta.totalBs.toFixed(2)),
             cuenta: `${cuenta.centroCostoCodigo ?? ""}.000`.replace(/^\./, ""),
             debeBs: "",
-            haberBs: Number(cuenta.totalBs.toFixed(2))
+            haberBs: isCostoProduccion ? "" : Number(cuenta.totalBs.toFixed(2))
+          }
+        });
+        rows.push({
+          id: `haber-atencion-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}`,
+          values: {
+            periodo: "",
+            cargos: "",
+            descripcion: `Aten. Material mes de ${MONTH_NAMES[periodo.mes - 1]}- ${periodo.anio}`,
+            parcialesBs: "",
+            cuenta: "",
+            debeBs: "",
+            haberBs: isCostoProduccion ? Number(cuenta.totalBs.toFixed(2)) : ""
           }
         });
 
@@ -1050,7 +1077,7 @@ export function buildDiarioAlmacenesApiReportDefinition(
             }))
           : cuenta.subCentros;
 
-        for (const subCentro of funcionGastos) {
+        for (const subCentro of isCostoProduccion ? funcionGastos : []) {
           rows.push({
             id: `haber-sub-${periodo.anio}-${periodo.mes}-${cuenta.centroCostoCodigo}-${subCentro.codigoCompleto}-${subCentro.funcionGastoCodigo}`,
             values: {
@@ -1175,6 +1202,7 @@ export function buildCuadroSuministrosApiReportDefinition(
 
     for (const proveedor of periodo.proveedores) {
       const proveedorNombre = proveedor.proveedor?.nombre ?? "Sin proveedor";
+      const proveedorSinIva = proveedor.totalSinIVA;
       rows.push({
         id: `proveedor-cuadro-${periodo.anio}-${periodo.mes}-${proveedorNombre}`,
         type: "group",
@@ -1186,7 +1214,7 @@ export function buildCuadroSuministrosApiReportDefinition(
           unidad: "",
           descripcion: "",
           totalBs: Number(proveedor.totalBs.toFixed(2)),
-          sinIvaBs: "",
+          sinIvaBs: proveedorSinIva == null ? "" : Number(proveedorSinIva.toFixed(2)),
           grupo: ""
         }
       });
@@ -1212,6 +1240,8 @@ export function buildCuadroSuministrosApiReportDefinition(
       }
     }
 
+    const periodoSinIva =
+      periodo.totalGeneralSinIVA ?? periodo.totalSinIVA ?? periodo.totalGeneralMenos13;
     rows.push({
       id: `total-cuadro-${periodo.anio}-${periodo.mes}`,
       type: "total",
@@ -1223,13 +1253,24 @@ export function buildCuadroSuministrosApiReportDefinition(
         unidad: "",
         descripcion: "TOTAL GENERAL",
         totalBs: Number(periodo.totalGeneral.toFixed(2)),
-        sinIvaBs: Number((periodo.totalGeneral * 0.87).toFixed(2)),
+        sinIvaBs: periodoSinIva == null ? "" : Number(periodoSinIva.toFixed(2)),
         grupo: ""
       }
     });
   }
 
   const totalGeneral = data.meses.reduce((sum, periodo) => sum + periodo.totalGeneral, 0);
+  const totalGeneralSinIva = data.meses.reduce((sum, periodo) => {
+    const periodoSinIva =
+      periodo.totalGeneralSinIVA ?? periodo.totalSinIVA ?? periodo.totalGeneralMenos13;
+    return sum + (periodoSinIva ?? 0);
+  }, 0);
+  const hasTotalGeneralSinIva = data.meses.some(
+    (periodo) =>
+      periodo.totalGeneralSinIVA != null ||
+      periodo.totalSinIVA != null ||
+      periodo.totalGeneralMenos13 != null
+  );
 
   return {
     type: "inventarios-suministros",
@@ -1250,7 +1291,11 @@ export function buildCuadroSuministrosApiReportDefinition(
     summary: [
       { label: "Meses", value: data.meses.length },
       { label: "Items", value: itemCount },
-      { label: "Total general", value: Number(totalGeneral.toFixed(2)) }
+      { label: "Total general", value: Number(totalGeneral.toFixed(2)) },
+      {
+        label: "Total general -13%",
+        value: hasTotalGeneralSinIva ? Number(totalGeneralSinIva.toFixed(2)) : ""
+      }
     ]
   };
 }
@@ -1636,6 +1681,7 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
 }): InventoryReportDefinition {
   const rows: InventoryReportRow[] = [];
   let productCount = 0;
+  const useApiMenos13Only = params.type === "entradas-almacen";
 
   for (const periodo of params.data.meses) {
     rows.push({
@@ -1666,7 +1712,8 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
           cantidad: "",
           precioUnit: "",
           totalBs: grupoTotal,
-          totalBsMenos13: grupo.totalBsMenos13 ?? totalMenos13(grupoTotal)
+          totalBsMenos13:
+            grupo.totalBsMenos13 ?? (useApiMenos13Only ? "" : totalMenos13(grupoTotal))
         }
       });
 
@@ -1707,7 +1754,8 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
               cantidad: roundMoney(producto.cantidad),
               precioUnit: roundMoney(producto.precioUnit),
               totalBs: productoTotal,
-              totalBsMenos13: producto.totalBsMenos13 ?? totalMenos13(productoTotal)
+              totalBsMenos13:
+                producto.totalBsMenos13 ?? (useApiMenos13Only ? "" : totalMenos13(productoTotal))
             }
           });
         }
@@ -1724,7 +1772,7 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
             cantidad: roundMoney(subGrupoTotales.cantidad),
             precioUnit: "",
             totalBs: subGrupoTotal,
-            totalBsMenos13: totalMenos13(subGrupoTotal)
+            totalBsMenos13: useApiMenos13Only ? "" : totalMenos13(subGrupoTotal)
           }
         });
       }
@@ -1742,7 +1790,8 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
         cantidad: "",
         precioUnit: "",
         totalBs: periodoTotal,
-        totalBsMenos13: periodo.totalGeneralMenos13 ?? totalMenos13(periodoTotal)
+        totalBsMenos13:
+          periodo.totalGeneralMenos13 ?? (useApiMenos13Only ? "" : totalMenos13(periodoTotal))
       }
     });
   }
@@ -1752,8 +1801,14 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
     0
   );
   const totalGeneralMenos13 = params.data.meses.reduce(
-    (total, periodo) => total + (periodo.totalGeneralMenos13 ?? totalMenos13(periodo.totalGeneral)),
+    (total, periodo) =>
+      total +
+      (periodo.totalGeneralMenos13 ??
+        (useApiMenos13Only ? 0 : totalMenos13(periodo.totalGeneral))),
     0
+  );
+  const hasTotalGeneralMenos13 = params.data.meses.some(
+    (periodo) => periodo.totalGeneralMenos13 != null
   );
 
   return {
@@ -1775,7 +1830,10 @@ function buildMovimientoAlmacenApiReportDefinition(params: {
       { label: "Meses", value: params.data.meses.length },
       { label: "Productos con movimiento", value: productCount },
       { label: "Total general", value: roundMoney(totalGeneral) },
-      { label: "Total general -13%", value: roundMoney(totalGeneralMenos13) }
+      {
+        label: "Total general -13%",
+        value: useApiMenos13Only && !hasTotalGeneralMenos13 ? "" : roundMoney(totalGeneralMenos13)
+      }
     ]
   };
 }
@@ -1888,13 +1946,7 @@ export function buildEntradasAlmacenApiReportDefinition(
                 producto.totalBsEntrada ??
                 producto.totalBs ??
                 producto.ingresoQty * producto.precioUnit,
-              totalBsMenos13:
-                producto.totalBsEntradaMenos13 ??
-                totalMenos13(
-                  producto.totalBsEntrada ??
-                    producto.totalBs ??
-                    producto.ingresoQty * producto.precioUnit
-                )
+              totalBsMenos13: producto.totalBsEntradaMenos13
             }))
           }));
           const totalProductos = subGrupos.reduce(
@@ -1906,14 +1958,11 @@ export function buildEntradasAlmacenApiReportDefinition(
           return {
             ...grupo,
             totalBs: grupo.totalBsEntrada ?? grupo.totalBs ?? totalProductos,
-            totalBsMenos13:
-              grupo.totalBsEntradaMenos13 ??
-              totalMenos13(grupo.totalBsEntrada ?? grupo.totalBs ?? totalProductos),
+            totalBsMenos13: grupo.totalBsEntradaMenos13,
             subGrupos
           };
         }),
-        totalGeneralMenos13:
-          periodo.totalGeneralMenos13 ?? totalMenos13(periodo.totalGeneral)
+        totalGeneralMenos13: periodo.totalGeneralMenos13
       }))
     }
   });

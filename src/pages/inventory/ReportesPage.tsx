@@ -217,12 +217,12 @@ function reportMovimientoOrderValue(cuenta: ReportDiarioCuenta) {
   const code = reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
   const order = [
     "22001008",
-    "22001009",
-    "67001009",
-    "22001010",
-    "67001010",
     "35001000",
     "44002000",
+    "22001010",
+    "67001010",
+    "22001009",
+    "67001009",
     "100001000",
     "104001000"
   ];
@@ -665,20 +665,21 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
   ];
 
   sortMovimientoCuentas(diarioSectoresToReportCuentas(periodo.sectoresHaber)).forEach((cuenta, cuentaIndex) => {
+    const isCostoProduccion = isCostoProduccionCuenta(cuenta);
     rows.push({
       key: `cuenta-${cuentaIndex}`,
       cargo: reportMovimientoCargo(cuenta),
       descripcion: reportMovimientoTitulo(cuenta),
-      bs: cuenta.esTransporte || cuenta.lineas.length ? "" : cuenta.totalBs,
-      haber: cuenta.totalBs,
+      bs: isCostoProduccion ? "" : cuenta.totalBs,
+      haber: isCostoProduccion ? "" : cuenta.totalBs,
       strong: true
     });
     rows.push({
       key: `atencion-${cuentaIndex}`,
       descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
-      bs: cuenta.esTransporte ? cuenta.totalBs : ""
+      haber: isCostoProduccion ? cuenta.totalBs : ""
     });
-    const lineas = movimientoLineasPorFuncion(cuenta);
+    const lineas = isCostoProduccion ? movimientoLineasPorFuncion(cuenta) : [];
     if (lineas.length) {
       lineas.forEach((linea, index) => {
         rows.push({
@@ -1779,26 +1780,41 @@ export function ReportesPage() {
                       (item) => cuadroGrupoKey(item.grupo) === cuadroGrupo
                     );
                     const subtotalBs = items.reduce((sum, item) => sum + item.importeBs, 0);
+                    const subtotalSinIVA = items.reduce(
+                      (sum, item) => sum + item.importeSinIVA,
+                      0
+                    );
                     return {
                       ...compra,
                       items,
-                      subtotalBs: Number(subtotalBs.toFixed(2))
+                      subtotalBs: Number(subtotalBs.toFixed(2)),
+                      subtotalSinIVA: Number(subtotalSinIVA.toFixed(2))
                     };
                   })
                   .filter((compra) => compra.items.length > 0);
                 const totalBs = compras.reduce((sum, compra) => sum + compra.subtotalBs, 0);
+                const totalSinIVA = compras.reduce(
+                  (sum, compra) => sum + (compra.subtotalSinIVA ?? 0),
+                  0
+                );
                 return {
                   ...proveedor,
                   compras,
-                  totalBs: Number(totalBs.toFixed(2))
+                  totalBs: Number(totalBs.toFixed(2)),
+                  totalSinIVA: Number(totalSinIVA.toFixed(2))
                 };
               })
               .filter((proveedor) => proveedor.compras.length > 0);
             const totalGeneral = proveedores.reduce((sum, proveedor) => sum + proveedor.totalBs, 0);
+            const totalGeneralSinIVA = proveedores.reduce(
+              (sum, proveedor) => sum + (proveedor.totalSinIVA ?? 0),
+              0
+            );
             return {
               ...periodo,
               proveedores,
-              totalGeneral: Number(totalGeneral.toFixed(2))
+              totalGeneral: Number(totalGeneral.toFixed(2)),
+              totalGeneralSinIVA: Number(totalGeneralSinIVA.toFixed(2))
             };
           })
           .filter((periodo) => periodo.proveedores.length > 0)
