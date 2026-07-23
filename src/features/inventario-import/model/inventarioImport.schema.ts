@@ -139,7 +139,8 @@ export const cierreMesListResponseSchema = z.object({
 
 export const cierreMesPayloadSchema = z.object({
   anio: numberLikeSchema.int().min(2000).max(2100),
-  mes: numberLikeSchema.int().min(1).max(12)
+  mes: numberLikeSchema.int().min(1).max(12),
+  force: z.boolean().optional()
 });
 
 export const inicializarPeriodoPayloadSchema = cierreMesPayloadSchema;

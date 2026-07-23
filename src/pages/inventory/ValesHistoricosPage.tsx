@@ -85,6 +85,15 @@ function normalizeError(error: unknown, fallbackMessage: string) {
   return fallbackMessage;
 }
 
+function isAlreadyClosedPeriodError(error: unknown) {
+  if (!(error instanceof ApiError)) return false;
+  const normalizedMessage = error.message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return normalizedMessage.includes("periodo") && normalizedMessage.includes("ya esta cerrado");
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
   return new Date(value).toLocaleString("es-BO");
@@ -545,6 +554,29 @@ export function ValesHistoricosPage() {
         `Período ${mes}/${anio} cerrado. Saldos creados: ${response.data.saldosCreados ?? 0}, actualizados: ${response.data.saldosActualizados ?? 0}.`
       );
     } catch (error) {
+      if (isAlreadyClosedPeriodError(error)) {
+        const forceConfirmed = window.confirm(
+          `El período ${String(mes).padStart(2, "0")}/${anio} ya está cerrado. ¿Deseas forzar el cierre y recalcular los saldos definitivos?`
+        );
+        if (!forceConfirmed) {
+          showError(normalizeError(error, "El período ya está cerrado."));
+          return;
+        }
+
+        try {
+          const response = await createCierreMesMutation.mutateAsync({ anio, mes, force: true });
+          await queryClient.invalidateQueries({ queryKey: ["inventario-import", "cierre-mes"] });
+          await queryClient.invalidateQueries({ queryKey: ["inventario-import", "saldo-mensual"] });
+          showSuccess(
+            `Cierre forzado para ${mes}/${anio}. Saldos creados: ${response.data.saldosCreados ?? 0}, actualizados: ${response.data.saldosActualizados ?? 0}.`
+          );
+          return;
+        } catch (forceError) {
+          showError(normalizeError(forceError, "No se pudo forzar el cierre del período mensual."));
+          return;
+        }
+      }
+
       showError(normalizeError(error, "No se pudo cerrar el período mensual."));
     }
   }

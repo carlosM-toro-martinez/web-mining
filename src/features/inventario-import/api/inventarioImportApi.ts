@@ -1,5 +1,6 @@
 import { deleteRequest, getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
 import { httpClient } from "@/shared/api/core/httpClient";
+import { ApiError } from "@/shared/api/core/apiError";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   importResultSchema,
@@ -255,12 +256,25 @@ export async function getCierresMes() {
 }
 
 export async function createCierreMes(payload: CierreMesPayload) {
-  return postRequest({
-    url: apiEndpoints.inventarioImport.cierreMes,
-    body: cierreMesPayloadSchema.parse(payload),
-    config: { timeout: 0 },
-    schema: cierreMesCreateResponseSchema
-  });
+  const response = await httpClient.post(
+    apiEndpoints.inventarioImport.cierreMes,
+    cierreMesPayloadSchema.parse(payload),
+    { timeout: 0 }
+  );
+  const data = response.data as unknown;
+
+  if (data && typeof data === "object" && "success" in data && data.success === false) {
+    const payloadData = data as Record<string, unknown>;
+    const message = [payloadData.error, payloadData.message, payloadData.msg].find(
+      (value) => typeof value === "string" && value.trim()
+    );
+    throw new ApiError(
+      typeof message === "string" ? message.trim() : "No se pudo cerrar el período mensual.",
+      { details: payloadData }
+    );
+  }
+
+  return cierreMesCreateResponseSchema.parse(data);
 }
 
 export async function inicializarPeriodoHistorico(payload: InicializarPeriodoPayload) {
