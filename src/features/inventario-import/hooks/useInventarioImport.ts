@@ -5,6 +5,7 @@ import {
   ajustarSaldoMensualTotal,
   deleteSaldoMensualById,
   createCierreMes,
+  deleteCierreMes,
   ejecutarBackfillCpp,
   getCierresMes,
   getDiagnosticoPrecios,
@@ -35,6 +36,7 @@ import type {
   SaldoMensualPayload,
   SaldoMensualQuery,
   SincronizarStockPayload,
+  CierreMesPayload,
   StockInicialPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
@@ -181,6 +183,12 @@ export function useCierresMesQuery(enabled = true) {
 export function useCreateCierreMesMutation() {
   return useMutation({
     mutationFn: createCierreMes
+  });
+}
+
+export function useDeleteCierreMesMutation() {
+  return useMutation({
+    mutationFn: (payload: CierreMesPayload) => deleteCierreMes(payload)
   });
 }
 

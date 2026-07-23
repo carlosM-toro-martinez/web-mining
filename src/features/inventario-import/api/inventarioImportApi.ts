@@ -8,6 +8,7 @@ import {
   ajustarPreciosSinIvaResponseSchema,
   cierreMesListResponseSchema,
   cierreMesCreateResponseSchema,
+  cierreMesDeleteResponseSchema,
   ajusteProductosMesPayloadSchema,
   ajusteProductosMesResponseSchema,
   cierreMesPayloadSchema,
@@ -275,6 +276,14 @@ export async function createCierreMes(payload: CierreMesPayload) {
   }
 
   return cierreMesCreateResponseSchema.parse(data);
+}
+
+export async function deleteCierreMes(payload: CierreMesPayload) {
+  return deleteRequest({
+    url: apiEndpoints.inventarioImport.cierreMes,
+    config: { data: cierreMesPayloadSchema.parse(payload) },
+    schema: cierreMesDeleteResponseSchema
+  });
 }
 
 export async function inicializarPeriodoHistorico(payload: InicializarPeriodoPayload) {

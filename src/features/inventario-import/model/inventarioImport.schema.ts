@@ -157,6 +157,14 @@ export const cierreMesCreateResponseSchema = z.object({
   })
 });
 
+export const cierreMesDeleteResponseSchema = z
+  .object({
+    success: z.boolean().optional().default(true),
+    message: z.string().optional(),
+    data: z.unknown().optional()
+  })
+  .passthrough();
+
 export const importResultSchema = z.object({
   success: z.boolean().optional().default(true),
   data: z.record(z.string(), z.unknown())

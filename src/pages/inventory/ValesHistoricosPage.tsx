@@ -7,6 +7,7 @@ import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
 import {
   useCierresMesQuery,
   useCreateCierreMesMutation,
+  useDeleteCierreMesMutation,
   useInicializarPeriodoHistoricoMutation,
   useSaldoMensualPreviewQuery,
   useSaldoMensualQuery,
@@ -243,6 +244,7 @@ export function ValesHistoricosPage() {
   const anularCompraMutation = useAnularCompraMutation();
   const actualizarCompraItemPrecioMutation = useActualizarCompraItemPrecioMutation();
   const createCierreMesMutation = useCreateCierreMesMutation();
+  const deleteCierreMesMutation = useDeleteCierreMesMutation();
   const inicializarPeriodoMutation = useInicializarPeriodoHistoricoMutation();
   const updateSaldoMensualByIdMutation = useUpdateSaldoMensualByIdMutation();
   const canUseFlow =
@@ -578,6 +580,22 @@ export function ValesHistoricosPage() {
       }
 
       showError(normalizeError(error, "No se pudo cerrar el período mensual."));
+    }
+  }
+
+  async function handleDeleteCierreMes(anio: number, mes: number) {
+    const confirmed = window.confirm(
+      `Vas a reabrir el período ${String(mes).padStart(2, "0")}/${anio}. El mes dejará de figurar como cerrado y podrá recibir cambios. ¿Deseas continuar?`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteCierreMesMutation.mutateAsync({ anio, mes });
+      await queryClient.invalidateQueries({ queryKey: ["inventario-import", "cierre-mes"] });
+      await queryClient.invalidateQueries({ queryKey: ["inventario-import", "saldo-mensual"] });
+      showSuccess(`Período ${mes}/${anio} reabierto correctamente.`);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo reabrir el período mensual."));
     }
   }
 
@@ -2582,13 +2600,18 @@ export function ValesHistoricosPage() {
                   <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Cerrado en
                   </th>
+                  {canClosePeriod ? (
+                    <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Acción
+                    </th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-soft)]">
                 {cierresMesQuery.isLoading ? (
                   <tr>
                     <td
-                      colSpan={2}
+                      colSpan={canClosePeriod ? 3 : 2}
                       className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                     >
                       Cargando períodos cerrados...
@@ -2598,7 +2621,7 @@ export function ValesHistoricosPage() {
                 {!cierresMesQuery.isLoading && cierres.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={2}
+                      colSpan={canClosePeriod ? 3 : 2}
                       className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                     >
                       Aún no hay períodos cerrados.
@@ -2613,6 +2636,18 @@ export function ValesHistoricosPage() {
                     <td className="px-3 py-2 text-xs">
                       {item.creadoAt ? new Date(item.creadoAt).toLocaleString() : "-"}
                     </td>
+                    {canClosePeriod ? (
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCierreMes(item.anio, item.mes)}
+                          disabled={deleteCierreMesMutation.isPending}
+                          className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                        >
+                          {deleteCierreMesMutation.isPending ? "Reabriendo..." : "Reabrir"}
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
