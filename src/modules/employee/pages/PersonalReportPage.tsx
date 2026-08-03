@@ -7,12 +7,14 @@ import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/use
 import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { LibroAsistenciaReport } from "@/modules/employee/components/LibroAsistenciaReport";
 
 interface ReportDay {
   fecha: string;
   estado: string;
   minutosRetraso: number;
   real?: { entrada?: string; salida?: string } | null;
+  salidaEstimada?: string | null;
 }
 
 function hasAttendanceMark(day: ReportDay) {
@@ -914,6 +916,12 @@ export function PersonalReportPage() {
           ))}
         </div>
       </article>
+
+      <LibroAsistenciaReport
+        entries={reportQuery.data ?? []}
+        desde={appliedFilters.desde}
+        hasta={appliedFilters.hasta}
+      />
     </section>
   );
 }
