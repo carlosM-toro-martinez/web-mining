@@ -20,10 +20,20 @@ interface AbsenceItem {
 
 const tipos = ["VACACION", "DESCANSO", "PERMISO", "ENFERMEDAD", "FERIADO", "ABANDONO", "OTRO"];
 
+type Alcance = "INDIVIDUAL" | "TODOS" | "OBRERO" | "TECNICO_EMPLEADO";
+
+const alcanceOptions: Array<{ value: Alcance; label: string }> = [
+  { value: "INDIVIDUAL", label: "Un trabajador" },
+  { value: "TODOS", label: "Todo el personal" },
+  { value: "OBRERO", label: "Solo obreros" },
+  { value: "TECNICO_EMPLEADO", label: "Solo técnicos/empleados" }
+];
+
 export function PersonalAbsencesPage() {
   const { showError, showSuccess } = useToast();
   const queryClient = useQueryClient();
   const employees = useEmployees();
+  const [alcance, setAlcance] = useState<Alcance>("INDIVIDUAL");
   const [empleadoId, setEmpleadoId] = useState("");
   const [tipo, setTipo] = useState("VACACION");
   const [desde, setDesde] = useState("");
@@ -46,18 +56,34 @@ export function PersonalAbsencesPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      await httpClient.post("/api/personal/ausencias", {
-        employeeId: Number(empleadoId),
+      if (alcance === "INDIVIDUAL") {
+        await httpClient.post("/api/personal/ausencias", {
+          employeeId: Number(empleadoId),
+          tipo,
+          desde,
+          hasta,
+          motivo: motivo || undefined,
+          aprobado
+        });
+        return { creadas: 1 };
+      }
+
+      const response = await httpClient.post("/api/personal/ausencias/bulk", {
+        alcance,
         tipo,
         desde,
         hasta,
         motivo: motivo || undefined,
         aprobado
       });
+      const payload = response.data as { data?: { creadas?: number } };
+      return { creadas: payload.data?.creadas ?? 0 };
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["personal-ausencias"] });
-      showSuccess("Ausencia registrada.");
+      showSuccess(
+        alcance === "INDIVIDUAL" ? "Ausencia registrada." : `Se registraron ${result.creadas} ausencias.`
+      );
     },
     onError: (error) => showError(error instanceof Error ? error.message : "No se pudo registrar ausencia.")
   });
@@ -94,14 +120,37 @@ export function PersonalAbsencesPage() {
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <AutocompleteSelect value={empleadoId} onChange={setEmpleadoId} options={employeeOptions} placeholder="Buscar empleado" className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
+          <select
+            value={alcance}
+            onChange={(e) => setAlcance(e.target.value as Alcance)}
+            className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm"
+          >
+            {alcanceOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          {alcance === "INDIVIDUAL" ? (
+            <AutocompleteSelect value={empleadoId} onChange={setEmpleadoId} options={employeeOptions} placeholder="Buscar empleado" className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
+          ) : null}
           <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm">{tipos.map((t) => <option key={t} value={t}>{t}</option>)}</select>
           <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo" className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
           <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={aprobado} onChange={(e) => setAprobado(e.target.checked)} />Aprobado</label>
-          <button type="button" onClick={() => void createMutation.mutateAsync()} disabled={!empleadoId || !desde || !hasta || createMutation.isPending} className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">Registrar ausencia</button>
+          <button
+            type="button"
+            onClick={() => void createMutation.mutateAsync()}
+            disabled={(alcance === "INDIVIDUAL" && !empleadoId) || !desde || !hasta || createMutation.isPending}
+            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+          >
+            {alcance === "INDIVIDUAL" ? "Registrar ausencia" : "Registrar ausencia masiva"}
+          </button>
         </div>
+        {alcance !== "INDIVIDUAL" ? (
+          <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
+            Se registrará para {alcance === "TODOS" ? "todo el personal activo" : alcance === "OBRERO" ? "todos los obreros activos" : "todos los técnicos/empleados activos"}.
+          </p>
+        ) : null}
       </article>
 
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
