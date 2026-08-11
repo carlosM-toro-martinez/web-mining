@@ -862,11 +862,12 @@ export function PersonalReportPage() {
         </p>
       </article>
 
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
         <div className="px-5 py-3 text-xs text-[var(--color-on-surface-variant)]">
           {reportQuery.isFetching ? "Cargando reporte..." : `Registros: ${reportQuery.data?.length ?? 0}`}
         </div>
-        <div className="space-y-4 p-4">
+        <div className="max-h-[75vh] space-y-4 overflow-y-auto p-4">
           {reportQuery.isLoading ? (
             <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
               Cargando datos de asistencia...
@@ -922,6 +923,7 @@ export function PersonalReportPage() {
         desde={appliedFilters.desde}
         hasta={appliedFilters.hasta}
       />
+      </div>
     </section>
   );
 }
