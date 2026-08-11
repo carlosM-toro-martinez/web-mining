@@ -7,14 +7,10 @@ import {
   HardHat,
   PackageSearch,
   PackageCheck,
-  Layers3,
   FileBarChart2,
   ReceiptText,
   ClipboardList,
   Settings,
-  Truck,
-  UploadCloud,
-  PencilLine,
   CalendarClock
 } from "lucide-react";
 
@@ -38,13 +34,6 @@ const cards = [
     description: "Crea, filtra y edita productos por grupo y subgrupo.",
     to: "/inventario/productos",
     icon: PackageSearch,
-    available: true
-  },
-  {
-    title: "Stock Actual",
-    description: "Consulta stock detallado por producto y ordena de menor a mayor existencia.",
-    to: "/inventario/stock",
-    icon: Layers3,
     available: true
   },
   {
@@ -103,20 +92,6 @@ const cards = [
   //   icon: Truck,
   //   available: true
   // },
-  {
-    title: "Importación",
-    description: "Carga catálogo Excel, stock inicial y saldos mensuales históricos.",
-    to: "/inventario/importacion",
-    icon: UploadCloud,
-    available: true
-  },
-  {
-    title: "Editar stock inicial",
-    description: "Carga y edita stock inicial uno por uno con JSON automático.",
-    to: "/inventario/stock-inicial-editar",
-    icon: PencilLine,
-    available: true
-  },
   {
     title: "EPP",
     description: "Asignacion y control de equipos de proteccion personal.",

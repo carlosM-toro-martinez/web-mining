@@ -1,14 +1,13 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Play, Search, Settings2 } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2 } from "lucide-react";
 import {
-  useAjustarPreciosSinIvaMutation,
   useBackfillCppMutation,
   useDiagnosticoPreciosQuery,
   useDiagnosticoSaldosQuery
 } from "@/features/inventario-import/hooks/useInventarioImport";
+import { useReordenarMovimientosMutation } from "@/features/movimientos/hooks/useMovimientos";
 import { useComprasConSaldoInicialReportQuery } from "@/features/reportes/hooks/useReportes";
 import type {
-  AjustarPreciosSinIvaResponse,
   BackfillCppResponse,
   DiagnosticoPreciosItem,
   DiagnosticoSaldosItem,
@@ -19,6 +18,7 @@ import type {
   CompraConSaldoInicialProducto,
   MonthlyRangeReportQueryParams
 } from "@/features/reportes/model/reportes.schema";
+import type { ReordenarMovimientosResponse } from "@/features/movimientos/model/movimientos.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -83,28 +83,11 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleDateString("es-BO");
 }
 
-function responseSummary(response: AjustarPreciosSinIvaResponse | undefined) {
-  if (!response) return "";
-  const data = response.data;
-  if (!data || typeof data !== "object" || Array.isArray(data)) return response.message ?? "Ajuste ejecutado.";
-  const record = data as Record<string, unknown>;
-  const parts = [
-    ["procesados", record.procesados],
-    ["actualizados", record.actualizados],
-    ["sinCompras", record.sinCompras],
-    ["cascadeados", record.cascadeados],
-    ["fallidos", record.fallidos]
-  ]
-    .filter(([, value]) => value !== undefined && value !== null)
-    .map(([label, value]) => `${label}: ${String(value)}`);
-  return parts.length ? parts.join(" · ") : response.message ?? "Ajuste ejecutado.";
-}
-
 export function AjustesPage() {
   const now = new Date();
   const { showError, showSuccess } = useToast();
-  const ajustarPreciosSinIvaMutation = useAjustarPreciosSinIvaMutation();
   const backfillCppMutation = useBackfillCppMutation();
+  const reordenarMutation = useReordenarMovimientosMutation();
 
   const [diagnosticoAnio, setDiagnosticoAnio] = useState(String(now.getFullYear()));
   const [diagnosticoMes, setDiagnosticoMes] = useState(String(now.getMonth() + 1));
@@ -120,9 +103,12 @@ export function AjustesPage() {
   const [comprasParams, setComprasParams] = useState<MonthlyRangeReportQueryParams | null>(null);
   const [comprasGrupo, setComprasGrupo] = useState("");
   const [comprasSearch, setComprasSearch] = useState("");
-  const [ajusteAnio, setAjusteAnio] = useState(String(now.getFullYear()));
-  const [ajusteMes, setAjusteMes] = useState(String(now.getMonth() + 1));
-  const [ajusteResponse, setAjusteResponse] = useState<AjustarPreciosSinIvaResponse | null>(null);
+  const [reordenarAnio, setReordenarAnio] = useState(String(now.getFullYear()));
+  const [reordenarMes, setReordenarMes] = useState(String(now.getMonth() + 1));
+  const [reordenarProductoId, setReordenarProductoId] = useState("");
+  const [reordenarResponse, setReordenarResponse] = useState<ReordenarMovimientosResponse | null>(
+    null
+  );
   const [cppAnio, setCppAnio] = useState(String(now.getFullYear()));
   const [cppMes, setCppMes] = useState(String(now.getMonth() + 1));
   const [cppResponse, setCppResponse] = useState<BackfillCppResponse | null>(null);
@@ -131,7 +117,10 @@ export function AjustesPage() {
     anio: Number(diagnosticoAnio),
     mes: Number(diagnosticoMes)
   };
-  const diagnosticoQuery = useDiagnosticoPreciosQuery(activeDiagnosticoParams, Boolean(diagnosticoParams));
+  const diagnosticoQuery = useDiagnosticoPreciosQuery(
+    activeDiagnosticoParams,
+    Boolean(diagnosticoParams)
+  );
   const activeSaldosParams = saldosParams ?? {
     anio: Number(saldosAnio),
     mes: Number(saldosMes)
@@ -153,7 +142,10 @@ export function AjustesPage() {
   const comprasConSaldoData = comprasConSaldoQuery.data?.data;
   const saldosRows = saldosData?.discrepancias ?? [];
   const diagnosticoRows = useMemo(
-    () => (diagnosticoTab === "sinPrecio" ? diagnosticoData?.sinPrecio ?? [] : diagnosticoData?.sinProm ?? []),
+    () =>
+      diagnosticoTab === "sinPrecio"
+        ? (diagnosticoData?.sinPrecio ?? [])
+        : (diagnosticoData?.sinProm ?? []),
     [diagnosticoData?.sinPrecio, diagnosticoData?.sinProm, diagnosticoTab]
   );
   const comprasGrupoOptions = useMemo(() => {
@@ -177,7 +169,9 @@ export function AjustesPage() {
         .filter((grupo) => !comprasGrupo || comprasGrupoKey(grupo) === comprasGrupo)
         .flatMap((grupo) =>
           grupo.productos
-            .filter((producto) => !search || comprasProductoSearchText(producto, grupo).includes(search))
+            .filter(
+              (producto) => !search || comprasProductoSearchText(producto, grupo).includes(search)
+            )
             .map((producto) => ({ mes, grupo, producto }))
         )
     );
@@ -231,22 +225,34 @@ export function AjustesPage() {
     }
   }
 
-  function handleAjusteSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleReordenarSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const periodo = parsePeriodo(ajusteAnio, ajusteMes);
+    const periodo = parsePeriodo(reordenarAnio, reordenarMes);
     if (!periodo) {
-      showError("Indica un año y mes válidos para ejecutar el ajuste.");
+      showError("Indica un año y mes válidos para reordenar.");
       return;
     }
+    const payload: { anio: number; mes: number; productoId?: number } = { ...periodo };
+    const pid = Number(reordenarProductoId);
+    if (reordenarProductoId.trim() && Number.isInteger(pid) && pid > 0) {
+      payload.productoId = pid;
+    }
 
-    setAjusteResponse(null);
-    ajustarPreciosSinIvaMutation.mutate(periodo, {
+    setReordenarResponse(null);
+    reordenarMutation.mutate(payload, {
       onSuccess: (response) => {
-        setAjusteResponse(response);
-        showSuccess(responseSummary(response));
+        setReordenarResponse(response);
+        const d = response.data;
+        const resumen = [
+          `productos: ${d.productosReordenados}`,
+          `movimientos: ${d.movimientosActualizados}`,
+          d.errores.length ? `errores: ${d.errores.length}` : null
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        showSuccess(`Reordenamiento completado · ${resumen}`);
       },
-      onError: (error) =>
-        showError(normalizeError(error, "No se pudo ejecutar el ajuste de precios sin IVA."))
+      onError: (error) => showError(normalizeError(error, "No se pudo reordenar los movimientos."))
     });
   }
 
@@ -272,7 +278,11 @@ export function AjustesPage() {
           data?.saldosActualizados !== undefined ? `saldos: ${data.saldosActualizados}` : null,
           data?.errores?.length ? `errores: ${data.errores.length}` : null
         ].filter(Boolean);
-        showSuccess(resumen.length ? `Backfill CPP ejecutado · ${resumen.join(" · ")}` : "Backfill CPP ejecutado.");
+        showSuccess(
+          resumen.length
+            ? `Backfill CPP ejecutado · ${resumen.join(" · ")}`
+            : "Backfill CPP ejecutado."
+        );
       },
       onError: (error) => showError(normalizeError(error, "No se pudo ejecutar el backfill CPP."))
     });
@@ -320,9 +330,12 @@ export function AjustesPage() {
             <Settings2 size={18} />
           </div>
           <div>
-            <h1 className="page-title font-headline text-3xl font-extrabold">Ajustes de inventario</h1>
+            <h1 className="page-title font-headline text-3xl font-extrabold">
+              Ajustes de inventario
+            </h1>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-              Diagnóstico de productos sin precio y ejecución controlada del ajuste de precios sin IVA.
+              Diagnóstico de productos sin precio y ejecución controlada del ajuste de precios sin
+              IVA.
             </p>
           </div>
         </div>
@@ -345,7 +358,10 @@ export function AjustesPage() {
             ) : null}
           </div>
 
-          <form className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleDiagnosticoSubmit}>
+          <form
+            className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]"
+            onSubmit={handleDiagnosticoSubmit}
+          >
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                 Año
@@ -378,7 +394,11 @@ export function AjustesPage() {
                 disabled={diagnosticoQuery.isFetching}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {diagnosticoQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                {diagnosticoQuery.isFetching ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Search size={16} />
+                )}
                 Consultar
               </button>
             </div>
@@ -419,8 +439,16 @@ export function AjustesPage() {
 
           <div className="mb-3 flex flex-wrap gap-2">
             {[
-              { key: "sinPrecio" as const, label: "Sin precio unitario", count: diagnosticoData?.sinPrecioCount },
-              { key: "sinProm" as const, label: "Sin precio promedio", count: diagnosticoData?.sinPromCount }
+              {
+                key: "sinPrecio" as const,
+                label: "Sin precio unitario",
+                count: diagnosticoData?.sinPrecioCount
+              },
+              {
+                key: "sinProm" as const,
+                label: "Sin precio promedio",
+                count: diagnosticoData?.sinPromCount
+              }
             ].map((option) => (
               <button
                 key={option.key}
@@ -445,23 +473,37 @@ export function AjustesPage() {
                   <tr>
                     <th className="border-b border-[var(--color-border-soft)] px-3 py-2">ID</th>
                     <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
+                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2">
+                      Producto
+                    </th>
                     <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Unidad</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo final</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Precio unit.</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Precio prom.</th>
+                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                      Saldo final
+                    </th>
+                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                      Precio unit.
+                    </th>
+                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                      Precio prom.
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {!diagnosticoParams ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                      <td
+                        colSpan={7}
+                        className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                      >
                         Consulta un período para ver productos sin precio asignado.
                       </td>
                     </tr>
                   ) : diagnosticoQuery.isFetching ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                      <td
+                        colSpan={7}
+                        className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                      >
                         Cargando diagnóstico...
                       </td>
                     </tr>
@@ -471,18 +513,25 @@ export function AjustesPage() {
                         key={`${productCode(item)}-${item.id ?? item.productoId ?? index}`}
                         className="border-b border-[var(--color-border-soft)] last:border-0"
                       >
-                        <td className="px-3 py-2 font-mono text-xs">{item.productoId ?? item.id ?? "-"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">
+                          {item.productoId ?? item.id ?? "-"}
+                        </td>
                         <td className="px-3 py-2 font-mono text-xs">{productCode(item)}</td>
                         <td className="px-3 py-2 font-medium">{productName(item)}</td>
                         <td className="px-3 py-2">{item.unidad ?? "-"}</td>
                         <td className="px-3 py-2 text-right">{formatNumber(item.saldoFinal)}</td>
                         <td className="px-3 py-2 text-right">{formatNumber(item.precioUnit, 4)}</td>
-                        <td className="px-3 py-2 text-right">{formatNumber(item.precioUnitProm, 4)}</td>
+                        <td className="px-3 py-2 text-right">
+                          {formatNumber(item.precioUnitProm, 4)}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-success)]">
+                      <td
+                        colSpan={7}
+                        className="px-3 py-8 text-center text-sm text-[var(--color-success)]"
+                      >
                         Sin productos pendientes para el período consultado.
                       </td>
                     </tr>
@@ -494,14 +543,20 @@ export function AjustesPage() {
         </article>
 
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
-          <div className="mb-4">
-            <h2 className="text-lg font-bold">Ajustar precios sin IVA</h2>
-            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-              Ejecuta el proceso para el período seleccionado y muestra la respuesta del servidor.
-            </p>
+          <div className="mb-4 flex items-start gap-3">
+            <div className="rounded-lg bg-[var(--color-primary)]/12 p-2 text-[var(--color-primary)]">
+              <ArrowUpDown size={16} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Reordenar movimientos</h2>
+              <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
+                Corrige stockAntes, stockDespues y saldoBs del bin card cuando hay salidas
+                registradas antes de su compra.
+              </p>
+            </div>
           </div>
 
-          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleAjusteSubmit}>
+          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleReordenarSubmit}>
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                 Año
@@ -510,8 +565,8 @@ export function AjustesPage() {
                 type="number"
                 min={2000}
                 max={2100}
-                value={ajusteAnio}
-                onChange={(event) => setAjusteAnio(event.target.value)}
+                value={reordenarAnio}
+                onChange={(event) => setReordenarAnio(event.target.value)}
                 className={inputClassName}
               />
             </div>
@@ -523,61 +578,107 @@ export function AjustesPage() {
                 type="number"
                 min={1}
                 max={12}
-                value={ajusteMes}
-                onChange={(event) => setAjusteMes(event.target.value)}
+                value={reordenarMes}
+                onChange={(event) => setReordenarMes(event.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                ID Producto{" "}
+                <span className="font-normal normal-case">(opcional — vacío = todos)</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                placeholder="Todos los productos del período"
+                value={reordenarProductoId}
+                onChange={(event) => setReordenarProductoId(event.target.value)}
                 className={inputClassName}
               />
             </div>
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                disabled={ajustarPreciosSinIvaMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={reordenarMutation.isPending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {ajustarPreciosSinIvaMutation.isPending ? (
+                {reordenarMutation.isPending ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <Play size={16} />
+                  <ArrowUpDown size={16} />
                 )}
-                Ejecutar ajuste
+                Reordenar movimientos
               </button>
             </div>
           </form>
 
-          <div className="mt-4 rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/10 p-3 text-sm text-[var(--color-on-surface)]">
+          <div className="mt-4 rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/10 p-3 text-sm">
             <div className="flex items-start gap-2">
-              <AlertTriangle size={16} className="mt-0.5 text-[var(--color-warning)]" />
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
               <p className="text-[var(--color-on-surface-variant)]">
-                Este proceso modifica precios del mes y propaga cambios a meses siguientes según la lógica del backend.
+                Solo modifica stockAntes, stockDespues y saldoBs de los movimientos. Ejecuta
+                backfill CPP primero para tener precios correctos.
               </p>
             </div>
           </div>
 
-          {ajustarPreciosSinIvaMutation.isError ? (
+          {reordenarMutation.isError ? (
             <div className="mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-              {normalizeError(ajustarPreciosSinIvaMutation.error, "No se pudo ejecutar el ajuste.")}
+              {normalizeError(reordenarMutation.error, "No se pudo reordenar los movimientos.")}
             </div>
           ) : null}
 
-          <div className="mt-5">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Respuesta
-            </h3>
-            <pre className="max-h-[420px] overflow-auto rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] p-3 text-xs leading-relaxed text-[var(--color-on-surface)]">
-              {ajusteResponse ? JSON.stringify(ajusteResponse, null, 2) : "Sin ejecución todavía."}
-            </pre>
-          </div>
+          {reordenarResponse ? (
+            <div className="mt-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Productos
+                  </p>
+                  <p className="mt-1 text-2xl font-extrabold">
+                    {reordenarResponse.data.productosReordenados}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Movimientos
+                  </p>
+                  <p className="mt-1 text-2xl font-extrabold">
+                    {reordenarResponse.data.movimientosActualizados}
+                  </p>
+                </div>
+              </div>
+              {reordenarResponse.data.errores.length > 0 ? (
+                <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-xs text-[var(--color-error)]">
+                  {reordenarResponse.data.errores.map((e) => (
+                    <div key={e.productoId}>
+                      Producto {e.productoId}: {e.error}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-5 text-sm text-[var(--color-on-surface-variant)]">
+              Sin ejecución todavía.
+            </p>
+          )}
         </article>
 
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
           <div className="mb-4">
             <h2 className="text-lg font-bold">Backfill CPP</h2>
             <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-              Recalcula el CPP del mes, actualiza movimientos y deja el saldo mensual consistente con compras sin IVA.
+              Recalcula el CPP del mes, actualiza movimientos y deja el saldo mensual consistente
+              con compras sin IVA.
             </p>
           </div>
 
-          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleBackfillCppSubmit}>
+          <form
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            onSubmit={handleBackfillCppSubmit}
+          >
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                 Año
@@ -610,7 +711,11 @@ export function AjustesPage() {
                 disabled={backfillCppMutation.isPending}
                 className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-bold text-[var(--color-on-primary)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {backfillCppMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+                {backfillCppMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Play size={16} />
+                )}
                 Ejecutar backfill CPP
               </button>
             </div>
@@ -620,7 +725,8 @@ export function AjustesPage() {
             <div className="flex items-start gap-2">
               <AlertTriangle size={16} className="mt-0.5 text-[var(--color-warning)]" />
               <p className="text-[var(--color-on-surface-variant)]">
-                Ejecuta los meses en orden cronológico. El CPP de un mes depende del precio promedio del mes anterior.
+                Ejecuta los meses en orden cronológico. El CPP de un mes depende del precio promedio
+                del mes anterior.
               </p>
             </div>
           </div>
@@ -720,7 +826,11 @@ export function AjustesPage() {
               disabled={comprasConSaldoQuery.isFetching}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {comprasConSaldoQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+              {comprasConSaldoQuery.isFetching ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Search size={16} />
+              )}
               Consultar
             </button>
           </div>
@@ -761,7 +871,10 @@ export function AjustesPage() {
 
         {comprasConSaldoQuery.isError ? (
           <div className="mb-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-            {normalizeError(comprasConSaldoQuery.error, "No se pudo consultar compras con saldo inicial.")}
+            {normalizeError(
+              comprasConSaldoQuery.error,
+              "No se pudo consultar compras con saldo inicial."
+            )}
           </div>
         ) : null}
 
@@ -799,22 +912,34 @@ export function AjustesPage() {
                   <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Grupo</th>
                   <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
                   <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo inicial</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo Bs.</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Comprado Bs.</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Saldo inicial
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Saldo Bs.
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Comprado Bs.
+                  </th>
                   <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Compras</th>
                 </tr>
               </thead>
               <tbody>
                 {!comprasParams ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={8}
+                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Consulta un rango para ver productos con saldo inicial y compras.
                     </td>
                   </tr>
                 ) : comprasConSaldoQuery.isFetching ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={8}
+                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Cargando compras con saldo inicial...
                     </td>
                   </tr>
@@ -829,10 +954,18 @@ export function AjustesPage() {
                       </td>
                       <td className="min-w-[160px] px-3 py-2">{comprasGrupoLabel(grupo)}</td>
                       <td className="px-3 py-2 font-mono text-xs">{producto.codigo ?? "-"}</td>
-                      <td className="min-w-[220px] px-3 py-2 font-medium">{producto.nombre ?? "-"}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(producto.saldoInicialQty)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(producto.saldoInicialBs)}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{formatNumber(producto.totalCompradoBs)}</td>
+                      <td className="min-w-[220px] px-3 py-2 font-medium">
+                        {producto.nombre ?? "-"}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(producto.saldoInicialQty)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(producto.saldoInicialBs)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold">
+                        {formatNumber(producto.totalCompradoBs)}
+                      </td>
                       <td className="min-w-[360px] px-3 py-2">
                         <div className="space-y-1 text-xs text-[var(--color-on-surface-variant)]">
                           {producto.compras.map((compra, index) => (
@@ -843,8 +976,9 @@ export function AjustesPage() {
                               <span className="font-semibold text-[var(--color-on-surface)]">
                                 {compra.numeroFactura ?? "Sin factura"}
                               </span>{" "}
-                              · {formatDate(compra.fecha)} · {compra.proveedor ?? "Sin proveedor"} · Cant.{" "}
-                              {formatNumber(compra.cantidad)} · P.U. {formatNumber(compra.precioUnit, 4)} · Bs.{" "}
+                              · {formatDate(compra.fecha)} · {compra.proveedor ?? "Sin proveedor"} ·
+                              Cant. {formatNumber(compra.cantidad)} · P.U.{" "}
+                              {formatNumber(compra.precioUnit, 4)} · Bs.{" "}
                               {formatNumber(compra.importeBs)}
                             </div>
                           ))}
@@ -854,7 +988,10 @@ export function AjustesPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={8}
+                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Sin productos para los filtros seleccionados.
                     </td>
                   </tr>
@@ -875,12 +1012,16 @@ export function AjustesPage() {
           </div>
           {saldosData?.periodo || saldosParams ? (
             <span className="rounded-full bg-[var(--color-primary)]/12 px-3 py-1 text-xs font-bold text-[var(--color-primary)]">
-              {saldosData?.periodo ?? `${String(saldosParams?.mes ?? "").padStart(2, "0")}/${saldosParams?.anio}`}
+              {saldosData?.periodo ??
+                `${String(saldosParams?.mes ?? "").padStart(2, "0")}/${saldosParams?.anio}`}
             </span>
           ) : null}
         </div>
 
-        <form className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleSaldosSubmit}>
+        <form
+          className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]"
+          onSubmit={handleSaldosSubmit}
+        >
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
               Año
@@ -913,7 +1054,11 @@ export function AjustesPage() {
               disabled={saldosQuery.isFetching}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saldosQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+              {saldosQuery.isFetching ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Search size={16} />
+              )}
               Consultar
             </button>
           </div>
@@ -937,7 +1082,9 @@ export function AjustesPage() {
               <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                 Correctos
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-[var(--color-success)]">{saldosData.productosOk}</p>
+              <p className="mt-1 text-2xl font-extrabold text-[var(--color-success)]">
+                {saldosData.productosOk}
+              </p>
             </div>
             <div className="rounded-lg border border-[var(--color-error)]/25 bg-[var(--color-error)]/8 p-3">
               <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
@@ -957,26 +1104,48 @@ export function AjustesPage() {
                 <tr>
                   <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
                   <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo inicial</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Salida mensual</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Movimientos</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Dif. salida</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo final</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Calculado</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Dif. saldo</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Problemas</th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Saldo inicial
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Salida mensual
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Movimientos
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Dif. salida
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Saldo final
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Calculado
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
+                    Dif. saldo
+                  </th>
+                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">
+                    Problemas
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {!saldosParams ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={10}
+                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Consulta un período para revisar discrepancias de saldos.
                     </td>
                   </tr>
                 ) : saldosQuery.isFetching ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
+                    <td
+                      colSpan={10}
+                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
+                    >
                       Cargando diagnóstico...
                     </td>
                   </tr>
@@ -987,14 +1156,28 @@ export function AjustesPage() {
                       className="border-b border-[var(--color-border-soft)] last:border-0"
                     >
                       <td className="px-3 py-2 font-mono text-xs">{saldoProductCode(item)}</td>
-                      <td className="min-w-[220px] px-3 py-2 font-medium">{saldoProductName(item)}</td>
+                      <td className="min-w-[220px] px-3 py-2 font-medium">
+                        {saldoProductName(item)}
+                      </td>
                       <td className="px-3 py-2 text-right">{formatNumber(item.saldoInicial)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.salidaQty?.saldoMensual)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.salidaQty?.movimientos)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.salidaQty?.diferencia)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.saldoFinal?.saldoMensual)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.saldoFinal?.calculado)}</td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.saldoFinal?.diferencia)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(item.salidaQty?.saldoMensual)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(item.salidaQty?.movimientos)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(item.salidaQty?.diferencia)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(item.saldoFinal?.saldoMensual)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(item.saldoFinal?.calculado)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(item.saldoFinal?.diferencia)}
+                      </td>
                       <td className="min-w-[260px] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
                         {item.problemas.length ? item.problemas.join(" | ") : "-"}
                       </td>
@@ -1002,7 +1185,10 @@ export function AjustesPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--color-success)]">
+                    <td
+                      colSpan={10}
+                      className="px-3 py-8 text-center text-sm text-[var(--color-success)]"
+                    >
                       Sin discrepancias para el período consultado.
                     </td>
                   </tr>

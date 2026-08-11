@@ -93,6 +93,27 @@ export const createEntradaManualPayloadSchema = z.object({
   referenciaId: z.string().trim().optional()
 });
 
+export const reordenarMovimientosPayloadSchema = z.object({
+  anio: z.number().int().min(2000).max(2100),
+  mes: z.number().int().min(1).max(12),
+  productoId: z.number().int().positive().optional()
+});
+
+export const reordenarMovimientosResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    anio: z.number(),
+    mes: z.number(),
+    productoId: z.number().nullable().optional(),
+    productosReordenados: z.number(),
+    movimientosActualizados: z.number(),
+    resultados: z.array(z.object({ productoId: z.number(), movimientosActualizados: z.number() })),
+    errores: z.array(z.object({ productoId: z.number(), error: z.string() }))
+  })
+});
+
 export type Movimiento = z.infer<typeof movimientoSchema>;
 export type CreateSalidaManualPayload = z.infer<typeof createSalidaManualPayloadSchema>;
 export type CreateEntradaManualPayload = z.infer<typeof createEntradaManualPayloadSchema>;
+export type ReordenarMovimientosPayload = z.infer<typeof reordenarMovimientosPayloadSchema>;
+export type ReordenarMovimientosResponse = z.infer<typeof reordenarMovimientosResponseSchema>;
