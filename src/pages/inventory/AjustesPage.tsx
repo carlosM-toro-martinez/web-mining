@@ -1,12 +1,15 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2 } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2, TriangleAlert } from "lucide-react";
 import {
   useBackfillCppMutation,
   useDiagnosticoPreciosQuery,
   useDiagnosticoSaldosQuery
 } from "@/features/inventario-import/hooks/useInventarioImport";
 import { useReordenarMovimientosMutation } from "@/features/movimientos/hooks/useMovimientos";
-import { useComprasConSaldoInicialReportQuery } from "@/features/reportes/hooks/useReportes";
+import {
+  useComprasConSaldoInicialReportQuery,
+  useInventarioAlmacenReportQuery
+} from "@/features/reportes/hooks/useReportes";
 import type {
   BackfillCppResponse,
   DiagnosticoPreciosItem,
@@ -112,6 +115,9 @@ export function AjustesPage() {
   const [cppAnio, setCppAnio] = useState(String(now.getFullYear()));
   const [cppMes, setCppMes] = useState(String(now.getMonth() + 1));
   const [cppResponse, setCppResponse] = useState<BackfillCppResponse | null>(null);
+  const [negativosAnio, setNegativosAnio] = useState(String(now.getFullYear()));
+  const [negativosMes, setNegativosMes] = useState(String(now.getMonth() + 1));
+  const [negativosParams, setNegativosParams] = useState<{ anioInicio: number; mesInicio: number; anioFin: number; mesFin: number } | null>(null);
 
   const activeDiagnosticoParams = diagnosticoParams ?? {
     anio: Number(diagnosticoAnio),
@@ -136,10 +142,43 @@ export function AjustesPage() {
     activeComprasParams,
     Boolean(comprasParams)
   );
+  const activeNegativosParams = negativosParams ?? {
+    anioInicio: Number(negativosAnio), mesInicio: Number(negativosMes),
+    anioFin: Number(negativosAnio),   mesFin: Number(negativosMes)
+  };
+  const negativosQuery = useInventarioAlmacenReportQuery(activeNegativosParams, Boolean(negativosParams));
 
   const diagnosticoData = diagnosticoQuery.data?.data;
   const saldosData = saldosQuery.data?.data;
   const comprasConSaldoData = comprasConSaldoQuery.data?.data;
+
+  const negativosRows = useMemo(() => {
+    const meses = negativosQuery.data?.data?.meses ?? [];
+    return meses.flatMap(mes =>
+      mes.grupos.flatMap(grupo =>
+        grupo.subGrupos.flatMap(sg =>
+          sg.productos
+            .filter(p =>
+              p.saldoInicial < 0 || p.ingresoQty < 0 || p.salidaQty < 0 ||
+              p.saldoFinal < 0  || p.precioUnit < 0  || p.totalBs < 0
+            )
+            .map(p => ({
+              grupoNombre:    grupo.nombre ?? "-",
+              subGrupoNombre: sg.nombre    ?? "-",
+              codigo:         p.codigo     ?? "-",
+              nombre:         p.nombre     ?? "-",
+              unidad:         p.unidad     ?? "-",
+              saldoInicial:   p.saldoInicial,
+              ingresoQty:     p.ingresoQty,
+              salidaQty:      p.salidaQty,
+              saldoFinal:     p.saldoFinal,
+              precioUnit:     p.precioUnit,
+              totalBs:        p.totalBs,
+            }))
+        )
+      )
+    );
+  }, [negativosQuery.data]);
   const saldosRows = saldosData?.discrepancias ?? [];
   const diagnosticoRows = useMemo(
     () =>
@@ -222,6 +261,23 @@ export function AjustesPage() {
     setDiagnosticoParams(periodo);
     if (diagnosticoParams?.anio === periodo.anio && diagnosticoParams.mes === periodo.mes) {
       void diagnosticoQuery.refetch();
+    }
+  }
+
+  function handleNegativosSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const periodo = parsePeriodo(negativosAnio, negativosMes);
+    if (!periodo) {
+      showError("Indica un año y mes válidos.");
+      return;
+    }
+    const params = { anioInicio: periodo.anio, mesInicio: periodo.mes, anioFin: periodo.anio, mesFin: periodo.mes };
+    setNegativosParams(params);
+    if (
+      negativosParams?.anioInicio === params.anioInicio &&
+      negativosParams.mesInicio === params.mesInicio
+    ) {
+      void negativosQuery.refetch();
     }
   }
 
@@ -1000,6 +1056,141 @@ export function AjustesPage() {
             </table>
           </div>
         </div>
+      </article>
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-[var(--color-error)]/12 p-2 text-[var(--color-error)]">
+              <TriangleAlert size={16} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Negativos en inventario</h2>
+              <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
+                Detecta productos con valores negativos según inventario-almacen: saldo inicial, ingreso, salida, saldo final, precio unitario o total Bs.
+              </p>
+            </div>
+          </div>
+          {negativosParams ? (
+            <span className="rounded-full bg-[var(--color-error)]/12 px-3 py-1 text-xs font-bold text-[var(--color-error)]">
+              {String(negativosParams.mesInicio).padStart(2, "0")}/{negativosParams.anioInicio}
+            </span>
+          ) : null}
+        </div>
+
+        <form className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleNegativosSubmit}>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Año
+            </label>
+            <input
+              type="number"
+              min={2000}
+              max={2100}
+              value={negativosAnio}
+              onChange={(e) => setNegativosAnio(e.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Mes
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={negativosMes}
+              onChange={(e) => setNegativosMes(e.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={negativosQuery.isFetching}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {negativosQuery.isFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+              Consultar
+            </button>
+          </div>
+        </form>
+
+        {negativosQuery.isError ? (
+          <div className="mb-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
+            {normalizeError(negativosQuery.error, "No se pudo consultar el inventario.")}
+          </div>
+        ) : null}
+
+        {negativosParams && !negativosQuery.isFetching && negativosRows.length === 0 ? (
+          <div className="rounded-lg border border-[var(--color-success)]/25 bg-[var(--color-success)]/8 p-4 text-sm text-[var(--color-success)]">
+            Sin valores negativos para el período consultado.
+          </div>
+        ) : null}
+
+        {negativosRows.length > 0 ? (
+          <>
+            <div className="mb-3 rounded-lg border border-[var(--color-error)]/25 bg-[var(--color-error)]/8 p-3 text-sm">
+              <span className="font-bold text-[var(--color-error)]">{negativosRows.length}</span>
+              <span className="ml-1 text-[var(--color-on-surface-variant)]">
+                {negativosRows.length === 1 ? "producto con valor negativo" : "productos con valores negativos"}
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse text-sm">
+                  <thead className="sticky top-0 bg-[var(--color-surface-container-highest)] text-left text-xs uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    <tr>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Grupo</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Unidad</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo inicial</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Ingreso</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Salida</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Saldo final</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">P. Unit.</th>
+                      <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">Total Bs.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {negativosRows.map((row, index) => (
+                      <tr
+                        key={`${row.codigo}-${index}`}
+                        className="border-b border-[var(--color-border-soft)] last:border-0"
+                      >
+                        <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">{row.grupoNombre}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{row.codigo}</td>
+                        <td className="min-w-[200px] px-3 py-2 font-medium">{row.nombre}</td>
+                        <td className="px-3 py-2 text-xs">{row.unidad}</td>
+                        {[
+                          { val: row.saldoInicial, dec: 2 },
+                          { val: row.ingresoQty,   dec: 2 },
+                          { val: row.salidaQty,    dec: 2 },
+                          { val: row.saldoFinal,   dec: 2 },
+                          { val: row.precioUnit,   dec: 4 },
+                          { val: row.totalBs,      dec: 2 },
+                        ].map(({ val, dec }, ci) => (
+                          <td
+                            key={ci}
+                            className={`px-3 py-2 text-right font-mono text-xs tabular-nums ${
+                              val < 0
+                                ? "bg-[var(--color-error)]/12 font-bold text-[var(--color-error)]"
+                                : ""
+                            }`}
+                          >
+                            {formatNumber(val, dec)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        ) : null}
       </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
