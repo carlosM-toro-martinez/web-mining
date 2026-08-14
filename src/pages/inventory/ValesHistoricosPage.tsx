@@ -890,6 +890,7 @@ export function ValesHistoricosPage() {
       return;
     }
 
+    let createdValeId: string | null = null;
     try {
       const createValePayload = {
         solicitanteId: solicitanteIdNum,
@@ -903,18 +904,25 @@ export function ValesHistoricosPage() {
       console.log("[ValesHistoricos] POST /api/vales payload", createValePayload);
       const created = await createValeMutation.mutateAsync(createValePayload);
       console.log("[ValesHistoricos] POST /api/vales response", created);
+      createdValeId = created.data.id;
 
       const cantidadesEntregadas = Object.fromEntries(
         (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
       );
+      // Mapear cuentaId por productoId (más robusto que por índice)
       const cuentaIds = Object.fromEntries(
-        (created.data.items ?? []).map((item, index) => [
-          item.id,
-          parsedItems[index]?.cuentaId ?? 0
-        ])
+        (created.data.items ?? []).map((serverItem) => {
+          const local = parsedItems.find((p) => p.productoId === serverItem.productoId);
+          return [serverItem.id, local?.cuentaId ?? 0];
+        })
       );
       if (Object.values(cuentaIds).some((value) => !value || value <= 0)) {
-        showError("No se pudo mapear la cuenta contable por item para la entrega histórica.");
+        await anularValeMutation.mutateAsync({
+          id: createdValeId,
+          payload: { motivo: "Anulado automáticamente: error al mapear cuenta contable" }
+        });
+        createdValeId = null;
+        showError("No se pudo mapear la cuenta contable. El vale fue cancelado automáticamente.");
         return;
       }
 
@@ -929,6 +937,7 @@ export function ValesHistoricosPage() {
       );
       const delivered = await entregarValeMutation.mutateAsync(entregarValePayload);
       console.log(`[ValesHistoricos] POST /api/vales/${created.data.id}/entregar response`, delivered);
+      createdValeId = null;
 
       showSuccess(
         isPeriodoCerrado
@@ -940,6 +949,14 @@ export function ValesHistoricosPage() {
       setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }]);
       setNextDraftItemId(2);
     } catch (error) {
+      if (createdValeId) {
+        try {
+          await anularValeMutation.mutateAsync({
+            id: createdValeId,
+            payload: { motivo: "Anulado automáticamente: error en entrega" }
+          });
+        } catch { /* ignorar error de anulación */ }
+      }
       showError(normalizeError(error, "No se pudo registrar o entregar el vale histórico."));
     }
   }
