@@ -12,6 +12,7 @@ import {
   anularVale,
   aprobarVale,
   createVale,
+  eliminarVale,
   entregarVale,
   getAnulacionesVales,
   getProductosPorUsuario,
@@ -222,6 +223,17 @@ export function useAnularValeMutation() {
         success: true,
         data: response.data.vale
       });
+    }
+  });
+}
+
+export function useEliminarValeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => eliminarVale(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.vales.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
     }
   });
 }

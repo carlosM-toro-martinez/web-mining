@@ -8,5 +8,6 @@ export const valesEndpoints = {
   anulaciones: "/api/vales/anulaciones",
   historialSolicitante: (userId: number | string) => `/api/vales/solicitante/${userId}`,
   resumenSolicitantes: "/api/vales/resumen-solicitantes",
-  productosPorUsuario: (userId: number | string) => `/api/vales/usuario/${userId}/productos`
+  productosPorUsuario: (userId: number | string) => `/api/vales/usuario/${userId}/productos`,
+  eliminar: (id: string) => `/api/vales/${id}/eliminar`
 } as const;

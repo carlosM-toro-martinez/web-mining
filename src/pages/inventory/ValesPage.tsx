@@ -13,6 +13,7 @@ import {
   useAnulacionesValesQuery,
   useAnularValeMutation,
   useCreateValeMutation,
+  useEliminarValeMutation,
   useEntregarValeMutation,
   useProductosPorUsuarioQuery,
   useResumenSolicitantesQuery,
@@ -65,13 +66,22 @@ export function ValesPage() {
   const usersQuery = useUsersListQuery();
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const cuentasQuery = useCuentasQuery();
-  const valesQuery = useValesQuery({ page: 1, limit: 200 });
+  const [filterFechaInicio, setFilterFechaInicio] = useState("");
+  const [filterFechaFin, setFilterFechaFin] = useState("");
+
+  const valesQuery = useValesQuery({
+    page: 1,
+    limit: 500,
+    ...(filterFechaInicio ? { fechaInicio: filterFechaInicio } : {}),
+    ...(filterFechaFin ? { fechaFin: filterFechaFin } : {})
+  });
   const anulacionesQuery = useAnulacionesValesQuery(user?.role === "ADMIN");
   const resumenSolicitantesQuery = useResumenSolicitantesQuery(canUseFlow);
 
   const createValeMutation = useCreateValeMutation();
   const entregarValeMutation = useEntregarValeMutation();
   const anularValeMutation = useAnularValeMutation();
+  const eliminarValeMutation = useEliminarValeMutation();
   const updateProductoMutation = useUpdateProductoMutation();
   const registerMutation = useRegisterMutation();
   const pendingOfflineQuery = useInventoryOfflinePendingCount();
@@ -91,6 +101,8 @@ export function ValesPage() {
   const [isAnularModalOpen, setIsAnularModalOpen] = useState(false);
   const [anularValeId, setAnularValeId] = useState("");
   const [anularMotivo, setAnularMotivo] = useState("");
+  const [isEliminarModalOpen, setIsEliminarModalOpen] = useState(false);
+  const [eliminarValeId, setEliminarValeId] = useState("");
 
   const productosPorUsuarioQuery = useProductosPorUsuarioQuery(
     historialUserId ? Number(historialUserId) : null,
@@ -252,6 +264,23 @@ export function ValesPage() {
     setAnularValeId(valeId);
     setAnularMotivo("");
     setIsAnularModalOpen(true);
+  }
+
+  function openEliminarModal(valeId: string) {
+    setEliminarValeId(valeId);
+    setIsEliminarModalOpen(true);
+  }
+
+  function handleConfirmEliminarVale() {
+    if (!eliminarValeId) return;
+    eliminarValeMutation.mutate(eliminarValeId, {
+      onSuccess: () => {
+        showSuccess("Vale eliminado permanentemente. El stock ha sido restaurado.");
+        setIsEliminarModalOpen(false);
+        setEliminarValeId("");
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo eliminar el vale."))
+    });
   }
 
   function handleConfirmAnularVale(event: FormEvent<HTMLFormElement>) {
@@ -648,7 +677,33 @@ export function ValesPage() {
       />
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 text-lg font-bold">Vales recientes</h2>
+        <h2 className="mb-4 text-lg font-bold">Vales</h2>
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr_1fr_auto]">
+          <span className="self-center text-xs font-semibold text-[var(--color-on-surface-variant)]">
+            Filtrar por fecha:
+          </span>
+          <input
+            type="date"
+            value={filterFechaInicio}
+            onChange={(e) => setFilterFechaInicio(e.target.value)}
+            className={inputClassName}
+            placeholder="Desde"
+          />
+          <input
+            type="date"
+            value={filterFechaFin}
+            onChange={(e) => setFilterFechaFin(e.target.value)}
+            className={inputClassName}
+            placeholder="Hasta"
+          />
+          <button
+            type="button"
+            onClick={() => { setFilterFechaInicio(""); setFilterFechaFin(""); }}
+            className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+          >
+            Limpiar
+          </button>
+        </div>
         <div className="table-scroll overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
@@ -668,7 +723,7 @@ export function ValesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {valesRecientes.slice(0, 12).map((vale) => (
+              {valesRecientes.map((vale) => (
                 <tr key={vale.id}>
                   <td className="px-3 py-2 text-xs">
                     <span
@@ -684,19 +739,31 @@ export function ValesPage() {
                     {vale.createdAt ? new Date(vale.createdAt).toLocaleString() : "-"}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {canAnularVale(vale.estado) ? (
-                      <button
-                        type="button"
-                        onClick={() => openAnularModal(vale.id)}
-                        className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
-                      >
-                        Anular vale
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-[var(--color-on-surface-variant)]">
-                        No aplica
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {canAnularVale(vale.estado) ? (
+                        <button
+                          type="button"
+                          onClick={() => openAnularModal(vale.id)}
+                          className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+                        >
+                          Anular
+                        </button>
+                      ) : null}
+                      {user?.role === "ADMIN" && canAnularVale(vale.estado) ? (
+                        <button
+                          type="button"
+                          onClick={() => openEliminarModal(vale.id)}
+                          className="rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/20"
+                        >
+                          Eliminar
+                        </button>
+                      ) : null}
+                      {!canAnularVale(vale.estado) ? (
+                        <span className="text-[10px] text-[var(--color-on-surface-variant)]">
+                          No aplica
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -765,6 +832,38 @@ export function ValesPage() {
             </table>
           </div>
         </article>
+      ) : null}
+
+      {isEliminarModalOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h3 className="text-lg font-bold text-[var(--color-error)]">Eliminar vale permanentemente</h3>
+            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
+              Esta accion <strong>borra el vale completamente</strong> de la base de datos y restaura
+              el stock directamente, sin crear contra-asientos. No se puede deshacer.
+            </p>
+            <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+              Solo aplica a vales no retroactivos. Si el vale tiene movimientos retroactivos, usa Anular.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setIsEliminarModalOpen(false); setEliminarValeId(""); }}
+                className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={eliminarValeMutation.isPending}
+                onClick={handleConfirmEliminarVale}
+                className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {eliminarValeMutation.isPending ? "Eliminando..." : "Confirmar eliminacion"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {isAnularModalOpen ? (

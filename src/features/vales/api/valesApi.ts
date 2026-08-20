@@ -1,4 +1,5 @@
-import { getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
+import { z } from "zod";
+import { deleteRequest, getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   aprobarValePayloadSchema,
@@ -114,5 +115,12 @@ export async function getAnulacionesVales() {
   return getRequest({
     url: apiEndpoints.vales.anulaciones,
     schema: anulacionesListResponseSchema
+  });
+}
+
+export async function eliminarVale(id: string) {
+  return deleteRequest({
+    url: apiEndpoints.vales.eliminar(id),
+    schema: z.object({ success: z.boolean(), data: z.object({ eliminado: z.boolean(), valeId: z.string() }) })
   });
 }
