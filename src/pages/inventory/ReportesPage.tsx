@@ -2965,7 +2965,7 @@ export function ReportesPage() {
                             : typeof value === "number"
                               ? value.toLocaleString("es-BO", {
                                   minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2
+                                  maximumFractionDigits: 10
                                 })
                               : value;
                         return (
