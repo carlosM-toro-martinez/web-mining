@@ -1232,7 +1232,7 @@ export function buildCuadroSuministrosApiReportDefinition(
               unidad: item.unidad ?? "",
               descripcion: item.nombre ?? "",
               totalBs: Number(item.importeBs.toFixed(2)),
-              sinIvaBs: Number(item.importeSinIVA.toFixed(2)),
+              sinIvaBs: item.importeSinIVA,
               grupo: item.grupo?.codigo ?? ""
             }
           });
