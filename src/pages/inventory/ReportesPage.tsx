@@ -486,7 +486,7 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
         .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
       // Para sectores de transporte: centroCosto y funcionGasto son únicos por sector
       const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
-      const funcionCodigo = sector.funcionGastos[0]?.funcionGastoCodigo ?? "";
+      const funcionCodigo = sector.funcionGastos[0]?.codigo ?? "";
 
       rows.push({
         key: `sector-${sectorIndex}`,

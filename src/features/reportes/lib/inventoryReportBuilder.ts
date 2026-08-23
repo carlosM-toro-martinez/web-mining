@@ -971,7 +971,7 @@ export function buildDiarioAlmacenesApiReportDefinition(
         const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? [])
           .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
         const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
-        const funcionCodigo = sector.funcionGastos[0]?.funcionGastoCodigo ?? "";
+        const funcionCodigo = sector.funcionGastos[0]?.codigo ?? "";
 
         rows.push({
           id: `sector-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
