@@ -457,6 +457,8 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
   const rows: Array<{
     key: string;
     descripcion: string;
+    centroCosto?: string;
+    funcionGasto?: string;
     parcial?: number | "";
     cuenta?: string;
     debe?: number | "";
@@ -489,6 +491,8 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
           rows.push({
             key: `linea-sector-${sectorIndex}-${lineIndex}`,
             descripcion: linea.funcionGastoNombre,
+            centroCosto: linea.centroCostoCodigo,
+            funcionGasto: linea.funcionGastoCodigo,
             parcial: linea.totalBs,
             cuenta: reportDiarioDetalleCuenta(
               linea.centroCostoCodigo,
@@ -563,6 +567,16 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
           <thead>
             <tr>
               <th className="border border-black px-1 py-1 text-left">D E S C R I P C I O N</th>
+              <th className="border border-black px-1 py-1 text-center">
+                CENTRO
+                <br />
+                DE COSTO
+              </th>
+              <th className="border border-black px-1 py-1 text-center">
+                FUNCION
+                <br />
+                DEL GASTO
+              </th>
               <th className="border border-black px-1 py-1 text-right">
                 PARCIALES
                 <br />
@@ -585,6 +599,12 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
                   className={`border border-black px-1 py-0.5 ${row.strong ? "font-bold underline" : ""}`}
                 >
                   {row.descripcion}
+                </td>
+                <td className="border border-black px-1 py-0.5 text-center">
+                  {row.centroCosto ?? ""}
+                </td>
+                <td className="border border-black px-1 py-0.5 text-center">
+                  {row.funcionGasto ?? ""}
                 </td>
                 <td className="border border-black px-1 py-0.5 text-right">
                   {formatBs(row.parcial || undefined)}
