@@ -59,6 +59,7 @@ export const compraSchema = z.object({
   numeroFactura: z.string().optional().nullable(),
   observacion: z.string().optional().nullable(),
   fechaOperacion: z.string().optional().nullable(),
+  esGasEspecial: z.boolean().optional().nullable(),
   createdAt: z.string().optional().nullable(),
   recibidoAt: z.string().optional().nullable(),
   proveedor: proveedorSchema.optional().nullable(),
@@ -162,6 +163,7 @@ export const createCompraPayloadSchema = z.object({
   observacion: z.string().trim().optional(),
   fechaOperacion: z.string().datetime().optional(),
   tieneIva: z.boolean().optional(),
+  esGasEspecial: z.boolean().optional().nullable(),
   items: z
     .array(
       z.object({
