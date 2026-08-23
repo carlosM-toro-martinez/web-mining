@@ -993,21 +993,49 @@ export function buildDiarioAlmacenesApiReportDefinition(
         });
 
         if (shouldShowDiarioSectorDetails(sector)) {
-          for (const linea of diarioSectorLineas(sector)) {
-            rows.push({
-              id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${linea.id || rows.length}`,
-              values: {
-                periodo: "",
-                cargos: "",
-                descripcion: linea.funcionGastoNombre,
-                centroCosto: linea.centroCostoCodigo,
-                funcionGasto: linea.funcionGastoCodigo,
-                parcialesBs: Number(linea.totalBs.toFixed(2)),
-                cuenta: cuentaDetalleDiario(linea.centroCostoCodigo, linea.funcionGastoCodigo),
-                debeBs: "",
-                haberBs: ""
+          const sectorDigits = (sector.sectorCodigo ?? "").replace(/[^\d]/g, "");
+          const sectorCuentas = periodo.cuentasHaber
+            .filter(c => sectorDigits && (c.codigoCompleto ?? "").replace(/[^\d]/g, "").includes(sectorDigits))
+            .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
+
+          if (sectorCuentas.length) {
+            for (const cuenta of sectorCuentas) {
+              for (const linea of cuenta.lineas) {
+                const fgCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
+                const descripcion = linea.nombre ?? linea.funcionGastoNombre ?? "";
+                rows.push({
+                  id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${cuenta.codigoCompleto}-${fgCodigo}`,
+                  values: {
+                    periodo: "",
+                    cargos: "",
+                    descripcion,
+                    centroCosto: cuenta.centroCostoCodigo ?? "",
+                    funcionGasto: fgCodigo,
+                    parcialesBs: Number(linea.importeBs.toFixed(2)),
+                    cuenta: cuentaDetalleDiario(cuenta.centroCostoCodigo, fgCodigo),
+                    debeBs: "",
+                    haberBs: ""
+                  }
+                });
               }
-            });
+            }
+          } else {
+            for (const linea of diarioSectorLineas(sector)) {
+              rows.push({
+                id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${linea.id || rows.length}`,
+                values: {
+                  periodo: "",
+                  cargos: "",
+                  descripcion: linea.funcionGastoNombre,
+                  centroCosto: linea.centroCostoCodigo,
+                  funcionGasto: linea.funcionGastoCodigo,
+                  parcialesBs: Number(linea.totalBs.toFixed(2)),
+                  cuenta: cuentaDetalleDiario(linea.centroCostoCodigo, linea.funcionGastoCodigo),
+                  debeBs: "",
+                  haberBs: ""
+                }
+              });
+            }
           }
         }
       }

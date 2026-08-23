@@ -487,19 +487,38 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
       });
 
       if (showDetails) {
-        diarioSectorLineas(sector).forEach((linea, lineIndex) => {
-          rows.push({
-            key: `linea-sector-${sectorIndex}-${lineIndex}`,
-            descripcion: linea.funcionGastoNombre,
-            centroCosto: linea.centroCostoCodigo,
-            funcionGasto: linea.funcionGastoCodigo,
-            parcial: linea.totalBs,
-            cuenta: reportDiarioDetalleCuenta(
-              linea.centroCostoCodigo,
-              linea.funcionGastoCodigo
-            )
+        const sectorDigits = (sector.sectorCodigo ?? "").replace(/[^\d]/g, "");
+        const sectorCuentas = periodo.cuentasHaber
+          .filter(c => sectorDigits && (c.codigoCompleto ?? "").replace(/[^\d]/g, "").includes(sectorDigits))
+          .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
+
+        if (sectorCuentas.length) {
+          sectorCuentas.forEach((cuenta, ci) => {
+            cuenta.lineas.forEach((linea, li) => {
+              const funcionGastoCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
+              const descripcion = linea.nombre ?? linea.funcionGastoNombre ?? "";
+              rows.push({
+                key: `linea-sector-${sectorIndex}-${ci}-${li}`,
+                descripcion,
+                centroCosto: cuenta.centroCostoCodigo ?? "",
+                funcionGasto: funcionGastoCodigo,
+                parcial: linea.importeBs,
+                cuenta: reportDiarioDetalleCuenta(cuenta.centroCostoCodigo, funcionGastoCodigo)
+              });
+            });
           });
-        });
+        } else {
+          diarioSectorLineas(sector).forEach((linea, lineIndex) => {
+            rows.push({
+              key: `linea-sector-${sectorIndex}-${lineIndex}`,
+              descripcion: linea.funcionGastoNombre,
+              centroCosto: linea.centroCostoCodigo,
+              funcionGasto: linea.funcionGastoCodigo,
+              parcial: linea.totalBs,
+              cuenta: reportDiarioDetalleCuenta(linea.centroCostoCodigo, linea.funcionGastoCodigo)
+            });
+          });
+        }
       }
     });
   } else {
