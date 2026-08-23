@@ -265,6 +265,7 @@ export function ValesHistoricosPage() {
   const [fechaOperacionCompra, setFechaOperacionCompra] = useState("");
   const [numeroFacturaCompra, setNumeroFacturaCompra] = useState("");
   const [compraSinIva, setCompraSinIva] = useState(false);
+  const [compraEsGasEspecial, setCompraEsGasEspecial] = useState(false);
   const [compraDraftItems, setCompraDraftItems] = useState<CompraDraftItem[]>([
     { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
   ]);
@@ -831,6 +832,7 @@ export function ValesHistoricosPage() {
         numeroFactura: numeroFacturaCompra.trim() || undefined,
         fechaOperacion: `${fechaOperacionCompra}T00:00:00.000Z`,
         tieneIva: !compraSinIva,
+        esGasEspecial: compraSinIva ? null : compraEsGasEspecial,
         items: parsedItems
       });
       const cantidadesRecibidas = Object.fromEntries(
@@ -849,6 +851,7 @@ export function ValesHistoricosPage() {
       setFechaOperacionCompra("");
       setNumeroFacturaCompra("");
       setCompraSinIva(false);
+      setCompraEsGasEspecial(false);
       setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }]);
       setNextCompraDraftItemId(2);
     } catch (error) {
@@ -1418,6 +1421,34 @@ export function ValesHistoricosPage() {
               <span>Sin IVA</span>
             </label>
           </div>
+
+          {!compraSinIva && (
+            <div className="rounded-lg border border-[var(--color-outline-variant)] p-3">
+              <p className="mb-2 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Fórmula IVA
+              </p>
+              <div className="flex gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="compraEsGasEspecial"
+                    checked={!compraEsGasEspecial}
+                    onChange={() => setCompraEsGasEspecial(false)}
+                  />
+                  <span>IVA 13% normal (× 0.87)</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="compraEsGasEspecial"
+                    checked={compraEsGasEspecial}
+                    onChange={() => setCompraEsGasEspecial(true)}
+                  />
+                  <span>Gas especial (IVA sobre 70%)</span>
+                </label>
+              </div>
+            </div>
+          )}
 
           {isPeriodoCerradoCompra ? (
             <div className="rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/15 p-3 text-xs text-[var(--color-warning)]">
