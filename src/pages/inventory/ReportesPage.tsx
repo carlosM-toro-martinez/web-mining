@@ -454,6 +454,16 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
   const periodo = response.data.meses[0];
   if (!periodo) return null;
   const month = movimientoMonthLabel(periodo.anio, periodo.mes);
+
+  // Lookup: sectorNombre → cuentasHaber entries (tienen centroCostoCodigo por cuenta)
+  const sectorNombreToCuentas = new Map<string, typeof periodo.cuentasHaber>();
+  for (const cuenta of periodo.cuentasHaber) {
+    if (!cuenta.sectorNombre) continue;
+    const arr = sectorNombreToCuentas.get(cuenta.sectorNombre) ?? [];
+    arr.push(cuenta);
+    sectorNombreToCuentas.set(cuenta.sectorNombre, arr);
+  }
+
   const rows: Array<{
     key: string;
     descripcion: string;
@@ -472,6 +482,12 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
   if (periodo.sectoresHaber.length) {
     sortDiarioSectores(periodo.sectoresHaber).forEach((sector, sectorIndex) => {
       const showDetails = shouldShowDiarioSectorDetails(sector);
+      const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? [])
+        .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
+      // Para sectores de transporte: centroCosto y funcionGasto son únicos por sector
+      const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
+      const funcionCodigo = sector.funcionGastos[0]?.funcionGastoCodigo ?? "";
+
       rows.push({
         key: `sector-${sectorIndex}`,
         descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
@@ -482,32 +498,31 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
       rows.push({
         key: `atencion-${sectorIndex}`,
         descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
+        centroCosto: showDetails ? "" : centroCodigo,
+        funcionGasto: showDetails ? "" : funcionCodigo,
         parcial: showDetails ? "" : sector.totalBs,
         debe: showDetails ? "" : sector.totalBs
       });
 
       if (showDetails) {
-        const sectorDigits = (sector.sectorCodigo ?? "").replace(/[^\d]/g, "");
-        const sectorCuentas = periodo.cuentasHaber
-          .filter(c => sectorDigits && (c.codigoCompleto ?? "").replace(/[^\d]/g, "").includes(sectorDigits))
-          .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
-
-        if (sectorCuentas.length) {
+        const hasCuentaLineas = sectorCuentas.some(c => c.lineas.length > 0);
+        if (hasCuentaLineas) {
+          // Usamos cuentasHaber para obtener centroCosto + funcionGasto por fila
           sectorCuentas.forEach((cuenta, ci) => {
             cuenta.lineas.forEach((linea, li) => {
-              const funcionGastoCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
-              const descripcion = linea.nombre ?? linea.funcionGastoNombre ?? "";
+              const fgCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
               rows.push({
                 key: `linea-sector-${sectorIndex}-${ci}-${li}`,
-                descripcion,
+                descripcion: linea.nombre ?? linea.funcionGastoNombre ?? "",
                 centroCosto: cuenta.centroCostoCodigo ?? "",
-                funcionGasto: funcionGastoCodigo,
+                funcionGasto: fgCodigo,
                 parcial: linea.importeBs,
-                cuenta: reportDiarioDetalleCuenta(cuenta.centroCostoCodigo, funcionGastoCodigo)
+                cuenta: reportDiarioDetalleCuenta(cuenta.centroCostoCodigo, fgCodigo)
               });
             });
           });
         } else {
+          // Fallback: sector.funcionGastos (sin centroCosto)
           diarioSectorLineas(sector).forEach((linea, lineIndex) => {
             rows.push({
               key: `linea-sector-${sectorIndex}-${lineIndex}`,
@@ -844,7 +859,7 @@ function costoSheetName(cuenta: {
   const text =
     `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
   if (code.includes("22001008") || text.includes("TRANSPORTISTAS VARIOS") || text.includes("TRANSPORTE VARIOS"))
-    return "DETALLE TRANSPORTE";
+    return "ROMARESNI";
   if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA")) return "EMUSA";
   if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD"))
     return "PUNTUALIDAD";
@@ -857,10 +872,10 @@ function costoSheetName(cuenta: {
 }
 
 function costoSheetMeta(sheetName: string) {
-  if (sheetName === "DETALLE TRANSPORTE") {
+  if (sheetName === "ROMARESNI") {
     return {
-      title: "DETALLE DE MATERIALES  TRANSPORTE VARIO COMBUSTIBLE",
-      codeLine: "22,001,008    CTAS.CTES.TRANSPORTE VARIOS COMBUSTIBLE",
+      title: "DETALLE DE MATERIALES  EMPRESA CONST. ROMARESNI S.R.L.",
+      codeLine: "22,001,008    CTAS.CTES.EMPRESA CONST. ROMARESNI S.R.L.",
       isTransport: true
     };
   }
@@ -1222,7 +1237,7 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
     "EMUSA",
     "OBRAS EN CONSTRUCCION",
     "MAQUINARIA Y EQUIPO",
-    "DETALLE TRANSPORTE"
+    "ROMARESNI"
   ];
   const orderedSheets = order
     .map((name) => sheets.get(name))

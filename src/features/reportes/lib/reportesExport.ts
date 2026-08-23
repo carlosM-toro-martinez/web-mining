@@ -167,7 +167,7 @@ function costoSheetName(cuenta: {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   const text = `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
   if (code.includes("22001008") || text.includes("TRANSPORTISTAS VARIOS") || text.includes("TRANSPORTE VARIOS"))
-    return "DETALLE TRANSPORTE";
+    return "ROMARESNI";
   if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA")) return "EMUSA";
   if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD")) return "PUNTUALIDAD";
   if (code.includes("35001000") || text.includes("MAQUINARIAS")) return "MAQUINARIA Y EQUIPO";
@@ -177,10 +177,10 @@ function costoSheetName(cuenta: {
 }
 
 function costoSheetMeta(sheetName: string) {
-  if (sheetName === "DETALLE TRANSPORTE") {
+  if (sheetName === "ROMARESNI") {
     return {
-      title: "DETALLE DE MATERIALES  TRANSPORTE VARIO COMBUSTIBLE",
-      codeLine: "22,001,008    CTAS.CTES.TRANSPORTE VARIOS COMBUSTIBLE",
+      title: "DETALLE DE MATERIALES  EMPRESA CONST. ROMARESNI S.R.L.",
+      codeLine: "22,001,008    CTAS.CTES.EMPRESA CONST. ROMARESNI S.R.L.",
       isTransport: true
     };
   }
@@ -1292,8 +1292,8 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
       kind: row.type === "group" ? "title" : row.type === "total" ? "total" : undefined,
       values: [
         valueOf(row, "descripcion"),
-        valueOf(row, "centroCosto"),
-        valueOf(row, "funcionGasto"),
+        valueOf(row, "centroCostoCodigo"),
+        valueOf(row, "funcionGastoCodigo"),
         valueOf(row, "parcialesBs"),
         valueOf(row, "cuenta"),
         valueOf(row, "debeBs"),
@@ -1301,6 +1301,7 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
       ]
     }));
 
+  const LAST_COL = 6;
   const aoa: Array<Array<string | number>> = [
     ["COMPROBANTE  DE  DIARIO"],
     ["DIARIO  ALMACENES"],
@@ -1311,23 +1312,23 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
   sheet["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
-    { s: { r: 2, c: 1 }, e: { r: 2, c: 6 } }
+    { s: { r: 0, c: 0 }, e: { r: 0, c: LAST_COL } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: LAST_COL } },
+    { s: { r: 2, c: 1 }, e: { r: 2, c: LAST_COL } }
   ];
-  sheet["!cols"] = [{ wch: 45 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
-  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 6 } }, excelTitleStyle);
-  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 6 } }, excelHeaderStyle);
+  sheet["!cols"] = [{ wch: 45 }, { wch: 13 }, { wch: 13 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
+  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: LAST_COL } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: LAST_COL } }, excelHeaderStyle);
   styleRange(
     sheet,
-    { s: { r: 5, c: 0 }, e: { r: 4 + bodyRows.length, c: 6 } },
+    { s: { r: 5, c: 0 }, e: { r: 4 + bodyRows.length, c: LAST_COL } },
     excelBodyStyle,
     new Set([3, 5, 6]),
     "#,##0.00"
   );
   bodyRows.forEach((row, index) => {
     if (row.kind === "title" || row.kind === "total") {
-      styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: 6 } }, {
+      styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: LAST_COL } }, {
         ...excelBodyStyle,
         font: { bold: true, sz: 10 }
       }, new Set([3, 5, 6]));
@@ -1560,7 +1561,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
       "EMUSA",
       "OBRAS EN CONSTRUCCION",
       "MAQUINARIA Y EQUIPO",
-      "DETALLE TRANSPORTE"
+      "ROMARESNI"
     ];
     const remainingSheetNames = [...groupedCuentas.keys()].filter((sheetName) => !orderedSheetNames.includes(sheetName));
     for (const sheetName of [...orderedSheetNames, ...remainingSheetNames]) {

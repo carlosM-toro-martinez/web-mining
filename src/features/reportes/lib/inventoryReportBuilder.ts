@@ -936,8 +936,6 @@ export function buildDiarioAlmacenesApiReportDefinition(
           periodo: formatMonth(periodo.anio, periodo.mes),
           cargos: "",
           descripcion: "CONTABILIZACION DIARIO ALMACENES MES:",
-          centroCosto: "",
-          funcionGasto: "",
           parcialesBs: "",
           cuenta: "",
           debeBs: "",
@@ -951,8 +949,6 @@ export function buildDiarioAlmacenesApiReportDefinition(
           periodo: "",
           cargos: "",
           descripcion: `${MONTH_NAMES[periodo.mes - 1]}-${periodo.anio}`,
-          centroCosto: "",
-          funcionGasto: "",
           parcialesBs: "",
           cuenta: "",
           debeBs: "",
@@ -960,8 +956,23 @@ export function buildDiarioAlmacenesApiReportDefinition(
         }
       });
 
+      // Lookup sectorNombre → cuentasHaber entries (tienen centroCostoCodigo por cuenta)
+      const sectorNombreToCuentas = new Map<string, typeof periodo.cuentasHaber>();
+      for (const cuenta of periodo.cuentasHaber) {
+        if (!cuenta.sectorNombre) continue;
+        const arr = sectorNombreToCuentas.get(cuenta.sectorNombre) ?? [];
+        arr.push(cuenta);
+        sectorNombreToCuentas.set(cuenta.sectorNombre, arr);
+      }
+
       for (const sector of sortDiarioSectores(periodo.sectoresHaber)) {
         const sectorKey = reportCuentaKey(sector.sectorCodigo);
+        const showDetails = shouldShowDiarioSectorDetails(sector);
+        const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? [])
+          .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
+        const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
+        const funcionCodigo = sector.funcionGastos[0]?.funcionGastoCodigo ?? "";
+
         rows.push({
           id: `sector-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
           type: "group",
@@ -969,11 +980,11 @@ export function buildDiarioAlmacenesApiReportDefinition(
             periodo: formatMonth(periodo.anio, periodo.mes),
             cargos: "",
             descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
-            centroCosto: "",
-            funcionGasto: "",
+            centroCostoCodigo: "",
+            funcionGastoCodigo: "",
             parcialesBs: "",
             cuenta: sector.sectorCodigo ?? "",
-            debeBs: shouldShowDiarioSectorDetails(sector) ? Number(sector.totalBs.toFixed(2)) : "",
+            debeBs: showDetails ? Number(sector.totalBs.toFixed(2)) : "",
             haberBs: ""
           }
         });
@@ -983,42 +994,37 @@ export function buildDiarioAlmacenesApiReportDefinition(
             periodo: "",
             cargos: "",
             descripcion: `Aten. Material mes de ${MONTH_NAMES[periodo.mes - 1]}- ${periodo.anio}`,
-            centroCosto: "",
-            funcionGasto: "",
-            parcialesBs: shouldShowDiarioSectorDetails(sector) ? "" : Number(sector.totalBs.toFixed(2)),
+            centroCostoCodigo: showDetails ? "" : centroCodigo,
+            funcionGastoCodigo: showDetails ? "" : funcionCodigo,
+            parcialesBs: showDetails ? "" : Number(sector.totalBs.toFixed(2)),
             cuenta: "",
-            debeBs: shouldShowDiarioSectorDetails(sector) ? "" : Number(sector.totalBs.toFixed(2)),
+            debeBs: showDetails ? "" : Number(sector.totalBs.toFixed(2)),
             haberBs: ""
           }
         });
 
-        if (shouldShowDiarioSectorDetails(sector)) {
-          const sectorDigits = (sector.sectorCodigo ?? "").replace(/[^\d]/g, "");
-          const sectorCuentas = periodo.cuentasHaber
-            .filter(c => sectorDigits && (c.codigoCompleto ?? "").replace(/[^\d]/g, "").includes(sectorDigits))
-            .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
-
-          if (sectorCuentas.length) {
-            for (const cuenta of sectorCuentas) {
-              for (const linea of cuenta.lineas) {
+        if (showDetails) {
+          const hasCuentaLineas = sectorCuentas.some(c => c.lineas.length > 0);
+          if (hasCuentaLineas) {
+            sectorCuentas.forEach((cuenta, ci) => {
+              cuenta.lineas.forEach((linea, li) => {
                 const fgCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
-                const descripcion = linea.nombre ?? linea.funcionGastoNombre ?? "";
                 rows.push({
-                  id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${cuenta.codigoCompleto}-${fgCodigo}`,
+                  id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${ci}-${li}`,
                   values: {
                     periodo: "",
                     cargos: "",
-                    descripcion,
-                    centroCosto: cuenta.centroCostoCodigo ?? "",
-                    funcionGasto: fgCodigo,
+                    descripcion: linea.nombre ?? linea.funcionGastoNombre ?? "",
+                    centroCostoCodigo: cuenta.centroCostoCodigo ?? "",
+                    funcionGastoCodigo: fgCodigo,
                     parcialesBs: Number(linea.importeBs.toFixed(2)),
                     cuenta: cuentaDetalleDiario(cuenta.centroCostoCodigo, fgCodigo),
                     debeBs: "",
                     haberBs: ""
                   }
                 });
-              }
-            }
+              });
+            });
           } else {
             for (const linea of diarioSectorLineas(sector)) {
               rows.push({
@@ -1027,8 +1033,8 @@ export function buildDiarioAlmacenesApiReportDefinition(
                   periodo: "",
                   cargos: "",
                   descripcion: linea.funcionGastoNombre,
-                  centroCosto: linea.centroCostoCodigo,
-                  funcionGasto: linea.funcionGastoCodigo,
+                  centroCostoCodigo: linea.centroCostoCodigo,
+                  funcionGastoCodigo: linea.funcionGastoCodigo,
                   parcialesBs: Number(linea.totalBs.toFixed(2)),
                   cuenta: cuentaDetalleDiario(linea.centroCostoCodigo, linea.funcionGastoCodigo),
                   debeBs: "",
@@ -1140,8 +1146,6 @@ export function buildDiarioAlmacenesApiReportDefinition(
           periodo: formatMonth(periodo.anio, periodo.mes),
           cargos: "",
           descripcion: "INVENTARIO MATERIALES Y SUMINISTROS",
-          centroCosto: "",
-          funcionGasto: "",
           parcialesBs: "",
           cuenta: "26.002.000",
           debeBs: "",
@@ -1154,8 +1158,6 @@ export function buildDiarioAlmacenesApiReportDefinition(
           periodo: "",
           cargos: "",
           descripcion: "Según Vales Salida Materiales",
-          centroCosto: "",
-          funcionGasto: "",
           parcialesBs: "",
           cuenta: "",
           debeBs: "",
@@ -1170,8 +1172,6 @@ export function buildDiarioAlmacenesApiReportDefinition(
         periodo: formatMonth(periodo.anio, periodo.mes),
         cargos: "",
         descripcion: "",
-        centroCosto: "",
-        funcionGasto: "",
         parcialesBs: "",
         cuenta: "",
         debeBs: Number(
@@ -1196,8 +1196,8 @@ export function buildDiarioAlmacenesApiReportDefinition(
       reportType === "diario-almacenes"
         ? [
             { key: "descripcion", label: "Descripcion" },
-            { key: "centroCosto", label: "Centro de Costo", align: "center" as const },
-            { key: "funcionGasto", label: "Funcion del Gasto", align: "center" as const },
+            { key: "centroCostoCodigo", label: "Centro Costo", align: "center" },
+            { key: "funcionGastoCodigo", label: "Funcion Gasto", align: "center" },
             { key: "parcialesBs", label: "Parciales Bs.", align: "right" },
             { key: "cuenta", label: "No De Cuenta", align: "center" },
             { key: "debeBs", label: "Debe Bs.", align: "right" },
