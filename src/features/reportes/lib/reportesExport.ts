@@ -1292,6 +1292,8 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
       kind: row.type === "group" ? "title" : row.type === "total" ? "total" : undefined,
       values: [
         valueOf(row, "descripcion"),
+        valueOf(row, "centroCosto"),
+        valueOf(row, "funcionGasto"),
         valueOf(row, "parcialesBs"),
         valueOf(row, "cuenta"),
         valueOf(row, "debeBs"),
@@ -1304,31 +1306,31 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
     ["DIARIO  ALMACENES"],
     ["SECTOR:  LIPEÑA", periodo ? `MES:  DE ${monthName}  ${periodo.anio}` : monthLabelFromSubtitle(report.subtitle)],
     [],
-    ["D E S C R I P C I O N", "PARCIALES\nBs.", "No  DE CUENTA", "BOLIVIANOS\nD E B E", "BOLIVIANOS\nH A B E R"],
+    ["D E S C R I P C I O N", "CENTRO\nDE COSTO", "FUNCION\nDEL GASTO", "PARCIALES\nBs.", "No  DE CUENTA", "BOLIVIANOS\nD E B E", "BOLIVIANOS\nH A B E R"],
     ...bodyRows.map((row) => row.values)
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
   sheet["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
-    { s: { r: 2, c: 1 }, e: { r: 2, c: 4 } }
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
+    { s: { r: 2, c: 1 }, e: { r: 2, c: 6 } }
   ];
-  sheet["!cols"] = [{ wch: 45 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
-  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 4 } }, excelTitleStyle);
-  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } }, excelHeaderStyle);
+  sheet["!cols"] = [{ wch: 45 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
+  styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 6 } }, excelTitleStyle);
+  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 6 } }, excelHeaderStyle);
   styleRange(
     sheet,
-    { s: { r: 5, c: 0 }, e: { r: 4 + bodyRows.length, c: 4 } },
+    { s: { r: 5, c: 0 }, e: { r: 4 + bodyRows.length, c: 6 } },
     excelBodyStyle,
-    new Set([1, 3, 4]),
+    new Set([3, 5, 6]),
     "#,##0.00"
   );
   bodyRows.forEach((row, index) => {
     if (row.kind === "title" || row.kind === "total") {
-      styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: 4 } }, {
+      styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: 6 } }, {
         ...excelBodyStyle,
         font: { bold: true, sz: 10 }
-      }, new Set([1, 3, 4]));
+      }, new Set([3, 5, 6]));
     }
   });
   appendAndSaveStyledSheet({ sheet, sheetName: "Diario Almacenes", fileToken: "diario-almacenes" });
