@@ -46,6 +46,7 @@ export const compraItemSchema = z.preprocess(
     cantidadPedida: numberLikeSchema.nonnegative(),
     cantidadRecibida: numberLikeSchema.nonnegative().default(0),
     precioUnit: numberLikeSchema.nonnegative(),
+    totalBs: numberLikeSchema.nonnegative().optional().nullable(),
     producto: compraProductoSchema.optional().nullable()
   })
 );
@@ -126,7 +127,8 @@ export const anularCompraPayloadSchema = z.object({
 });
 
 export const actualizarCompraItemPrecioPayloadSchema = z.object({
-  precioUnit: numberLikeSchema.positive("Precio unitario invalido.")
+  precioUnit: numberLikeSchema.positive("Precio unitario invalido.").optional(),
+  totalBs: numberLikeSchema.positive("Total invalido.").optional(),
 });
 
 export const actualizarCompraItemPrecioResponseSchema = z.object({
@@ -169,7 +171,8 @@ export const createCompraPayloadSchema = z.object({
       z.object({
         productoId: numberLikeSchema.int().positive("Producto invalido."),
         cantidadPedida: numberLikeSchema.positive("Cantidad pedida invalida."),
-        precioUnit: numberLikeSchema.positive("Precio unitario invalido.")
+        precioUnit: numberLikeSchema.positive("Precio unitario invalido."),
+        totalBs: numberLikeSchema.positive().optional()
       })
     )
     .min(1, "Debes agregar al menos un item.")

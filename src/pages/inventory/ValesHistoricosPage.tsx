@@ -134,6 +134,7 @@ function getCompraItemCantidad(item: CompraItem) {
 }
 
 function getCompraItemTotal(item: CompraItem) {
+  if (item.totalBs != null) return Number(item.totalBs);
   return getCompraItemCantidad(item) * item.precioUnit;
 }
 
@@ -765,30 +766,32 @@ export function ValesHistoricosPage() {
     }
 
     const productoNombre = item.producto?.nombre ?? item.producto?.codigo ?? "Producto";
-    const rawPrecio = window.prompt(
-      `Nuevo precio unitario para ${productoNombre}:`,
-      String(item.precioUnit)
+    const cantidadActual = getCompraItemCantidad(item);
+    const totalActual = getCompraItemTotal(item);
+    const rawTotal = window.prompt(
+      `Nuevo total Bs para ${productoNombre} (${formatNumber(cantidadActual)} unidades):`,
+      String(totalActual)
     );
-    if (rawPrecio === null) return;
+    if (rawTotal === null) return;
 
-    const precioUnit = Number(rawPrecio.trim().replace(",", "."));
-    if (!Number.isFinite(precioUnit) || precioUnit <= 0) {
-      showError("Ingresa un precio unitario valido mayor a cero.");
+    const totalBs = Number(rawTotal.trim().replace(",", "."));
+    if (!Number.isFinite(totalBs) || totalBs <= 0) {
+      showError("Ingresa un total en Bs valido mayor a cero.");
       return;
     }
 
+    const precioUnit = cantidadActual > 0 ? totalBs / cantidadActual : totalBs;
+
     try {
       setSavingCompraItemPrecioId(item.id);
-      const response = await actualizarCompraItemPrecioMutation.mutateAsync({
+      await actualizarCompraItemPrecioMutation.mutateAsync({
         compraId: compra.id,
         itemId: item.id,
-        payload: { precioUnit }
+        payload: { precioUnit, totalBs }
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
       showSuccess(
-        `Precio actualizado: Bs. ${formatNumber(response.data.precioAnterior)} -> Bs. ${formatNumber(
-          response.data.nuevoPrecioUnit
-        )}. Movimientos actualizados: ${response.data.movimientosActualizados}.`
+        `Total actualizado: Bs. ${formatNumber(totalActual)} → Bs. ${formatNumber(totalBs)}.`
       );
     } catch (error) {
       showError(normalizeError(error, "No se pudo actualizar el precio del item."));
@@ -811,7 +814,8 @@ export function ValesHistoricosPage() {
     const parsedItems = compraDraftItems.map((item) => ({
       productoId: Number(item.productoId),
       cantidadPedida: Number(item.cantidadPedida),
-      precioUnit: computeCompraPrecioUnit(item)
+      precioUnit: computeCompraPrecioUnit(item),
+      ...(item.usePrecioGlobal && Number(item.precioGlobal) > 0 ? { totalBs: Number(item.precioGlobal) } : {})
     }));
     if (
       parsedItems.some(

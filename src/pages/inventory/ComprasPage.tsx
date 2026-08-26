@@ -247,7 +247,8 @@ export function ComprasPage() {
       items: draftItems.map((item) => ({
         productoId: Number(item.productoId),
         cantidadPedida: Number(item.cantidadPedida),
-        precioUnit: computePrecioUnit(item)
+        precioUnit: computePrecioUnit(item),
+        ...(item.usePrecioGlobal && Number(item.precioGlobal) > 0 ? { totalBs: Number(item.precioGlobal) } : {})
       }))
     };
 
