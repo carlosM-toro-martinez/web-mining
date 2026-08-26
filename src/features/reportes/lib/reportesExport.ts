@@ -1554,16 +1554,23 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
     }
 
     const orderedSheetNames = [
+      "ROMARESNI",
+      "EMUSA",
+      "PUNTUALIDAD",
+      "MAQUINARIA Y EQUIPO",
+      "OBRAS EN CONSTRUCCION",
       "LIPEÑA",
       "MA-HSI (3)",
-      "CONSTRUCCION-25",
-      "PUNTUALIDAD",
-      "EMUSA",
-      "OBRAS EN CONSTRUCCION",
-      "MAQUINARIA Y EQUIPO",
-      "ROMARESNI"
+      "CONSTRUCCION-25"
     ];
     const remainingSheetNames = [...groupedCuentas.keys()].filter((sheetName) => !orderedSheetNames.includes(sheetName));
+    // Compute AGL numbers: count only transport sheets that have data, in order
+    let aglCounter = 0;
+    const aglBySheet = new Map<string, number>();
+    for (const sn of [...orderedSheetNames, ...remainingSheetNames]) {
+      if (!groupedCuentas.has(sn)) continue;
+      if (costoSheetMeta(sn).isTransport) aglBySheet.set(sn, ++aglCounter);
+    }
     for (const sheetName of [...orderedSheetNames, ...remainingSheetNames]) {
       const cuenta = groupedCuentas.get(sheetName);
       if (!cuenta) continue;
@@ -1587,6 +1594,10 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         blankTo(6);
         put(2, 1, "Empresa Minera ");
         put(3, 1, "MARTE S.R.L.");
+        const aglNum = aglBySheet.get(sheetName);
+        if (aglNum != null) {
+          put(3, 5, `ANEXO AGL-${String(aglNum).padStart(3, "0")}/${periodo.anio}`);
+        }
         put(7, 1, title);
         put(8, 1, `LIPEÑA    ${monthPhrase(periodo.anio, periodo.mes)}`);
         put(10, 1, codeLine);
@@ -1599,13 +1610,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(headerRow, 3, "CANTIDAD");
         put(headerRow, 4, "DEBE");
         put(headerRow, 5, "DESTINATARIO");
-        put(headerRow + 1, 1, "ALAMACEN GENERAL LIPEÑA");
-        let row = 22;
-        put(row, 1, cuenta.summaryLabel ?? "");
-        put(row, 3, asOptionalExcelNumber(cuenta.totalCantidad));
-        put(row, 4, asExcelNumber(cuenta.totalBs));
-        put(row, 5, cuenta.summaryDestinatario ?? "");
-        row += 1;
+        let row = headerRow + 2;
         for (const detalle of cuenta.detalles) {
           put(row, 1, detalle.productoNombre ?? "");
           put(row, 2, detalle.unidad ?? "");
@@ -1740,7 +1745,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         const headerRow = sheetName === "PUNTUALIDAD" ? 18 : 17;
         const boxTop = headerRow - 1;
         const totalRow = Math.max(
-          22 + cuenta.detalles.length + 6,
+          headerRow + 2 + cuenta.detalles.length + 5,
           sheetName === "PUNTUALIDAD" ? 32 : 31
         );
         styleRange(sheet, { s: { r: headerRow, c: 1 }, e: { r: headerRow, c: 4 } }, smallItalicHeader);

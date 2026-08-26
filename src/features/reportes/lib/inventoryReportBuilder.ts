@@ -889,19 +889,31 @@ function diarioSectorOrderValue(sector: DiarioSectorHaber) {
 }
 
 function sortDiarioSectores(sectores: DiarioSectorHaber[]) {
-  return [...sectores].sort((a, b) => {
-    const orderDiff = diarioSectorOrderValue(a) - diarioSectorOrderValue(b);
-    if (orderDiff !== 0) return orderDiff;
-    return (a.sectorNombre ?? "").localeCompare(b.sectorNombre ?? "", "es");
-  });
+  return [...sectores].sort((a, b) =>
+    (a.sectorCodigo ?? "").localeCompare(b.sectorCodigo ?? "", undefined, { numeric: true })
+  );
 }
 
 function cuentaDetalleDiario(centroCostoCodigo?: string | null, funcionGastoCodigo?: string | null) {
   return [centroCostoCodigo, funcionGastoCodigo].filter(Boolean).join("-");
 }
 
+const DIARIO_DETAIL_CODIGOS_BUILDER = new Set(["100001000", "104001000"]);
+
 function shouldShowDiarioSectorDetails(sector: DiarioSectorHaber) {
-  return reportCuentaKey(sector.sectorCodigo) === "100001000";
+  return DIARIO_DETAIL_CODIGOS_BUILDER.has(reportCuentaKey(sector.sectorCodigo));
+}
+
+function diarioSectorDisplayName(sector: DiarioSectorHaber): string {
+  const code = reportCuentaKey(sector.sectorCodigo);
+  if (code === "22001008") return "CUENTA POR COBRAR-ROMARESNI";
+  if (code === "22001009") return "CUENTA POR COBRAR-EMUSA";
+  if (code === "22001010") return "CUENTA POR COBRAR-PUNTUALIDAD";
+  if (code === "35001000") return "MAQUINARIAS Y EQUIPOS LIPEÑA";
+  if (code === "44002000") return "OBRAS EN CONSTRUCCION LIPEÑA";
+  if (code === "100001000") return "COSTO PRODUCCION LIPEÑA";
+  if (code === "104001000") return "GASTOS MEDIO AMBIENTE";
+  return (sector.sectorNombre ?? "SIN SECTOR").toUpperCase();
 }
 
 export function buildDiarioAlmacenesApiReportDefinition(
@@ -929,33 +941,6 @@ export function buildDiarioAlmacenesApiReportDefinition(
     }
 
     if (reportType === "diario-almacenes" && periodo.sectoresHaber.length) {
-      rows.push({
-        id: `intro-diario-${periodo.anio}-${periodo.mes}`,
-        type: "group",
-        values: {
-          periodo: formatMonth(periodo.anio, periodo.mes),
-          cargos: "",
-          descripcion: "CONTABILIZACION DIARIO ALMACENES MES:",
-          parcialesBs: "",
-          cuenta: "",
-          debeBs: "",
-          haberBs: ""
-        }
-      });
-      rows.push({
-        id: `intro-mes-diario-${periodo.anio}-${periodo.mes}`,
-        type: "group",
-        values: {
-          periodo: "",
-          cargos: "",
-          descripcion: `${MONTH_NAMES[periodo.mes - 1]}-${periodo.anio}`,
-          parcialesBs: "",
-          cuenta: "",
-          debeBs: "",
-          haberBs: ""
-        }
-      });
-
       // Lookup sectorNombre → cuentasHaber entries (tienen centroCostoCodigo por cuenta)
       const sectorNombreToCuentas = new Map<string, typeof periodo.cuentasHaber>();
       for (const cuenta of periodo.cuentasHaber) {
@@ -965,13 +950,24 @@ export function buildDiarioAlmacenesApiReportDefinition(
         sectorNombreToCuentas.set(cuenta.sectorNombre, arr);
       }
 
-      for (const sector of sortDiarioSectores(periodo.sectoresHaber)) {
+      const sectoresSorted = sortDiarioSectores(periodo.sectoresHaber);
+      let aglCounter = 0;
+      const aglBySectorIndex = new Map<number, number>();
+      sectoresSorted.forEach((sector, i) => {
+        if (!shouldShowDiarioSectorDetails(sector)) aglBySectorIndex.set(i, ++aglCounter);
+      });
+
+      sectoresSorted.forEach((sector, sectorIndex) => {
         const sectorKey = reportCuentaKey(sector.sectorCodigo);
         const showDetails = shouldShowDiarioSectorDetails(sector);
         const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? [])
           .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
         const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
         const funcionCodigo = sector.funcionGastos[0]?.codigo ?? "";
+        const aglNum = aglBySectorIndex.get(sectorIndex);
+        const aglLabel = aglNum != null
+          ? `AGL-${String(aglNum).padStart(3, "0")}/${periodo.anio}`
+          : null;
 
         rows.push({
           id: `sector-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
@@ -979,72 +975,121 @@ export function buildDiarioAlmacenesApiReportDefinition(
           values: {
             periodo: formatMonth(periodo.anio, periodo.mes),
             cargos: "",
-            descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
+            descripcion: diarioSectorDisplayName(sector),
             centroCostoCodigo: "",
             funcionGastoCodigo: "",
             parcialesBs: "",
             cuenta: sector.sectorCodigo ?? "",
-            debeBs: showDetails ? Number(sector.totalBs.toFixed(2)) : "",
-            haberBs: ""
-          }
-        });
-        rows.push({
-          id: `sector-aten-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
-          values: {
-            periodo: "",
-            cargos: "",
-            descripcion: `Aten. Material mes de ${MONTH_NAMES[periodo.mes - 1]}- ${periodo.anio}`,
-            centroCostoCodigo: showDetails ? "" : centroCodigo,
-            funcionGastoCodigo: showDetails ? "" : funcionCodigo,
-            parcialesBs: showDetails ? "" : Number(sector.totalBs.toFixed(2)),
-            cuenta: "",
-            debeBs: showDetails ? "" : Number(sector.totalBs.toFixed(2)),
+            debeBs: Number(sector.totalBs.toFixed(2)),
             haberBs: ""
           }
         });
 
+        if (!showDetails && aglLabel) {
+          rows.push({
+            id: `sector-agl-diario-${periodo.anio}-${periodo.mes}-${sectorKey}`,
+            values: {
+              periodo: "",
+              cargos: "",
+              descripcion: aglLabel,
+              centroCostoCodigo: centroCodigo,
+              funcionGastoCodigo: funcionCodigo,
+              parcialesBs: Number(sector.totalBs.toFixed(2)),
+              cuenta: "",
+              debeBs: "",
+              haberBs: ""
+            }
+          });
+        }
+
         if (showDetails) {
-          const hasCuentaLineas = sectorCuentas.some(c => c.lineas.length > 0);
-          if (hasCuentaLineas) {
-            sectorCuentas.forEach((cuenta, ci) => {
-              cuenta.lineas.forEach((linea, li) => {
-                const fgCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
+          const costoLineas = (sector as any).costoLineas as Array<{
+            centroCostoCodigo: string;
+            funcionGastoCodigo: string;
+            funcionGastoNombre: string;
+            importeBs: number;
+          }> | undefined;
+
+          if (costoLineas && costoLineas.length > 0) {
+            [...costoLineas]
+              .sort((a, b) => {
+                const fgDiff = Number(a.funcionGastoCodigo) - Number(b.funcionGastoCodigo);
+                if (fgDiff !== 0) return fgDiff;
+                return Number(a.centroCostoCodigo) - Number(b.centroCostoCodigo);
+              })
+              .forEach((linea, li) => {
                 rows.push({
-                  id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${ci}-${li}`,
+                  id: `sector-costo-diario-${periodo.anio}-${periodo.mes}-${li}`,
                   values: {
                     periodo: "",
                     cargos: "",
-                    descripcion: linea.nombre ?? linea.funcionGastoNombre ?? "",
-                    centroCostoCodigo: cuenta.centroCostoCodigo ?? "",
-                    funcionGastoCodigo: fgCodigo,
+                    descripcion: linea.funcionGastoNombre,
+                    centroCostoCodigo: linea.centroCostoCodigo,
+                    funcionGastoCodigo: linea.funcionGastoCodigo,
                     parcialesBs: Number(linea.importeBs.toFixed(2)),
-                    cuenta: cuentaDetalleDiario(cuenta.centroCostoCodigo, fgCodigo),
+                    cuenta: "",
                     debeBs: "",
                     haberBs: ""
                   }
                 });
               });
-            });
           } else {
-            for (const linea of diarioSectorLineas(sector)) {
-              rows.push({
-                id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${linea.id || rows.length}`,
-                values: {
-                  periodo: "",
-                  cargos: "",
-                  descripcion: linea.funcionGastoNombre,
-                  centroCostoCodigo: linea.centroCostoCodigo,
-                  funcionGastoCodigo: linea.funcionGastoCodigo,
-                  parcialesBs: Number(linea.totalBs.toFixed(2)),
-                  cuenta: cuentaDetalleDiario(linea.centroCostoCodigo, linea.funcionGastoCodigo),
-                  debeBs: "",
-                  haberBs: ""
-                }
+            // Fallback: parse FG code from codigoCompleto "CC-FG-SECTOR" — works without new backend field
+            const fgNameMap = new Map(sector.funcionGastos.map(fg => [fg.codigo, fg.nombre ?? fg.codigo]));
+            const ccEntries = sectorCuentas
+              .map(cuenta => {
+                const fgCode = (cuenta as any).funcionGastoCodigo
+                  ?? (cuenta.codigoCompleto ?? "").split("-")[1]
+                  ?? "";
+                const fgName = (cuenta as any).funcionGastoNombre
+                  ?? fgNameMap.get(fgCode)
+                  ?? fgCode;
+                return { cuenta, fgCode, fgName };
+              })
+              .filter(e => Boolean(e.fgCode))
+              .sort((a, b) => {
+                const fgDiff = Number(a.fgCode) - Number(b.fgCode);
+                if (fgDiff !== 0) return fgDiff;
+                return Number(a.cuenta.centroCostoCodigo ?? "") - Number(b.cuenta.centroCostoCodigo ?? "");
               });
+            if (ccEntries.length > 0) {
+              ccEntries.forEach(({ cuenta, fgCode, fgName }, ci) => {
+                rows.push({
+                  id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-cc-${ci}`,
+                  values: {
+                    periodo: "",
+                    cargos: "",
+                    descripcion: fgName,
+                    centroCostoCodigo: cuenta.centroCostoCodigo ?? "",
+                    funcionGastoCodigo: fgCode,
+                    parcialesBs: Number(((cuenta as any).totalBs ?? 0).toFixed(2)),
+                    cuenta: "",
+                    debeBs: "",
+                    haberBs: ""
+                  }
+                });
+              });
+            } else {
+              for (const linea of diarioSectorLineas(sector)) {
+                rows.push({
+                  id: `sector-detalle-diario-${periodo.anio}-${periodo.mes}-${linea.id || rows.length}`,
+                  values: {
+                    periodo: "",
+                    cargos: "",
+                    descripcion: linea.funcionGastoNombre,
+                    centroCostoCodigo: "",
+                    funcionGastoCodigo: linea.funcionGastoCodigo,
+                    parcialesBs: Number(linea.totalBs.toFixed(2)),
+                    cuenta: "",
+                    debeBs: "",
+                    haberBs: ""
+                  }
+                });
+              }
             }
           }
         }
-      }
+      });
     } else {
       rows.push({
         id: `inventario-debe-${periodo.anio}-${periodo.mes}`,

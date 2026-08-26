@@ -314,11 +314,27 @@ function reportDiarioSectorOrderValue(sector: ReportDiarioSector) {
 }
 
 function sortDiarioSectores(sectores: ReportDiarioSector[]) {
-  return sectores;
+  return [...sectores].sort((a, b) =>
+    (a.sectorCodigo ?? "").localeCompare(b.sectorCodigo ?? "", undefined, { numeric: true })
+  );
 }
 
+const DIARIO_DETAIL_CODIGOS = new Set(["100001000", "104001000"]);
+
 function shouldShowDiarioSectorDetails(sector: ReportDiarioSector) {
-  return reportCuentaLookupKey(sector.sectorCodigo) === "100001000";
+  return DIARIO_DETAIL_CODIGOS.has(reportCuentaLookupKey(sector.sectorCodigo));
+}
+
+function diarioSectorDisplayName(sector: ReportDiarioSector): string {
+  const code = reportCuentaLookupKey(sector.sectorCodigo);
+  if (code === "22001008") return "CUENTA POR COBRAR-ROMARESNI";
+  if (code === "22001009") return "CUENTA POR COBRAR-EMUSA";
+  if (code === "22001010") return "CUENTA POR COBRAR-PUNTUALIDAD";
+  if (code === "35001000") return "MAQUINARIAS Y EQUIPOS LIPEÑA";
+  if (code === "44002000") return "OBRAS EN CONSTRUCCION LIPEÑA";
+  if (code === "100001000") return "COSTO PRODUCCION LIPEÑA";
+  if (code === "104001000") return "GASTOS MEDIO AMBIENTE";
+  return (sector.sectorNombre ?? "SIN SECTOR").toUpperCase();
 }
 
 function reportDiarioDetalleCuenta(
@@ -474,65 +490,120 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
     debe?: number | "";
     haber?: number | "";
     strong?: boolean;
-  }> = [
-    { key: "conta", descripcion: "CONTABILIZACION DIARIO ALMACENES MES:", strong: true },
-    { key: "mes", descripcion: `${month}-${periodo.anio}`, strong: true }
-  ];
+  }> = [];
 
   if (periodo.sectoresHaber.length) {
-    sortDiarioSectores(periodo.sectoresHaber).forEach((sector, sectorIndex) => {
+    const sectoresSorted = sortDiarioSectores(periodo.sectoresHaber);
+    // Assign AGL numbers only to non-detail sectors, in sorted order
+    let aglCounter = 0;
+    const aglBySectorIndex = new Map<number, number>();
+    sectoresSorted.forEach((sector, i) => {
+      if (!shouldShowDiarioSectorDetails(sector)) {
+        aglBySectorIndex.set(i, ++aglCounter);
+      }
+    });
+
+    sectoresSorted.forEach((sector, sectorIndex) => {
       const showDetails = shouldShowDiarioSectorDetails(sector);
       const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? [])
         .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
-      // Para sectores de transporte: centroCosto y funcionGasto son únicos por sector
       const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
       const funcionCodigo = sector.funcionGastos[0]?.codigo ?? "";
+      const aglNum = aglBySectorIndex.get(sectorIndex);
+      const aglLabel = aglNum != null
+        ? `AGL-${String(aglNum).padStart(3, "0")}/${periodo.anio}`
+        : null;
 
       rows.push({
         key: `sector-${sectorIndex}`,
-        descripcion: (sector.sectorNombre ?? "SIN SECTOR").toUpperCase(),
+        descripcion: diarioSectorDisplayName(sector),
         cuenta: sector.sectorCodigo ?? "",
-        debe: showDetails ? sector.totalBs : "",
+        debe: sector.totalBs,
         strong: true
       });
-      rows.push({
-        key: `atencion-${sectorIndex}`,
-        descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
-        centroCosto: showDetails ? "" : centroCodigo,
-        funcionGasto: showDetails ? "" : funcionCodigo,
-        parcial: showDetails ? "" : sector.totalBs,
-        debe: showDetails ? "" : sector.totalBs
-      });
+
+      if (!showDetails && aglLabel) {
+        // Transport sector: single AGL sub-line
+        rows.push({
+          key: `agl-${sectorIndex}`,
+          descripcion: aglLabel,
+          centroCosto: centroCodigo,
+          funcionGasto: funcionCodigo,
+          parcial: sector.totalBs
+        });
+      }
 
       if (showDetails) {
-        const hasCuentaLineas = sectorCuentas.some(c => c.lineas.length > 0);
-        if (hasCuentaLineas) {
-          // Usamos cuentasHaber para obtener centroCosto + funcionGasto por fila
-          sectorCuentas.forEach((cuenta, ci) => {
-            cuenta.lineas.forEach((linea, li) => {
-              const fgCodigo = linea.subCentro ?? linea.funcionGastoCodigo ?? "";
+        // COSTO PRODUCCION / MEDIO AMBIENTE: individual per-vale lines with CC + FG
+        const costoLineas = (sector as any).costoLineas as Array<{
+          centroCostoCodigo: string;
+          funcionGastoCodigo: string;
+          funcionGastoNombre: string;
+          importeBs: number;
+        }> | undefined;
+
+        if (costoLineas && costoLineas.length > 0) {
+          // Per-vale per-(CC+FG) breakdown from new backend field
+          [...costoLineas]
+            .sort((a, b) => {
+              const fgDiff = Number(a.funcionGastoCodigo) - Number(b.funcionGastoCodigo);
+              if (fgDiff !== 0) return fgDiff;
+              return Number(a.centroCostoCodigo) - Number(b.centroCostoCodigo);
+            })
+            .forEach((linea, li) => {
               rows.push({
-                key: `linea-sector-${sectorIndex}-${ci}-${li}`,
-                descripcion: linea.nombre ?? linea.funcionGastoNombre ?? "",
-                centroCosto: cuenta.centroCostoCodigo ?? "",
-                funcionGasto: fgCodigo,
+                key: `linea-costo-${sectorIndex}-${li}`,
+                descripcion: linea.funcionGastoNombre,
+                centroCosto: linea.centroCostoCodigo,
+                funcionGasto: linea.funcionGastoCodigo,
                 parcial: linea.importeBs,
-                cuenta: reportDiarioDetalleCuenta(cuenta.centroCostoCodigo, fgCodigo)
+                cuenta: ""
               });
             });
-          });
         } else {
-          // Fallback: sector.funcionGastos (sin centroCosto)
-          diarioSectorLineas(sector).forEach((linea, lineIndex) => {
-            rows.push({
-              key: `linea-sector-${sectorIndex}-${lineIndex}`,
-              descripcion: linea.funcionGastoNombre,
-              centroCosto: linea.centroCostoCodigo,
-              funcionGasto: linea.funcionGastoCodigo,
-              parcial: linea.totalBs,
-              cuenta: reportDiarioDetalleCuenta(linea.centroCostoCodigo, linea.funcionGastoCodigo)
+          // Fallback: use cuentasHaber entries — extract FG code from codigoCompleto "CC-FG-SECTOR"
+          // Works with both old and new backend (new backend also sends funcionGastoCodigo directly)
+          const fgNameMap = new Map(sector.funcionGastos.map(fg => [fg.codigo, fg.nombre ?? fg.codigo]));
+          const ccEntries = sectorCuentas
+            .map(cuenta => {
+              const fgCode = (cuenta as any).funcionGastoCodigo
+                ?? (cuenta.codigoCompleto ?? "").split("-")[1]
+                ?? "";
+              const fgName = (cuenta as any).funcionGastoNombre
+                ?? fgNameMap.get(fgCode)
+                ?? fgCode;
+              return { cuenta, fgCode, fgName };
+            })
+            .filter(e => Boolean(e.fgCode))
+            .sort((a, b) => {
+              const fgDiff = Number(a.fgCode) - Number(b.fgCode);
+              if (fgDiff !== 0) return fgDiff;
+              return Number(a.cuenta.centroCostoCodigo ?? "") - Number(b.cuenta.centroCostoCodigo ?? "");
             });
-          });
+          if (ccEntries.length > 0) {
+            ccEntries.forEach(({ cuenta, fgCode, fgName }, ci) => {
+              rows.push({
+                key: `linea-sector-${sectorIndex}-cc-${ci}`,
+                descripcion: fgName,
+                centroCosto: cuenta.centroCostoCodigo ?? "",
+                funcionGasto: fgCode,
+                parcial: (cuenta as any).totalBs ?? 0,
+                cuenta: ""
+              });
+            });
+          } else {
+            // Last-resort only if codigoCompleto parsing also fails
+            diarioSectorLineas(sector).forEach((linea, lineIndex) => {
+              rows.push({
+                key: `linea-sector-${sectorIndex}-${lineIndex}`,
+                descripcion: linea.funcionGastoNombre,
+                centroCosto: "",
+                funcionGasto: linea.funcionGastoCodigo,
+                parcial: linea.totalBs,
+                cuenta: ""
+              });
+            });
+          }
         }
       }
     });
@@ -560,7 +631,7 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
             key: `linea-${cuentaIndex}-${index}`,
             descripcion: linea.nombre ?? "",
             parcial: linea.importeBs,
-            cuenta: reportLineaCuenta(linea)
+            cuenta: ""
           });
         });
       }
@@ -838,6 +909,7 @@ type CostoSheet = {
   title: string;
   codeLine: string;
   isTransport: boolean;
+  aglLabel?: string;
   anio: number;
   mes: number;
   totalBs: number;
@@ -874,55 +946,55 @@ function costoSheetName(cuenta: {
 function costoSheetMeta(sheetName: string) {
   if (sheetName === "ROMARESNI") {
     return {
-      title: "DETALLE DE MATERIALES  EMPRESA CONST. ROMARESNI S.R.L.",
-      codeLine: "22,001,008    CTAS.CTES.EMPRESA CONST. ROMARESNI S.R.L.",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "22.001.008 CUENTAS POR COBRAR: EMPRESA CONST. ROMARESNI S.R.L.",
       isTransport: true
     };
   }
   if (sheetName === "MAQUINARIA Y EQUIPO") {
     return {
-      title: "DETALLE DE MATERIALES  MAQUINARIAS Y EQUIPOS LIPEÑA",
-      codeLine: "35,001,000    CTAS.CTES.MAQUINARIAS Y EQUIPOS LIPEÑA",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "35.001.000 CUENTAS POR COBRAR: MAQUINARIAS Y EQUIPOS LIPEÑA",
       isTransport: true
     };
   }
   if (sheetName === "MA-HSI (3)") {
     return {
-      title: "DETALLE DE MATERIALES  COSTO DE MEDIO AMBIENTE",
-      codeLine: "104,001,000 CTAS.CTES.M.A. HSI.",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "104.001.000 CUENTAS POR COBRAR: M.A. HSI.",
       isTransport: false
     };
   }
   if (sheetName === "CONSTRUCCION-25") {
     return {
-      title: "DETALLE DE MATERIALES  COSTO DE OBRAS EN CONSTRUCCION",
-      codeLine: "44,002,000 CTAS.CTES.OBRAS EN CONSTRUCCION",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "44.002.000 CUENTAS POR COBRAR: OBRAS EN CONSTRUCCION",
       isTransport: false
     };
   }
   if (sheetName === "OBRAS EN CONSTRUCCION") {
     return {
-      title: "DETALLE DE MATERIALES  OBRAS EN CONSTRUCCION LIPEÑA",
-      codeLine: "44,002,000    CTAS.CTES.OBRAS EN CONSTRUCCION LIPEÑA",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "44.002.000 CUENTAS POR COBRAR: OBRAS EN CONSTRUCCION LIPEÑA",
       isTransport: true
     };
   }
   if (sheetName === "PUNTUALIDAD") {
     return {
-      title: "DETALLE DE MATERIALES  COSTO DE TRANSPORTE PUNTUALIDAD",
-      codeLine: "67,001,097    CTAS.CTES.TRANSPORTE PUNTUALIDAD",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "22.001.010 CUENTAS POR COBRAR: E.T. LA PUNTUALIDAD S.R.L.",
       isTransport: true
     };
   }
   if (sheetName === "EMUSA") {
     return {
-      title: "DETALLE DE MATERIALES  COSTO DE TRANSPORTE EMUSA",
-      codeLine: "67,001,098    CTAS.CTES.TRANSPORTE EMUSA",
+      title: "DETALLE DE MATERIALES Y SUMINISTROS",
+      codeLine: "22.001.009 CUENTAS POR COBRAR: EMUSA S.R.L.",
       isTransport: true
     };
   }
   return {
-    title: "DETALLE DE MATERIALES  COSTO DE PRODUCCION",
+    title: "DETALLE DE MATERIALES Y SUMINISTROS",
     codeLine: "",
     isTransport: false
   };
@@ -1034,7 +1106,7 @@ function detalleMaterialesFromDiario(
                   productoNombre: linea.nombre ?? "",
                   unidad: linea.unidad ?? "",
                   cantidad: linea.cantidad ?? 0,
-                  importeBs: vale.totalBs ?? linea.importeBs ?? 0,
+                  importeBs: linea.importeBs ?? vale.totalBs ?? 0,
                   vehiculo: vale.solicitante?.nombre ?? ""
                 }))
               ) ?? [];
@@ -1230,20 +1302,26 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
   }
 
   const order = [
+    "ROMARESNI",
+    "EMUSA",
+    "PUNTUALIDAD",
+    "MAQUINARIA Y EQUIPO",
+    "OBRAS EN CONSTRUCCION",
     "LIPEÑA",
     "MA-HSI (3)",
-    "CONSTRUCCION-25",
-    "PUNTUALIDAD",
-    "EMUSA",
-    "OBRAS EN CONSTRUCCION",
-    "MAQUINARIA Y EQUIPO",
-    "ROMARESNI"
+    "CONSTRUCCION-25"
   ];
   const orderedSheets = order
     .map((name) => sheets.get(name))
     .filter((sheet): sheet is CostoSheet => Boolean(sheet));
   const remainingSheets = [...sheets.values()].filter((sheet) => !order.includes(sheet.name));
-  return [...orderedSheets, ...remainingSheets];
+  const allSheets = [...orderedSheets, ...remainingSheets];
+  let aglCounter = 0;
+  return allSheets.map((sheet) => {
+    if (!sheet.isTransport) return sheet;
+    const num = ++aglCounter;
+    return { ...sheet, aglLabel: `ANEXO AGL-${String(num).padStart(3, "0")}/${sheet.anio}` };
+  });
 }
 
 function CostoProduccionPreview({ response }: { response: DetalleMaterialesReportResponse }) {
@@ -1295,8 +1373,15 @@ function CostoProduccionPreview({ response }: { response: DetalleMaterialesRepor
       </div>
       <div className="overflow-x-auto rounded-lg border border-[var(--color-border-soft)] bg-white">
         <div className="min-w-[920px] p-5 font-[Arial] text-black">
-          <div className={`${isMain ? "" : "mt-4"} text-[16px] font-bold`}>Empresa Minera</div>
-          <div className="text-[24px] font-bold underline">MARTE S.R.L.</div>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className={`${isMain ? "" : "mt-4"} text-[16px] font-bold`}>Empresa Minera</div>
+              <div className="text-[24px] font-bold underline">MARTE S.R.L.</div>
+            </div>
+            {activeSheet.aglLabel ? (
+              <div className="text-right text-[12px] font-bold">{activeSheet.aglLabel}</div>
+            ) : null}
+          </div>
           <div className={`${headerRowOffset} text-center font-bold underline`}>
             {activeSheet.title}
           </div>
@@ -1326,29 +1411,6 @@ function CostoProduccionPreview({ response }: { response: DetalleMaterialesRepor
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td className="border-x border-black px-1 py-1" colSpan={5}>
-                      ALAMACEN GENERAL LIPEÑA
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="border-x border-black py-4" colSpan={5}></td>
-                  </tr>
-                  <tr>
-                    <td className="border-x border-black px-1 py-0.5 text-center">
-                      {activeSheet.summaryLabel ?? ""}
-                    </td>
-                    <td className="border-x border-black px-1 py-0.5"></td>
-                    <td className="border-x border-black px-1 py-0.5 text-right">
-                      {activeSheet.totalCantidad != null ? formatBs(activeSheet.totalCantidad).replace(",00", "") : ""}
-                    </td>
-                    <td className="border-x border-black px-1 py-0.5 text-right">
-                      {formatBs(activeSheet.totalBs)}
-                    </td>
-                    <td className="border-x border-black px-1 py-0.5">
-                      {activeSheet.summaryDestinatario ?? ""}
-                    </td>
-                  </tr>
                   {activeSheet.detalles.map((detalle, index) => (
                     <tr key={`${detalle.productoNombre}-${index}`}>
                       <td className="border-x border-black px-1 py-0.5">
