@@ -954,6 +954,11 @@ function costoSheetName(cuenta: {
     return "MA-HSI (3)";
   if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION"))
     return "CONSTRUCCION-25";
+  // Dynamic individual "cuentas por cobrar" (22.001.011, 22.001.012, ...)
+  const knownCodes = ["22001008", "22001009", "22001010"];
+  if (code.startsWith("22001") && !knownCodes.some((k) => code.includes(k))) {
+    return cuenta.centroCostoNombre?.trim().toUpperCase() || code;
+  }
   return "LIPEÑA";
 }
 
@@ -1008,9 +1013,9 @@ function costoSheetMeta(sheetName: string) {
     };
   }
   return {
-    title: "DETALLE DE MATERIALES Y SUMINISTROS",
+    title: `DETALLE DE MATERIALES COSTO DE PRODUCCION ${sheetName}`,
     codeLine: "",
-    isTransport: false
+    isTransport: true
   };
 }
 
@@ -1260,11 +1265,15 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
     const name = costoSheetName(cuenta);
     const meta = costoSheetMeta(name);
     const current = sheets.get(name);
+    const dynamicCodeLine =
+      meta.codeLine ||
+      `${cuenta.codigoCompleto ?? ""} CUENTAS POR COBRAR: ${cuenta.centroCostoNombre ?? ""}`.trim();
     const sheet =
       current ??
       ({
         name,
         ...meta,
+        codeLine: dynamicCodeLine,
         anio: periodo.anio,
         mes: periodo.mes,
         totalBs: cuenta.totalBs,
@@ -1315,21 +1324,17 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
     }
   }
 
-  const order = [
-    "ROMARESNI",
-    "EMUSA",
-    "PUNTUALIDAD",
-    "MAQUINARIA Y EQUIPO",
-    "OBRAS EN CONSTRUCCION",
-    "LIPEÑA",
-    "MA-HSI (3)",
-    "CONSTRUCCION-25"
-  ];
-  const orderedSheets = order
+  const firstOrder = ["ROMARESNI", "EMUSA", "PUNTUALIDAD"];
+  const lastOrder = ["MAQUINARIA Y EQUIPO", "OBRAS EN CONSTRUCCION", "LIPEÑA", "MA-HSI (3)", "CONSTRUCCION-25"];
+  const allOrderedNames = [...firstOrder, ...lastOrder];
+  const firstSheets = firstOrder
     .map((name) => sheets.get(name))
     .filter((sheet): sheet is CostoSheet => Boolean(sheet));
-  const remainingSheets = [...sheets.values()].filter((sheet) => !order.includes(sheet.name));
-  const allSheets = [...orderedSheets, ...remainingSheets];
+  const lastSheets = lastOrder
+    .map((name) => sheets.get(name))
+    .filter((sheet): sheet is CostoSheet => Boolean(sheet));
+  const remainingSheets = [...sheets.values()].filter((sheet) => !allOrderedNames.includes(sheet.name));
+  const allSheets = [...firstSheets, ...remainingSheets, ...lastSheets];
   let aglCounter = 0;
   return allSheets.map((sheet) => {
     if (!sheet.isTransport) return sheet;
