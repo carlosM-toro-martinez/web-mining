@@ -8,7 +8,7 @@ import {
   FileText,
   ListFilter
 } from "lucide-react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   useAnulacionesEntradasReportQuery,
   useAnulacionesSalidasReportQuery,
@@ -83,8 +83,22 @@ function cuadroGrupoSortValue(label: string) {
   return code ? Number(code) : Number.MAX_SAFE_INTEGER;
 }
 
-type DateMode = "none" | "specific" | "range";
+type DateMode = "none" | "specific" | "range" | "month";
 type DataMode = "paged" | "all";
+
+function monthToRange(yyyyMm: string): { inicio: string; fin: string } | null {
+  if (!yyyyMm) return null;
+  const [yearStr, monthStr] = yyyyMm.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!year || !month) return null;
+  const lastDay = new Date(year, month, 0).getDate();
+  const mm = String(month).padStart(2, "0");
+  return {
+    inicio: `${year}-${mm}-01`,
+    fin: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`
+  };
+}
 type LegacyReportType = "bin-card" | "bin-card-valorado";
 type ApiReportType = "stock-actual" | "vales-resumen" | "compras-resumen";
 
@@ -1631,13 +1645,13 @@ function monthRangeFromDates(params: {
   const startSource =
     params.dateMode === "specific"
       ? params.fecha
-      : params.dateMode === "range"
+      : params.dateMode === "range" || params.dateMode === "month"
         ? params.fechaInicio
         : "";
   const endSource =
     params.dateMode === "specific"
       ? params.fecha
-      : params.dateMode === "range"
+      : params.dateMode === "range" || params.dateMode === "month"
         ? params.fechaFin
         : "";
   const start = startSource ? new Date(`${startSource}T00:00:00`) : fallback;
@@ -1662,6 +1676,7 @@ function isPagedMeta(
 export function ReportesPage() {
   const { tipo } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const isLegacyType = isLegacyReportType(tipo);
   const isAdminType = isInventoryReportType(tipo);
@@ -1673,17 +1688,25 @@ export function ReportesPage() {
 
   const today = new Date();
   const currentYear = today.getFullYear();
-  const defaultFechaInicio = `${currentYear}-01-01`;
+  const currentMonth = String(today.getMonth() + 1).padStart(2, "0");
+  const defaultFechaInicio = `${currentYear}-${currentMonth}-01`;
   const defaultFechaFin = today.toISOString().slice(0, 10);
+
+  const urlDateMode = (searchParams.get("dm") as DateMode) || "range";
+  const urlFechaInicio = searchParams.get("di") || defaultFechaInicio;
+  const urlFechaFin = searchParams.get("df") || defaultFechaFin;
+  const urlFecha = searchParams.get("fec") || "";
+  const urlMes = searchParams.get("mes") || "";
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [productoIdDraft, setProductoIdDraft] = useState("");
   const [cuadroGrupoDraft, setCuadroGrupoDraft] = useState("");
-  const [dateModeDraft, setDateModeDraft] = useState<DateMode>("range");
-  const [fechaDraft, setFechaDraft] = useState("");
-  const [fechaInicioDraft, setFechaInicioDraft] = useState(defaultFechaInicio);
-  const [fechaFinDraft, setFechaFinDraft] = useState(defaultFechaFin);
+  const [dateModeDraft, setDateModeDraft] = useState<DateMode>(urlDateMode);
+  const [mesDraft, setMesDraft] = useState(urlMes);
+  const [fechaDraft, setFechaDraft] = useState(urlFecha);
+  const [fechaInicioDraft, setFechaInicioDraft] = useState(urlFechaInicio);
+  const [fechaFinDraft, setFechaFinDraft] = useState(urlFechaFin);
   const [dataModeDraft, setDataModeDraft] = useState<DataMode>("paged");
   const [estadoReporteDraft, setEstadoReporteDraft] = useState("");
   const [salidasCuentaIdDraft, setSalidasCuentaIdDraft] = useState("");
@@ -1693,10 +1716,11 @@ export function ReportesPage() {
   const [salidasSinCuentaDraft, setSalidasSinCuentaDraft] = useState(false);
   const [productoId, setProductoId] = useState("");
   const [cuadroGrupo, setCuadroGrupo] = useState("");
-  const [dateMode, setDateMode] = useState<DateMode>("range");
-  const [fecha, setFecha] = useState("");
-  const [fechaInicio, setFechaInicio] = useState(defaultFechaInicio);
-  const [fechaFin, setFechaFin] = useState(defaultFechaFin);
+  const [dateMode, setDateMode] = useState<DateMode>(urlDateMode);
+  const [mes, setMes] = useState(urlMes);
+  const [fecha, setFecha] = useState(urlFecha);
+  const [fechaInicio, setFechaInicio] = useState(urlFechaInicio);
+  const [fechaFin, setFechaFin] = useState(urlFechaFin);
   const [dataMode, setDataMode] = useState<DataMode>("paged");
   const [estadoReporte, setEstadoReporte] = useState("");
   const [salidasCuentaId, setSalidasCuentaId] = useState("");
@@ -2088,8 +2112,17 @@ export function ReportesPage() {
     setCuadroGrupo(cuadroGrupoDraft);
     setDateMode(dateModeDraft);
     setFecha(fechaDraft);
-    setFechaInicio(fechaInicioDraft);
-    setFechaFin(fechaFinDraft);
+    setMes(mesDraft);
+
+    let efectivoInicio = fechaInicioDraft;
+    let efectivoFin = fechaFinDraft;
+    if (dateModeDraft === "month" && mesDraft) {
+      const range = monthToRange(mesDraft);
+      if (range) { efectivoInicio = range.inicio; efectivoFin = range.fin; }
+    }
+    setFechaInicio(efectivoInicio);
+    setFechaFin(efectivoFin);
+
     setDataMode(dataModeDraft);
     setEstadoReporte(estadoReporteDraft);
     setSalidasCuentaId(salidasCuentaIdDraft);
@@ -2098,12 +2131,24 @@ export function ReportesPage() {
     setSalidasCentro(salidasCentroDraft.trim());
     setSalidasSinCuenta(salidasSinCuentaDraft);
     setExpandedCompraIds(new Set());
+
+    // Persist filters in URL so refresh restores the same state
+    const next = new URLSearchParams();
+    next.set("dm", dateModeDraft);
+    if (dateModeDraft === "specific" && fechaDraft) next.set("fec", fechaDraft);
+    if (dateModeDraft === "month" && mesDraft) next.set("mes", mesDraft);
+    if (dateModeDraft === "range" || dateModeDraft === "month") {
+      next.set("di", efectivoInicio);
+      next.set("df", efectivoFin);
+    }
+    setSearchParams(next, { replace: true });
   }
 
   function handleResetFilters() {
     setProductoIdDraft("");
     setCuadroGrupoDraft("");
     setDateModeDraft("range");
+    setMesDraft("");
     setFechaDraft("");
     setFechaInicioDraft(defaultFechaInicio);
     setFechaFinDraft(defaultFechaFin);
@@ -2117,6 +2162,7 @@ export function ReportesPage() {
     setProductoId("");
     setCuadroGrupo("");
     setDateMode("range");
+    setMes("");
     setFecha("");
     setFechaInicio(defaultFechaInicio);
     setFechaFin(defaultFechaFin);
@@ -2130,6 +2176,7 @@ export function ReportesPage() {
     setExpandedCompraIds(new Set());
     setPage(1);
     setLimit(50);
+    setSearchParams({}, { replace: true });
   }
 
   function handleExportExcel() {
@@ -2402,21 +2449,24 @@ export function ReportesPage() {
               <option value="none">Sin filtro de fecha</option>
               <option value="specific">Fecha especifica</option>
               <option value="range">Rango de fechas</option>
+              <option value="month">Por mes</option>
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              Modo de carga
-            </label>
-            <select
-              value={dataModeDraft}
-              onChange={(event) => setDataModeDraft(event.target.value as DataMode)}
-              className={inputClassName}
-            >
-              <option value="paged">Paginado</option>
-              <option value="all">Ver todo</option>
-            </select>
-          </div>
+          {(isLegacyType || isApiType) ? (
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Modo de carga
+              </label>
+              <select
+                value={dataModeDraft}
+                onChange={(event) => setDataModeDraft(event.target.value as DataMode)}
+                className={inputClassName}
+              >
+                <option value="paged">Paginado</option>
+                <option value="all">Ver todo</option>
+              </select>
+            </div>
+          ) : null}
           {tipo === "vales-resumen" || tipo === "compras-resumen" ? (
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
@@ -2447,21 +2497,23 @@ export function ReportesPage() {
               </select>
             </div>
           ) : null}
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-              Registros por pagina
-            </label>
-            <select
-              value={limit}
-              onChange={(event) => setLimit(Number(event.target.value))}
-              className={inputClassName}
-              disabled={dataModeDraft === "all"}
-            >
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
+          {(isLegacyType || isApiType) ? (
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Registros por pagina
+              </label>
+              <select
+                value={limit}
+                onChange={(event) => setLimit(Number(event.target.value))}
+                className={inputClassName}
+                disabled={dataModeDraft === "all"}
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          ) : null}
           <div className="flex items-end gap-2">
             <button
               type="submit"
@@ -2516,6 +2568,19 @@ export function ReportesPage() {
                 />
               </div>
             </>
+          ) : null}
+          {dateModeDraft === "month" ? (
+            <div className="xl:col-span-2">
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Mes
+              </label>
+              <input
+                type="month"
+                value={mesDraft}
+                onChange={(event) => setMesDraft(event.target.value)}
+                className={inputClassName}
+              />
+            </div>
           ) : null}
         </form>
       </article>
