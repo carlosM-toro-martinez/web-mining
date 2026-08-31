@@ -40,7 +40,7 @@ import type {
   SincronizarStockPayload,
   CierreMesPayload,
   StockInicialPayload,
-  type LimpiarMesPayload
+  LimpiarMesPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export function useImportCatalogoMutation() {
