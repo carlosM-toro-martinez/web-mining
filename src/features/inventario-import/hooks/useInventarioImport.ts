@@ -22,7 +22,9 @@ import {
   importStockInicial,
   sincronizarStock,
   updateSaldoMensualById,
-  upsertSaldoMensualItem
+  upsertSaldoMensualItem,
+  getLimpiarMesPreview,
+  ejecutarLimpiarMes
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
   AjustarPreciosSinIvaPayload,
@@ -37,7 +39,8 @@ import type {
   SaldoMensualQuery,
   SincronizarStockPayload,
   CierreMesPayload,
-  StockInicialPayload
+  StockInicialPayload,
+  type LimpiarMesPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export function useImportCatalogoMutation() {
@@ -195,5 +198,19 @@ export function useDeleteCierreMesMutation() {
 export function useInicializarPeriodoHistoricoMutation() {
   return useMutation({
     mutationFn: inicializarPeriodoHistorico
+  });
+}
+
+export function useLimpiarMesPreviewQuery(params: LimpiarMesPayload, enabled: boolean) {
+  return useQuery({
+    queryKey: ["inventario-import", "limpiar-mes-preview", params],
+    queryFn: () => getLimpiarMesPreview(params),
+    enabled
+  });
+}
+
+export function useEjecutarLimpiarMesMutation() {
+  return useMutation({
+    mutationFn: (payload: LimpiarMesPayload) => ejecutarLimpiarMes(payload)
   });
 }

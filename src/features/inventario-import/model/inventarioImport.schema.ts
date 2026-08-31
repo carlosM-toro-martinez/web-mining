@@ -488,3 +488,70 @@ export type CierreMesItem = z.infer<typeof cierreMesItemSchema>;
 export type CierreMesPayload = z.infer<typeof cierreMesPayloadSchema>;
 export type InicializarPeriodoPayload = z.infer<typeof inicializarPeriodoPayloadSchema>;
 export type SaldoMensualPreviewResponse = z.infer<typeof saldoMensualPreviewResponseSchema>;
+
+// ─── Limpiar mes ─────────────────────────────────────────────────────────────
+
+const limpiarMesValeItemSchema = z.object({
+  productoId: numberLikeSchema.int(),
+  productoCodigo: z.string(),
+  productoNombre: z.string(),
+  unidad: z.string(),
+  cantidadSolicitada: numberLikeSchema,
+  cantidadEntregada: numberLikeSchema
+});
+
+const limpiarMesValeSchema = z.object({
+  id: z.string(),
+  fecha: z.coerce.date(),
+  estado: z.string(),
+  solicitante: z.string(),
+  items: z.array(limpiarMesValeItemSchema)
+});
+
+const limpiarMesCompraItemSchema = z.object({
+  productoId: numberLikeSchema.int(),
+  productoCodigo: z.string(),
+  productoNombre: z.string(),
+  unidad: z.string(),
+  cantidadRecibida: numberLikeSchema,
+  precioUnit: numberLikeSchema
+});
+
+const limpiarMesCompraSchema = z.object({
+  id: z.string(),
+  fecha: z.coerce.date(),
+  estado: z.string(),
+  proveedor: z.string(),
+  items: z.array(limpiarMesCompraItemSchema)
+});
+
+export const limpiarMesPreviewResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    anio: numberLikeSchema.int(),
+    mes: numberLikeSchema.int(),
+    vales: z.array(limpiarMesValeSchema),
+    compras: z.array(limpiarMesCompraSchema)
+  })
+});
+
+export const limpiarMesPayloadSchema = z.object({
+  anio: z.number().int().min(2000).max(2100),
+  mes: z.number().int().min(1).max(12)
+});
+
+export const limpiarMesResultResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    anio: numberLikeSchema.int(),
+    mes: numberLikeSchema.int(),
+    valesEliminados: numberLikeSchema.int(),
+    comprasEliminadas: numberLikeSchema.int()
+  })
+});
+
+export type LimpiarMesVale = z.infer<typeof limpiarMesValeSchema>;
+export type LimpiarMesCompra = z.infer<typeof limpiarMesCompraSchema>;
+export type LimpiarMesPayload = z.infer<typeof limpiarMesPayloadSchema>;
+export type LimpiarMesPreviewResponse = z.infer<typeof limpiarMesPreviewResponseSchema>;
+export type LimpiarMesResultResponse = z.infer<typeof limpiarMesResultResponseSchema>;

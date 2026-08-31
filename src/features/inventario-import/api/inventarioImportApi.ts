@@ -33,6 +33,9 @@ import {
   saldoMensualSingleResponseSchema,
   sincronizarStockPayloadSchema,
   stockInicialPayloadSchema,
+  limpiarMesPayloadSchema,
+  limpiarMesPreviewResponseSchema,
+  limpiarMesResultResponseSchema,
   type ReiniciarStockPayload,
   type RecalcularStockPayload,
   type AjustarPreciosSinIvaPayload,
@@ -46,7 +49,8 @@ import {
   type SincronizarStockPayload,
   type StockInicialPayload,
   type CierreMesPayload,
-  type InicializarPeriodoPayload
+  type InicializarPeriodoPayload,
+  type LimpiarMesPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export async function importCatalogo(
@@ -292,4 +296,21 @@ export async function inicializarPeriodoHistorico(payload: InicializarPeriodoPay
     body: inicializarPeriodoPayloadSchema.parse(payload),
     schema: importResultSchema
   });
+}
+
+export async function getLimpiarMesPreview(params: LimpiarMesPayload) {
+  const parsed = limpiarMesPayloadSchema.parse(params);
+  return getRequest({
+    url: apiEndpoints.inventarioImport.limpiarMesPreview,
+    config: { params: parsed },
+    schema: limpiarMesPreviewResponseSchema
+  });
+}
+
+export async function ejecutarLimpiarMes(payload: LimpiarMesPayload) {
+  const parsed = limpiarMesPayloadSchema.parse(payload);
+  const response = await httpClient.delete(apiEndpoints.inventarioImport.limpiarMes, {
+    data: parsed
+  });
+  return limpiarMesResultResponseSchema.parse(response.data);
 }

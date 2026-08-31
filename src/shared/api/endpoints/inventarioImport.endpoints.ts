@@ -17,5 +17,7 @@ export const inventarioImportEndpoints = {
   ajustarPreciosSinIva: "/api/inventario-import/ajustar-precios-sin-iva",
   backfillCpp: "/api/backfill/cpp",
   diagnosticoPrecios: "/api/inventario-import/diagnostico-precios",
-  diagnosticoSaldos: "/api/inventario-import/diagnostico-saldos"
+  diagnosticoSaldos: "/api/inventario-import/diagnostico-saldos",
+  limpiarMesPreview: "/api/inventario-import/limpiar-mes/preview",
+  limpiarMes: "/api/inventario-import/limpiar-mes"
 } as const;

@@ -1,9 +1,11 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2, TriangleAlert } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2, Trash2, TriangleAlert } from "lucide-react";
 import {
   useBackfillCppMutation,
   useDiagnosticoPreciosQuery,
-  useDiagnosticoSaldosQuery
+  useDiagnosticoSaldosQuery,
+  useLimpiarMesPreviewQuery,
+  useEjecutarLimpiarMesMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
 import { useReordenarMovimientosMutation } from "@/features/movimientos/hooks/useMovimientos";
 import {
@@ -14,6 +16,8 @@ import type {
   BackfillCppResponse,
   DiagnosticoPreciosItem,
   DiagnosticoSaldosItem,
+  LimpiarMesVale,
+  LimpiarMesCompra,
   SaldoMensualQuery
 } from "@/features/inventario-import/model/inventarioImport.schema";
 import type {
@@ -118,6 +122,11 @@ export function AjustesPage() {
   const [negativosAnio, setNegativosAnio] = useState(String(now.getFullYear()));
   const [negativosMes, setNegativosMes] = useState(String(now.getMonth() + 1));
   const [negativosParams, setNegativosParams] = useState<{ anioInicio: number; mesInicio: number; anioFin: number; mesFin: number } | null>(null);
+  const [limpiarAnio, setLimpiarAnio] = useState(String(now.getFullYear()));
+  const [limpiarMes, setLimpiarMes] = useState(String(now.getMonth() + 1));
+  const [limpiarParams, setLimpiarParams] = useState<{ anio: number; mes: number } | null>(null);
+  const [limpiarTab, setLimpiarTab] = useState<"vales" | "compras">("vales");
+  const [limpiarConfirmando, setLimpiarConfirmando] = useState(false);
 
   const activeDiagnosticoParams = diagnosticoParams ?? {
     anio: Number(diagnosticoAnio),
@@ -147,6 +156,9 @@ export function AjustesPage() {
     anioFin: Number(negativosAnio),   mesFin: Number(negativosMes)
   };
   const negativosQuery = useInventarioAlmacenReportQuery(activeNegativosParams, Boolean(negativosParams));
+  const activeLimpiarParams = limpiarParams ?? { anio: Number(limpiarAnio), mes: Number(limpiarMes) };
+  const limpiarPreviewQuery = useLimpiarMesPreviewQuery(activeLimpiarParams, Boolean(limpiarParams));
+  const limpiarMesMutation = useEjecutarLimpiarMesMutation();
 
   const diagnosticoData = diagnosticoQuery.data?.data;
   const saldosData = saldosQuery.data?.data;
@@ -341,6 +353,35 @@ export function AjustesPage() {
         );
       },
       onError: (error) => showError(normalizeError(error, "No se pudo ejecutar el backfill CPP."))
+    });
+  }
+
+  function handleLimpiarPreviewSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const periodo = parsePeriodo(limpiarAnio, limpiarMes);
+    if (!periodo) {
+      showError("Indica un año y mes válidos.");
+      return;
+    }
+    setLimpiarConfirmando(false);
+    setLimpiarParams(periodo);
+    if (limpiarParams?.anio === periodo.anio && limpiarParams.mes === periodo.mes) {
+      void limpiarPreviewQuery.refetch();
+    }
+  }
+
+  function handleLimpiarMesConfirmar() {
+    if (!limpiarParams) return;
+    limpiarMesMutation.mutate(limpiarParams, {
+      onSuccess: (response) => {
+        const d = response.data;
+        showSuccess(
+          `Limpiar mes completado · vales eliminados: ${d.valesEliminados} · compras eliminadas: ${d.comprasEliminadas}`
+        );
+        setLimpiarParams(null);
+        setLimpiarConfirmando(false);
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo limpiar el mes."))
     });
   }
 
@@ -1388,6 +1429,245 @@ export function AjustesPage() {
             </table>
           </div>
         </div>
+      </article>
+
+      {/* ─── Limpiar mes ─────────────────────────────────────────────────── */}
+      <article className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-surface-container-high)] p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">Limpiar mes</h2>
+            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
+              Elimina permanentemente todos los vales y compras no-retroactivos de un mes.
+              No afecta movimientos históricos ni SaldoMensual.
+            </p>
+          </div>
+          {limpiarParams ? (
+            <span className="rounded-full bg-[var(--color-error)]/12 px-3 py-1 text-xs font-bold text-[var(--color-error)]">
+              {String(limpiarParams.mes).padStart(2, "0")}/{limpiarParams.anio}
+            </span>
+          ) : null}
+        </div>
+
+        <form
+          className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]"
+          onSubmit={handleLimpiarPreviewSubmit}
+        >
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Año
+            </label>
+            <input
+              type="number"
+              min={2000}
+              max={2100}
+              value={limpiarAnio}
+              onChange={(e) => setLimpiarAnio(e.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+              Mes
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={limpiarMes}
+              onChange={(e) => setLimpiarMes(e.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={limpiarPreviewQuery.isFetching}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {limpiarPreviewQuery.isFetching ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Search size={16} />
+              )}
+              Ver preview
+            </button>
+          </div>
+        </form>
+
+        {limpiarPreviewQuery.isError ? (
+          <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
+            {normalizeError(limpiarPreviewQuery.error, "No se pudo cargar el preview.")}
+          </div>
+        ) : null}
+
+        {limpiarPreviewQuery.data ? (() => {
+          const preview = limpiarPreviewQuery.data.data;
+          const vales = preview.vales as LimpiarMesVale[];
+          const compras = preview.compras as LimpiarMesCompra[];
+          const totalVales = vales.length;
+          const totalCompras = compras.length;
+          const tabVales = limpiarTab === "vales";
+
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Vales
+                  </p>
+                  <p className="mt-1 text-2xl font-extrabold">{totalVales}</p>
+                </div>
+                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Compras
+                  </p>
+                  <p className="mt-1 text-2xl font-extrabold">{totalCompras}</p>
+                </div>
+              </div>
+
+              {/* tabs */}
+              <div className="flex gap-1 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-1">
+                {(["vales", "compras"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setLimpiarTab(tab)}
+                    className={`flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                      limpiarTab === tab
+                        ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
+                        : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)]"
+                    }`}
+                  >
+                    {tab === "vales" ? `Vales (${totalVales})` : `Compras (${totalCompras})`}
+                  </button>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-[var(--color-border-soft)]">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
+                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
+                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                        {tabVales ? "Solicitante" : "Proveedor"}
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
+                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Productos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tabVales
+                      ? vales.length === 0
+                        ? (
+                          <tr>
+                            <td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                              Sin vales no-retroactivos en este mes.
+                            </td>
+                          </tr>
+                        )
+                        : vales.map((vale) => (
+                          <tr key={vale.id} className="border-b border-[var(--color-border-soft)] last:border-0">
+                            <td className="px-3 py-2 font-mono text-xs">{formatDate(vale.fecha.toISOString())}</td>
+                            <td className="px-3 py-2">{vale.solicitante}</td>
+                            <td className="px-3 py-2">
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                vale.estado === "ANULADO"
+                                  ? "bg-[var(--color-error)]/15 text-[var(--color-error)]"
+                                  : vale.estado === "ENTREGADO"
+                                  ? "bg-[var(--color-success)]/15 text-[var(--color-success)]"
+                                  : "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
+                              }`}>
+                                {vale.estado}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                              {vale.items.map((i) => `${i.productoCodigo} ×${i.cantidadEntregada}`).join(", ")}
+                            </td>
+                          </tr>
+                        ))
+                      : compras.length === 0
+                        ? (
+                          <tr>
+                            <td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                              Sin compras no-retroactivas en este mes.
+                            </td>
+                          </tr>
+                        )
+                        : compras.map((compra) => (
+                          <tr key={compra.id} className="border-b border-[var(--color-border-soft)] last:border-0">
+                            <td className="px-3 py-2 font-mono text-xs">{formatDate(compra.fecha.toISOString())}</td>
+                            <td className="px-3 py-2">{compra.proveedor}</td>
+                            <td className="px-3 py-2">
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                compra.estado === "ANULADA"
+                                  ? "bg-[var(--color-error)]/15 text-[var(--color-error)]"
+                                  : "bg-[var(--color-success)]/15 text-[var(--color-success)]"
+                              }`}>
+                                {compra.estado}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                              {compra.items.map((i) => `${i.productoCodigo} ×${i.cantidadRecibida}`).join(", ")}
+                            </td>
+                          </tr>
+                        ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              {totalVales === 0 && totalCompras === 0 ? null : (
+                <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/8 p-4">
+                  <div className="mb-3 flex items-start gap-2 text-sm text-[var(--color-error)]">
+                    <TriangleAlert size={16} className="mt-0.5 shrink-0" />
+                    <span>
+                      Esta acción es <strong>irreversible</strong>. Se eliminarán {totalVales} vale(s) y {totalCompras} compra(s)
+                      del mes {String(preview.mes).padStart(2, "0")}/{preview.anio} junto con todos sus movimientos.
+                      El stock físico será ajustado automáticamente.
+                    </span>
+                  </div>
+                  {!limpiarConfirmando ? (
+                    <button
+                      type="button"
+                      onClick={() => setLimpiarConfirmando(true)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/40 bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/12"
+                    >
+                      <Trash2 size={15} />
+                      Eliminar todo el mes
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold text-[var(--color-error)]">
+                        ¿Confirmas la eliminación permanente?
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleLimpiarMesConfirmar}
+                        disabled={limpiarMesMutation.isPending}
+                        className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {limpiarMesMutation.isPending ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                        Sí, eliminar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLimpiarConfirmando(false)}
+                        disabled={limpiarMesMutation.isPending}
+                        className="rounded-lg border border-[var(--color-border-soft)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--color-surface-container-highest)]"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })() : null}
       </article>
     </section>
   );
