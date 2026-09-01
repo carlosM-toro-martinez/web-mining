@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, BarChart3, CalendarClock, Lock, Plus, ShieldAlert, ShoppingCart, Search } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarClock, Loader2, Lock, Plus, RefreshCw, ShieldAlert, ShoppingCart, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
@@ -339,14 +339,16 @@ export function ValesHistoricosPage() {
     }),
     [compraHistoricoConsulta, now]
   );
-  const valesHistoricosQuery = useValesQuery({
-    ...historicoParams,
-    solicitanteId: historicoConsulta?.solicitanteId
-  }, Boolean(historicoConsulta));
-  const comprasHistoricasQuery = useComprasQuery({
-    ...compraHistoricoParams,
-    proveedorId: compraHistoricoConsulta?.proveedorId
-  }, Boolean(compraHistoricoConsulta));
+  const valesHistoricosQuery = useValesQuery(
+    { ...historicoParams, solicitanteId: historicoConsulta?.solicitanteId },
+    Boolean(historicoConsulta),
+    { refetchInterval: historicoConsulta ? 30_000 : false }
+  );
+  const comprasHistoricasQuery = useComprasQuery(
+    { ...compraHistoricoParams, proveedorId: compraHistoricoConsulta?.proveedorId },
+    Boolean(compraHistoricoConsulta),
+    { refetchInterval: compraHistoricoConsulta ? 30_000 : false }
+  );
   const valesHistoricosFiltrados = useMemo(() => {
     const vales = valesHistoricosQuery.data?.data ?? [];
     if (!historicoConsulta?.productoId) return vales;
@@ -421,7 +423,9 @@ export function ValesHistoricosPage() {
     }),
     [previewAnio, previewMes, now]
   );
-  const previewQuery = useSaldoMensualPreviewQuery(previewParams, previewEnabled);
+  const previewQuery = useSaldoMensualPreviewQuery(previewParams, previewEnabled, {
+    refetchInterval: previewEnabled ? 30_000 : false
+  });
 
   const filteredPreviewItems = useMemo(() => {
     const items = previewQuery.data?.items ?? [];
@@ -1594,6 +1598,12 @@ export function ValesHistoricosPage() {
         <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
           <BarChart3 size={16} className="text-[var(--color-primary)]" />
           Vista previa — Saldo del mes
+          {previewQuery.isFetching && !previewQuery.isLoading ? (
+            <span className="ml-1 inline-flex items-center gap-1 text-xs font-normal text-[var(--color-on-surface-variant)]">
+              <Loader2 size={12} className="animate-spin" />
+              actualizando
+            </span>
+          ) : null}
         </h2>
         <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
           Consulta el estado real del mes combinando el saldo inicial con todos los movimientos
@@ -1873,8 +1883,17 @@ export function ValesHistoricosPage() {
               </span>
             </span>
           </span>
-          <span className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
-            {isHistoricoPanelOpen ? "Contraer" : "Abrir"}
+          <span className="flex items-center gap-2">
+            {(valesHistoricosQuery.isFetching && !valesHistoricosQuery.isLoading) ||
+            (comprasHistoricasQuery.isFetching && !comprasHistoricasQuery.isLoading) ? (
+              <span className="inline-flex items-center gap-1 text-xs text-[var(--color-on-surface-variant)]">
+                <RefreshCw size={11} className="animate-spin" />
+                actualizando
+              </span>
+            ) : null}
+            <span className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+              {isHistoricoPanelOpen ? "Contraer" : "Abrir"}
+            </span>
           </span>
         </button>
 

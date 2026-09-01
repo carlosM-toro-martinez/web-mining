@@ -39,11 +39,16 @@ export function useValeQuery(id: string) {
   });
 }
 
-export function useValesQuery(params?: ValesListParams, enabled = true) {
+export function useValesQuery(
+  params?: ValesListParams,
+  enabled = true,
+  options?: { refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: queryKeys.vales.list(params),
     queryFn: () => getVales(params),
-    enabled
+    enabled,
+    ...options
   });
 }
 

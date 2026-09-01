@@ -27,12 +27,17 @@ import type {
 import { queryKeys } from "@/shared/lib/queryKeys";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
-export function useComprasQuery(params: ComprasQueryParams, enabled = true) {
+export function useComprasQuery(
+  params: ComprasQueryParams,
+  enabled = true,
+  options?: { refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: queryKeys.compras.list(params),
     queryFn: () => getCompras(params),
     enabled,
-    refetchOnMount: "always"
+    refetchOnMount: "always",
+    ...options
   });
 }
 

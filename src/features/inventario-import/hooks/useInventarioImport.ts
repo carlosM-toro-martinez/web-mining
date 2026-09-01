@@ -70,11 +70,16 @@ export function useSaldoMensualQuery(params: SaldoMensualQuery, enabled: boolean
   });
 }
 
-export function useSaldoMensualPreviewQuery(params: SaldoMensualQuery, enabled: boolean) {
+export function useSaldoMensualPreviewQuery(
+  params: SaldoMensualQuery,
+  enabled: boolean,
+  options?: { refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: ["inventario-import", "saldo-mensual-preview", params],
     queryFn: () => getSaldoMensualPreview(params),
-    enabled
+    enabled,
+    ...options
   });
 }
 
