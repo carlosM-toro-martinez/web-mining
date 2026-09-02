@@ -43,7 +43,7 @@ import type {
   CierreMesPayload,
   StockInicialPayload,
   LimpiarMesPayload,
-  type FixRedondeoPayload
+  FixRedondeoPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export function useImportCatalogoMutation() {
