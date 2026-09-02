@@ -10,6 +10,8 @@ import {
   getCierresMes,
   getDiagnosticoPrecios,
   getDiagnosticoSaldos,
+  getDiagnosticoRedondeo,
+  postFixRedondeo,
   getSaldoMensual,
   getSaldoMensualById,
   getSaldoMensualPreview,
@@ -40,7 +42,8 @@ import type {
   SincronizarStockPayload,
   CierreMesPayload,
   StockInicialPayload,
-  LimpiarMesPayload
+  LimpiarMesPayload,
+  type FixRedondeoPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export function useImportCatalogoMutation() {
@@ -166,6 +169,18 @@ export function useDiagnosticoSaldosQuery(params: SaldoMensualQuery, enabled: bo
     queryFn: () => getDiagnosticoSaldos(params),
     enabled
   });
+}
+
+export function useDiagnosticoRedondeoQuery(params: SaldoMensualQuery, enabled: boolean) {
+  return useQuery({
+    queryKey: ["inventario-import", "diagnostico-redondeo", params],
+    queryFn: () => getDiagnosticoRedondeo(params),
+    enabled
+  });
+}
+
+export function useFixRedondeoMutation() {
+  return useMutation({ mutationFn: postFixRedondeo });
 }
 
 export function useImportarAjusteInicialSaldoMensualExcelMutation() {

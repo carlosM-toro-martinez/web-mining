@@ -50,7 +50,11 @@ import {
   type StockInicialPayload,
   type CierreMesPayload,
   type InicializarPeriodoPayload,
-  type LimpiarMesPayload
+  type LimpiarMesPayload,
+  type FixRedondeoPayload,
+  diagnosticoRedondeoResponseSchema,
+  fixRedondeoPayloadSchema,
+  fixRedondeoResponseSchema
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export async function importCatalogo(
@@ -224,6 +228,23 @@ export async function getDiagnosticoSaldos(params: SaldoMensualQuery) {
     url: apiEndpoints.inventarioImport.diagnosticoSaldos,
     config: { params: parsed },
     schema: diagnosticoSaldosResponseSchema
+  });
+}
+
+export async function getDiagnosticoRedondeo(params: SaldoMensualQuery) {
+  const parsed = saldoMensualQuerySchema.parse(params);
+  return getRequest({
+    url: apiEndpoints.inventarioImport.diagnosticoRedondeo,
+    config: { params: parsed },
+    schema: diagnosticoRedondeoResponseSchema
+  });
+}
+
+export async function postFixRedondeo(payload: FixRedondeoPayload) {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.fixRedondeo,
+    body: fixRedondeoPayloadSchema.parse(payload),
+    schema: fixRedondeoResponseSchema
   });
 }
 

@@ -4,6 +4,8 @@ import {
   useBackfillCppMutation,
   useDiagnosticoPreciosQuery,
   useDiagnosticoSaldosQuery,
+  useDiagnosticoRedondeoQuery,
+  useFixRedondeoMutation,
   useLimpiarMesPreviewQuery,
   useEjecutarLimpiarMesMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
@@ -127,6 +129,10 @@ export function AjustesPage() {
   const [limpiarParams, setLimpiarParams] = useState<{ anio: number; mes: number } | null>(null);
   const [limpiarTab, setLimpiarTab] = useState<"vales" | "compras">("vales");
   const [limpiarConfirmando, setLimpiarConfirmando] = useState(false);
+  const [redondeoAnio, setRedondeoAnio] = useState(String(now.getFullYear()));
+  const [redondeoMes, setRedondeoMes] = useState(String(now.getMonth() + 1));
+  const [redondeoParams, setRedondeoParams] = useState<{ anio: number; mes: number } | null>(null);
+  const fixRedondeoMutation = useFixRedondeoMutation();
 
   const activeDiagnosticoParams = diagnosticoParams ?? {
     anio: Number(diagnosticoAnio),
@@ -141,6 +147,8 @@ export function AjustesPage() {
     mes: Number(saldosMes)
   };
   const saldosQuery = useDiagnosticoSaldosQuery(activeSaldosParams, Boolean(saldosParams));
+  const activeRedondeoParams = redondeoParams ?? { anio: Number(redondeoAnio), mes: Number(redondeoMes) };
+  const redondeoQuery = useDiagnosticoRedondeoQuery(activeRedondeoParams, Boolean(redondeoParams));
   const activeComprasParams = comprasParams ?? {
     anioInicio: Number(comprasAnioInicio),
     mesInicio: Number(comprasMesInicio),
@@ -1668,6 +1676,132 @@ export function AjustesPage() {
             </div>
           );
         })() : null}
+      </article>
+
+      {/* ── Diagnóstico de redondeo ingresosBs ─────────────────────────────── */}
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container)] p-5">
+        <h2 className="mb-1 text-base font-semibold text-[var(--color-on-surface)]">
+          Diagnóstico de redondeo — Ingreso Materiales
+        </h2>
+        <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+          Verifica si la suma per-grupo de <code>ingresosBs</code> difiere de la suma flat en el mes.
+          Si hay discrepancia, muestra el grupo y producto exacto a ajustar y permite aplicar el fix mínimo (&lt;&nbsp;0.01&nbsp;Bs).
+        </p>
+        <form
+          className="mb-4 flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setRedondeoParams({ anio: Number(redondeoAnio), mes: Number(redondeoMes) });
+          }}
+        >
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Año</label>
+            <input type="number" min="2000" max="2100" value={redondeoAnio}
+              onChange={(e) => setRedondeoAnio(e.target.value)} className={inputClassName} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Mes</label>
+            <input type="number" min="1" max="12" value={redondeoMes}
+              onChange={(e) => setRedondeoMes(e.target.value)} className={inputClassName} />
+          </div>
+          <button type="submit" className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white">
+            <Search className="h-4 w-4" /> Verificar
+          </button>
+        </form>
+
+        {redondeoQuery.isLoading && (
+          <div className="flex items-center gap-2 text-sm text-[var(--color-on-surface-variant)]">
+            <Loader2 className="h-4 w-4 animate-spin" /> Analizando…
+          </div>
+        )}
+
+        {redondeoQuery.data && (() => {
+          const d = redondeoQuery.data.data;
+          return (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] p-4">
+                <div>
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">Suma flat (inventarios-suministros)</p>
+                  <p className="font-mono text-sm font-semibold">{formatNumber(d.flatRnd)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">Suma per-grupo (balance-mensual)</p>
+                  <p className="font-mono text-sm font-semibold">{formatNumber(d.perGrupoRnd)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">Discrepancia</p>
+                  <p className={`font-mono text-sm font-bold ${d.ok ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}>
+                    {d.ok ? "✓ Sin discrepancia" : `${formatNumber(d.discrepancia)} Bs`}
+                  </p>
+                </div>
+              </div>
+
+              {d.ok && (
+                <p className="text-sm text-[var(--color-success)]">
+                  Los totales coinciden para {String(d.mes).padStart(2,"0")}/{d.anio}. No se requiere ajuste.
+                </p>
+              )}
+
+              {!d.ok && d.grupos.map((g) => (
+                <div key={g.grupoId} className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-4 space-y-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-error)]">Grupo con sub-centavo ≥ 0.005</p>
+                    <p className="text-sm font-semibold">{g.grupoCodigo} — {g.grupoNombre}</p>
+                    <p className="font-mono text-xs text-[var(--color-on-surface-variant)]">
+                      rawSum: {g.rawSum.toFixed(8)} → redondeado: {formatNumber(g.rounded)} (sub-centavo: {g.subCentavo.toFixed(6)})
+                    </p>
+                  </div>
+
+                  {g.productoAjuste && (
+                    <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container)] p-3 space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Ajuste mínimo propuesto</p>
+                      <p className="text-sm"><span className="font-mono font-semibold">[{g.productoAjuste.codigo}]</span> {g.productoAjuste.nombre}</p>
+                      <div className="flex flex-wrap gap-4 font-mono text-xs">
+                        <span>Actual: <strong>{g.productoAjuste.ingresosBsActual.toFixed(10)}</strong></span>
+                        <span>→ Nuevo: <strong>{g.productoAjuste.ingresosBsNuevo.toFixed(10)}</strong></span>
+                        <span className="text-[var(--color-on-surface-variant)]">ε = {g.productoAjuste.epsilon.toFixed(10)} Bs</span>
+                      </div>
+                      <p className="text-xs text-[var(--color-on-surface-variant)]">
+                        SaldoMensual id: <span className="font-mono">{g.productoAjuste.saldoMensualId}</span>
+                      </p>
+                      <div className="pt-1">
+                        <p className="mb-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">Query SQL equivalente para producción:</p>
+                        <pre className="overflow-x-auto rounded bg-[var(--color-surface-container-highest)] p-2 font-mono text-xs">
+{`UPDATE "SaldoMensual"\nSET "ingresosBs" = ${g.productoAjuste.ingresosBsNuevo.toFixed(10)}\nWHERE id = '${g.productoAjuste.saldoMensualId}';`}
+                        </pre>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={fixRedondeoMutation.isPending}
+                        onClick={async () => {
+                          const ok = window.confirm(
+                            `Ajustar ingresosBs de [${g.productoAjuste!.codigo}] en ${d.mes}/${d.anio} de ${g.productoAjuste!.ingresosBsActual.toFixed(6)} a ${g.productoAjuste!.ingresosBsNuevo.toFixed(6)} (cambio: ${g.productoAjuste!.epsilon.toFixed(6)} Bs). ¿Confirmar?`
+                          );
+                          if (!ok) return;
+                          try {
+                            await fixRedondeoMutation.mutateAsync({
+                              anio: d.anio,
+                              mes: d.mes,
+                              saldoMensualId: g.productoAjuste!.saldoMensualId,
+                              ingresosBsNuevo: g.productoAjuste!.ingresosBsNuevo,
+                            });
+                            showSuccess(`Fix aplicado. ingresosBs ajustado en ${g.productoAjuste!.epsilon.toFixed(6)} Bs. Los reportes de ${d.mes}/${d.anio} ahora cuadran.`);
+                            setRedondeoParams({ anio: d.anio, mes: d.mes });
+                          } catch (err) {
+                            showError(normalizeError(err, "No se pudo aplicar el fix."));
+                          }
+                        }}
+                        className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {fixRedondeoMutation.isPending ? "Aplicando…" : "Aplicar fix"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </article>
     </section>
   );

@@ -274,6 +274,7 @@ export function ValesHistoricosPage() {
   const now = new Date();
   const [cierreAnio, setCierreAnio] = useState(String(now.getFullYear()));
   const [cierreMes, setCierreMes] = useState(String(now.getMonth() + 1));
+  const [cierreSoloRegistrar, setCierreSoloRegistrar] = useState(false);
   const [initAnio, setInitAnio] = useState(String(now.getFullYear()));
   const [initMes, setInitMes] = useState(String(now.getMonth() + 1));
   const [aperturaAnio, setAperturaAnio] = useState(String(now.getFullYear()));
@@ -551,15 +552,22 @@ export function ValesHistoricosPage() {
       showError("Debes indicar año y mes válidos.");
       return;
     }
-    const confirmed = window.confirm(
-      `Vas a cerrar definitivamente el período ${String(mes).padStart(2, "0")}/${anio}. Esta acción fija los saldos mensuales y no se puede deshacer. ¿Deseas continuar?`
-    );
+    const confirmMsg = cierreSoloRegistrar
+      ? `Vas a cerrar el período ${String(mes).padStart(2, "0")}/${anio} SIN recalcular valores. Los saldos guardados quedarán intactos. ¿Deseas continuar?`
+      : `Vas a cerrar definitivamente el período ${String(mes).padStart(2, "0")}/${anio}. Esta acción fija los saldos mensuales y no se puede deshacer. ¿Deseas continuar?`;
+    const confirmed = window.confirm(confirmMsg);
     if (!confirmed) return;
     try {
-      const response = await createCierreMesMutation.mutateAsync({ anio, mes });
+      const response = await createCierreMesMutation.mutateAsync({
+        anio,
+        mes,
+        ...(cierreSoloRegistrar ? { soloRegistrarCierre: true } : {}),
+      });
       await queryClient.invalidateQueries({ queryKey: ["inventario-import", "cierre-mes"] });
       showSuccess(
-        `Período ${mes}/${anio} cerrado. Saldos creados: ${response.data.saldosCreados ?? 0}, actualizados: ${response.data.saldosActualizados ?? 0}.`
+        cierreSoloRegistrar
+          ? `Período ${mes}/${anio} cerrado sin recalcular valores.`
+          : `Período ${mes}/${anio} cerrado. Saldos creados: ${response.data.saldosCreados ?? 0}, actualizados: ${response.data.saldosActualizados ?? 0}.`
       );
     } catch (error) {
       if (isAlreadyClosedPeriodError(error)) {
@@ -2764,6 +2772,18 @@ export function ValesHistoricosPage() {
                   onChange={(event) => setCierreMes(event.target.value)}
                   className={inputClassName}
                 />
+              </div>
+              <div className="col-span-2 flex items-center gap-2 pt-1">
+                <input
+                  id="cierreSoloRegistrar"
+                  type="checkbox"
+                  checked={cierreSoloRegistrar}
+                  onChange={(e) => setCierreSoloRegistrar(e.target.checked)}
+                  className="h-4 w-4 accent-[var(--color-error)]"
+                />
+                <label htmlFor="cierreSoloRegistrar" className="text-xs text-[var(--color-on-surface-variant)] cursor-pointer select-none">
+                  Solo registrar cierre (sin recalcular valores guardados)
+                </label>
               </div>
               <div className="flex items-end">
                 <button

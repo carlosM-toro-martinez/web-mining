@@ -18,6 +18,8 @@ export const inventarioImportEndpoints = {
   backfillCpp: "/api/backfill/cpp",
   diagnosticoPrecios: "/api/inventario-import/diagnostico-precios",
   diagnosticoSaldos: "/api/inventario-import/diagnostico-saldos",
+  diagnosticoRedondeo: "/api/inventario-import/diagnostico-redondeo",
+  fixRedondeo: "/api/inventario-import/fix-redondeo",
   limpiarMesPreview: "/api/inventario-import/limpiar-mes/preview",
   limpiarMes: "/api/inventario-import/limpiar-mes"
 } as const;

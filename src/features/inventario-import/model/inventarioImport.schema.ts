@@ -140,7 +140,8 @@ export const cierreMesListResponseSchema = z.object({
 export const cierreMesPayloadSchema = z.object({
   anio: numberLikeSchema.int().min(2000).max(2100),
   mes: numberLikeSchema.int().min(1).max(12),
-  force: z.boolean().optional()
+  force: z.boolean().optional(),
+  soloRegistrarCierre: z.boolean().optional()
 });
 
 export const inicializarPeriodoPayloadSchema = cierreMesPayloadSchema;
@@ -483,6 +484,57 @@ export const saldoMensualPreviewResponseSchema = z.object({
     items: z.array(saldoMensualPreviewItemSchema)
   })
 });
+
+// ─── Diagnóstico de redondeo ingresosBs ──────────────────────────────────────
+
+export const diagnosticoRedondeoResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    anio:        z.number(),
+    mes:         z.number(),
+    flatRnd:     z.number(),
+    perGrupoRnd: z.number(),
+    discrepancia: z.number(),
+    ok:          z.boolean(),
+    grupos: z.array(z.object({
+      grupoId:     z.number(),
+      grupoCodigo: z.string(),
+      grupoNombre: z.string(),
+      rawSum:      z.number(),
+      rounded:     z.number(),
+      subCentavo:  z.number(),
+      productoAjuste: z.object({
+        saldoMensualId:   z.string(),
+        productoId:       z.number(),
+        codigo:           z.string(),
+        nombre:           z.string(),
+        ingresosBsActual: z.number(),
+        ingresosBsNuevo:  z.number(),
+        epsilon:          z.number(),
+      }).nullable(),
+    }))
+  })
+});
+
+export const fixRedondeoPayloadSchema = z.object({
+  anio:            z.number().int().min(2000).max(2100),
+  mes:             z.number().int().min(1).max(12),
+  saldoMensualId:  z.string().min(1),
+  ingresosBsNuevo: z.number(),
+});
+
+export const fixRedondeoResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    saldoMensualId: z.string(),
+    anterior:       z.number(),
+    nuevo:          z.number(),
+    diferencia:     z.number(),
+  })
+});
+
+export type DiagnosticoRedondeoResponse = z.infer<typeof diagnosticoRedondeoResponseSchema>;
+export type FixRedondeoPayload = z.infer<typeof fixRedondeoPayloadSchema>;
 
 export type CierreMesItem = z.infer<typeof cierreMesItemSchema>;
 export type CierreMesPayload = z.infer<typeof cierreMesPayloadSchema>;
