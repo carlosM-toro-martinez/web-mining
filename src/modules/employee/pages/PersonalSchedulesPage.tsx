@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { getTipoPersonalLabel } from "@/modules/employee/hooks/useEmployees";
+import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 
 interface Horario {
   id: number;
@@ -22,6 +24,20 @@ interface Horario {
   _count?: { asignaciones?: number };
 }
 
+interface HorarioDetalle extends Horario {
+  asignaciones: Array<{
+    id: number;
+    desde: string;
+    employee: {
+      id: number;
+      nombre: string;
+      cargo?: string | null;
+      documento?: string | null;
+      tipoPersonal?: EmployeeTipoPersonal | null;
+    };
+  }>;
+}
+
 const weekDays: Array<keyof Pick<Horario, "lunes" | "martes" | "miercoles" | "jueves" | "viernes" | "sabado" | "domingo">> = [
   "lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"
 ];
@@ -39,12 +55,24 @@ export function PersonalSchedulesPage() {
     lunes: true, martes: true, miercoles: true, jueves: true, viernes: true, sabado: false, domingo: false
   });
 
+  const [horarioVerId, setHorarioVerId] = useState("");
+
   const horariosQuery = useQuery({
     queryKey: ["personal-horarios"],
     queryFn: async () => {
       const response = await httpClient.get("/api/personal/horarios");
       const payload = response.data as { data?: Horario[] };
       return payload.data ?? [];
+    }
+  });
+
+  const horarioDetalleQuery = useQuery({
+    queryKey: ["personal-horario-detalle", horarioVerId],
+    enabled: Boolean(horarioVerId),
+    queryFn: async () => {
+      const response = await httpClient.get(`/api/personal/horarios/${horarioVerId}`);
+      const payload = response.data as { data?: HorarioDetalle };
+      return payload.data ?? null;
     }
   });
 
@@ -156,6 +184,66 @@ export function PersonalSchedulesPage() {
             </tbody>
           </table>
         </div>
+      </article>
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="text-lg font-bold">Trabajadores por horario</h2>
+        <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
+          Selecciona un horario para ver a todos los trabajadores actualmente asignados a él.
+        </p>
+        <select
+          value={horarioVerId}
+          onChange={(e) => setHorarioVerId(e.target.value)}
+          className="mt-3 w-full max-w-sm rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm md:w-auto"
+        >
+          <option value="">Selecciona un horario...</option>
+          {horariosQuery.data?.map((h) => (
+            <option key={h.id} value={String(h.id)}>
+              {h.nombre} ({h.horaEntrada}-{h.horaSalida}) — {h._count?.asignaciones ?? 0} asignado(s)
+            </option>
+          ))}
+        </select>
+
+        {horarioVerId ? (
+          <div className="mt-4 overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
+            <div className="px-4 py-2 text-xs text-[var(--color-on-surface-variant)]">
+              {horarioDetalleQuery.isLoading
+                ? "Cargando trabajadores..."
+                : `Trabajadores asignados: ${horarioDetalleQuery.data?.asignaciones.length ?? 0}`}
+            </div>
+            <div className="table-scroll overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-2 text-xs">Nombre</th>
+                    <th className="px-4 py-2 text-xs">Documento</th>
+                    <th className="px-4 py-2 text-xs">Cargo</th>
+                    <th className="px-4 py-2 text-xs">Tipo</th>
+                    <th className="px-4 py-2 text-xs">Asignado desde</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!horarioDetalleQuery.isLoading && (horarioDetalleQuery.data?.asignaciones.length ?? 0) === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+                        Nadie tiene este horario asignado actualmente.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {horarioDetalleQuery.data?.asignaciones.map((asignacion) => (
+                    <tr key={asignacion.id} className="border-t border-[var(--color-border-soft)]">
+                      <td className="px-4 py-2 text-sm">{asignacion.employee.nombre}</td>
+                      <td className="px-4 py-2 text-sm font-mono">{asignacion.employee.documento ?? "-"}</td>
+                      <td className="px-4 py-2 text-sm">{asignacion.employee.cargo ?? "-"}</td>
+                      <td className="px-4 py-2 text-sm">{getTipoPersonalLabel(asignacion.employee.tipoPersonal)}</td>
+                      <td className="px-4 py-2 text-sm font-mono">{asignacion.desde.slice(0, 10)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </article>
     </section>
   );
