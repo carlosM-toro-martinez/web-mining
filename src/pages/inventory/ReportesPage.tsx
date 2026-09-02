@@ -228,20 +228,8 @@ function reportMovimientoTitulo(cuenta: ReportDiarioCuenta) {
 }
 
 function reportMovimientoOrderValue(cuenta: ReportDiarioCuenta) {
-  const code = reportCuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
-  const order = [
-    "22001008",
-    "35001000",
-    "44002000",
-    "22001010",
-    "67001010",
-    "22001009",
-    "67001009",
-    "100001000",
-    "104001000"
-  ];
-  const index = order.indexOf(code);
-  return index >= 0 ? index : order.length;
+  const display = reportMovimientoCargo(cuenta) ?? "";
+  return Number(display.replace(/[^\d]/g, "")) || Number.MAX_SAFE_INTEGER;
 }
 
 function reportMovimientoCargo(cuenta: ReportDiarioCuenta) {

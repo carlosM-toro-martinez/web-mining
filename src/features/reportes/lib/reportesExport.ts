@@ -1079,20 +1079,8 @@ function cuentaMovimientoTitulo(cuenta: DiarioCuenta) {
 }
 
 function movimientoCuentaOrderValue(cuenta: DiarioCuenta) {
-  const code = cuentaLookupKey(cuenta.sectorCodigo ?? cuenta.codigoCompleto);
-  const order = [
-    "22001008",
-    "35001000",
-    "44002000",
-    "22001010",
-    "67001010",
-    "22001009",
-    "67001009",
-    "100001000",
-    "104001000"
-  ];
-  const index = order.indexOf(code);
-  return index >= 0 ? index : order.length;
+  const display = movimientoCargoDisplay(cuenta);
+  return Number(display.replace(/[^\d]/g, "")) || Number.MAX_SAFE_INTEGER;
 }
 
 function movimientoCargoDisplay(cuenta: DiarioCuenta) {
