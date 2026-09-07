@@ -173,10 +173,15 @@ function costoSheetName(cuenta: {
   if (code.includes("35001000") || text.includes("MAQUINARIAS")) return "MAQUINARIA Y EQUIPO";
   if (code.includes("104001000") || text.includes("MEDIO AMBIENTE") || text.includes("M.A.")) return "MA-HSI (3)";
   if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION")) return "CONSTRUCCION-25";
+  // Cuentas por cobrar dinámicas (22.001.011, 22.001.012, …) → nombre del centro de costo
+  const knownCodes = ["22001008", "22001009", "22001010"];
+  if (code.startsWith("22001") && !knownCodes.some((k) => code.includes(k))) {
+    return cuenta.centroCostoNombre?.trim().toUpperCase() || code;
+  }
   return "LIPEÑA";
 }
 
-function costoSheetMeta(sheetName: string) {
+function costoSheetMeta(sheetName: string, codigoCompleto?: string | null) {
   if (sheetName === "ROMARESNI") {
     return {
       title: "DETALLE DE MATERIALES  EMPRESA CONST. ROMARESNI S.R.L.",
@@ -226,10 +231,13 @@ function costoSheetMeta(sheetName: string) {
       isTransport: true
     };
   }
+  // Hoja dinámica (22.001.011, 22.001.012, …)
+  const digits = (codigoCompleto ?? "").replace(/[^\d]/g, "");
+  const fmtCode = digits.replace(/^(\d{2})(\d{3})(\d{3})$/, "$1,$2,$3");
   return {
-    title: "DETALLE DE MATERIALES  COSTO DE PRODUCCION",
-    codeLine: "",
-    isTransport: false
+    title: `DETALLE DE MATERIALES  COSTO DE PRODUCCION ${sheetName}`,
+    codeLine: fmtCode ? `${fmtCode}    CUENTAS POR COBRAR: ${sheetName}` : "",
+    isTransport: true
   };
 }
 
@@ -1486,10 +1494,10 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
 
     for (const cuenta of cuentas) {
       const sheetName = costoSheetName(cuenta);
-      const meta = costoSheetMeta(sheetName);
+      const meta = costoSheetMeta(sheetName, cuenta.codigoCompleto);
       const current = groupedCuentas.get(sheetName);
       const sheet = current ?? {
-        codigoCompleto: "",
+        codigoCompleto: cuenta.codigoCompleto ?? "",
         centroCostoNombre: "",
         funcionGastoNombre: "",
         vehiculo: null,
@@ -1557,12 +1565,12 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
     const aglBySheet = new Map<string, number>();
     for (const sn of [...orderedSheetNames, ...remainingSheetNames]) {
       if (!groupedCuentas.has(sn)) continue;
-      if (costoSheetMeta(sn).isTransport) aglBySheet.set(sn, ++aglCounter);
+      if (costoSheetMeta(sn, groupedCuentas.get(sn)?.codigoCompleto).isTransport) aglBySheet.set(sn, ++aglCounter);
     }
     for (const sheetName of [...orderedSheetNames, ...remainingSheetNames]) {
       const cuenta = groupedCuentas.get(sheetName);
       if (!cuenta) continue;
-      const meta = costoSheetMeta(sheetName);
+      const meta = costoSheetMeta(sheetName, cuenta.codigoCompleto);
       const title = meta.title;
       const codeLine = meta.codeLine;
       const groupedLineas = meta.isTransport ? [] : groupCostoLineas(cuenta.lineas);
