@@ -231,6 +231,13 @@ function costoSheetMeta(sheetName: string, codigoCompleto?: string | null) {
       isTransport: true
     };
   }
+  if (sheetName === "LIPEÑA") {
+    return {
+      title: "DETALLE DE MATERIALES  COSTO DE PRODUCCION",
+      codeLine: "",
+      isTransport: false
+    };
+  }
   // Hoja dinámica (22.001.011, 22.001.012, …)
   const digits = (codigoCompleto ?? "").replace(/[^\d]/g, "");
   const fmtCode = digits.replace(/^(\d{2})(\d{3})(\d{3})$/, "$1,$2,$3");
