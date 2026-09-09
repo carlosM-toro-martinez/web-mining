@@ -5,10 +5,14 @@ import {
   FileSpreadsheet,
   Landmark,
   MapPinned,
+  Pencil,
   Plus,
   ReceiptText,
   Search,
-  Upload
+  Trash2,
+  Upload,
+  X,
+  Check
 } from "lucide-react";
 import {
   useCentrosCostoQuery,
@@ -18,8 +22,16 @@ import {
   useCreateSalidaMovimientoMutation,
   useCreateSectorMutation,
   useCuentasQuery,
+  useDeleteCentroCostoMutation,
+  useDeleteCuentaMutation,
+  useDeleteFuncionGastoMutation,
+  useDeleteSectorMutation,
   useFuncionesGastoQuery,
-  useSectoresQuery
+  useSectoresQuery,
+  useUpdateCentroCostoMutation,
+  useUpdateCuentaMutation,
+  useUpdateFuncionGastoMutation,
+  useUpdateSectorMutation
 } from "@/features/contabilidad/hooks/useContabilidad";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
 import { ApiError } from "@/shared/api/core/apiError";
@@ -69,6 +81,15 @@ export function AccountingPage() {
   const createCuentaMutation = useCreateCuentaMutation();
   const createSalidaMutation = useCreateSalidaMovimientoMutation();
 
+  const updateCentroMutation = useUpdateCentroCostoMutation();
+  const deleteCentroMutation = useDeleteCentroCostoMutation();
+  const updateFuncionMutation = useUpdateFuncionGastoMutation();
+  const deleteFuncionMutation = useDeleteFuncionGastoMutation();
+  const updateSectorMutation = useUpdateSectorMutation();
+  const deleteSectorMutation = useDeleteSectorMutation();
+  const updateCuentaMutation = useUpdateCuentaMutation();
+  const deleteCuentaMutation = useDeleteCuentaMutation();
+
   const centros = centrosQuery.data?.data ?? [];
   const funciones = funcionesQuery.data?.data ?? [];
   const sectores = sectoresQuery.data?.data ?? [];
@@ -97,6 +118,19 @@ export function AccountingPage() {
   const [funcionSearch, setFuncionSearch] = useState("");
   const [sectorSearch, setSectorSearch] = useState("");
   const [cuentaSearch, setCuentaSearch] = useState("");
+
+  // Estado de edición inline
+  const [editingCentroId, setEditingCentroId] = useState<number | null>(null);
+  const [editingFuncionId, setEditingFuncionId] = useState<number | null>(null);
+  const [editingSectorId, setEditingSectorId] = useState<number | null>(null);
+  const [editingCuentaId, setEditingCuentaId] = useState<number | null>(null);
+  const [editCodigo, setEditCodigo] = useState("");
+  const [editNombre, setEditNombre] = useState("");
+  // Para cuentas: edit completo
+  const [editCuentaCodigo, setEditCuentaCodigo] = useState("");
+  const [editCuentaCentroId, setEditCuentaCentroId] = useState("");
+  const [editCuentaFuncionId, setEditCuentaFuncionId] = useState("");
+  const [editCuentaSectorId, setEditCuentaSectorId] = useState("");
 
   const centroMap = useMemo(() => new Map(centros.map((item) => [item.id, item])), [centros]);
   const funcionMap = useMemo(() => new Map(funciones.map((item) => [item.id, item])), [funciones]);
@@ -280,6 +314,116 @@ export function AccountingPage() {
         onError: (error) => showError(normalizeError(error, "No se pudo registrar la salida."))
       }
     );
+  }
+
+  function startEditCentro(item: { id: number; codigo: string; nombre: string }) {
+    setEditingCentroId(item.id);
+    setEditCodigo(item.codigo);
+    setEditNombre(item.nombre);
+  }
+  function startEditFuncion(item: { id: number; codigo: string; nombre: string }) {
+    setEditingFuncionId(item.id);
+    setEditCodigo(item.codigo);
+    setEditNombre(item.nombre);
+  }
+  function startEditSector(item: { id: number; codigo: string; nombre: string }) {
+    setEditingSectorId(item.id);
+    setEditCodigo(item.codigo);
+    setEditNombre(item.nombre);
+  }
+  function startEditCuenta(item: {
+    id: number;
+    codigoCompleto: string;
+    centroCostoId: number;
+    funcionGastoId: number;
+    sectorId?: number | null;
+  }) {
+    setEditingCuentaId(item.id);
+    setEditCuentaCodigo(item.codigoCompleto);
+    setEditCuentaCentroId(String(item.centroCostoId));
+    setEditCuentaFuncionId(String(item.funcionGastoId));
+    setEditCuentaSectorId(item.sectorId ? String(item.sectorId) : "");
+  }
+  function cancelEdit() {
+    setEditingCentroId(null);
+    setEditingFuncionId(null);
+    setEditingSectorId(null);
+    setEditingCuentaId(null);
+  }
+
+  function handleSaveCentro(id: number) {
+    updateCentroMutation.mutate(
+      { id, payload: { codigo: editCodigo.trim().toUpperCase(), nombre: editNombre.trim() } },
+      {
+        onSuccess: () => { showSuccess("Centro actualizado."); setEditingCentroId(null); },
+        onError: (e) => showError(normalizeError(e, "No se pudo actualizar el centro."))
+      }
+    );
+  }
+  function handleDeleteCentro(id: number) {
+    if (!window.confirm("¿Eliminar este centro de costo? Esta acción no se puede deshacer.")) return;
+    deleteCentroMutation.mutate(id, {
+      onSuccess: () => showSuccess("Centro eliminado."),
+      onError: (e) => showError(normalizeError(e, "No se pudo eliminar el centro."))
+    });
+  }
+
+  function handleSaveFuncion(id: number) {
+    updateFuncionMutation.mutate(
+      { id, payload: { codigo: editCodigo.trim().toUpperCase(), nombre: editNombre.trim() } },
+      {
+        onSuccess: () => { showSuccess("Función actualizada."); setEditingFuncionId(null); },
+        onError: (e) => showError(normalizeError(e, "No se pudo actualizar la función."))
+      }
+    );
+  }
+  function handleDeleteFuncion(id: number) {
+    if (!window.confirm("¿Eliminar esta función de gasto? Esta acción no se puede deshacer.")) return;
+    deleteFuncionMutation.mutate(id, {
+      onSuccess: () => showSuccess("Función eliminada."),
+      onError: (e) => showError(normalizeError(e, "No se pudo eliminar la función."))
+    });
+  }
+
+  function handleSaveSector(id: number) {
+    updateSectorMutation.mutate(
+      { id, payload: { codigo: editCodigo.trim().toUpperCase(), nombre: editNombre.trim() } },
+      {
+        onSuccess: () => { showSuccess("Sector actualizado."); setEditingSectorId(null); },
+        onError: (e) => showError(normalizeError(e, "No se pudo actualizar el sector."))
+      }
+    );
+  }
+  function handleDeleteSector(id: number) {
+    if (!window.confirm("¿Eliminar este sector? Esta acción no se puede deshacer.")) return;
+    deleteSectorMutation.mutate(id, {
+      onSuccess: () => showSuccess("Sector eliminado."),
+      onError: (e) => showError(normalizeError(e, "No se pudo eliminar el sector."))
+    });
+  }
+
+  function handleSaveCuenta(id: number) {
+    const centroCostoId = Number(editCuentaCentroId);
+    const funcionGastoId = Number(editCuentaFuncionId);
+    const sectorId = editCuentaSectorId ? Number(editCuentaSectorId) : null;
+    if (!centroCostoId || !funcionGastoId) {
+      showError("Debes seleccionar centro de costo y función de gasto.");
+      return;
+    }
+    updateCuentaMutation.mutate(
+      { id, payload: { codigoCompleto: editCuentaCodigo.trim().toUpperCase(), centroCostoId, funcionGastoId, sectorId } },
+      {
+        onSuccess: () => { showSuccess("Cuenta actualizada."); setEditingCuentaId(null); },
+        onError: (e) => showError(normalizeError(e, "No se pudo actualizar la cuenta."))
+      }
+    );
+  }
+  function handleDeleteCuenta(id: number) {
+    if (!window.confirm("¿Eliminar esta cuenta contable? Esta acción no se puede deshacer.")) return;
+    deleteCuentaMutation.mutate(id, {
+      onSuccess: () => showSuccess("Cuenta eliminada."),
+      onError: (e) => showError(normalizeError(e, "No se pudo eliminar la cuenta."))
+    });
   }
 
   function openImportDialog() {
@@ -739,15 +883,52 @@ export function AccountingPage() {
             />
           </div>
           <div className="mt-3 space-y-2 text-sm">
-            {centrosFiltered.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2"
-              >
-                <p className="font-mono text-xs uppercase">{item.codigo}</p>
-                <p>{item.nombre}</p>
-              </div>
-            ))}
+            {centrosFiltered.map((item) =>
+              editingCentroId === item.id ? (
+                <div key={item.id} className="rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5 px-3 py-2 space-y-2">
+                  <input
+                    value={editCodigo}
+                    onChange={(e) => setEditCodigo(e.target.value.toUpperCase())}
+                    className={`${inputClassName} font-mono uppercase tracking-wide`}
+                    placeholder="Codigo"
+                  />
+                  <input
+                    value={editNombre}
+                    onChange={(e) => setEditNombre(e.target.value)}
+                    className={inputClassName}
+                    placeholder="Nombre"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveCentro(item.id)}
+                      disabled={updateCentroMutation.isPending}
+                      className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                    >
+                      <Check size={12} /> Guardar
+                    </button>
+                    <button type="button" onClick={cancelEdit} className="flex items-center gap-1 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold">
+                      <X size={12} /> Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={item.id} className="group flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                  <div>
+                    <p className="font-mono text-xs uppercase">{item.codigo}</p>
+                    <p>{item.nombre}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                    <button type="button" onClick={() => startEditCentro(item)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
+                      <Pencil size={14} />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteCentro(item.id)} disabled={deleteCentroMutation.isPending} className="rounded p-1 hover:bg-[var(--color-error)]/10 text-[var(--color-error)]" title="Eliminar">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </article>
 
@@ -802,15 +983,52 @@ export function AccountingPage() {
             />
           </div>
           <div className="mt-3 space-y-2 text-sm">
-            {funcionesFiltered.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2"
-              >
-                <p className="font-mono text-xs uppercase">{item.codigo}</p>
-                <p>{item.nombre}</p>
-              </div>
-            ))}
+            {funcionesFiltered.map((item) =>
+              editingFuncionId === item.id ? (
+                <div key={item.id} className="rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5 px-3 py-2 space-y-2">
+                  <input
+                    value={editCodigo}
+                    onChange={(e) => setEditCodigo(e.target.value.toUpperCase())}
+                    className={`${inputClassName} font-mono uppercase tracking-wide`}
+                    placeholder="Codigo"
+                  />
+                  <input
+                    value={editNombre}
+                    onChange={(e) => setEditNombre(e.target.value)}
+                    className={inputClassName}
+                    placeholder="Nombre"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveFuncion(item.id)}
+                      disabled={updateFuncionMutation.isPending}
+                      className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                    >
+                      <Check size={12} /> Guardar
+                    </button>
+                    <button type="button" onClick={cancelEdit} className="flex items-center gap-1 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold">
+                      <X size={12} /> Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={item.id} className="group flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                  <div>
+                    <p className="font-mono text-xs uppercase">{item.codigo}</p>
+                    <p>{item.nombre}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                    <button type="button" onClick={() => startEditFuncion(item)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
+                      <Pencil size={14} />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteFuncion(item.id)} disabled={deleteFuncionMutation.isPending} className="rounded p-1 hover:bg-[var(--color-error)]/10 text-[var(--color-error)]" title="Eliminar">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </article>
 
@@ -855,15 +1073,52 @@ export function AccountingPage() {
             />
           </div>
           <div className="mt-3 space-y-2 text-sm">
-            {sectoresFiltered.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2"
-              >
-                <p className="font-mono text-xs uppercase">{item.codigo}</p>
-                <p>{item.nombre}</p>
-              </div>
-            ))}
+            {sectoresFiltered.map((item) =>
+              editingSectorId === item.id ? (
+                <div key={item.id} className="rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5 px-3 py-2 space-y-2">
+                  <input
+                    value={editCodigo}
+                    onChange={(e) => setEditCodigo(e.target.value.toUpperCase())}
+                    className={`${inputClassName} font-mono uppercase tracking-wide`}
+                    placeholder="Codigo"
+                  />
+                  <input
+                    value={editNombre}
+                    onChange={(e) => setEditNombre(e.target.value)}
+                    className={inputClassName}
+                    placeholder="Nombre"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveSector(item.id)}
+                      disabled={updateSectorMutation.isPending}
+                      className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                    >
+                      <Check size={12} /> Guardar
+                    </button>
+                    <button type="button" onClick={cancelEdit} className="flex items-center gap-1 rounded-lg border border-[var(--color-border-soft)] px-3 py-1.5 text-xs font-semibold">
+                      <X size={12} /> Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={item.id} className="group flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                  <div>
+                    <p className="font-mono text-xs uppercase">{item.codigo}</p>
+                    <p>{item.nombre}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                    <button type="button" onClick={() => startEditSector(item)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
+                      <Pencil size={14} />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteSector(item.id)} disabled={deleteSectorMutation.isPending} className="rounded p-1 hover:bg-[var(--color-error)]/10 text-[var(--color-error)]" title="Eliminar">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </article>
       </div>
@@ -985,52 +1240,102 @@ export function AccountingPage() {
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 bg-[var(--color-surface-container-highest)]">
               <tr>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Codigo
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Centro
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Funcion
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Sector
-                </th>
-                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Movimientos
-                </th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Codigo</th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Centro</th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Funcion</th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Sector</th>
+                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Movimientos</th>
+                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {cuentasFiltered.map((cuenta) => (
-                <tr
-                  key={cuenta.id}
-                  className="transition hover:bg-[var(--color-surface-container-highest)]"
-                >
-                  <td className="px-3 py-2 font-mono text-xs uppercase">{cuenta.codigoCompleto}</td>
-                  <td className="px-3 py-2 text-sm">
-                    {cuenta.centroCosto.codigo} - {cuenta.centroCosto.nombre}
-                  </td>
-                  <td className="px-3 py-2 text-sm">
-                    {cuenta.funcionGasto.codigo} - {cuenta.funcionGasto.nombre}
-                  </td>
-                  <td className="px-3 py-2 text-sm">
-                    {cuenta.sector
-                      ? `${cuenta.sector.codigo} - ${cuenta.sector.nombre}`
-                      : "Sin sector"}
-                  </td>
-                  <td className="px-3 py-2 text-right text-xs">
-                    {cuenta._count?.movimientos ?? 0}
-                  </td>
-                </tr>
-              ))}
+              {cuentasFiltered.map((cuenta) =>
+                editingCuentaId === cuenta.id ? (
+                  <tr key={cuenta.id} className="bg-[var(--color-primary)]/5">
+                    <td className="px-2 py-2">
+                      <input
+                        value={editCuentaCodigo}
+                        onChange={(e) => setEditCuentaCodigo(e.target.value.toUpperCase())}
+                        className={`${inputClassName} font-mono uppercase tracking-wide`}
+                        placeholder="Codigo"
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        value={editCuentaCentroId}
+                        onChange={(e) => setEditCuentaCentroId(e.target.value)}
+                        className={inputClassName}
+                      >
+                        <option value="">Selecciona centro</option>
+                        {centros.map((c) => (
+                          <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        value={editCuentaFuncionId}
+                        onChange={(e) => setEditCuentaFuncionId(e.target.value)}
+                        className={inputClassName}
+                      >
+                        <option value="">Selecciona funcion</option>
+                        {funciones.map((f) => (
+                          <option key={f.id} value={f.id}>{f.codigo} - {f.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <select
+                        value={editCuentaSectorId}
+                        onChange={(e) => setEditCuentaSectorId(e.target.value)}
+                        className={inputClassName}
+                      >
+                        <option value="">Sin sector</option>
+                        {sectores.map((s) => (
+                          <option key={s.id} value={s.id}>{s.codigo} - {s.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2 text-right text-xs">{cuenta._count?.movimientos ?? 0}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveCuenta(cuenta.id)}
+                          disabled={updateCuentaMutation.isPending}
+                          className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                        >
+                          <Check size={12} /> Guardar
+                        </button>
+                        <button type="button" onClick={cancelEdit} className="flex items-center gap-1 rounded-lg border border-[var(--color-border-soft)] px-2 py-1 text-xs font-semibold">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={cuenta.id} className="group transition hover:bg-[var(--color-surface-container-highest)]">
+                    <td className="px-3 py-2 font-mono text-xs uppercase">{cuenta.codigoCompleto}</td>
+                    <td className="px-3 py-2 text-sm">{cuenta.centroCosto.codigo} - {cuenta.centroCosto.nombre}</td>
+                    <td className="px-3 py-2 text-sm">{cuenta.funcionGasto.codigo} - {cuenta.funcionGasto.nombre}</td>
+                    <td className="px-3 py-2 text-sm">{cuenta.sector ? `${cuenta.sector.codigo} - ${cuenta.sector.nombre}` : "Sin sector"}</td>
+                    <td className="px-3 py-2 text-right text-xs">{cuenta._count?.movimientos ?? 0}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+                        <button type="button" onClick={() => startEditCuenta(cuenta)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
+                          <Pencil size={14} />
+                        </button>
+                        <button type="button" onClick={() => handleDeleteCuenta(cuenta.id)} disabled={deleteCuentaMutation.isPending} className="rounded p-1 hover:bg-[var(--color-error)]/10 text-[var(--color-error)]" title="Eliminar">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              )}
               {!cuentasFiltered.length ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]"
-                  >
+                  <td colSpan={6} className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
                     No hay cuentas para el filtro actual.
                   </td>
                 </tr>

@@ -177,6 +177,32 @@ export const createSalidaPayloadSchema = z.object({
   referenciaId: z.string().trim().min(1, "El ID de referencia es obligatorio.")
 });
 
+export const updateCentroCostoPayloadSchema = z.object({
+  codigo: z.string().trim().min(1, "El codigo es obligatorio.").optional(),
+  nombre: z.string().trim().min(1, "El nombre es obligatorio.").optional()
+});
+
+export const updateFuncionGastoPayloadSchema = z.object({
+  codigo: z.string().trim().min(1, "El codigo es obligatorio.").optional(),
+  nombre: z.string().trim().min(1, "El nombre es obligatorio.").optional()
+});
+
+export const updateSectorPayloadSchema = z.object({
+  codigo: z.string().trim().min(1, "El codigo es obligatorio.").optional(),
+  nombre: z.string().trim().min(1, "El nombre es obligatorio.").optional()
+});
+
+export const updateCuentaPayloadSchema = z.object({
+  codigoCompleto: z.string().trim().min(1).optional(),
+  centroCostoId: z.number().int().positive().optional(),
+  funcionGastoId: z.number().int().positive().optional(),
+  sectorId: z.number().int().positive().nullable().optional()
+});
+
+export const deleteResponseSchema = z.object({
+  success: z.boolean()
+});
+
 export type CentroCosto = z.infer<typeof centroCostoSchema>;
 export type FuncionGasto = z.infer<typeof funcionGastoSchema>;
 export type Sector = z.infer<typeof sectorSchema>;
@@ -187,3 +213,7 @@ export type CreateFuncionGastoPayload = z.infer<typeof createFuncionGastoPayload
 export type CreateSectorPayload = z.infer<typeof createSectorPayloadSchema>;
 export type CreateCuentaPayload = z.infer<typeof createCuentaPayloadSchema>;
 export type CreateSalidaPayload = z.infer<typeof createSalidaPayloadSchema>;
+export type UpdateCentroCostoPayload = z.infer<typeof updateCentroCostoPayloadSchema>;
+export type UpdateFuncionGastoPayload = z.infer<typeof updateFuncionGastoPayloadSchema>;
+export type UpdateSectorPayload = z.infer<typeof updateSectorPayloadSchema>;
+export type UpdateCuentaPayload = z.infer<typeof updateCuentaPayloadSchema>;

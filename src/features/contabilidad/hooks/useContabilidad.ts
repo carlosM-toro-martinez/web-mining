@@ -5,17 +5,29 @@ import {
   createFuncionGasto,
   createSector,
   createSalidaMovimiento,
+  deleteCentroCosto,
+  deleteCuenta,
+  deleteFuncionGasto,
+  deleteSector,
   getCentrosCosto,
   getCuentas,
   getFuncionesGasto,
-  getSectores
+  getSectores,
+  updateCentroCosto,
+  updateCuenta,
+  updateFuncionGasto,
+  updateSector
 } from "@/features/contabilidad/api/contabilidadApi";
 import type {
   CreateCentroCostoPayload,
   CreateCuentaPayload,
   CreateFuncionGastoPayload,
   CreateSectorPayload,
-  CreateSalidaPayload
+  CreateSalidaPayload,
+  UpdateCentroCostoPayload,
+  UpdateCuentaPayload,
+  UpdateFuncionGastoPayload,
+  UpdateSectorPayload
 } from "@/features/contabilidad/model/contabilidad.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
@@ -89,6 +101,96 @@ export function useCreateSectorMutation() {
     mutationFn: (payload: CreateSectorPayload) => createSector(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.sectores() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useUpdateCentroCostoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateCentroCostoPayload }) =>
+      updateCentroCosto(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.centrosCosto() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useDeleteCentroCostoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteCentroCosto(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.centrosCosto() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useUpdateFuncionGastoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateFuncionGastoPayload }) =>
+      updateFuncionGasto(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.funcionesGasto() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useDeleteFuncionGastoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteFuncionGasto(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.funcionesGasto() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useUpdateSectorMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateSectorPayload }) =>
+      updateSector(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.sectores() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useDeleteSectorMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteSector(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.sectores() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useUpdateCuentaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateCuentaPayload }) =>
+      updateCuenta(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
+    }
+  });
+}
+
+export function useDeleteCuentaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteCuenta(id),
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.contabilidad.cuentas() });
     }
   });

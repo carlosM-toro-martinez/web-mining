@@ -219,15 +219,15 @@ function costoSheetMeta(sheetName: string, codigoCompleto?: string | null) {
   }
   if (sheetName === "PUNTUALIDAD") {
     return {
-      title: "DETALLE DE MATERIALES  COSTO DE TRANSPORTE PUNTUALIDAD",
-      codeLine: "67,001,097    CTAS.CTES.TRANSPORTE PUNTUALIDAD",
+      title: "DETALLE DE MATERIALES  Y SUMINISTROS",
+      codeLine: "22.001.010    CUENTAS POR COBRAR: E.T. LA PUNTUALIDAD S.R.L.",
       isTransport: true
     };
   }
   if (sheetName === "EMUSA") {
     return {
-      title: "DETALLE DE MATERIALES  COSTO DE TRANSPORTE EMUSA",
-      codeLine: "67,001,098    CTAS.CTES.TRANSPORTE EMUSA",
+      title: "DETALLE DE MATERIALES  Y SUMINISTROS",
+      codeLine: "22.001.009    CUENTAS POR COBRAR: EMUSA S.R.L.",
       isTransport: true
     };
   }
