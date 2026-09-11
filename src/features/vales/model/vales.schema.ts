@@ -179,7 +179,8 @@ export const createValePayloadSchema = z.object({
         cantidadSolicitada: z.number().positive("La cantidad solicitada debe ser mayor a cero.")
       })
     )
-    .min(1, "Debes agregar al menos un item.")
+    .min(1, "Debes agregar al menos un item."),
+  forceRetroactivo: z.boolean().optional()
 });
 
 export const aprobarValePayloadSchema = z.object({
@@ -188,7 +189,8 @@ export const aprobarValePayloadSchema = z.object({
 
 export const entregarValePayloadSchema = z.object({
   cantidadesEntregadas: z.record(z.string(), numberLikeSchema.min(0)),
-  cuentaIds: z.record(z.string(), numberLikeSchema.int().positive()).optional()
+  cuentaIds: z.record(z.string(), numberLikeSchema.int().positive()).optional(),
+  forceRetroactivo: z.boolean().optional()
 });
 
 export const anularValePayloadSchema = z.object({

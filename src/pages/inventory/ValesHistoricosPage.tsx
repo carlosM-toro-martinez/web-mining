@@ -917,7 +917,8 @@ export function ValesHistoricosPage() {
         items: parsedItems.map((item) => ({
           productoId: item.productoId,
           cantidadSolicitada: item.cantidadSolicitada
-        }))
+        })),
+        forceRetroactivo: true
       };
 
       console.log("[ValesHistoricos] POST /api/vales payload", createValePayload);
@@ -947,7 +948,7 @@ export function ValesHistoricosPage() {
 
       const entregarValePayload = {
         id: created.data.id,
-        payload: { cantidadesEntregadas, cuentaIds }
+        payload: { cantidadesEntregadas, cuentaIds, forceRetroactivo: true as const }
       };
 
       console.log(
