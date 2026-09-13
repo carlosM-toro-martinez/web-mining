@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2, Trash2, TriangleAlert } from "lucide-react";
 import {
   useBackfillCppMutation,
+  useSyncStockFromSaldoMensualMutation,
   useDiagnosticoPreciosQuery,
   useDiagnosticoSaldosQuery,
   useDiagnosticoRedondeoQuery,
@@ -16,6 +17,7 @@ import {
 } from "@/features/reportes/hooks/useReportes";
 import type {
   BackfillCppResponse,
+  SyncStockFromSaldoMensualResponse,
   DiagnosticoPreciosItem,
   DiagnosticoSaldosItem,
   LimpiarMesVale,
@@ -96,6 +98,8 @@ export function AjustesPage() {
   const now = new Date();
   const { showError, showSuccess } = useToast();
   const backfillCppMutation = useBackfillCppMutation();
+  const syncStockMutation = useSyncStockFromSaldoMensualMutation();
+  const [syncStockResult, setSyncStockResult] = useState<SyncStockFromSaldoMensualResponse | null>(null);
   const reordenarMutation = useReordenarMovimientosMutation();
 
   const [diagnosticoAnio, setDiagnosticoAnio] = useState(String(now.getFullYear()));
@@ -445,6 +449,105 @@ export function AjustesPage() {
           </div>
         </div>
       </header>
+
+      <article className="rounded-xl border border-[var(--color-warning)]/40 bg-[var(--color-surface-container-low)] p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="rounded-lg bg-[var(--color-warning)]/14 p-2 text-[var(--color-warning)]">
+            <ArrowUpDown size={16} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Sincronizar Stock desde SaldoMensual</h2>
+            <p className="mt-0.5 text-xs text-[var(--color-on-surface-variant)]">
+              Actualiza <code>Stock.cantidad</code>, <code>precioUnit</code> y <code>precioProm</code> de cada producto
+              usando el <strong>SaldoMensual más reciente</strong> como fuente de verdad.
+              Ejecutar antes de registrar compras/vales del mes actual para asegurar que el stock de partida sea correcto.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={syncStockMutation.isPending}
+            onClick={() => {
+              if (!window.confirm(
+                "Esta acción sobreescribirá Stock.cantidad, precioUnit y precioProm de TODOS los productos con el SaldoMensual más reciente. ¿Confirmar?"
+              )) return;
+              setSyncStockResult(null);
+              syncStockMutation.mutate(undefined, {
+                onSuccess: (response) => {
+                  setSyncStockResult(response);
+                  showSuccess(
+                    `Stock sincronizado: ${response.data.actualizados} de ${response.data.total} productos actualizados.`
+                  );
+                },
+                onError: (error) => showError(normalizeError(error, "No se pudo sincronizar el stock."))
+              });
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-warning)] px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {syncStockMutation.isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <ArrowUpDown size={16} />
+            )}
+            {syncStockMutation.isPending ? "Sincronizando..." : "Sincronizar Stock → SaldoMensual"}
+          </button>
+          {syncStockResult ? (
+            <button
+              type="button"
+              onClick={() => setSyncStockResult(null)}
+              className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)]"
+            >
+              Limpiar resultado
+            </button>
+          ) : null}
+        </div>
+
+        {syncStockResult ? (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 text-xs">
+              <span>Total productos en SaldoMensual: <strong>{syncStockResult.data.total}</strong></span>
+              <span className="text-[var(--color-success)]">Actualizados: <strong>{syncStockResult.data.actualizados}</strong></span>
+              <span className="text-[var(--color-on-surface-variant)]">Sin Stock (omitidos): <strong>{syncStockResult.data.omitidos}</strong></span>
+              {syncStockResult.data.errores.length > 0 ? (
+                <span className="text-[var(--color-error)]">Errores: <strong>{syncStockResult.data.errores.length}</strong></span>
+              ) : null}
+            </div>
+            {syncStockResult.data.errores.length > 0 ? (
+              <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/8 p-3 text-xs text-[var(--color-error)]">
+                {syncStockResult.data.errores.map((e) => (
+                  <div key={e.productoId}>productoId {e.productoId}: {e.error}</div>
+                ))}
+              </div>
+            ) : null}
+            {syncStockResult.data.detalle.length > 0 ? (
+              <div className="table-scroll overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Código</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cantidad</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">P. Unit</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">P. Prom</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-soft)]">
+                    {syncStockResult.data.detalle.map((item) => (
+                      <tr key={item.productoId}>
+                        <td className="px-3 py-1.5 font-mono">{item.codigo}</td>
+                        <td className="px-3 py-1.5 text-right">{item.cantidad}</td>
+                        <td className="px-3 py-1.5 text-right">{item.precioUnit}</td>
+                        <td className="px-3 py-1.5 text-right">{item.precioProm}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </article>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">

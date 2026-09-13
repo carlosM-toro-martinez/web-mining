@@ -607,3 +607,27 @@ export type LimpiarMesCompra = z.infer<typeof limpiarMesCompraSchema>;
 export type LimpiarMesPayload = z.infer<typeof limpiarMesPayloadSchema>;
 export type LimpiarMesPreviewResponse = z.infer<typeof limpiarMesPreviewResponseSchema>;
 export type LimpiarMesResultResponse = z.infer<typeof limpiarMesResultResponseSchema>;
+
+// ─── Sincronizar Stock desde SaldoMensual ────────────────────────────────────
+
+export const syncStockFromSaldoMensualResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    actualizados: z.number().int(),
+    total: z.number().int(),
+    omitidos: z.number().int(),
+    errores: z.array(z.object({
+      productoId: z.number().int(),
+      error: z.string()
+    })),
+    detalle: z.array(z.object({
+      productoId: z.number().int(),
+      codigo: z.string(),
+      cantidad: z.string(),
+      precioUnit: z.string(),
+      precioProm: z.string()
+    }))
+  })
+});
+
+export type SyncStockFromSaldoMensualResponse = z.infer<typeof syncStockFromSaldoMensualResponseSchema>;

@@ -54,7 +54,8 @@ import {
   type FixRedondeoPayload,
   diagnosticoRedondeoResponseSchema,
   fixRedondeoPayloadSchema,
-  fixRedondeoResponseSchema
+  fixRedondeoResponseSchema,
+  syncStockFromSaldoMensualResponseSchema
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
 export async function importCatalogo(
@@ -210,6 +211,15 @@ export async function ejecutarBackfillCpp(payload: BackfillCppPayload) {
     body: backfillCppPayloadSchema.parse(payload),
     config: { timeout: 0 },
     schema: backfillCppResponseSchema
+  });
+}
+
+export async function syncStockFromSaldoMensual() {
+  return postRequest({
+    url: apiEndpoints.inventarioImport.syncStockFromSaldoMensual,
+    body: {},
+    config: { timeout: 0 },
+    schema: syncStockFromSaldoMensualResponseSchema
   });
 }
 

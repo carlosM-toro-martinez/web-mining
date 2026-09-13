@@ -66,15 +66,40 @@ export function ValesPage() {
   const usersQuery = useUsersListQuery();
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });
   const cuentasQuery = useCuentasQuery();
-  const [filterFechaInicio, setFilterFechaInicio] = useState("");
-  const [filterFechaFin, setFilterFechaFin] = useState("");
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth() + 1;
 
-  const valesQuery = useValesQuery({
-    page: 1,
-    limit: 500,
-    ...(filterFechaInicio ? { fechaInicio: filterFechaInicio } : {}),
-    ...(filterFechaFin ? { fechaFin: filterFechaFin } : {})
-  });
+  const [valesConsultaAnio, setValesConsultaAnio] = useState(String(currentYear));
+  const [valesConsultaMes, setValesConsultaMes] = useState(String(currentMonth));
+  const [valesConsultaEstado, setValesConsultaEstado] = useState("");
+  const [valesConsultaSolicitanteId, setValesConsultaSolicitanteId] = useState("");
+  const [consultaValesParams, setConsultaValesParams] = useState<{
+    anio: number;
+    mes: number;
+    estado?: string;
+    solicitanteId?: number;
+  } | null>(null);
+  const [valesPage, setValesPage] = useState(1);
+  const [anulacionesSearchProducto, setAnulacionesSearchProducto] = useState("");
+  const [anulacionesFilterAnulador, setAnulacionesFilterAnulador] = useState("");
+  const [anulacionesPage, setAnulacionesPage] = useState(1);
+
+  const valesQuery = useValesQuery(
+    consultaValesParams
+      ? {
+          anio: consultaValesParams.anio,
+          mes: consultaValesParams.mes,
+          ...(consultaValesParams.estado ? { estado: consultaValesParams.estado } : {}),
+          ...(consultaValesParams.solicitanteId
+            ? { solicitanteId: consultaValesParams.solicitanteId }
+            : {}),
+          page: valesPage,
+          limit: 15
+        }
+      : undefined,
+    Boolean(consultaValesParams)
+  );
   const anulacionesQuery = useAnulacionesValesQuery(user?.role === "ADMIN");
   const resumenSolicitantesQuery = useResumenSolicitantesQuery(canUseFlow);
 
@@ -113,7 +138,6 @@ export function ValesPage() {
   const productos = productosQuery.data?.data ?? [];
   const cuentas = cuentasQuery.data?.data ?? [];
   const vales = valesQuery.data?.data ?? [];
-  const anulaciones = anulacionesQuery.data?.data ?? [];
 
   const usuarioOptions = useMemo(
     () =>
@@ -162,6 +186,75 @@ export function ValesPage() {
       }),
     [vales]
   );
+
+  const anulaciones = anulacionesQuery.data?.data ?? [];
+  const anulacionesMesActual = useMemo(() => {
+    return anulaciones.filter((item) => {
+      if (!item.createdAt) return false;
+      const d = new Date(item.createdAt);
+      return d.getUTCFullYear() === currentYear && d.getUTCMonth() + 1 === currentMonth;
+    });
+  }, [anulaciones, currentYear, currentMonth]);
+
+  const anulacionesFiltradas = useMemo(() => {
+    let result = anulacionesMesActual;
+    if (anulacionesFilterAnulador) {
+      const q = anulacionesFilterAnulador.trim().toLowerCase();
+      result = result.filter((item) =>
+        (item.usuario?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (anulacionesSearchProducto) {
+      const q = anulacionesSearchProducto.trim().toLowerCase();
+      result = result.filter((item) =>
+        (item.vale?.items ?? []).some(
+          (i) =>
+            (i.producto?.nombre ?? "").toLowerCase().includes(q) ||
+            (i.producto?.codigo ?? "").toLowerCase().includes(q)
+        )
+      );
+    }
+    return result;
+  }, [anulacionesMesActual, anulacionesFilterAnulador, anulacionesSearchProducto]);
+
+  const ANULACIONES_PER_PAGE = 10;
+  const anulacionesTotalPages = Math.max(
+    1,
+    Math.ceil(anulacionesFiltradas.length / ANULACIONES_PER_PAGE)
+  );
+  const anulacionesPaginadas = useMemo(() => {
+    const start = (anulacionesPage - 1) * ANULACIONES_PER_PAGE;
+    return anulacionesFiltradas.slice(start, start + ANULACIONES_PER_PAGE);
+  }, [anulacionesFiltradas, anulacionesPage]);
+
+  const valesMeta = valesQuery.data?.meta;
+  const valesTotalPages = valesMeta?.totalPages ?? 1;
+
+  function handleConsultarVales(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const anio = Number(valesConsultaAnio);
+    const mes = Number(valesConsultaMes);
+    if (!anio || !mes) {
+      showError("Año y mes son obligatorios.");
+      return;
+    }
+    setValesPage(1);
+    setConsultaValesParams({
+      anio,
+      mes,
+      ...(valesConsultaEstado ? { estado: valesConsultaEstado } : {}),
+      ...(valesConsultaSolicitanteId
+        ? { solicitanteId: Number(valesConsultaSolicitanteId) }
+        : {})
+    });
+  }
+
+  function handleLimpiarConsultaVales() {
+    setConsultaValesParams(null);
+    setValesPage(1);
+    setValesConsultaEstado("");
+    setValesConsultaSolicitanteId("");
+  }
 
   function addDraftItem() {
     setDraftItems((current) => [
@@ -366,11 +459,19 @@ export function ValesPage() {
         (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
       );
 
+      const cuentaIdsPayload: Record<string, number> = {};
+      for (const serverItem of created.data.items ?? []) {
+        const localItem = parsedItems.find((pi) => pi.productoId === serverItem.productoId);
+        if (localItem?.cuentaId) {
+          cuentaIdsPayload[serverItem.id] = localItem.cuentaId;
+        }
+      }
+
       let delivered;
       try {
         delivered = await entregarValeMutation.mutateAsync({
           id: created.data.id,
-          payload: { cantidadesEntregadas },
+          payload: { cantidadesEntregadas, cuentaIds: cuentaIdsPayload },
           stockAdjustments
         });
       } catch (error) {
@@ -383,7 +484,7 @@ export function ValesPage() {
         await Promise.all(uniquePairs.map((item) => ensureProductoCuenta(item.productoId, item.cuentaId)));
         delivered = await entregarValeMutation.mutateAsync({
           id: created.data.id,
-          payload: { cantidadesEntregadas },
+          payload: { cantidadesEntregadas, cuentaIds: cuentaIdsPayload },
           stockAdjustments
         });
       }
@@ -677,126 +778,280 @@ export function ValesPage() {
       />
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 text-lg font-bold">Vales</h2>
-        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr_1fr_auto]">
-          <span className="self-center text-xs font-semibold text-[var(--color-on-surface-variant)]">
-            Filtrar por fecha:
-          </span>
-          <input
-            type="date"
-            value={filterFechaInicio}
-            onChange={(e) => setFilterFechaInicio(e.target.value)}
-            className={inputClassName}
-            placeholder="Desde"
-          />
-          <input
-            type="date"
-            value={filterFechaFin}
-            onChange={(e) => setFilterFechaFin(e.target.value)}
-            className={inputClassName}
-            placeholder="Hasta"
-          />
-          <button
-            type="button"
-            onClick={() => { setFilterFechaInicio(""); setFilterFechaFin(""); }}
-            className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-          >
-            Limpiar
-          </button>
-        </div>
-        <div className="table-scroll overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Estado
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Solicitante
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Fecha
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Accion
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {valesRecientes.map((vale) => (
-                <tr key={vale.id}>
-                  <td className="px-3 py-2 text-xs">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(vale.estado)}`}
-                    >
-                      {vale.estado}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    {vale.solicitante?.nombre ?? vale.solicitanteId ?? "-"}
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    {vale.createdAt ? new Date(vale.createdAt).toLocaleString() : "-"}
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    <div className="flex flex-wrap gap-1.5">
-                      {canAnularVale(vale.estado) ? (
-                        <button
-                          type="button"
-                          onClick={() => openAnularModal(vale.id)}
-                          className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+        <h2 className="mb-4 text-lg font-bold">Consultar vales</h2>
+        <form className="mb-4 space-y-3" onSubmit={handleConsultarVales}>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Año
+              </label>
+              <input
+                type="number"
+                min="2020"
+                max="2100"
+                value={valesConsultaAnio}
+                onChange={(e) => setValesConsultaAnio(e.target.value)}
+                className={inputClassName}
+                placeholder="Año"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Mes
+              </label>
+              <select
+                value={valesConsultaMes}
+                onChange={(e) => setValesConsultaMes(e.target.value)}
+                className={inputClassName}
+                required
+              >
+                {[
+                  [1, "Enero"], [2, "Febrero"], [3, "Marzo"], [4, "Abril"],
+                  [5, "Mayo"], [6, "Junio"], [7, "Julio"], [8, "Agosto"],
+                  [9, "Septiembre"], [10, "Octubre"], [11, "Noviembre"], [12, "Diciembre"]
+                ].map(([num, name]) => (
+                  <option key={num} value={num}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Estado
+              </label>
+              <select
+                value={valesConsultaEstado}
+                onChange={(e) => setValesConsultaEstado(e.target.value)}
+                className={inputClassName}
+              >
+                <option value="">Todos</option>
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="APROBADO">Aprobado</option>
+                <option value="PARCIAL">Parcial</option>
+                <option value="COMPLETADO">Completado</option>
+                <option value="ANULADO">Anulado</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                Solicitante
+              </label>
+              <AutocompleteSelect
+                value={valesConsultaSolicitanteId}
+                onChange={setValesConsultaSolicitanteId}
+                options={[{ id: "", label: "Todos", searchText: "todos" }, ...usuarioOptions]}
+                placeholder="Todos"
+                className={inputClassName}
+                maxVisibleOptions={30}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={valesQuery.isFetching}
+              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+            >
+              {valesQuery.isFetching ? "Cargando..." : "Consultar"}
+            </button>
+            {consultaValesParams ? (
+              <button
+                type="button"
+                onClick={handleLimpiarConsultaVales}
+                className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+              >
+                Limpiar
+              </button>
+            ) : null}
+          </div>
+        </form>
+
+        {consultaValesParams === null ? (
+          <p className="py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
+            Completa el formulario y pulsa <strong>Consultar</strong> para cargar los vales.
+          </p>
+        ) : (
+          <>
+            <div className="table-scroll overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Estado
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Tipo
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Solicitante
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Fecha
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Productos
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Accion
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {valesRecientes.map((vale) => (
+                    <tr key={vale.id}>
+                      <td className="px-3 py-2 text-xs">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(vale.estado)}`}
                         >
-                          Anular
-                        </button>
-                      ) : null}
-                      {user?.role === "ADMIN" && canAnularVale(vale.estado) ? (
-                        <button
-                          type="button"
-                          onClick={() => openEliminarModal(vale.id)}
-                          className="rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/20"
-                        >
-                          Eliminar
-                        </button>
-                      ) : null}
-                      {!canAnularVale(vale.estado) ? (
-                        <span className="text-[10px] text-[var(--color-on-surface-variant)]">
-                          No aplica
+                          {vale.estado}
                         </span>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {valesRecientes.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            vale.fechaOperacion
+                              ? "border-[var(--color-tertiary)]/35 bg-[var(--color-tertiary)]/10 text-[var(--color-tertiary)]"
+                              : "border-[var(--color-primary)]/35 bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                          }`}
+                        >
+                          {vale.fechaOperacion ? "Histórica" : "Actual"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {vale.solicitante?.nombre ?? vale.solicitanteId ?? "-"}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {vale.createdAt ? new Date(vale.createdAt).toLocaleDateString() : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          {(vale.items ?? []).map((item) => (
+                            <span key={item.id} className="text-[10px] text-[var(--color-on-surface-variant)]">
+                              {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
+                              {item.producto?.nombre ?? `Prod. ${item.productoId}`}
+                              {" "}×{" "}
+                              <span className="font-semibold text-[var(--color-on-surface)]">
+                                {item.cantidadEntregada ?? item.cantidadSolicitada}
+                              </span>
+                              {" "}{item.producto?.unidad ?? ""}
+                            </span>
+                          ))}
+                          {!(vale.items ?? []).length ? (
+                            <span className="text-[10px] text-[var(--color-on-surface-variant)]">—</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        <div className="flex flex-wrap gap-1.5">
+                          {canAnularVale(vale.estado) ? (
+                            <button
+                              type="button"
+                              onClick={() => openAnularModal(vale.id)}
+                              className="rounded-lg border border-[var(--color-error)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10"
+                            >
+                              Anular
+                            </button>
+                          ) : null}
+                          {user?.role === "ADMIN" && canAnularVale(vale.estado) ? (
+                            <button
+                              type="button"
+                              onClick={() => openEliminarModal(vale.id)}
+                              className="rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/20"
+                            >
+                              Eliminar
+                            </button>
+                          ) : null}
+                          {!canAnularVale(vale.estado) ? (
+                            <span className="text-[10px] text-[var(--color-on-surface-variant)]">
+                              No aplica
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {valesRecientes.length === 0 && !valesQuery.isFetching ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
+                      >
+                        Sin vales para los filtros seleccionados.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            {valesTotalPages > 1 ? (
+              <div className="mt-3 flex items-center justify-between gap-2 text-xs text-[var(--color-on-surface-variant)]">
+                <span>
+                  Página {valesPage} de {valesTotalPages} — {valesMeta?.total ?? 0} vales
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={valesPage <= 1}
+                    onClick={() => setValesPage((p) => Math.max(1, p - 1))}
+                    className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 font-semibold disabled:opacity-40"
                   >
-                    Sin vales registrados.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={valesPage >= valesTotalPages}
+                    onClick={() => setValesPage((p) => Math.min(valesTotalPages, p + 1))}
+                    className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 font-semibold disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
       </article>
 
       {user?.role === "ADMIN" ? (
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-4 text-lg font-bold">Auditoria de anulaciones</h2>
+          <h2 className="mb-4 text-lg font-bold">
+            Auditoría de anulaciones
+            <span className="ml-2 text-sm font-normal text-[var(--color-on-surface-variant)]">
+              (mes actual)
+            </span>
+          </h2>
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input
+              value={anulacionesSearchProducto}
+              onChange={(e) => {
+                setAnulacionesSearchProducto(e.target.value);
+                setAnulacionesPage(1);
+              }}
+              className={inputClassName}
+              placeholder="Buscar por producto"
+            />
+            <input
+              value={anulacionesFilterAnulador}
+              onChange={(e) => {
+                setAnulacionesFilterAnulador(e.target.value);
+                setAnulacionesPage(1);
+              }}
+              className={inputClassName}
+              placeholder="Filtrar por persona que anuló"
+            />
+          </div>
           <div className="table-scroll overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr>
                   <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Fecha anulacion
-                  </th>
-                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Vale ID
+                    Fecha anulación
                   </th>
                   <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Solicitante
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Productos
                   </th>
                   <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Anulado por
@@ -807,30 +1062,67 @@ export function ValesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-soft)]">
-                {anulaciones.map((item) => (
+                {anulacionesPaginadas.map((item) => (
                   <tr key={item.id}>
                     <td className="px-3 py-2 text-xs">
                       {item.createdAt ? new Date(item.createdAt).toLocaleString() : "-"}
                     </td>
-                    <td className="px-3 py-2 text-xs font-mono">{item.vale?.id ?? "-"}</td>
                     <td className="px-3 py-2 text-xs">{item.vale?.solicitante?.nombre ?? "-"}</td>
+                    <td className="px-3 py-2 text-xs">
+                      <div className="flex flex-col gap-0.5">
+                        {(item.vale?.items ?? []).map((vi, idx) => (
+                          <span key={idx} className="text-[10px] text-[var(--color-on-surface-variant)]">
+                            {vi.producto?.codigo ? `${vi.producto.codigo} - ` : ""}
+                            {vi.producto?.nombre ?? "—"}
+                          </span>
+                        ))}
+                        {!(item.vale?.items ?? []).length ? (
+                          <span className="text-[10px] text-[var(--color-on-surface-variant)]">—</span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-xs">{item.usuario?.nombre ?? "-"}</td>
                     <td className="px-3 py-2 text-xs">{item.motivo ?? "-"}</td>
                   </tr>
                 ))}
-                {!anulaciones.length ? (
+                {!anulacionesFiltradas.length ? (
                   <tr>
                     <td
                       colSpan={5}
                       className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                     >
-                      Sin anulaciones registradas.
+                      Sin anulaciones este mes.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
           </div>
+          {anulacionesTotalPages > 1 ? (
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-[var(--color-on-surface-variant)]">
+              <span>
+                Página {anulacionesPage} de {anulacionesTotalPages} — {anulacionesFiltradas.length} anulaciones
+              </span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  disabled={anulacionesPage <= 1}
+                  onClick={() => setAnulacionesPage((p) => Math.max(1, p - 1))}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 font-semibold disabled:opacity-40"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  disabled={anulacionesPage >= anulacionesTotalPages}
+                  onClick={() => setAnulacionesPage((p) => Math.min(anulacionesTotalPages, p + 1))}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 font-semibold disabled:opacity-40"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          ) : null}
         </article>
       ) : null}
 

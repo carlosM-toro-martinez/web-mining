@@ -166,6 +166,7 @@ export function ComprasPage() {
   const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
   const [anularMotivo, setAnularMotivo] = useState("");
   const [showAnularForm, setShowAnularForm] = useState(false);
+  const [tieneIva, setTieneIva] = useState<boolean>(true);
   const [esGasEspecial, setEsGasEspecial] = useState<boolean>(false);
 
   const canAnular = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
@@ -180,6 +181,19 @@ export function ComprasPage() {
         (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" })
       ),
     [proveedores]
+  );
+
+  const proveedorOptions = useMemo(
+    () =>
+      proveedoresOrdenados.map((proveedor) => ({
+        id: String(proveedor.id),
+        label:
+          (proveedor.nombre ?? "") +
+          (proveedor.lugar ? ` — ${proveedor.lugar}` : "") +
+          (proveedor.nit ? ` · NIT ${proveedor.nit}` : ""),
+        searchText: `${proveedor.nombre ?? ""} ${proveedor.lugar ?? ""} ${proveedor.nit ?? ""}`
+      })),
+    [proveedoresOrdenados]
   );
 
   const comprasOrdenadas = useMemo(
@@ -243,7 +257,8 @@ export function ComprasPage() {
       proveedorId: Number(proveedorId),
       numeroFactura: numeroFactura.trim() || undefined,
       observacion: observacion.trim() || undefined,
-      esGasEspecial,
+      tieneIva,
+      esGasEspecial: tieneIva ? esGasEspecial : null,
       items: draftItems.map((item) => ({
         productoId: Number(item.productoId),
         cantidadPedida: Number(item.cantidadPedida),
@@ -278,6 +293,7 @@ export function ComprasPage() {
         setProveedorId("");
         setNumeroFactura("");
         setObservacion("");
+        setTieneIva(true);
         setEsGasEspecial(false);
         setDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }]);
         setNextDraftItemId(2);
@@ -599,8 +615,7 @@ export function ComprasPage() {
         />
       </header>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
             <PackagePlus size={16} className="text-[var(--color-primary)]" />
             Crear pedido de compra
@@ -608,24 +623,14 @@ export function ComprasPage() {
 
           <form className="space-y-3" onSubmit={handleCreateCompra}>
             <div className="flex gap-2">
-              <select
-                required
+              <AutocompleteSelect
                 value={proveedorId}
-                onChange={(event) => setProveedorId(event.target.value)}
+                onChange={setProveedorId}
+                options={proveedorOptions}
+                placeholder={proveedoresQuery.isLoading ? "Cargando proveedores..." : "Buscar proveedor..."}
                 className={inputClassName}
                 disabled={!canManage || proveedoresQuery.isLoading}
-              >
-                <option value="">
-                  {proveedoresQuery.isLoading ? "Cargando proveedores..." : "Selecciona proveedor"}
-                </option>
-                {proveedoresOrdenados.map((proveedor) => (
-                  <option key={proveedor.id} value={proveedor.id}>
-                    {proveedor.nombre}
-                    {proveedor.lugar ? ` - ${proveedor.lugar}` : ""}
-                    {proveedor.nit ? ` - NIT ${proveedor.nit}` : ""}
-                  </option>
-                ))}
-              </select>
+              />
               <button
                 type="button"
                 onClick={() => setIsCreateProveedorModalOpen(true)}
@@ -668,27 +673,47 @@ export function ComprasPage() {
               <p className="mb-2 text-xs font-semibold text-[var(--color-on-surface-variant)]">
                 Fórmula IVA
               </p>
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
-                    type="radio"
-                    name="esGasEspecial"
-                    checked={!esGasEspecial}
-                    onChange={() => setEsGasEspecial(false)}
+                    type="checkbox"
+                    checked={!tieneIva}
+                    onChange={(event) => {
+                      setTieneIva(!event.target.checked);
+                      if (event.target.checked) setEsGasEspecial(false);
+                    }}
                     disabled={!canManage}
                   />
-                  <span>IVA 13% normal (× 0.87)</span>
+                  <span>Sin IVA (factor × 1)</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="esGasEspecial"
-                    checked={esGasEspecial}
-                    onChange={() => setEsGasEspecial(true)}
-                    disabled={!canManage}
-                  />
-                  <span>Gas especial (IVA sobre 70%)</span>
-                </label>
+                {tieneIva ? (
+                  <>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="esGasEspecial"
+                        checked={!esGasEspecial}
+                        onChange={() => setEsGasEspecial(false)}
+                        disabled={!canManage}
+                      />
+                      <span>IVA 13% normal (× 0.87)</span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="esGasEspecial"
+                        checked={esGasEspecial}
+                        onChange={() => setEsGasEspecial(true)}
+                        disabled={!canManage}
+                      />
+                      <span>Gas especial IVA (× 0.909)</span>
+                    </label>
+                  </>
+                ) : (
+                  <span className="text-xs text-[var(--color-on-surface-variant)]">
+                    Precio registrado sin descuento de IVA
+                  </span>
+                )}
               </div>
             </div>
 
@@ -810,11 +835,12 @@ export function ComprasPage() {
               </button>
             </div>
           </form>
-        </article>
+      </article>
 
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.5fr)]">
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
           <h2 className="mb-4 text-lg font-bold">Listado de compras</h2>
-          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(170px,1fr)_minmax(220px,1.3fr)_minmax(170px,1fr)_minmax(170px,1fr)_130px]">
+          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <select
               value={estadoFilter}
               onChange={(event) => {
@@ -828,21 +854,16 @@ export function ComprasPage() {
               <option value="PARCIAL">PARCIAL</option>
               <option value="COMPLETADO">COMPLETADO</option>
             </select>
-            <select
+            <AutocompleteSelect
               value={proveedorFilterId}
-              onChange={(event) => {
-                setProveedorFilterId(event.target.value);
+              onChange={(nextValue) => {
+                setProveedorFilterId(nextValue);
                 setListPage(1);
               }}
+              options={proveedorOptions}
+              placeholder="Todos los proveedores"
               className={filterInputClassName}
-            >
-              <option value="">Todos los proveedores</option>
-              {proveedoresOrdenados.map((proveedor) => (
-                <option key={proveedor.id} value={proveedor.id}>
-                  {proveedor.nombre}
-                </option>
-              ))}
-            </select>
+            />
             <input
               type="date"
               value={fechaInicioFilter}
@@ -872,7 +893,7 @@ export function ComprasPage() {
                 setFechaFinFilter(defaultListDateRange.fechaFin);
                 setListPage(1);
               }}
-              className="min-h-11 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] sm:col-span-2 xl:col-span-1"
+              className="min-h-11 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] sm:col-span-2"
             >
               Limpiar
             </button>
@@ -983,10 +1004,9 @@ export function ComprasPage() {
             </div>
           </div>
         </article>
-      </div>
 
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 text-lg font-bold">Detalle y recepcion de compra</h2>
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+          <h2 className="mb-4 text-lg font-bold">Detalle y recepcion de compra</h2>
         {!selectedCompraId ? (
           <p className="text-sm text-[var(--color-on-surface-variant)]">
             Selecciona una compra de la lista para revisar items y confirmar recepcion.
@@ -1200,7 +1220,8 @@ export function ComprasPage() {
             ) : null}
           </form>
         ) : null}
-      </article>
+        </article>
+      </div>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 text-lg font-bold">Historial de anulaciones</h2>

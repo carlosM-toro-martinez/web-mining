@@ -29,6 +29,7 @@ interface ValeDraftItem {
   id: number;
   productoId: string;
   cantidadSolicitada: string;
+  cuentaId: string;
 }
 
 function normalizeError(error: unknown, fallbackMessage: string) {
@@ -83,8 +84,9 @@ export function EntregasPage() {
   const [valeIdActivo, setValeIdActivo] = useState("");
   const [solicitanteCreateId, setSolicitanteCreateId] = useState("");
   const [draftItems, setDraftItems] = useState<ValeDraftItem[]>([
-    { id: 1, productoId: "", cantidadSolicitada: "1" }
+    { id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
   ]);
+  const [itemCuentaIds, setItemCuentaIds] = useState<Record<string, string>>({});
   const [nextDraftItemId, setNextDraftItemId] = useState(2);
   const [cantidadesEntregadas, setCantidadesEntregadas] = useState<Record<string, string>>({});
   const [manualModalOpen, setManualModalOpen] = useState(false);
@@ -276,17 +278,26 @@ export function EntregasPage() {
   useEffect(() => {
     if (!vale) return;
     const values: Record<string, string> = {};
+    const cuentas_: Record<string, string> = {};
     vale.items.forEach((item) => {
       const pendiente = Math.max(item.cantidadSolicitada - (item.cantidadEntregada ?? 0), 0);
       values[item.id] = String(pendiente);
+      // Auto-populate from product's default cuentaId if not already set
+      if (!itemCuentaIds[item.id] && item.producto?.stock) {
+        const defaultCuenta = (item.producto as any)?.cuentaId;
+        cuentas_[item.id] = defaultCuenta ? String(defaultCuenta) : "";
+      } else {
+        cuentas_[item.id] = itemCuentaIds[item.id] ?? "";
+      }
     });
     setCantidadesEntregadas(values);
-  }, [vale]);
+    setItemCuentaIds(cuentas_);
+  }, [vale?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addDraftItem() {
     setDraftItems((current) => [
       ...current,
-      { id: nextDraftItemId, productoId: "", cantidadSolicitada: "1" }
+      { id: nextDraftItemId, productoId: "", cantidadSolicitada: "1", cuentaId: "" }
     ]);
     setNextDraftItemId((current) => current + 1);
   }
@@ -311,12 +322,13 @@ export function EntregasPage() {
       return;
     }
 
-    const items = draftItems.map((item) => ({
+    const parsedItems = draftItems.map((item) => ({
       productoId: Number(item.productoId),
-      cantidadSolicitada: Number(item.cantidadSolicitada)
+      cantidadSolicitada: Number(item.cantidadSolicitada),
+      cuentaId: Number(item.cuentaId)
     }));
     if (
-      items.some(
+      parsedItems.some(
         (item) => !item.productoId || !item.cantidadSolicitada || item.cantidadSolicitada <= 0
       )
     ) {
@@ -324,22 +336,46 @@ export function EntregasPage() {
       return;
     }
 
+    let createdValeId: string | null = null;
     try {
-      const created = await createValeMutation.mutateAsync({ solicitanteId, items });
+      const created = await createValeMutation.mutateAsync({
+        solicitanteId,
+        items: parsedItems.map(({ productoId, cantidadSolicitada }) => ({ productoId, cantidadSolicitada }))
+      });
+      createdValeId = created.data.id;
       const cantidadesEntregadasPayload = Object.fromEntries(
         (created.data.items ?? []).map((item) => [item.id, Number(item.cantidadSolicitada)])
       );
+      // Mapear cuentaId por productoId (igual que ValesHistoricosPage)
+      const cuentaIds = Object.fromEntries(
+        (created.data.items ?? []).map((serverItem) => {
+          const local = parsedItems.find((p) => p.productoId === serverItem.productoId);
+          return [serverItem.id, local?.cuentaId ?? 0];
+        })
+      );
       const delivered = await entregarValeMutation.mutateAsync({
         id: created.data.id,
-        payload: { cantidadesEntregadas: cantidadesEntregadasPayload }
+        payload: {
+          cantidadesEntregadas: cantidadesEntregadasPayload,
+          ...(Object.values(cuentaIds).some((v) => v > 0) ? { cuentaIds } : {})
+        }
       });
+      createdValeId = null;
       showSuccess(`Vale ${delivered.data.vale.id} registrado y entregado automáticamente.`);
       setSolicitanteCreateId("");
-      setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1" }]);
+      setDraftItems([{ id: 1, productoId: "", cantidadSolicitada: "1", cuentaId: "" }]);
       setNextDraftItemId(2);
       setValeIdInput(delivered.data.vale.id);
       setValeIdActivo(delivered.data.vale.id);
     } catch (error) {
+      if (createdValeId) {
+        try {
+          await entregarValeMutation.mutateAsync({
+            id: createdValeId,
+            payload: { cantidadesEntregadas: {} }
+          });
+        } catch { /* ignorar */ }
+      }
       showError(normalizeError(error, "No se pudo registrar y entregar el vale automáticamente."));
     }
   }
@@ -389,8 +425,19 @@ export function EntregasPage() {
       return;
     }
 
+    const cuentaIdsPayload = Object.fromEntries(
+      Object.entries(itemCuentaIds)
+        .filter(([, v]) => v && Number(v) > 0)
+        .map(([k, v]) => [k, Number(v)])
+    );
     entregarValeMutation.mutate(
-      { id: vale.id, payload: { cantidadesEntregadas: payload } },
+      {
+        id: vale.id,
+        payload: {
+          cantidadesEntregadas: payload,
+          ...(Object.keys(cuentaIdsPayload).length > 0 ? { cuentaIds: cuentaIdsPayload } : {})
+        }
+      },
       {
         onSuccess: (response) => {
           showSuccess(
@@ -511,11 +558,17 @@ export function EntregasPage() {
           {draftItems.map((item, index) => (
             <div
               key={item.id}
-              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_140px_auto]"
+              className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_130px_1fr_auto]"
             >
               <AutocompleteSelect
                 value={item.productoId}
-                onChange={(nextValue) => updateDraftItem(item.id, { productoId: nextValue })}
+                onChange={(nextValue) => {
+                  const producto = productos.find((p) => String(p.id) === nextValue);
+                  updateDraftItem(item.id, {
+                    productoId: nextValue,
+                    cuentaId: producto?.cuentaId ? String(producto.cuentaId) : (item.cuentaId || "")
+                  });
+                }}
                 options={productoOptions}
                 placeholder={`Producto #${index + 1}`}
                 className={inputClassName}
@@ -532,6 +585,18 @@ export function EntregasPage() {
                 className={inputClassName}
                 placeholder="Cantidad"
               />
+              <select
+                value={item.cuentaId}
+                onChange={(event) => updateDraftItem(item.id, { cuentaId: event.target.value })}
+                className={inputClassName}
+              >
+                <option value="">Cuenta contable (opcional)</option>
+                {cuentas.map((cuenta) => (
+                  <option key={cuenta.id} value={cuenta.id}>
+                    {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre}/{cuenta.funcionGasto.nombre}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => removeDraftItem(item.id)}
@@ -795,7 +860,7 @@ export function EntregasPage() {
                   return (
                     <div
                       key={item.id}
-                      className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_120px_120px]"
+                      className="grid grid-cols-1 gap-2 rounded-lg bg-[var(--color-surface-container-high)] p-3 md:grid-cols-[1fr_110px_1fr_110px]"
                     >
                       <div>
                         <p className="text-sm font-semibold">
@@ -819,6 +884,23 @@ export function EntregasPage() {
                         }
                         className={inputClassName}
                       />
+                      <select
+                        value={itemCuentaIds[item.id] ?? ""}
+                        onChange={(event) =>
+                          setItemCuentaIds((current) => ({
+                            ...current,
+                            [item.id]: event.target.value
+                          }))
+                        }
+                        className={inputClassName}
+                      >
+                        <option value="">Cuenta contable</option>
+                        {cuentas.map((cuenta) => (
+                          <option key={cuenta.id} value={cuenta.id}>
+                            {cuenta.codigoCompleto} - {cuenta.centroCosto.nombre}/{cuenta.funcionGasto.nombre}
+                          </option>
+                        ))}
+                      </select>
                       <div className="flex items-center text-xs text-[var(--color-on-surface-variant)]">
                         {entregaControl.messages[item.id] ? (
                           <span className="font-semibold text-[var(--color-error)]">

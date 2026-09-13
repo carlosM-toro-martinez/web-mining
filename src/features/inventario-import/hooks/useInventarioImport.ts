@@ -26,7 +26,8 @@ import {
   updateSaldoMensualById,
   upsertSaldoMensualItem,
   getLimpiarMesPreview,
-  ejecutarLimpiarMes
+  ejecutarLimpiarMes,
+  syncStockFromSaldoMensual
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
   AjustarPreciosSinIvaPayload,
@@ -152,6 +153,12 @@ export function useAjustarPreciosSinIvaMutation() {
 export function useBackfillCppMutation() {
   return useMutation({
     mutationFn: (payload: BackfillCppPayload) => ejecutarBackfillCpp(payload)
+  });
+}
+
+export function useSyncStockFromSaldoMensualMutation() {
+  return useMutation({
+    mutationFn: () => syncStockFromSaldoMensual()
   });
 }
 

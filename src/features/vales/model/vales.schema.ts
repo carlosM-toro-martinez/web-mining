@@ -277,7 +277,22 @@ export const anulacionesListResponseSchema = z.object({
       vale: z.object({
         id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
         createdAt: z.string().optional().nullable(),
-        solicitante: valeUsuarioSchema.optional().nullable()
+        solicitante: valeUsuarioSchema.optional().nullable(),
+        items: z
+          .array(
+            z.object({
+              producto: z
+                .object({
+                  id: numberLikeSchema.int().positive(),
+                  nombre: z.string().optional().nullable(),
+                  codigo: z.string().optional().nullable()
+                })
+                .optional()
+                .nullable()
+            })
+          )
+          .optional()
+          .default([])
       })
     })
   )
