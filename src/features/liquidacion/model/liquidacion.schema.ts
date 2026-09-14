@@ -1,0 +1,83 @@
+import { z } from "zod";
+
+export const tipoPeriodoLiquidacionSchema = z.enum(["SEMANAL", "MENSUAL"]);
+export const estadoLiquidacionSchema = z.enum(["BORRADOR", "CERRADO", "ANULADO"]);
+export const tipoConceptoLiquidacionSchema = z.enum(["ABONO", "DEDUCCION"]);
+
+const remitenteRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
+const loteRef = z.object({ id: z.string().min(1), correlativo: z.string().min(1) });
+const conceptoRef = z.object({
+  id: z.number().int().positive(),
+  nombre: z.string().min(1),
+  tipo: tipoConceptoLiquidacionSchema
+});
+
+export const liquidacionDetalleLoteSchema = z.object({
+  id: z.string().min(1),
+  loteId: z.string().min(1),
+  tonelajeNeto: z.union([z.string(), z.number()]),
+  precioAplicado: z.union([z.string(), z.number()]),
+  subtotal: z.union([z.string(), z.number()]),
+  lote: loteRef.optional()
+});
+
+export const liquidacionItemConceptoSchema = z.object({
+  id: z.string().min(1),
+  liquidacionId: z.string().min(1),
+  conceptoId: z.number().int().positive(),
+  descripcion: z.string().nullable().optional(),
+  monto: z.union([z.string(), z.number()]),
+  concepto: conceptoRef.optional()
+});
+
+export const anulacionLiquidacionSchema = z.object({
+  id: z.string().min(1),
+  motivo: z.string().min(1),
+  createdAt: z.string()
+});
+
+export const liquidacionSchema = z.object({
+  id: z.string().min(1),
+  remitenteId: z.number().int().positive(),
+  tipoPeriodo: tipoPeriodoLiquidacionSchema,
+  fechaInicio: z.string(),
+  fechaFin: z.string(),
+  estado: estadoLiquidacionSchema,
+  totalBruto: z.union([z.string(), z.number()]),
+  totalAbonos: z.union([z.string(), z.number()]),
+  totalDeducciones: z.union([z.string(), z.number()]),
+  totalNeto: z.union([z.string(), z.number()]),
+  createdAt: z.string(),
+  remitente: remitenteRef.optional(),
+  detalleLotes: z.array(liquidacionDetalleLoteSchema).optional(),
+  itemsConcepto: z.array(liquidacionItemConceptoSchema).optional(),
+  anulacion: anulacionLiquidacionSchema.nullable().optional()
+});
+
+export const createLiquidacionPayloadSchema = z.object({
+  remitenteId: z.number().int().positive("Debes elegir un remitente."),
+  tipoPeriodo: tipoPeriodoLiquidacionSchema,
+  fechaInicio: z.string().min(1, "La fecha de inicio es obligatoria."),
+  fechaFin: z.string().min(1, "La fecha de fin es obligatoria.")
+});
+
+export const agregarItemConceptoPayloadSchema = z.object({
+  conceptoId: z.number().int().positive("Debes elegir un concepto."),
+  monto: z.number().positive("El monto debe ser mayor a cero."),
+  descripcion: z.string().trim().optional()
+});
+
+export const anularLiquidacionPayloadSchema = z.object({
+  motivo: z.string().trim().min(1, "Debes indicar el motivo de la anulación.")
+});
+
+export const liquidacionListResponseSchema = z.object({ success: z.boolean(), data: z.array(liquidacionSchema) });
+export const liquidacionResponseSchema = z.object({ success: z.boolean(), data: liquidacionSchema });
+export const liquidacionItemResponseSchema = z.object({ success: z.boolean(), data: liquidacionItemConceptoSchema });
+
+export type TipoPeriodoLiquidacion = z.infer<typeof tipoPeriodoLiquidacionSchema>;
+export type EstadoLiquidacion = z.infer<typeof estadoLiquidacionSchema>;
+export type Liquidacion = z.infer<typeof liquidacionSchema>;
+export type CreateLiquidacionPayload = z.infer<typeof createLiquidacionPayloadSchema>;
+export type AgregarItemConceptoPayload = z.infer<typeof agregarItemConceptoPayloadSchema>;
+export type AnularLiquidacionPayload = z.infer<typeof anularLiquidacionPayloadSchema>;

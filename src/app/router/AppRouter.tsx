@@ -27,6 +27,19 @@ import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { MapPage } from "@/pages/map/MapPage";
 import { AmbientalPage } from "@/pages/ambiental/AmbientalPage";
+import { LogisticaPage } from "@/pages/logistica/LogisticaPage";
+import { ParametrosLogisticaPage } from "@/pages/logistica/ParametrosLogisticaPage";
+import { FlotaPage } from "@/pages/logistica/FlotaPage";
+import { RemitentesPage } from "@/pages/logistica/RemitentesPage";
+import { LotesDespachoPage } from "@/pages/logistica/LotesDespachoPage";
+import { LiquidacionesPage } from "@/pages/logistica/LiquidacionesPage";
+import { LogisticaReportesPage } from "@/pages/logistica/LogisticaReportesPage";
+import { CajaChicaPage } from "@/pages/cajaChica/CajaChicaPage";
+import { ParametrosCajaChicaPage } from "@/pages/cajaChica/ParametrosCajaChicaPage";
+import { GastosCajaPage } from "@/pages/cajaChica/GastosCajaPage";
+import { SaldosCajaPage } from "@/pages/cajaChica/SaldosCajaPage";
+import { RendicionesCajaPage } from "@/pages/cajaChica/RendicionesCajaPage";
+import { ReportesCajaChicaPage } from "@/pages/cajaChica/ReportesCajaChicaPage";
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
 import { PersonalHomePage } from "@/modules/employee/pages/PersonalHomePage";
 import { PersonalReportsPage } from "@/modules/employee/pages/PersonalReportsPage";
@@ -39,6 +52,8 @@ import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
 import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
 import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
+import { LogisticaRoute } from "@/app/router/guards/LogisticaRoute";
+import { CajaChicaRoute } from "@/app/router/guards/CajaChicaRoute";
 import { PersonalRoute } from "@/app/router/guards/PersonalRoute";
 import { EppRoute } from "@/app/router/guards/EppRoute";
 
@@ -98,6 +113,25 @@ export function AppRouter() {
             <Route element={<AdminRoute />}>
               <Route path="/inventario/offline-monitor" element={<InventoryOfflineMonitorPage />} />
             </Route>
+          </Route>
+
+          <Route element={<LogisticaRoute />}>
+            <Route path="/logistica" element={<LogisticaPage />} />
+            <Route path="/logistica/parametros" element={<ParametrosLogisticaPage />} />
+            <Route path="/logistica/flota" element={<FlotaPage />} />
+            <Route path="/logistica/remitentes" element={<RemitentesPage />} />
+            <Route path="/logistica/lotes" element={<LotesDespachoPage />} />
+            <Route path="/logistica/liquidaciones" element={<LiquidacionesPage />} />
+            <Route path="/logistica/reportes" element={<LogisticaReportesPage />} />
+          </Route>
+
+          <Route element={<CajaChicaRoute />}>
+            <Route path="/caja-chica" element={<CajaChicaPage />} />
+            <Route path="/caja-chica/parametros" element={<ParametrosCajaChicaPage />} />
+            <Route path="/caja-chica/gastos" element={<GastosCajaPage />} />
+            <Route path="/caja-chica/saldos" element={<SaldosCajaPage />} />
+            <Route path="/caja-chica/rendiciones" element={<RendicionesCajaPage />} />
+            <Route path="/caja-chica/reportes" element={<ReportesCajaChicaPage />} />
           </Route>
 
           <Route path="/entregas" element={<Navigate to="/inventario/entregas" replace />} />

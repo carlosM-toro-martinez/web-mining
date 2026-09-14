@@ -14,9 +14,14 @@ import {
   Layers3,
   Menu,
   PackageCheck,
+  PackageSearch,
   Building2,
   ShoppingCart,
   ClipboardList,
+  ReceiptText,
+  Landmark,
+  PiggyBank,
+  Wallet,
   Truck,
   UserPlus,
   RefreshCw,
@@ -26,6 +31,7 @@ import {
   HardHat,
   Leaf,
   Moon,
+  Scale,
   Sun
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -49,12 +55,18 @@ export function AppShell() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isInventoryExpanded, setIsInventoryExpanded] = useState(false);
   const [isPersonalExpanded, setIsPersonalExpanded] = useState(false);
+  const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false);
+  const [isCajaChicaExpanded, setIsCajaChicaExpanded] = useState(false);
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
   const isAlmacenero = user?.role === "ALMACENERO";
   const isRecepcionista = user?.role === "RECEPCIONISTA";
   const isSuperintendente = user?.role === "SUPERINTENDENTE";
   const isAdministrador = user?.role === "ADMINISTRADOR";
+  const isAsistenteAdministrativo = user?.role === "ASISTENTE_ADMINISTRATIVO";
+  const isContador = user?.role === "CONTADOR";
   const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
+  const canSeeLogisticaRoute = isAdmin || isSuperintendente || isAsistenteAdministrativo;
+  const canSeeCajaChicaRoute = isAdmin || isAdministrador || isContador || isSuperintendente;
   const canSeeEppRoute =
     isAdmin || isAdministrador || isSuperintendente || user?.role === "TRABAJADOR";
 
@@ -101,6 +113,29 @@ export function AppShell() {
       { label: "Reporte", icon: FileBarChart2, to: "/personal/reporte" }
     ] as NavItem[];
   }, [isAdmin, isAdministrador, isSuperintendente]);
+
+  const logisticaNavItems = useMemo(() => {
+    if (!canSeeLogisticaRoute) return [];
+    return [
+      { label: "Flota", icon: Truck, to: "/logistica/flota" },
+      { label: "Lotes de despacho", icon: PackageSearch, to: "/logistica/lotes" },
+      { label: "Liquidaciones", icon: ReceiptText, to: "/logistica/liquidaciones" },
+      { label: "Reportes", icon: FileBarChart2, to: "/logistica/reportes" },
+      { label: "Remitentes", icon: Building2, to: "/logistica/remitentes" },
+      { label: "Parámetros", icon: Landmark, to: "/logistica/parametros" }
+    ] as NavItem[];
+  }, [canSeeLogisticaRoute]);
+
+  const cajaChicaNavItems = useMemo(() => {
+    if (!canSeeCajaChicaRoute) return [];
+    return [
+      { label: "Gastos", icon: Wallet, to: "/caja-chica/gastos" },
+      { label: "Saldos", icon: Scale, to: "/caja-chica/saldos" },
+      { label: "Rendiciones", icon: ReceiptText, to: "/caja-chica/rendiciones" },
+      { label: "Reportes", icon: FileBarChart2, to: "/caja-chica/reportes" },
+      { label: "Parámetros", icon: Landmark, to: "/caja-chica/parametros" }
+    ] as NavItem[];
+  }, [canSeeCajaChicaRoute]);
 
   const avatarLabel = useMemo(() => {
     const source = user?.nombre?.trim();
@@ -158,8 +193,44 @@ export function AppShell() {
     }
   }, [location.pathname]);
 
+  useEffect(() => {
+    const persisted = window.localStorage.getItem("ui:logistica-expanded");
+    if (persisted === "true") {
+      setIsLogisticaExpanded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("ui:logistica-expanded", isLogisticaExpanded ? "true" : "false");
+  }, [isLogisticaExpanded]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/logistica")) {
+      setIsLogisticaExpanded(true);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const persisted = window.localStorage.getItem("ui:caja-chica-expanded");
+    if (persisted === "true") {
+      setIsCajaChicaExpanded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("ui:caja-chica-expanded", isCajaChicaExpanded ? "true" : "false");
+  }, [isCajaChicaExpanded]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/caja-chica")) {
+      setIsCajaChicaExpanded(true);
+    }
+  }, [location.pathname]);
+
   const isInventorySectionActive = location.pathname.startsWith("/inventario");
   const isPersonalSectionActive = location.pathname.startsWith("/personal");
+  const isLogisticaSectionActive = location.pathname.startsWith("/logistica");
+  const isCajaChicaSectionActive = location.pathname.startsWith("/caja-chica");
 
   return (
     <div className="app-shell min-h-screen bg-[var(--color-surface)] font-body text-[var(--color-on-surface)]">
@@ -315,6 +386,118 @@ export function AppShell() {
               {isSidebarCollapsed || !isPersonalExpanded
                 ? null
                 : personalNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `ml-5 mr-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? "bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                            : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                        }`
+                      }
+                    >
+                      <item.icon size={16} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+            </>
+          ) : null}
+
+          {logisticaNavItems.length > 0 ? (
+            <>
+              <div
+                className={`mt-2 flex items-center ${
+                  isLogisticaSectionActive
+                    ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                }`}
+              >
+                <NavLink
+                  to="/logistica"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center py-3 text-sm font-semibold transition-all ${
+                    isSidebarCollapsed ? "w-full justify-center px-2" : "flex-1 gap-3 px-4"
+                  }`}
+                >
+                  <Truck size={18} />
+                  {isSidebarCollapsed ? null : <span>Logística</span>}
+                </NavLink>
+                {isSidebarCollapsed ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setIsLogisticaExpanded((current) => !current)}
+                    className="px-3 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)]"
+                    aria-label={isLogisticaExpanded ? "Contraer logística" : "Expandir logística"}
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${isLogisticaExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {isSidebarCollapsed || !isLogisticaExpanded
+                ? null
+                : logisticaNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `ml-5 mr-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? "bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                            : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                        }`
+                      }
+                    >
+                      <item.icon size={16} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+            </>
+          ) : null}
+
+          {cajaChicaNavItems.length > 0 ? (
+            <>
+              <div
+                className={`mt-2 flex items-center ${
+                  isCajaChicaSectionActive
+                    ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                }`}
+              >
+                <NavLink
+                  to="/caja-chica"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center py-3 text-sm font-semibold transition-all ${
+                    isSidebarCollapsed ? "w-full justify-center px-2" : "flex-1 gap-3 px-4"
+                  }`}
+                >
+                  <PiggyBank size={18} />
+                  {isSidebarCollapsed ? null : <span>Caja Chica</span>}
+                </NavLink>
+                {isSidebarCollapsed ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setIsCajaChicaExpanded((current) => !current)}
+                    className="px-3 text-[var(--color-on-surface-variant)] transition hover:text-[var(--color-on-surface)]"
+                    aria-label={isCajaChicaExpanded ? "Contraer caja chica" : "Expandir caja chica"}
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${isCajaChicaExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {isSidebarCollapsed || !isCajaChicaExpanded
+                ? null
+                : cajaChicaNavItems.map((item) => (
                     <NavLink
                       key={item.to}
                       to={item.to}

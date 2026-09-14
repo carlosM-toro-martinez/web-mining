@@ -159,5 +159,70 @@ export const queryKeys = {
     list: () => [...queryKeys.employees.all, "list"] as const,
     syncQueue: () => [...queryKeys.employees.all, "sync-queue"] as const,
     cuentas: () => [...queryKeys.contabilidad.all, "cuentas"] as const
+  },
+  parametrosLogistica: {
+    all: ["parametros-logistica"] as const,
+    municipiosOrigen: () => [...queryKeys.parametrosLogistica.all, "municipios-origen"] as const,
+    tiposMineral: () => [...queryKeys.parametrosLogistica.all, "tipos-mineral"] as const,
+    ingenios: () => [...queryKeys.parametrosLogistica.all, "ingenios"] as const,
+    conceptosLiquidacion: () => [...queryKeys.parametrosLogistica.all, "conceptos-liquidacion"] as const,
+    alicuotasRegalia: () => [...queryKeys.parametrosLogistica.all, "alicuotas-regalia"] as const,
+    tarifasLiquidacion: () => [...queryKeys.parametrosLogistica.all, "tarifas-liquidacion"] as const
+  },
+  remitentes: {
+    all: ["remitentes"] as const
+  },
+  flota: {
+    all: ["flota"] as const,
+    vehiculos: () => [...queryKeys.flota.all, "vehiculos"] as const,
+    vehiculoHistorial: (id: number) => [...queryKeys.flota.all, "vehiculo-historial", id] as const,
+    choferes: () => [...queryKeys.flota.all, "choferes"] as const
+  },
+  lotesDespacho: {
+    all: ["lotes-despacho"] as const,
+    list: (params: { estadoLote?: string; estadoFormulario101?: string; page?: number; limit?: number }) =>
+      [...queryKeys.lotesDespacho.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.lotesDespacho.all, "detail", id] as const
+  },
+  liquidaciones: {
+    all: ["liquidaciones"] as const,
+    list: (params: { remitenteId?: number; estado?: string }) =>
+      [...queryKeys.liquidaciones.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.liquidaciones.all, "detail", id] as const
+  },
+  logisticaReportes: {
+    all: ["logistica-reportes"] as const,
+    cuadroMensual: (params: { municipioId: number; anio: number; mes: number }) =>
+      [...queryKeys.logisticaReportes.all, "cuadro-mensual", params] as const,
+    cierres: (municipioId?: number) => [...queryKeys.logisticaReportes.all, "cierres", municipioId] as const
+  },
+  parametrosCajaChica: {
+    all: ["parametros-caja-chica"] as const,
+    cajas: () => [...queryKeys.parametrosCajaChica.all, "cajas"] as const,
+    centrosCosto: () => [...queryKeys.parametrosCajaChica.all, "centros-costo"] as const,
+    funcionesGasto: () => [...queryKeys.parametrosCajaChica.all, "funciones-gasto"] as const,
+    cuentasContables: () => [...queryKeys.parametrosCajaChica.all, "cuentas-contables"] as const,
+    conceptosRetencion: () => [...queryKeys.parametrosCajaChica.all, "conceptos-retencion"] as const
+  },
+  gastoCaja: {
+    all: ["gasto-caja"] as const,
+    list: (params: { cajaId?: number; estado?: string; page?: number; limit?: number }) =>
+      [...queryKeys.gastoCaja.all, "list", params] as const,
+    movimientosFondo: (cajaId?: number) => [...queryKeys.gastoCaja.all, "movimientos-fondo", cajaId] as const
+  },
+  rendicionCaja: {
+    all: ["rendicion-caja"] as const,
+    list: (params: { cajaId?: number; estado?: string }) => [...queryKeys.rendicionCaja.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.rendicionCaja.all, "detail", id] as const
+  },
+  reportesCajaChica: {
+    all: ["reportes-caja-chica"] as const,
+    retenciones: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
+      [...queryKeys.reportesCajaChica.all, "retenciones", params] as const,
+    noDeducibles: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
+      [...queryKeys.reportesCajaChica.all, "no-deducibles", params] as const,
+    desglose: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
+      [...queryKeys.reportesCajaChica.all, "desglose", params] as const,
+    estadoCuenta: (cajaId?: number) => [...queryKeys.reportesCajaChica.all, "estado-cuenta", cajaId] as const
   }
 };
