@@ -307,6 +307,13 @@ export function SaldosCajaPage() {
           extracto bancario real, es porque falta registrar un ingreso o una salida — agrégalo abajo.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {estadoCuenta ? (
+            <div className="rounded-lg border border-[var(--color-primary)]/35 bg-[var(--color-primary)]/6 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]">Para comparar — caja</p>
+              <p className="font-semibold">{estadoCuenta.caja.nombre}</p>
+              <p className="mt-2 text-lg font-bold text-[var(--color-primary)]">{estadoCuenta.caja.monedaBase} {formatMoneda(estadoCuenta.saldoActual)}</p>
+            </div>
+          ) : null}
           {cuentasBancarias.map((c) => (
             <div key={c.id} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
               <p className="font-semibold">{c.banco}</p>
