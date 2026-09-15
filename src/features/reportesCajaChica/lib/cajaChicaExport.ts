@@ -876,7 +876,6 @@ export function exportReporteRetencionesPdf(reporte: ReporteRetenciones) {
 function ejecucion(item: PartidaPresupuestoCaja) {
   return {
     presupuestado: Number(item.montoPresupuestado),
-    pagado: item.totalPagado ?? 0,
     gastado: item.totalGastado ?? 0,
     saldo: item.saldoAFavor ?? Number(item.montoPresupuestado) - (item.totalGastado ?? 0),
     ejecucion: item.porcentajeEjecucion ?? 0
@@ -884,31 +883,29 @@ function ejecucion(item: PartidaPresupuestoCaja) {
 }
 
 export function exportPlanillaControlPagosExcel(partidas: PartidaPresupuestoCaja[], periodoLabel: string) {
-  const lastCol = 5;
+  const lastCol = 4;
   const aoa: Array<Array<string | number>> = [
-    ["EMPRESA MINERA MARTE S.R.L.", "", "", "", "", ""],
-    [`PLANILLA DE CONTROL DE PAGOS · ${periodoLabel.toUpperCase()}`, "", "", "", "", ""],
+    ["EMPRESA MINERA MARTE S.R.L.", "", "", "", ""],
+    [`PLANILLA DE CONTROL DE PAGOS · ${periodoLabel.toUpperCase()}`, "", "", "", ""],
     [],
-    ["DESCRIPCIÓN", "CAJA", "TOTAL PRESUPUESTADO", "TOTAL PAGADO", "TOTAL GASTADO", "SALDO A FAVOR"]
+    ["DESCRIPCIÓN", "CAJA", "TOTAL PRESUPUESTADO", "TOTAL GASTADO", "SALDO A FAVOR"]
   ];
 
   let totalPresupuestado = 0;
-  let totalPagado = 0;
   let totalGastado = 0;
   let totalSaldo = 0;
 
   for (const partida of partidas) {
     const e = ejecucion(partida);
     totalPresupuestado += e.presupuestado;
-    totalPagado += e.pagado;
     totalGastado += e.gastado;
     totalSaldo += e.saldo;
-    aoa.push([partida.descripcion, partida.caja?.nombre ?? "", num(e.presupuestado), num(e.pagado), num(e.gastado), num(e.saldo)]);
+    aoa.push([partida.descripcion, partida.caja?.nombre ?? "", num(e.presupuestado), num(e.gastado), num(e.saldo)]);
   }
-  aoa.push(["TOTAL", "", num(totalPresupuestado), num(totalPagado), num(totalGastado), num(totalSaldo)]);
+  aoa.push(["TOTAL", "", num(totalPresupuestado), num(totalGastado), num(totalSaldo)]);
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 34 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+  sheet["!cols"] = [{ wch: 34 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
@@ -918,7 +915,7 @@ export function exportPlanillaControlPagosExcel(partidas: PartidaPresupuestoCaja
   styleRow(sheet, 3, lastCol, headerStyle);
   for (let r = 4; r < aoa.length - 1; r += 1) styleRow(sheet, r, lastCol, bodyStyle);
   styleRow(sheet, aoa.length - 1, lastCol, totalStyle);
-  for (const col of [2, 3, 4, 5]) {
+  for (const col of [2, 3, 4]) {
     for (let r = 0; r < aoa.length; r += 1) numberFormatCell(sheet, r, col);
   }
 
@@ -939,31 +936,28 @@ export function exportPlanillaControlPagosPdf(partidas: PartidaPresupuestoCaja[]
   doc.text(`PLANILLA DE CONTROL DE PAGOS · ${periodoLabel.toUpperCase()}`, centerX, 46, { align: "center" });
 
   let totalPresupuestado = 0;
-  let totalPagado = 0;
   let totalGastado = 0;
   let totalSaldo = 0;
 
   const rows: RowInput[] = partidas.map((partida) => {
     const e = ejecucion(partida);
     totalPresupuestado += e.presupuestado;
-    totalPagado += e.pagado;
     totalGastado += e.gastado;
     totalSaldo += e.saldo;
     return [
       partida.descripcion,
       partida.caja?.nombre ?? "",
       formatBs(e.presupuestado),
-      formatBs(e.pagado),
       formatBs(e.gastado),
       formatBs(e.saldo),
       `${e.ejecucion.toFixed(1)}%`
     ];
   });
-  rows.push(["TOTAL", "", formatBs(totalPresupuestado), formatBs(totalPagado), formatBs(totalGastado), formatBs(totalSaldo), ""]);
+  rows.push(["TOTAL", "", formatBs(totalPresupuestado), formatBs(totalGastado), formatBs(totalSaldo), ""]);
 
   autoTable(doc, {
     startY: 60,
-    head: [["Descripción", "Caja", "Total Presupuestado", "Total Pagado", "Total Gastado", "Saldo a Favor", "% Ejecución"]],
+    head: [["Descripción", "Caja", "Total Presupuestado", "Total Gastado", "Saldo a Favor", "% Ejecución"]],
     body: rows,
     styles: pdfTableStyles,
     headStyles: pdfHeadStyles,
@@ -971,8 +965,7 @@ export function exportPlanillaControlPagosPdf(partidas: PartidaPresupuestoCaja[]
       2: { halign: "right" },
       3: { halign: "right" },
       4: { halign: "right" },
-      5: { halign: "right" },
-      6: { halign: "right" }
+      5: { halign: "right" }
     },
     margin: { left: 30, right: 30 },
     didParseCell: (hook) => {

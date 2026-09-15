@@ -182,32 +182,40 @@ export function PresupuestoCajaPage() {
           ) : null}
         </div>
         <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
-          Presupuestado vs. gastado por partida, para la caja y el mes elegidos arriba. El saldo a
-          favor es lo que sobró (presupuestado − gastado), tal cual tu planilla real.
+          Presupuestado vs. gastado por partida, para la caja y el mes elegidos arriba. La
+          "Reposición" es lo que sobró (presupuestado − gastado), tal cual tu planilla real.
         </p>
+
+        {partidas.length > 0 ? (
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--color-on-surface)]/20 bg-[var(--color-surface-container-high)] px-4 py-3">
+            <span className="text-sm font-extrabold uppercase tracking-wide">Total Presupuesto</span>
+            <span className="font-mono text-lg font-extrabold">{formatMoneda(totalPresupuestado)}</span>
+          </div>
+        ) : null}
+
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                <th className="py-1 pr-3">Descripción</th>
-                <th className="py-1 pr-3 text-right">Presupuestado</th>
-                <th className="py-1 pr-3 text-right">Pagado</th>
-                <th className="py-1 pr-3 text-right">Gastado</th>
-                <th className="py-1 pr-3 text-right">Saldo a favor</th>
-                <th className="py-1 pr-3 text-right">% Ejecución</th>
-                <th className="py-1"></th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5">N°</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5">Descripción</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">Total Presupuestado</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">Total Gastado</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">Total Reposición</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">% Ejecución</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {partidas.map((p) => (
+            <tbody>
+              {partidas.map((p, index) => (
                 <tr key={p.id} className="group">
-                  <td className="py-1 pr-3">{p.descripcion}</td>
-                  <td className="py-1 pr-3 text-right">{formatMoneda(Number(p.montoPresupuestado))}</td>
-                  <td className="py-1 pr-3 text-right">{formatMoneda(p.totalPagado ?? 0)}</td>
-                  <td className="py-1 pr-3 text-right">{formatMoneda(p.totalGastado ?? 0)}</td>
-                  <td className="py-1 pr-3 text-right font-semibold">{formatMoneda(p.saldoAFavor ?? 0)}</td>
-                  <td className="py-1 pr-3 text-right">{(p.porcentajeEjecucion ?? 0).toFixed(1)}%</td>
-                  <td className="py-1 text-right">
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-[var(--color-on-surface-variant)]">{index + 1}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5">{p.descripcion}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(Number(p.montoPresupuestado))}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(p.totalGastado ?? 0)}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right font-semibold">{formatMoneda(p.saldoAFavor ?? 0)}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{(p.porcentajeEjecucion ?? 0).toFixed(1)}%</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
                     <button
                       type="button"
                       onClick={() => handleDeletePartida(p.id)}
@@ -219,19 +227,18 @@ export function PresupuestoCajaPage() {
                 </tr>
               ))}
               {partidas.length === 0 ? (
-                <tr><td colSpan={7} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin partidas de presupuesto para este mes.</td></tr>
+                <tr><td colSpan={7} className="border border-[var(--color-border-soft)] py-3 text-center text-[var(--color-on-surface-variant)]">Sin partidas de presupuesto para este mes.</td></tr>
               ) : null}
             </tbody>
             {partidas.length > 0 ? (
               <tfoot>
-                <tr className="border-t border-[var(--color-border-soft)] font-bold">
-                  <td className="py-1 pr-3">Total</td>
-                  <td className="py-1 pr-3 text-right">{formatMoneda(totalPresupuestado)}</td>
-                  <td className="py-1 pr-3 text-right"></td>
-                  <td className="py-1 pr-3 text-right">{formatMoneda(totalGastado)}</td>
-                  <td className="py-1 pr-3 text-right">{formatMoneda(totalSaldoAFavor)}</td>
-                  <td className="py-1 pr-3 text-right"></td>
-                  <td className="py-1"></td>
+                <tr className="font-bold">
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5" colSpan={2}>Total</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(totalPresupuestado)}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(totalGastado)}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(totalSaldoAFavor)}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right"></td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5"></td>
                 </tr>
               </tfoot>
             ) : null}

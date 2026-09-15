@@ -20,14 +20,11 @@ const cuentaBancariaRef = z.object({
   numeroCuenta: z.string().nullable().optional(),
   nombreCuenta: z.string().min(1)
 });
-const partidaRef = z.object({ id: z.number().int().positive(), descripcion: z.string().min(1) });
-
 export const movimientoBancoCajaSchema = z.object({
   id: z.string().min(1),
   cuentaBancariaId: z.number().int().positive(),
   tipo: tipoMovimientoBancoSchema,
   cajaId: z.number().int().positive().nullable().optional(),
-  partidaPresupuestoId: z.number().int().positive().nullable().optional(),
   fecha: z.string(),
   formaPago: formaPagoBancoSchema,
   numeroCheque: z.string().nullable().optional(),
@@ -37,8 +34,7 @@ export const movimientoBancoCajaSchema = z.object({
   descripcion: z.string().min(1),
   createdAt: z.string(),
   cuentaBancaria: cuentaBancariaRef.optional(),
-  caja: refConNombre.nullable().optional(),
-  partidaPresupuesto: partidaRef.nullable().optional()
+  caja: refConNombre.nullable().optional()
 });
 
 export const createMovimientoBancoCajaPayloadSchema = z
@@ -46,7 +42,6 @@ export const createMovimientoBancoCajaPayloadSchema = z
     cuentaBancariaId: z.number().int().positive("Debes elegir una cuenta bancaria."),
     tipo: tipoMovimientoBancoSchema,
     cajaId: z.number().int().positive().optional(),
-    partidaPresupuestoId: z.number().int().positive().optional(),
     fecha: z.string().min(1, "La fecha es obligatoria."),
     formaPago: formaPagoBancoSchema,
     numeroCheque: z.string().trim().optional(),

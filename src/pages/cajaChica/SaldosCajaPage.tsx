@@ -2,11 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Banknote, FileSpreadsheet, FileText, Landmark, PiggyBank, Scale } from "lucide-react";
 import { useEstadoCuentaCajaQuery } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
 import { exportEstadoCuentaExcel, exportEstadoCuentaPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
-import {
-  useCajasChicasQuery,
-  useCuentasBancariasCajaQuery,
-  usePartidasPresupuestoCajaQuery
-} from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
+import { useCajasChicasQuery, useCuentasBancariasCajaQuery } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import {
   useCreateMovimientoFondoCajaMutation,
@@ -22,7 +18,6 @@ import {
   useMovimientosBancoCajaQuery
 } from "@/features/movimientoBancoCaja/hooks/useMovimientoBancoCaja";
 import { ApiError } from "@/shared/api/core/apiError";
-import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -56,8 +51,6 @@ export function SaldosCajaPage() {
   const cajas = cajasQuery.data?.data ?? [];
   const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
   const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
-  const partidasQuery = usePartidasPresupuestoCajaQuery();
-  const partidas = partidasQuery.data?.data ?? [];
 
   const [cajaId, setCajaId] = useState("");
   useEffect(() => {
@@ -86,12 +79,10 @@ export function SaldosCajaPage() {
   // --- Form: registrar salida del banco hacia una caja (cheque/transferencia) ---
   const [salidaCuentaBancariaId, setSalidaCuentaBancariaId] = useState("");
   const [salidaCajaId, setSalidaCajaId] = useState("");
-  const [salidaPartidaId, setSalidaPartidaId] = useState("");
   const [salidaFecha, setSalidaFecha] = useState(today);
   const [salidaFormaPago, setSalidaFormaPago] = useState<FormaPagoBanco>("DEPOSITO");
   const [salidaNumeroCheque, setSalidaNumeroCheque] = useState("");
   const [salidaMonto, setSalidaMonto] = useState("");
-  const [salidaMoneda, setSalidaMoneda] = useState<MonedaCaja>("BOB");
   const [salidaDepositante, setSalidaDepositante] = useState("");
   const [salidaDescripcion, setSalidaDescripcion] = useState("");
 
@@ -100,7 +91,6 @@ export function SaldosCajaPage() {
   const [ingresoFecha, setIngresoFecha] = useState(today);
   const [ingresoFormaPago, setIngresoFormaPago] = useState<FormaPagoBanco>("DEPOSITO");
   const [ingresoMonto, setIngresoMonto] = useState("");
-  const [ingresoMoneda, setIngresoMoneda] = useState<MonedaCaja>("BOB");
   const [ingresoDepositante, setIngresoDepositante] = useState("");
   const [ingresoDescripcion, setIngresoDescripcion] = useState("");
 
@@ -112,7 +102,11 @@ export function SaldosCajaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cajas]);
 
-  const partidaOptions = partidas.map((p) => ({ id: String(p.id), label: p.descripcion, searchText: p.descripcion }));
+  // La moneda del movimiento siempre es la misma que la de la cuenta bancaria
+  // elegida (el backend la exige así) — nunca se elige aparte, para no
+  // arriesgarse a mezclar monedas sin darse cuenta.
+  const salidaCuenta = cuentasBancarias.find((c) => String(c.id) === salidaCuentaBancariaId);
+  const ingresoCuenta = cuentasBancarias.find((c) => String(c.id) === ingresoCuentaBancariaId);
 
   function handleCreateFondo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -138,17 +132,20 @@ export function SaldosCajaPage() {
 
   function handleCreateSalida(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!salidaCuenta) {
+      showError("Elige una cuenta bancaria.");
+      return;
+    }
     createBancoMutation.mutate(
       {
         cuentaBancariaId: Number(salidaCuentaBancariaId),
         tipo: "SALIDA_A_CAJA",
         cajaId: Number(salidaCajaId),
-        partidaPresupuestoId: salidaPartidaId ? Number(salidaPartidaId) : undefined,
         fecha: salidaFecha,
         formaPago: salidaFormaPago,
         numeroCheque: salidaFormaPago === "CHEQUE" ? salidaNumeroCheque.trim() || undefined : undefined,
         monto: Number(salidaMonto),
-        moneda: salidaMoneda,
+        moneda: salidaCuenta.monedaBase,
         depositanteNombre: salidaDepositante.trim() || undefined,
         descripcion: salidaDescripcion
       },
@@ -167,6 +164,10 @@ export function SaldosCajaPage() {
 
   function handleCreateIngreso(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!ingresoCuenta) {
+      showError("Elige una cuenta bancaria.");
+      return;
+    }
     createBancoMutation.mutate(
       {
         cuentaBancariaId: Number(ingresoCuentaBancariaId),
@@ -174,7 +175,7 @@ export function SaldosCajaPage() {
         fecha: ingresoFecha,
         formaPago: ingresoFormaPago,
         monto: Number(ingresoMonto),
-        moneda: ingresoMoneda,
+        moneda: ingresoCuenta.monedaBase,
         depositanteNombre: ingresoDepositante.trim() || undefined,
         descripcion: ingresoDescripcion
       },
@@ -377,22 +378,20 @@ export function SaldosCajaPage() {
             <select required value={salidaCuentaBancariaId} onChange={(e) => setSalidaCuentaBancariaId(e.target.value)} className={inputClassName}>
               <option value="">Cuenta bancaria...</option>
               {cuentasBancarias.map((c) => (
-                <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
+                <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta} ({c.monedaBase} {formatMoneda(c.saldoActual ?? 0)} disponible)</option>
               ))}
             </select>
+            {salidaCuenta ? (
+              <p className="rounded-lg bg-[var(--color-primary)]/8 px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
+                Disponible en esta cuenta: {salidaCuenta.monedaBase} {formatMoneda(salidaCuenta.saldoActual ?? 0)}
+              </p>
+            ) : null}
             <select required value={salidaCajaId} onChange={(e) => setSalidaCajaId(e.target.value)} className={inputClassName}>
               <option value="">Caja destino...</option>
               {cajas.map((c) => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>
-            <AutocompleteSelect
-              value={salidaPartidaId}
-              onChange={setSalidaPartidaId}
-              options={partidaOptions}
-              placeholder="Partida de presupuesto (opcional)..."
-              className={inputClassName}
-            />
             <select value={salidaFormaPago} onChange={(e) => setSalidaFormaPago(e.target.value as FormaPagoBanco)} className={inputClassName}>
               {Object.entries(FORMA_PAGO_BANCO_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -403,10 +402,9 @@ export function SaldosCajaPage() {
             ) : null}
             <div className="flex gap-2">
               <input required type="number" min="0.01" step="0.01" value={salidaMonto} onChange={(e) => setSalidaMonto(e.target.value)} className={inputClassName} placeholder="Monto" />
-              <select value={salidaMoneda} onChange={(e) => setSalidaMoneda(e.target.value as MonedaCaja)} className={`${inputClassName} w-24`}>
-                <option value="BOB">BOB</option>
-                <option value="USD">USD</option>
-              </select>
+              <span className={`${inputClassName} flex w-20 items-center justify-center font-semibold text-[var(--color-on-surface-variant)]`}>
+                {salidaCuenta?.monedaBase ?? "BOB"}
+              </span>
             </div>
             <input required type="date" value={salidaFecha} onChange={(e) => setSalidaFecha(e.target.value)} className={inputClassName} />
             <input value={salidaDepositante} onChange={(e) => setSalidaDepositante(e.target.value)} className={inputClassName} placeholder="Depositante (opcional)" />
@@ -430,9 +428,14 @@ export function SaldosCajaPage() {
             <select required value={ingresoCuentaBancariaId} onChange={(e) => setIngresoCuentaBancariaId(e.target.value)} className={inputClassName}>
               <option value="">Cuenta bancaria...</option>
               {cuentasBancarias.map((c) => (
-                <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
+                <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta} ({c.monedaBase} {formatMoneda(c.saldoActual ?? 0)} actual)</option>
               ))}
             </select>
+            {ingresoCuenta ? (
+              <p className="rounded-lg bg-[var(--color-primary)]/8 px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
+                Saldo actual de esta cuenta: {ingresoCuenta.monedaBase} {formatMoneda(ingresoCuenta.saldoActual ?? 0)}
+              </p>
+            ) : null}
             <select value={ingresoFormaPago} onChange={(e) => setIngresoFormaPago(e.target.value as FormaPagoBanco)} className={inputClassName}>
               {Object.entries(FORMA_PAGO_BANCO_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -440,10 +443,9 @@ export function SaldosCajaPage() {
             </select>
             <div className="flex gap-2">
               <input required type="number" min="0.01" step="0.01" value={ingresoMonto} onChange={(e) => setIngresoMonto(e.target.value)} className={inputClassName} placeholder="Monto" />
-              <select value={ingresoMoneda} onChange={(e) => setIngresoMoneda(e.target.value as MonedaCaja)} className={`${inputClassName} w-24`}>
-                <option value="BOB">BOB</option>
-                <option value="USD">USD</option>
-              </select>
+              <span className={`${inputClassName} flex w-20 items-center justify-center font-semibold text-[var(--color-on-surface-variant)]`}>
+                {ingresoCuenta?.monedaBase ?? "BOB"}
+              </span>
             </div>
             <input required type="date" value={ingresoFecha} onChange={(e) => setIngresoFecha(e.target.value)} className={inputClassName} />
             <input value={ingresoDepositante} onChange={(e) => setIngresoDepositante(e.target.value)} className={inputClassName} placeholder="Depositante (opcional)" />

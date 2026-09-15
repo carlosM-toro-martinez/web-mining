@@ -138,7 +138,6 @@ export const partidaPresupuestoCajaSchema = z.object({
   activo: z.boolean(),
   caja: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
   totalGastado: z.number().optional(),
-  totalPagado: z.number().optional(),
   saldoAFavor: z.number().optional(),
   porcentajeEjecucion: z.number().optional()
 });

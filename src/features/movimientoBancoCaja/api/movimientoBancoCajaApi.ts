@@ -12,7 +12,6 @@ export interface MovimientoBancoCajaQueryParams {
   cuentaBancariaId?: number;
   cajaId?: number;
   tipo?: TipoMovimientoBanco;
-  partidaPresupuestoId?: number;
 }
 
 export async function getMovimientosBancoCaja(params: MovimientoBancoCajaQueryParams = {}) {
