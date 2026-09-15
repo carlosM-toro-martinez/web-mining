@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import { Landmark, PiggyBank, ReceiptText, FileBarChart2, Scale, Wallet } from "lucide-react";
+import { ClipboardList, Landmark, PiggyBank, ReceiptText, FileBarChart2, Scale, Wallet } from "lucide-react";
 
 const cards = [
   {
     title: "Parámetros",
-    description: "Cajas, centros de costo, funciones de gasto, cuentas contables y tasas de retención. Se configuran una sola vez.",
+    description: "Cajas y cuentas bancarias (con su saldo inicial), centros de costo, funciones de gasto, cuentas contables y tasas de retención. Se configuran una sola vez.",
     to: "/caja-chica/parametros",
     icon: Landmark,
     available: true
@@ -18,9 +18,16 @@ const cards = [
   },
   {
     title: "Saldos y movimientos",
-    description: "Cuánto tienes disponible en cada caja ahora mismo, y el detalle de todos los fondos recibidos y gastos.",
+    description: "Cuánto hay disponible ahora mismo en cada caja y en cada cuenta bancaria, y dónde registras cualquier movimiento de dinero que no sea un gasto.",
     to: "/caja-chica/saldos",
     icon: Scale,
+    available: true
+  },
+  {
+    title: "Presupuesto",
+    description: "Para qué se pidió el dinero de cada mes (partidas) y cuánto queda a favor de cada una.",
+    to: "/caja-chica/presupuesto",
+    icon: ClipboardList,
     available: true
   },
   {

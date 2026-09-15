@@ -5,20 +5,29 @@ import {
   createConceptoRetencionCaja,
   createCuentaContableCaja,
   createFuncionGastoCaja,
+  createCuentaBancariaCaja,
+  createPartidaPresupuestoCaja,
   deleteCajaChica,
   deleteCentroCostoCaja,
   deleteCuentaContableCaja,
   deleteFuncionGastoCaja,
+  deleteCuentaBancariaCaja,
+  deletePartidaPresupuestoCaja,
   getCajasChicas,
   getCentrosCostoCaja,
   getConceptosRetencionCaja,
   getCuentasContablesCaja,
   getFuncionesGastoCaja,
+  getCuentasBancariasCaja,
+  getPartidasPresupuestoCaja,
+  type PartidasPresupuestoQueryParams,
   updateCajaChica,
   updateCentroCostoCaja,
   updateConceptoRetencionCaja,
   updateCuentaContableCaja,
-  updateFuncionGastoCaja
+  updateFuncionGastoCaja,
+  updateCuentaBancariaCaja,
+  updatePartidaPresupuestoCaja
 } from "@/features/parametrosCajaChica/api/parametrosCajaChicaApi";
 import type {
   CreateCajaChicaPayload,
@@ -26,11 +35,15 @@ import type {
   CreateConceptoRetencionCajaPayload,
   CreateCuentaContableCajaPayload,
   CreateFuncionGastoCajaPayload,
+  CreateCuentaBancariaCajaPayload,
+  CreatePartidaPresupuestoCajaPayload,
   UpdateCajaChicaPayload,
   UpdateCentroCostoCajaPayload,
   UpdateConceptoRetencionCajaPayload,
   UpdateCuentaContableCajaPayload,
-  UpdateFuncionGastoCajaPayload
+  UpdateFuncionGastoCajaPayload,
+  UpdateCuentaBancariaCajaPayload,
+  UpdatePartidaPresupuestoCajaPayload
 } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
@@ -188,6 +201,75 @@ export function useUpdateConceptoRetencionCajaMutation() {
       updateConceptoRetencionCaja(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.conceptosRetencion() });
+    }
+  });
+}
+
+// --- Cuentas bancarias ---
+export function useCuentasBancariasCajaQuery() {
+  return useQuery({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias(), queryFn: getCuentasBancariasCaja });
+}
+export function useCreateCuentaBancariaCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateCuentaBancariaCajaPayload) => createCuentaBancariaCaja(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() });
+    }
+  });
+}
+export function useUpdateCuentaBancariaCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateCuentaBancariaCajaPayload }) =>
+      updateCuentaBancariaCaja(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() });
+    }
+  });
+}
+export function useDeleteCuentaBancariaCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteCuentaBancariaCaja(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() });
+    }
+  });
+}
+
+// --- Partidas de presupuesto ---
+export function usePartidasPresupuestoCajaQuery(params: PartidasPresupuestoQueryParams = {}) {
+  return useQuery({
+    queryKey: queryKeys.parametrosCajaChica.partidasPresupuesto(params),
+    queryFn: () => getPartidasPresupuestoCaja(params)
+  });
+}
+export function useCreatePartidaPresupuestoCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreatePartidaPresupuestoCajaPayload) => createPartidaPresupuestoCaja(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.all });
+    }
+  });
+}
+export function useUpdatePartidaPresupuestoCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdatePartidaPresupuestoCajaPayload }) =>
+      updatePartidaPresupuestoCaja(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.all });
+    }
+  });
+}
+export function useDeletePartidaPresupuestoCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deletePartidaPresupuestoCaja(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.all });
     }
   });
 }

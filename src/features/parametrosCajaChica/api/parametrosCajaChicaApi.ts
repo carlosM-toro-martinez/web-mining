@@ -13,8 +13,14 @@ import {
   createConceptoRetencionCajaPayloadSchema,
   createCuentaContableCajaPayloadSchema,
   createFuncionGastoCajaPayloadSchema,
+  createCuentaBancariaCajaPayloadSchema,
+  createPartidaPresupuestoCajaPayloadSchema,
   cuentaContableCajaListResponseSchema,
   cuentaContableCajaResponseSchema,
+  cuentaBancariaCajaListResponseSchema,
+  cuentaBancariaCajaResponseSchema,
+  partidaPresupuestoCajaListResponseSchema,
+  partidaPresupuestoCajaResponseSchema,
   funcionGastoCajaListResponseSchema,
   funcionGastoCajaResponseSchema,
   updateCajaChicaPayloadSchema,
@@ -22,16 +28,22 @@ import {
   updateConceptoRetencionCajaPayloadSchema,
   updateCuentaContableCajaPayloadSchema,
   updateFuncionGastoCajaPayloadSchema,
+  updateCuentaBancariaCajaPayloadSchema,
+  updatePartidaPresupuestoCajaPayloadSchema,
   type CreateCajaChicaPayload,
   type CreateCentroCostoCajaPayload,
   type CreateConceptoRetencionCajaPayload,
   type CreateCuentaContableCajaPayload,
   type CreateFuncionGastoCajaPayload,
+  type CreateCuentaBancariaCajaPayload,
+  type CreatePartidaPresupuestoCajaPayload,
   type UpdateCajaChicaPayload,
   type UpdateCentroCostoCajaPayload,
   type UpdateConceptoRetencionCajaPayload,
   type UpdateCuentaContableCajaPayload,
-  type UpdateFuncionGastoCajaPayload
+  type UpdateFuncionGastoCajaPayload,
+  type UpdateCuentaBancariaCajaPayload,
+  type UpdatePartidaPresupuestoCajaPayload
 } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
 
 // --- Cajas chicas ---
@@ -113,4 +125,53 @@ export async function updateConceptoRetencionCaja(id: number, payload: UpdateCon
     body,
     schema: conceptoRetencionCajaResponseSchema
   });
+}
+
+// --- Cuentas bancarias ---
+export async function getCuentasBancariasCaja() {
+  return getRequest({ url: apiEndpoints.cajaChica.cuentasBancarias, schema: cuentaBancariaCajaListResponseSchema });
+}
+export async function createCuentaBancariaCaja(payload: CreateCuentaBancariaCajaPayload) {
+  const body = createCuentaBancariaCajaPayloadSchema.parse(payload);
+  return postRequest({ url: apiEndpoints.cajaChica.cuentasBancarias, body, schema: cuentaBancariaCajaResponseSchema });
+}
+export async function updateCuentaBancariaCaja(id: number, payload: UpdateCuentaBancariaCajaPayload) {
+  const body = updateCuentaBancariaCajaPayloadSchema.parse(payload);
+  return putRequest({ url: apiEndpoints.cajaChica.cuentaBancariaById(id), body, schema: cuentaBancariaCajaResponseSchema });
+}
+export async function deleteCuentaBancariaCaja(id: number) {
+  return deleteRequest({ url: apiEndpoints.cajaChica.cuentaBancariaById(id), schema: cajaChicaDeleteResponseSchema });
+}
+
+// --- Partidas de presupuesto ---
+export interface PartidasPresupuestoQueryParams {
+  cajaId?: number;
+  anio?: number;
+  mes?: number;
+}
+export async function getPartidasPresupuestoCaja(params: PartidasPresupuestoQueryParams = {}) {
+  return getRequest({
+    url: apiEndpoints.cajaChica.partidasPresupuesto,
+    config: { params },
+    schema: partidaPresupuestoCajaListResponseSchema
+  });
+}
+export async function createPartidaPresupuestoCaja(payload: CreatePartidaPresupuestoCajaPayload) {
+  const body = createPartidaPresupuestoCajaPayloadSchema.parse(payload);
+  return postRequest({
+    url: apiEndpoints.cajaChica.partidasPresupuesto,
+    body,
+    schema: partidaPresupuestoCajaResponseSchema
+  });
+}
+export async function updatePartidaPresupuestoCaja(id: number, payload: UpdatePartidaPresupuestoCajaPayload) {
+  const body = updatePartidaPresupuestoCajaPayloadSchema.parse(payload);
+  return putRequest({
+    url: apiEndpoints.cajaChica.partidaPresupuestoById(id),
+    body,
+    schema: partidaPresupuestoCajaResponseSchema
+  });
+}
+export async function deletePartidaPresupuestoCaja(id: number) {
+  return deleteRequest({ url: apiEndpoints.cajaChica.partidaPresupuestoById(id), schema: cajaChicaDeleteResponseSchema });
 }

@@ -38,6 +38,7 @@ import { CajaChicaPage } from "@/pages/cajaChica/CajaChicaPage";
 import { ParametrosCajaChicaPage } from "@/pages/cajaChica/ParametrosCajaChicaPage";
 import { GastosCajaPage } from "@/pages/cajaChica/GastosCajaPage";
 import { SaldosCajaPage } from "@/pages/cajaChica/SaldosCajaPage";
+import { PresupuestoCajaPage } from "@/pages/cajaChica/PresupuestoCajaPage";
 import { RendicionesCajaPage } from "@/pages/cajaChica/RendicionesCajaPage";
 import { ReportesCajaChicaPage } from "@/pages/cajaChica/ReportesCajaChicaPage";
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
@@ -130,6 +131,7 @@ export function AppRouter() {
             <Route path="/caja-chica/parametros" element={<ParametrosCajaChicaPage />} />
             <Route path="/caja-chica/gastos" element={<GastosCajaPage />} />
             <Route path="/caja-chica/saldos" element={<SaldosCajaPage />} />
+            <Route path="/caja-chica/presupuesto" element={<PresupuestoCajaPage />} />
             <Route path="/caja-chica/rendiciones" element={<RendicionesCajaPage />} />
             <Route path="/caja-chica/reportes" element={<ReportesCajaChicaPage />} />
           </Route>

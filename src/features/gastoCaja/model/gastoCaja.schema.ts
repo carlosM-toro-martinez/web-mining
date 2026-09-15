@@ -59,6 +59,7 @@ export const gastoCajaSchema = z.object({
   centroCostoCajaId: z.number().int().positive(),
   funcionGastoCajaId: z.number().int().positive(),
   cuentaContableCajaId: z.number().int().positive().nullable().optional(),
+  partidaPresupuestoId: z.number().int().positive().nullable().optional(),
   montoCreditoFiscalIva: z.union([z.string(), z.number()]),
   montoRetencionRcIva: z.union([z.string(), z.number()]),
   montoRetencionIueCompras: z.union([z.string(), z.number()]),
@@ -70,6 +71,7 @@ export const gastoCajaSchema = z.object({
   centroCostoCaja: refConNombre.optional(),
   funcionGastoCaja: refConNombre.optional(),
   cuentaContableCaja: refConNombre.nullable().optional(),
+  partidaPresupuesto: z.object({ id: z.number().int().positive(), descripcion: z.string().min(1) }).nullable().optional(),
   anulacion: anulacionGastoCajaSchema.nullable().optional()
 });
 
@@ -86,7 +88,9 @@ export const createGastoCajaPayloadSchema = z.object({
   montoTotal: z.number().positive("El monto debe ser mayor a cero."),
   moneda: monedaCajaSchema,
   centroCostoCajaId: z.number().int().positive("Debes elegir un centro de costo."),
-  funcionGastoCajaId: z.number().int().positive("Debes elegir una función de gasto.")
+  funcionGastoCajaId: z.number().int().positive("Debes elegir una función de gasto."),
+  cuentaContableCajaId: z.number().int().positive().optional(),
+  partidaPresupuestoId: z.number().int().positive().optional()
 });
 
 export const anularGastoCajaPayloadSchema = z.object({

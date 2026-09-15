@@ -1,11 +1,9 @@
-import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, Ban, Calculator, PiggyBank, Plus, RefreshCw, Wallet } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Ban, Calculator, Plus, RefreshCw, Wallet } from "lucide-react";
 import {
   useAnularGastoCajaMutation,
   useCreateGastoCajaMutation,
-  useCreateMovimientoFondoCajaMutation,
-  useGastosCajaQuery,
-  useMovimientosFondoCajaQuery
+  useGastosCajaQuery
 } from "@/features/gastoCaja/hooks/useGastoCaja";
 import { useGastoCajaOfflineQueue } from "@/features/gastoCaja/hooks/useGastoCajaOfflineQueue";
 import {
@@ -14,15 +12,17 @@ import {
   type CategoriaRetencionGasto,
   type EstadoGastoCaja,
   type MonedaCaja,
-  type TipoDocumentoGasto,
-  type TipoMovimientoFondoCaja
+  type TipoDocumentoGasto
 } from "@/features/gastoCaja/model/gastoCaja.schema";
 import {
   useCajasChicasQuery,
   useCentrosCostoCajaQuery,
   useConceptosRetencionCajaQuery,
-  useFuncionesGastoCajaQuery
+  useCuentasContablesCajaQuery,
+  useFuncionesGastoCajaQuery,
+  usePartidasPresupuestoCajaQuery
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
+import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -68,23 +68,24 @@ export function GastosCajaPage() {
   const cajasQuery = useCajasChicasQuery();
   const centrosQuery = useCentrosCostoCajaQuery();
   const funcionesQuery = useFuncionesGastoCajaQuery();
+  const cuentasQuery = useCuentasContablesCajaQuery();
   const retencionesQuery = useConceptosRetencionCajaQuery();
+  const partidasQuery = usePartidasPresupuestoCajaQuery();
   const { pendientes, encolar, sincronizar, sincronizando } = useGastoCajaOfflineQueue();
 
   const [filtroCaja, setFiltroCaja] = useState("");
   const gastosQuery = useGastosCajaQuery({ cajaId: filtroCaja ? Number(filtroCaja) : undefined, limit: 50 });
-  const movimientosQuery = useMovimientosFondoCajaQuery(filtroCaja ? Number(filtroCaja) : undefined);
 
   const createGastoMutation = useCreateGastoCajaMutation();
   const anularGastoMutation = useAnularGastoCajaMutation();
-  const createMovimientoMutation = useCreateMovimientoFondoCajaMutation();
 
   const cajas = cajasQuery.data?.data ?? [];
   const centros = centrosQuery.data?.data.filter((c) => c.parentId !== null) ?? [];
   const funciones = funcionesQuery.data?.data.filter((f) => f.parentId !== null) ?? [];
+  const cuentas = cuentasQuery.data?.data ?? [];
   const retenciones = retencionesQuery.data?.data ?? [];
+  const partidas = partidasQuery.data?.data ?? [];
   const gastos = gastosQuery.data?.data ?? [];
-  const movimientos = movimientosQuery.data?.data ?? [];
 
   const centroOptions = useMemo(
     () => centros.map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
@@ -93,6 +94,14 @@ export function GastosCajaPage() {
   const funcionOptions = useMemo(
     () => funciones.map((f) => ({ id: String(f.id), label: `${f.codigo} · ${f.nombre}`, searchText: f.codigo })),
     [funciones]
+  );
+  const cuentaOptions = useMemo(
+    () => cuentas.map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
+    [cuentas]
+  );
+  const partidaOptions = useMemo(
+    () => partidas.map((p) => ({ id: String(p.id), label: p.descripcion, searchText: p.descripcion })),
+    [partidas]
   );
 
   const tasaRcIva = useMemo(() => Number(retenciones.find((r) => r.codigo === "RC_IVA")?.porcentaje ?? 0) / 100, [retenciones]);
@@ -111,14 +120,19 @@ export function GastosCajaPage() {
   const [moneda, setMoneda] = useState<MonedaCaja>("BOB");
   const [centroCostoCajaId, setCentroCostoCajaId] = useState("");
   const [funcionGastoCajaId, setFuncionGastoCajaId] = useState("");
+  const [cuentaContableCajaId, setCuentaContableCajaId] = useState("");
+  const [partidaPresupuestoId, setPartidaPresupuestoId] = useState("");
   const [categoriaRendicion, setCategoriaRendicion] = useState<CategoriaRendicionGasto>("MATERIALES_SUMINISTROS");
 
-  const [movCajaId, setMovCajaId] = useState("");
-  const [movTipo, setMovTipo] = useState<TipoMovimientoFondoCaja>("REMESA_PRESUPUESTO");
-  const [movMonto, setMovMonto] = useState("");
-  const [movMoneda, setMovMoneda] = useState<MonedaCaja>("BOB");
-  const [movFecha, setMovFecha] = useState(today);
-  const [movReferencia, setMovReferencia] = useState("");
+  // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona
+  // sola en cuanto carga la lista.
+  useEffect(() => {
+    if (cajas.length === 0) return;
+    const lipena = String(encontrarCajaLipena(cajas)?.id ?? "");
+    if (!cajaId) setCajaId(lipena);
+    if (!filtroCaja) setFiltroCaja(lipena);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cajas]);
 
   const preview = useMemo(() => {
     const monto = Number(montoTotal) || 0;
@@ -164,7 +178,9 @@ export function GastosCajaPage() {
       montoTotal: Number(montoTotal),
       moneda,
       centroCostoCajaId: Number(centroCostoCajaId),
-      funcionGastoCajaId: Number(funcionGastoCajaId)
+      funcionGastoCajaId: Number(funcionGastoCajaId),
+      cuentaContableCajaId: cuentaContableCajaId ? Number(cuentaContableCajaId) : undefined,
+      partidaPresupuestoId: partidaPresupuestoId ? Number(partidaPresupuestoId) : undefined
     };
 
     createGastoMutation.mutate(payload, {
@@ -198,28 +214,6 @@ export function GastosCajaPage() {
     );
   }
 
-  function handleCreateMovimiento(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    createMovimientoMutation.mutate(
-      {
-        cajaId: Number(movCajaId),
-        tipo: movTipo,
-        monto: Number(movMonto),
-        moneda: movMoneda,
-        fecha: movFecha,
-        referencia: movReferencia.trim() || undefined
-      },
-      {
-        onSuccess: () => {
-          showSuccess("Fondo registrado.");
-          setMovMonto("");
-          setMovReferencia("");
-        },
-        onError: (error) => showError(normalizeError(error, "No se pudo registrar el fondo."))
-      }
-    );
-  }
-
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -234,7 +228,8 @@ export function GastosCajaPage() {
             <h1 className="font-headline text-3xl font-extrabold">Registro de Gastos</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
               Carga cada gasto con su respaldo. El motor tributario calcula el crédito fiscal o las
-              retenciones automáticamente, según las tasas configuradas en Parámetros.
+              retenciones automáticamente, según las tasas configuradas en Parámetros. ¿Buscas registrar
+              un fondo recibido o una salida de banco hacia la caja? Eso está en "Saldos y Movimientos".
             </p>
           </div>
         </div>
@@ -295,6 +290,31 @@ export function GastosCajaPage() {
               placeholder="Buscar función de gasto..."
               className={inputClassName}
             />
+
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Cuenta contable (opcional; si la dejas vacía, se resuelve sola)
+              </label>
+              <AutocompleteSelect
+                value={cuentaContableCajaId}
+                onChange={setCuentaContableCajaId}
+                options={cuentaOptions}
+                placeholder="Buscar cuenta contable..."
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Partida de presupuesto (opcional; para saber el saldo a favor)
+              </label>
+              <AutocompleteSelect
+                value={partidaPresupuestoId}
+                onChange={setPartidaPresupuestoId}
+                options={partidaOptions}
+                placeholder="Buscar partida de presupuesto..."
+                className={inputClassName}
+              />
+            </div>
 
             <div className="sm:col-span-2">
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
@@ -420,53 +440,6 @@ export function GastosCajaPage() {
               ))}
             </tbody>
           </table>
-        </div>
-      </article>
-
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-          <PiggyBank size={16} className="text-[var(--color-primary)]" />
-          Fondos recibidos
-        </h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[320px_1fr]">
-          <form className="space-y-3" onSubmit={handleCreateMovimiento}>
-            <select required value={movCajaId} onChange={(e) => setMovCajaId(e.target.value)} className={inputClassName}>
-              <option value="">Caja...</option>
-              {cajas.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
-            <select value={movTipo} onChange={(e) => setMovTipo(e.target.value as TipoMovimientoFondoCaja)} className={inputClassName}>
-              <option value="REMESA_PRESUPUESTO">Remesa presupuesto</option>
-              <option value="REMESA_SUELDOS">Remesa para sueldos</option>
-              <option value="REMESA_OTROS">Remesa varios</option>
-              <option value="REPOSICION">Reposición</option>
-            </select>
-            <div className="flex gap-2">
-              <input required type="number" min="0.01" step="0.01" value={movMonto} onChange={(e) => setMovMonto(e.target.value)} className={inputClassName} placeholder="Monto" />
-              <select value={movMoneda} onChange={(e) => setMovMoneda(e.target.value as MonedaCaja)} className={`${inputClassName} w-24`}>
-                <option value="BOB">BOB</option>
-                <option value="USD">USD</option>
-              </select>
-            </div>
-            <input required type="date" value={movFecha} onChange={(e) => setMovFecha(e.target.value)} className={inputClassName} />
-            <input value={movReferencia} onChange={(e) => setMovReferencia(e.target.value)} className={inputClassName} placeholder="Referencia (ej. CH.136)" />
-            <button type="submit" disabled={createMovimientoMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
-              {createMovimientoMutation.isPending ? "Guardando..." : "Registrar fondo"}
-            </button>
-          </form>
-          <div className="space-y-2 text-sm">
-            {movimientos.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
-                <div>
-                  <p className="font-semibold">{item.caja?.nombre}</p>
-                  <p className="text-xs text-[var(--color-on-surface-variant)]">{formatFecha(item.fecha)}{item.referencia ? ` · ${item.referencia}` : ""}</p>
-                </div>
-                <span className="font-mono text-sm font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
-              </div>
-            ))}
-            {movimientos.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Aún no hay fondos registrados.</p> : null}
-          </div>
         </div>
       </article>
     </section>

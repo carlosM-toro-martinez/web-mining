@@ -7,6 +7,7 @@ import type {
   ReporteRendicion,
   ReporteRetenciones
 } from "@/features/reportesCajaChica/model/reportesCajaChica.schema";
+import type { PartidaPresupuestoCaja } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
 
 const MESES_MAYUSCULA = [
   "ENERO",
@@ -865,4 +866,119 @@ export function exportReporteRetencionesPdf(reporte: ReporteRetenciones) {
   });
 
   openBrowserPrintDialog(doc, `resumen-retenciones-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// ============================================================================
+// Planilla de Control de Pagos — presupuesto vs. gastado por partida, con
+// saldo a favor (presupuestado - gastado), igual a la planilla real.
+// ============================================================================
+
+function ejecucion(item: PartidaPresupuestoCaja) {
+  return {
+    presupuestado: Number(item.montoPresupuestado),
+    pagado: item.totalPagado ?? 0,
+    gastado: item.totalGastado ?? 0,
+    saldo: item.saldoAFavor ?? Number(item.montoPresupuestado) - (item.totalGastado ?? 0),
+    ejecucion: item.porcentajeEjecucion ?? 0
+  };
+}
+
+export function exportPlanillaControlPagosExcel(partidas: PartidaPresupuestoCaja[], periodoLabel: string) {
+  const lastCol = 5;
+  const aoa: Array<Array<string | number>> = [
+    ["EMPRESA MINERA MARTE S.R.L.", "", "", "", "", ""],
+    [`PLANILLA DE CONTROL DE PAGOS · ${periodoLabel.toUpperCase()}`, "", "", "", "", ""],
+    [],
+    ["DESCRIPCIÓN", "CAJA", "TOTAL PRESUPUESTADO", "TOTAL PAGADO", "TOTAL GASTADO", "SALDO A FAVOR"]
+  ];
+
+  let totalPresupuestado = 0;
+  let totalPagado = 0;
+  let totalGastado = 0;
+  let totalSaldo = 0;
+
+  for (const partida of partidas) {
+    const e = ejecucion(partida);
+    totalPresupuestado += e.presupuestado;
+    totalPagado += e.pagado;
+    totalGastado += e.gastado;
+    totalSaldo += e.saldo;
+    aoa.push([partida.descripcion, partida.caja?.nombre ?? "", num(e.presupuestado), num(e.pagado), num(e.gastado), num(e.saldo)]);
+  }
+  aoa.push(["TOTAL", "", num(totalPresupuestado), num(totalPagado), num(totalGastado), num(totalSaldo)]);
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!cols"] = [{ wch: 34 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
+  ];
+  styleRow(sheet, 0, lastCol, titleStyle);
+  styleRow(sheet, 1, lastCol, { font: { bold: true, sz: 11 }, alignment: { horizontal: "center" } });
+  styleRow(sheet, 3, lastCol, headerStyle);
+  for (let r = 4; r < aoa.length - 1; r += 1) styleRow(sheet, r, lastCol, bodyStyle);
+  styleRow(sheet, aoa.length - 1, lastCol, totalStyle);
+  for (const col of [2, 3, 4, 5]) {
+    for (let r = 0; r < aoa.length; r += 1) numberFormatCell(sheet, r, col);
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Control de Pagos".slice(0, 31));
+  XLSX.writeFile(workbook, `planilla-control-pagos-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export function exportPlanillaControlPagosPdf(partidas: PartidaPresupuestoCaja[], periodoLabel: string) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const centerX = pageWidth / 2;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("EMPRESA MINERA MARTE S.R.L.", centerX, 30, { align: "center" });
+  doc.setFontSize(11);
+  doc.text(`PLANILLA DE CONTROL DE PAGOS · ${periodoLabel.toUpperCase()}`, centerX, 46, { align: "center" });
+
+  let totalPresupuestado = 0;
+  let totalPagado = 0;
+  let totalGastado = 0;
+  let totalSaldo = 0;
+
+  const rows: RowInput[] = partidas.map((partida) => {
+    const e = ejecucion(partida);
+    totalPresupuestado += e.presupuestado;
+    totalPagado += e.pagado;
+    totalGastado += e.gastado;
+    totalSaldo += e.saldo;
+    return [
+      partida.descripcion,
+      partida.caja?.nombre ?? "",
+      formatBs(e.presupuestado),
+      formatBs(e.pagado),
+      formatBs(e.gastado),
+      formatBs(e.saldo),
+      `${e.ejecucion.toFixed(1)}%`
+    ];
+  });
+  rows.push(["TOTAL", "", formatBs(totalPresupuestado), formatBs(totalPagado), formatBs(totalGastado), formatBs(totalSaldo), ""]);
+
+  autoTable(doc, {
+    startY: 60,
+    head: [["Descripción", "Caja", "Total Presupuestado", "Total Pagado", "Total Gastado", "Saldo a Favor", "% Ejecución"]],
+    body: rows,
+    styles: pdfTableStyles,
+    headStyles: pdfHeadStyles,
+    columnStyles: {
+      2: { halign: "right" },
+      3: { halign: "right" },
+      4: { halign: "right" },
+      5: { halign: "right" },
+      6: { halign: "right" }
+    },
+    margin: { left: 30, right: 30 },
+    didParseCell: (hook) => {
+      if (hook.section === "body" && hook.row.index === rows.length - 1) hook.cell.styles.fontStyle = "bold";
+    }
+  });
+
+  openBrowserPrintDialog(doc, `planilla-control-pagos-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

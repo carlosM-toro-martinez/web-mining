@@ -129,11 +129,12 @@ export function AppShell() {
   const cajaChicaNavItems = useMemo(() => {
     if (!canSeeCajaChicaRoute) return [];
     return [
+      { label: "Parámetros", icon: Landmark, to: "/caja-chica/parametros" },
       { label: "Gastos", icon: Wallet, to: "/caja-chica/gastos" },
-      { label: "Saldos", icon: Scale, to: "/caja-chica/saldos" },
+      { label: "Saldos y Movimientos", icon: Scale, to: "/caja-chica/saldos" },
+      { label: "Presupuesto", icon: ClipboardList, to: "/caja-chica/presupuesto" },
       { label: "Rendiciones", icon: ReceiptText, to: "/caja-chica/rendiciones" },
-      { label: "Reportes", icon: FileBarChart2, to: "/caja-chica/reportes" },
-      { label: "Parámetros", icon: Landmark, to: "/caja-chica/parametros" }
+      { label: "Reportes", icon: FileBarChart2, to: "/caja-chica/reportes" }
     ] as NavItem[];
   }, [canSeeCajaChicaRoute]);
 

@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Check, FolderTree, Landmark, ListTree, Pencil, Percent, PiggyBank, Search, Trash2, X } from "lucide-react";
+import { Banknote, Check, FolderTree, Landmark, ListTree, Pencil, Percent, PiggyBank, Search, Trash2, X } from "lucide-react";
 import {
   useCajasChicasQuery,
   useCentrosCostoCajaQuery,
@@ -9,11 +9,14 @@ import {
   useCreateConceptoRetencionCajaMutation,
   useCreateCuentaContableCajaMutation,
   useCreateFuncionGastoCajaMutation,
+  useCreateCuentaBancariaCajaMutation,
   useCuentasContablesCajaQuery,
+  useCuentasBancariasCajaQuery,
   useDeleteCajaChicaMutation,
   useDeleteCentroCostoCajaMutation,
   useDeleteCuentaContableCajaMutation,
   useDeleteFuncionGastoCajaMutation,
+  useDeleteCuentaBancariaCajaMutation,
   useFuncionesGastoCajaQuery,
   useUpdateCajaChicaMutation,
   useUpdateCentroCostoCajaMutation,
@@ -27,6 +30,7 @@ import type {
   ClaseCuentaCaja,
   ConceptoRetencionCaja,
   CuentaContableCaja,
+  CuentaBancariaCaja,
   FuncionGastoCaja,
   MonedaCaja,
   TipoCosteoCaja,
@@ -65,12 +69,14 @@ export function ParametrosCajaChicaPage() {
   const funcionesQuery = useFuncionesGastoCajaQuery();
   const cuentasQuery = useCuentasContablesCajaQuery();
   const retencionesQuery = useConceptosRetencionCajaQuery();
+  const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
 
   const cajas = cajasQuery.data?.data ?? [];
   const centros = centrosQuery.data?.data ?? [];
   const funciones = funcionesQuery.data?.data ?? [];
   const cuentas = cuentasQuery.data?.data ?? [];
   const retenciones = retencionesQuery.data?.data ?? [];
+  const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
 
   // --- Mutations ---
   const createCajaMutation = useCreateCajaChicaMutation();
@@ -91,10 +97,14 @@ export function ParametrosCajaChicaPage() {
   const createRetencionMutation = useCreateConceptoRetencionCajaMutation();
   const updateRetencionMutation = useUpdateConceptoRetencionCajaMutation();
 
+  const createCuentaBancariaMutation = useCreateCuentaBancariaCajaMutation();
+  const deleteCuentaBancariaMutation = useDeleteCuentaBancariaCajaMutation();
+
   // --- Caja chica form ---
   const [cajaCodigo, setCajaCodigo] = useState("");
   const [cajaNombre, setCajaNombre] = useState("");
   const [cajaMoneda, setCajaMoneda] = useState<MonedaCaja>("BOB");
+  const [cajaSaldoInicial, setCajaSaldoInicial] = useState("0");
   const [cajaSearch, setCajaSearch] = useState("");
   const [editingCajaId, setEditingCajaId] = useState<number | null>(null);
   const [editCajaCodigo, setEditCajaCodigo] = useState("");
@@ -125,6 +135,13 @@ export function ParametrosCajaChicaPage() {
   const [editingRetencionId, setEditingRetencionId] = useState<number | null>(null);
   const [editRetencionPorcentaje, setEditRetencionPorcentaje] = useState("");
 
+  // --- Cuenta bancaria ---
+  const [bancoNombre, setBancoNombre] = useState("");
+  const [bancoNumeroCuenta, setBancoNumeroCuenta] = useState("");
+  const [bancoNombreCuenta, setBancoNombreCuenta] = useState("");
+  const [bancoMonedaBase, setBancoMonedaBase] = useState<MonedaCaja>("BOB");
+  const [bancoSaldoInicial, setBancoSaldoInicial] = useState("0");
+
   const centrosRaiz = useMemo(() => centros.filter((c) => c.parentId === null), [centros]);
   const funcionesRaiz = useMemo(() => funciones.filter((f) => f.parentId === null), [funciones]);
 
@@ -148,12 +165,13 @@ export function ParametrosCajaChicaPage() {
   function handleCreateCaja(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     createCajaMutation.mutate(
-      { codigo: cajaCodigo, nombre: cajaNombre, monedaBase: cajaMoneda },
+      { codigo: cajaCodigo, nombre: cajaNombre, monedaBase: cajaMoneda, saldoInicial: Number(cajaSaldoInicial) || 0 },
       {
         onSuccess: () => {
           showSuccess("Caja chica creada.");
           setCajaCodigo("");
           setCajaNombre("");
+          setCajaSaldoInicial("0");
         },
         onError: (error) => showError(normalizeError(error, "No se pudo crear la caja chica."))
       }
@@ -283,6 +301,36 @@ export function ParametrosCajaChicaPage() {
     );
   }
 
+  function handleCreateCuentaBancaria(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    createCuentaBancariaMutation.mutate(
+      {
+        banco: bancoNombre,
+        numeroCuenta: bancoNumeroCuenta.trim() || undefined,
+        nombreCuenta: bancoNombreCuenta,
+        monedaBase: bancoMonedaBase,
+        saldoInicial: Number(bancoSaldoInicial) || 0
+      },
+      {
+        onSuccess: () => {
+          showSuccess("Cuenta bancaria creada.");
+          setBancoNombre("");
+          setBancoNumeroCuenta("");
+          setBancoNombreCuenta("");
+          setBancoSaldoInicial("0");
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo crear la cuenta bancaria."))
+      }
+    );
+  }
+
+  function handleDeleteCuentaBancaria(id: number) {
+    deleteCuentaBancariaMutation.mutate(id, {
+      onSuccess: () => showSuccess("Cuenta bancaria eliminada."),
+      onError: (error) => showError(normalizeError(error, "No se pudo eliminar: puede tener movimientos registrados."))
+    });
+  }
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -296,8 +344,9 @@ export function ParametrosCajaChicaPage() {
           <div>
             <h1 className="page-title font-headline text-3xl font-extrabold">Parámetros de Caja Chica</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
-              Cajas, centros de costo, funciones de gasto, cuentas contables y tasas de retención — la base
-              que alimenta el registro de gastos y las rendiciones.
+              Configuración de una sola vez: cajas y cuentas bancarias (con su saldo inicial), centros de
+              costo, funciones de gasto, cuentas contables y tasas de retención. ¿Buscas crear el
+              presupuesto del mes? Eso está en "Presupuesto".
             </p>
           </div>
         </div>
@@ -317,6 +366,12 @@ export function ParametrosCajaChicaPage() {
               <option value="BOB">Bolivianos (BOB)</option>
               <option value="USD">Dólares (USD)</option>
             </select>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Saldo inicial (cuánto había en esta caja al empezar a usar el sistema)
+              </label>
+              <input type="number" min="0" step="0.01" value={cajaSaldoInicial} onChange={(e) => setCajaSaldoInicial(e.target.value)} className={inputClassName} placeholder="0.00" />
+            </div>
             <button type="submit" disabled={createCajaMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
               {createCajaMutation.isPending ? "Guardando..." : "Guardar caja"}
             </button>
@@ -345,6 +400,7 @@ export function ParametrosCajaChicaPage() {
                   <div>
                     <p className="font-mono text-xs">{item.codigo}</p>
                     <p>{item.nombre} <span className="text-[10px] text-[var(--color-on-surface-variant)]">({item.monedaBase})</span></p>
+                    <p className="text-[10px] text-[var(--color-on-surface-variant)]">Saldo inicial: {Number(item.saldoInicial).toFixed(2)}</p>
                   </div>
                   <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                     <button type="button" onClick={() => startEditCaja(item)} className="rounded p-1 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10"><Pencil size={14} /></button>
@@ -541,6 +597,54 @@ export function ParametrosCajaChicaPage() {
               </div>
             )
           )}
+        </div>
+      </article>
+
+      {/* Cuentas bancarias */}
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h3 className="mb-1 flex items-center gap-2 text-lg font-bold">
+          <Banknote size={16} className="text-[var(--color-primary)]" />
+          Cuentas bancarias
+        </h3>
+        <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+          Ahí llega primero el presupuesto y los sueldos, antes de sacarse hacia la caja chica por
+          cheque o transferencia.
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[320px_1fr]">
+          <form className="space-y-3" onSubmit={handleCreateCuentaBancaria}>
+            <input required value={bancoNombre} onChange={(e) => setBancoNombre(e.target.value)} className={inputClassName} placeholder="Banco (ej. Mercantil Santa Cruz)" />
+            <input value={bancoNumeroCuenta} onChange={(e) => setBancoNumeroCuenta(e.target.value)} className={inputClassName} placeholder="N° de cuenta (opcional)" />
+            <input required value={bancoNombreCuenta} onChange={(e) => setBancoNombreCuenta(e.target.value)} className={inputClassName} placeholder="Nombre de la cuenta (ej. Cuenta Marte SRL)" />
+            <select value={bancoMonedaBase} onChange={(e) => setBancoMonedaBase(e.target.value as MonedaCaja)} className={inputClassName}>
+              <option value="BOB">Bolivianos (BOB)</option>
+              <option value="USD">Dólares (USD)</option>
+            </select>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Saldo inicial (cuánto había en esta cuenta al empezar a usar el sistema)
+              </label>
+              <input type="number" min="0" step="0.01" value={bancoSaldoInicial} onChange={(e) => setBancoSaldoInicial(e.target.value)} className={inputClassName} placeholder="0.00" />
+            </div>
+            <button type="submit" disabled={createCuentaBancariaMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
+              {createCuentaBancariaMutation.isPending ? "Guardando..." : "Guardar cuenta bancaria"}
+            </button>
+          </form>
+          <div className="space-y-2 text-sm">
+            {cuentasBancarias.map((item: CuentaBancariaCaja) => (
+              <div key={item.id} className="group flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                <div>
+                  <p className="font-semibold">{item.banco} · {item.nombreCuenta}</p>
+                  <p className="text-[10px] text-[var(--color-on-surface-variant)]">
+                    {item.numeroCuenta ? `N° ${item.numeroCuenta} · ` : ""}{item.monedaBase} · Saldo inicial: {Number(item.saldoInicial).toFixed(2)}
+                  </p>
+                </div>
+                <button type="button" onClick={() => handleDeleteCuentaBancaria(item.id)} className="rounded p-1 text-[var(--color-error)] opacity-0 transition hover:bg-[var(--color-error)]/10 group-hover:opacity-100">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            {cuentasBancarias.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Aún no hay cuentas bancarias.</p> : null}
+          </div>
         </div>
       </article>
     </section>

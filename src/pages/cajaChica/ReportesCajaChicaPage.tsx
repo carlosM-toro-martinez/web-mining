@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, FileBarChart2, FileSpreadsheet, FileText, PieChart, Search } from "lucide-react";
 import {
   useReporteDesgloseQuery,
   useReporteNoDeduciblesQuery,
   useReporteRetencionesQuery
 } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
-import { exportReporteRetencionesExcel, exportReporteRetencionesPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
+import {
+  exportReporteRetencionesExcel,
+  exportReporteRetencionesPdf
+} from "@/features/reportesCajaChica/lib/cajaChicaExport";
 import { useCajasChicasQuery } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
+import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 
 const buttonSecondaryClassName =
@@ -41,6 +45,11 @@ export function ReportesCajaChicaPage() {
   const [fechaFin, setFechaFin] = useState(hoy);
   const [consultado, setConsultado] = useState(true);
 
+  useEffect(() => {
+    if (!cajaId && cajas.length > 0) setCajaId(String(encontrarCajaLipena(cajas)?.id ?? ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cajas]);
+
   const params = {
     cajaId: cajaId ? Number(cajaId) : undefined,
     fechaInicio: fechaInicio || undefined,
@@ -70,7 +79,8 @@ export function ReportesCajaChicaPage() {
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
               Retenciones tributarias para el SIAT, gastos no deducibles y desglose de costos por
               centro de costo, función de gasto y cuenta contable, para el período que elijas. ¿Buscas
-              cuánto tienes disponible en una caja ahora mismo? Eso está en "Saldos y Movimientos".
+              cuánto tienes disponible en una caja ahora mismo? Eso está en "Saldos y Movimientos". ¿Buscas
+              el presupuesto y el saldo a favor por partida? Eso está en "Presupuesto".
             </p>
           </div>
         </div>
