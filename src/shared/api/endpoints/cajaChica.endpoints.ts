@@ -14,5 +14,9 @@ export const cajaChicaEndpoints = {
   cuentaBancariaById: (id: number | string) => `/api/cuentas-bancarias-caja/${id}`,
   partidasPresupuesto: "/api/partidas-presupuesto-caja",
   partidaPresupuestoById: (id: number | string) => `/api/partidas-presupuesto-caja/${id}`,
-  movimientosBanco: "/api/movimientos-banco-caja"
+  movimientosBanco: "/api/movimientos-banco-caja",
+  presupuestos: "/api/presupuestos-caja",
+  presupuestoById: (id: number | string) => `/api/presupuestos-caja/${id}`,
+  presupuestoAsignarBanco: (id: number | string) => `/api/presupuestos-caja/${id}/asignar-banco`,
+  presupuestoDuplicar: (id: number | string) => `/api/presupuestos-caja/${id}/duplicar`
 } as const;

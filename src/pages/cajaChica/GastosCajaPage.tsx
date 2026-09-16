@@ -104,7 +104,12 @@ export function GastosCajaPage() {
     [cuentas]
   );
   const partidaOptions = useMemo(
-    () => partidas.map((p) => ({ id: String(p.id), label: p.descripcion, searchText: p.descripcion })),
+    () =>
+      partidas.map((p) => ({
+        id: String(p.id),
+        label: p.presupuesto?.nombre ? `${p.presupuesto.nombre} · ${p.descripcion}` : p.descripcion,
+        searchText: p.descripcion
+      })),
     [partidas]
   );
 

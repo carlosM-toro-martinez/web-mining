@@ -127,24 +127,24 @@ export const createCuentaBancariaCajaPayloadSchema = z.object({
 });
 export const updateCuentaBancariaCajaPayloadSchema = createCuentaBancariaCajaPayloadSchema.partial();
 
-// --- Partida de presupuesto (por caja, mes/año) ---
+// --- Partida de presupuesto (línea de detalle, vive bajo una remesa/PresupuestoCaja) ---
 export const partidaPresupuestoCajaSchema = z.object({
   id: z.number().int().positive(),
-  cajaId: z.number().int().positive(),
-  anio: z.number().int(),
-  mes: z.number().int(),
+  presupuestoId: z.number().int().positive(),
   descripcion: z.string().min(1),
   montoPresupuestado: z.union([z.string(), z.number()]),
   activo: z.boolean(),
-  caja: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
+  caja: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).nullable().optional(),
+  presupuesto: z
+    .object({ id: z.number().int().positive(), nombre: z.string().min(1), anio: z.number().int(), mes: z.number().int() })
+    .nullable()
+    .optional(),
   totalGastado: z.number().optional(),
   saldoAFavor: z.number().optional(),
   porcentajeEjecucion: z.number().optional()
 });
 export const createPartidaPresupuestoCajaPayloadSchema = z.object({
-  cajaId: z.number().int().positive("Debes elegir una caja."),
-  anio: z.number().int().min(2000).max(2100),
-  mes: z.number().int().min(1).max(12),
+  presupuestoId: z.number().int().positive("Debes elegir una remesa/presupuesto."),
   descripcion: z.string().trim().min(1, "La descripción es obligatoria."),
   montoPresupuestado: z.number().positive("El monto debe ser mayor a cero.")
 });

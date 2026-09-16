@@ -169,6 +169,7 @@ export async function deleteCuentaBancariaCaja(id: number) {
 
 // --- Partidas de presupuesto ---
 export interface PartidasPresupuestoQueryParams {
+  presupuestoId?: number;
   cajaId?: number;
   anio?: number;
   mes?: number;

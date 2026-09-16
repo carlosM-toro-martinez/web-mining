@@ -204,8 +204,14 @@ export const queryKeys = {
     cuentasContables: () => [...queryKeys.parametrosCajaChica.all, "cuentas-contables"] as const,
     conceptosRetencion: () => [...queryKeys.parametrosCajaChica.all, "conceptos-retencion"] as const,
     cuentasBancarias: () => [...queryKeys.parametrosCajaChica.all, "cuentas-bancarias"] as const,
-    partidasPresupuesto: (params: { cajaId?: number; anio?: number; mes?: number }) =>
+    partidasPresupuesto: (params: { presupuestoId?: number; cajaId?: number; anio?: number; mes?: number }) =>
       [...queryKeys.parametrosCajaChica.all, "partidas-presupuesto", params] as const
+  },
+  presupuestoCaja: {
+    all: ["presupuesto-caja"] as const,
+    list: (params: { cajaId?: number; anio?: number; mes?: number; soloActivas?: boolean }) =>
+      [...queryKeys.presupuestoCaja.all, "list", params] as const,
+    detail: (id: number) => [...queryKeys.presupuestoCaja.all, "detail", id] as const
   },
   movimientoBancoCaja: {
     all: ["movimiento-banco-caja"] as const,
