@@ -12,6 +12,7 @@ interface AutocompleteSelectProps {
   options: AutocompleteOption[];
   placeholder?: string;
   disabled?: boolean;
+  required?: boolean;
   className?: string;
   maxVisibleOptions?: number;
 }
@@ -22,6 +23,7 @@ export function AutocompleteSelect({
   options,
   placeholder = "Buscar...",
   disabled = false,
+  required = false,
   className = "",
   maxVisibleOptions = 20
 }: AutocompleteSelectProps) {
@@ -61,6 +63,7 @@ export function AutocompleteSelect({
         }}
         placeholder={placeholder}
         disabled={disabled}
+        required={required}
         className={className}
       />
       {open && !disabled ? (

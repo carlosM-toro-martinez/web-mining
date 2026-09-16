@@ -1,19 +1,25 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { FileSpreadsheet, FileText, Trash2, Wallet } from "lucide-react";
+import { FileSpreadsheet, FileText, Landmark, Trash2, Wallet } from "lucide-react";
 import {
   useCajasChicasQuery,
   useCreatePartidaPresupuestoCajaMutation,
+  useCuentasBancariasCajaQuery,
   useDeletePartidaPresupuestoCajaMutation,
   usePartidasPresupuestoCajaQuery
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import { exportPlanillaControlPagosExcel, exportPlanillaControlPagosPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
+import { useCreateMovimientoBancoCajaMutation } from "@/features/movimientoBancoCaja/hooks/useMovimientoBancoCaja";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 const inputClassName =
-  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30";
 
 const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
@@ -38,12 +44,16 @@ export function PresupuestoCajaPage() {
 
   const cajasQuery = useCajasChicasQuery();
   const cajas = cajasQuery.data?.data ?? [];
+  const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
+  const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
 
   const [cajaId, setCajaId] = useState("");
   const [anio, setAnio] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [descripcion, setDescripcion] = useState("");
   const [montoPresupuestado, setMontoPresupuestado] = useState("");
+  const [bancoDestinoId, setBancoDestinoId] = useState("");
+  const bancoDestino = cuentasBancarias.find((c) => String(c.id) === bancoDestinoId);
 
   useEffect(() => {
     if (!cajaId && cajas.length > 0) setCajaId(String(encontrarCajaLipena(cajas)?.id ?? ""));
@@ -64,6 +74,33 @@ export function PresupuestoCajaPage() {
 
   const createMutation = useCreatePartidaPresupuestoCajaMutation();
   const deleteMutation = useDeletePartidaPresupuestoCajaMutation();
+  const asignarBancoMutation = useCreateMovimientoBancoCajaMutation();
+
+  function handleAsignarBanco() {
+    if (!bancoDestino) {
+      showError("Elige a qué cuenta bancaria se asignó el presupuesto.");
+      return;
+    }
+    if (totalPresupuestado <= 0) {
+      showError("No hay presupuesto para asignar en este período.");
+      return;
+    }
+    asignarBancoMutation.mutate(
+      {
+        cuentaBancariaId: bancoDestino.id,
+        tipo: "INGRESO",
+        fecha: today(),
+        formaPago: "DEPOSITO",
+        monto: totalPresupuestado,
+        moneda: bancoDestino.monedaBase,
+        descripcion: `Presupuesto aprobado y asignado — ${periodoLabel}`
+      },
+      {
+        onSuccess: () => showSuccess(`Presupuesto de ${periodoLabel} asignado a ${bancoDestino.banco}.`),
+        onError: (error) => showError(normalizeError(error, "No se pudo asignar el presupuesto al banco."))
+      }
+    );
+  }
 
   function handleCreatePartida(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -187,9 +224,35 @@ export function PresupuestoCajaPage() {
         </p>
 
         {partidas.length > 0 ? (
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--color-on-surface)]/20 bg-[var(--color-surface-container-high)] px-4 py-3">
-            <span className="text-sm font-extrabold uppercase tracking-wide">Total Presupuesto</span>
-            <span className="font-mono text-lg font-extrabold">{formatMoneda(totalPresupuestado)}</span>
+          <div className="mb-4 space-y-3 rounded-lg border border-[var(--color-on-surface)]/20 bg-[var(--color-surface-container-high)] p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-extrabold uppercase tracking-wide">Total Presupuesto</span>
+              <span className="font-mono text-lg font-extrabold">{formatMoneda(totalPresupuestado)}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-border-soft)] pt-3">
+              <Landmark size={14} className="shrink-0 text-[var(--color-primary)]" />
+              <p className="mr-2 text-xs text-[var(--color-on-surface-variant)]">
+                Cuando se apruebe este presupuesto y el dinero llegue al banco, regístralo aquí:
+              </p>
+              <select
+                value={bancoDestinoId}
+                onChange={(e) => setBancoDestinoId(e.target.value)}
+                className={`${inputClassName} w-auto flex-1`}
+              >
+                <option value="">Cuenta bancaria destino...</option>
+                {cuentasBancarias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAsignarBanco}
+                disabled={asignarBancoMutation.isPending}
+                className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+              >
+                {asignarBancoMutation.isPending ? "Asignando..." : "Aprobar y asignar al banco"}
+              </button>
+            </div>
           </div>
         ) : null}
 

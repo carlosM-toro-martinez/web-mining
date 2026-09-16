@@ -3,8 +3,10 @@ import {
   anularRendicionCaja,
   cerrarRendicionCaja,
   createRendicionCaja,
+  getPreviewRendicionCaja,
   getRendicionCajaById,
   getRendicionesCaja,
+  type PreviewRendicionCajaParams,
   type RendicionesCajaQueryParams
 } from "@/features/rendicionCaja/api/rendicionCajaApi";
 import type {
@@ -25,6 +27,15 @@ export function useRendicionCajaDetailQuery(id: string | undefined) {
     queryKey: queryKeys.rendicionCaja.detail(id ?? ""),
     queryFn: () => getRendicionCajaById(id as string),
     enabled: Boolean(id)
+  });
+}
+
+export function usePreviewRendicionCajaQuery(params: Partial<PreviewRendicionCajaParams>) {
+  const isComplete = Boolean(params.cajaId && params.periodoDesde && params.periodoHasta);
+  return useQuery({
+    queryKey: queryKeys.rendicionCaja.preview(params),
+    queryFn: () => getPreviewRendicionCaja(params as PreviewRendicionCajaParams),
+    enabled: isComplete
   });
 }
 

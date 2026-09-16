@@ -221,7 +221,9 @@ export const queryKeys = {
   rendicionCaja: {
     all: ["rendicion-caja"] as const,
     list: (params: { cajaId?: number; estado?: string }) => [...queryKeys.rendicionCaja.all, "list", params] as const,
-    detail: (id: string) => [...queryKeys.rendicionCaja.all, "detail", id] as const
+    detail: (id: string) => [...queryKeys.rendicionCaja.all, "detail", id] as const,
+    preview: (params: { cajaId?: number; periodoDesde?: string; periodoHasta?: string }) =>
+      [...queryKeys.rendicionCaja.all, "preview", params] as const
   },
   reportesCajaChica: {
     all: ["reportes-caja-chica"] as const,

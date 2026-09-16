@@ -22,6 +22,7 @@ export function useCreateMovimientoBancoCajaMutation() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.movimientoBancoCaja.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportesCajaChica.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.rendicionCaja.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() });
     }
   });
 }

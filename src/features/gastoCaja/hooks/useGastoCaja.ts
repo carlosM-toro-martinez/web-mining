@@ -21,13 +21,22 @@ export function useGastosCajaQuery(params: GastosCajaQueryParams = {}) {
   });
 }
 
+// Un gasto (de caja o directo del banco) cambia el saldo disponible, así
+// que además de refrescar la lista de gastos hay que invalidar el estado de
+// cuenta (Saldos y Movimientos) y el saldo de cuentas bancarias.
+async function invalidarSaldos(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.reportesCajaChica.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() })
+  ]);
+}
+
 export function useCreateGastoCajaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateGastoCajaPayload) => createGastoCaja(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all });
-    }
+    onSuccess: () => invalidarSaldos(queryClient)
   });
 }
 
@@ -35,9 +44,7 @@ export function useAnularGastoCajaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AnularGastoCajaPayload }) => anularGastoCaja(id, payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all });
-    }
+    onSuccess: () => invalidarSaldos(queryClient)
   });
 }
 
@@ -52,8 +59,6 @@ export function useCreateMovimientoFondoCajaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateMovimientoFondoCajaPayload) => createMovimientoFondoCaja(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all });
-    }
+    onSuccess: () => invalidarSaldos(queryClient)
   });
 }

@@ -4,6 +4,7 @@ export const tipoDocumentoGastoSchema = z.enum(["FACTURA", "CONTRATO_RETENCION",
 export const categoriaRetencionGastoSchema = z.enum(["SERVICIO", "COMPRA"]);
 export const monedaCajaSchema = z.enum(["BOB", "USD"]);
 export const estadoGastoCajaSchema = z.enum(["REGISTRADO", "RENDIDO", "ANULADO"]);
+export const origenGastoCajaSchema = z.enum(["CAJA", "BANCO"]);
 export const categoriaRendicionGastoSchema = z.enum([
   "MATERIALES_SUMINISTROS",
   "TRANSPORTES",
@@ -36,6 +37,11 @@ export const tipoMovimientoFondoCajaSchema = z.enum([
 ]);
 
 const refConNombre = z.object({ id: z.number().int().positive(), codigo: z.string().min(1), nombre: z.string().min(1) });
+const cuentaBancariaRef = z.object({
+  id: z.number().int().positive(),
+  banco: z.string().min(1),
+  nombreCuenta: z.string().min(1)
+});
 
 export const anulacionGastoCajaSchema = z.object({
   id: z.string().min(1),
@@ -45,7 +51,9 @@ export const anulacionGastoCajaSchema = z.object({
 
 export const gastoCajaSchema = z.object({
   id: z.string().min(1),
-  cajaId: z.number().int().positive(),
+  origen: origenGastoCajaSchema,
+  cajaId: z.number().int().positive().nullable().optional(),
+  cuentaBancariaCajaId: z.number().int().positive().nullable().optional(),
   fecha: z.string(),
   tipoDocumento: tipoDocumentoGastoSchema,
   categoriaRetencion: categoriaRetencionGastoSchema.nullable().optional(),
@@ -67,7 +75,8 @@ export const gastoCajaSchema = z.object({
   esNoDeducible: z.boolean(),
   estado: estadoGastoCajaSchema,
   createdAt: z.string(),
-  caja: refConNombre.optional(),
+  caja: refConNombre.nullable().optional(),
+  cuentaBancariaCaja: cuentaBancariaRef.nullable().optional(),
   centroCostoCaja: refConNombre.optional(),
   funcionGastoCaja: refConNombre.optional(),
   cuentaContableCaja: refConNombre.nullable().optional(),
@@ -75,23 +84,34 @@ export const gastoCajaSchema = z.object({
   anulacion: anulacionGastoCajaSchema.nullable().optional()
 });
 
-export const createGastoCajaPayloadSchema = z.object({
-  cajaId: z.number().int().positive("Debes elegir una caja."),
-  fecha: z.string().min(1, "La fecha es obligatoria."),
-  tipoDocumento: tipoDocumentoGastoSchema,
-  categoriaRetencion: categoriaRetencionGastoSchema.optional(),
-  categoriaRendicion: categoriaRendicionGastoSchema,
-  proveedorNombre: z.string().trim().min(1, "El proveedor es obligatorio."),
-  proveedorNitCi: z.string().trim().optional(),
-  glosa: z.string().trim().min(1, "La glosa es obligatoria."),
-  numeroRespaldo: z.string().trim().optional(),
-  montoTotal: z.number().positive("El monto debe ser mayor a cero."),
-  moneda: monedaCajaSchema,
-  centroCostoCajaId: z.number().int().positive("Debes elegir un centro de costo."),
-  funcionGastoCajaId: z.number().int().positive("Debes elegir una función de gasto."),
-  cuentaContableCajaId: z.number().int().positive().optional(),
-  partidaPresupuestoId: z.number().int().positive().optional()
-});
+export const createGastoCajaPayloadSchema = z
+  .object({
+    origen: origenGastoCajaSchema.default("CAJA"),
+    cajaId: z.number().int().positive().optional(),
+    cuentaBancariaCajaId: z.number().int().positive().optional(),
+    fecha: z.string().min(1, "La fecha es obligatoria."),
+    tipoDocumento: tipoDocumentoGastoSchema,
+    categoriaRetencion: categoriaRetencionGastoSchema.optional(),
+    categoriaRendicion: categoriaRendicionGastoSchema,
+    proveedorNombre: z.string().trim().min(1, "El proveedor es obligatorio."),
+    proveedorNitCi: z.string().trim().optional(),
+    glosa: z.string().trim().min(1, "La glosa es obligatoria."),
+    numeroRespaldo: z.string().trim().optional(),
+    montoTotal: z.number().positive("El monto debe ser mayor a cero."),
+    moneda: monedaCajaSchema,
+    centroCostoCajaId: z.number().int().positive("Debes elegir un centro de costo."),
+    funcionGastoCajaId: z.number().int().positive("Debes elegir una función de gasto."),
+    cuentaContableCajaId: z.number().int().positive().optional(),
+    partidaPresupuestoId: z.number().int().positive().optional()
+  })
+  .refine((data) => data.origen !== "CAJA" || Boolean(data.cajaId), {
+    message: "Debes elegir una caja.",
+    path: ["cajaId"]
+  })
+  .refine((data) => data.origen !== "BANCO" || Boolean(data.cuentaBancariaCajaId), {
+    message: "Debes elegir la cuenta bancaria.",
+    path: ["cuentaBancariaCajaId"]
+  });
 
 export const anularGastoCajaPayloadSchema = z.object({
   motivo: z.string().trim().min(1, "Debes indicar el motivo de la anulación.")
@@ -137,6 +157,7 @@ export type CategoriaRetencionGasto = z.infer<typeof categoriaRetencionGastoSche
 export type CategoriaRendicionGasto = z.infer<typeof categoriaRendicionGastoSchema>;
 export type MonedaCaja = z.infer<typeof monedaCajaSchema>;
 export type EstadoGastoCaja = z.infer<typeof estadoGastoCajaSchema>;
+export type OrigenGastoCaja = z.infer<typeof origenGastoCajaSchema>;
 export type TipoMovimientoFondoCaja = z.infer<typeof tipoMovimientoFondoCajaSchema>;
 export type GastoCaja = z.infer<typeof gastoCajaSchema>;
 export type CreateGastoCajaPayload = z.infer<typeof createGastoCajaPayloadSchema>;

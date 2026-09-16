@@ -14,7 +14,7 @@ const gastoReporteSchema = z.object({
   montoRetencionRcIva: z.union([z.string(), z.number()]),
   montoRetencionIueCompras: z.union([z.string(), z.number()]),
   montoRetencionIt: z.union([z.string(), z.number()]),
-  caja: cajaRef.optional()
+  caja: cajaRef.nullable().optional()
 });
 
 export const reporteRetencionesSchema = z.object({

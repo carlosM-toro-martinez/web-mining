@@ -3,6 +3,7 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   anularRendicionCajaPayloadSchema,
   createRendicionCajaPayloadSchema,
+  previewRendicionCajaResponseSchema,
   rendicionCajaListResponseSchema,
   rendicionCajaResponseSchema,
   type AnularRendicionCajaPayload,
@@ -12,6 +13,20 @@ import {
 export interface RendicionesCajaQueryParams {
   cajaId?: number;
   estado?: string;
+}
+
+export interface PreviewRendicionCajaParams {
+  cajaId: number;
+  periodoDesde: string;
+  periodoHasta: string;
+}
+
+export async function getPreviewRendicionCaja(params: PreviewRendicionCajaParams) {
+  return getRequest({
+    url: apiEndpoints.rendicionCaja.preview,
+    config: { params },
+    schema: previewRendicionCajaResponseSchema
+  });
 }
 
 export async function getRendicionesCaja(params: RendicionesCajaQueryParams = {}) {

@@ -12,6 +12,7 @@ import {
   useAnularRendicionCajaMutation,
   useCerrarRendicionCajaMutation,
   useCreateRendicionCajaMutation,
+  usePreviewRendicionCajaQuery,
   useRendicionCajaDetailQuery,
   useRendicionesCajaQuery
 } from "@/features/rendicionCaja/hooks/useRendicionCaja";
@@ -33,7 +34,7 @@ import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
-  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30";
 
 const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
@@ -92,6 +93,13 @@ export function RendicionesCajaPage() {
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
   const [tipoCambio, setTipoCambio] = useState("12.43");
+
+  const previewQuery = usePreviewRendicionCajaQuery({
+    cajaId: cajaId ? Number(cajaId) : undefined,
+    periodoDesde: periodoDesde || undefined,
+    periodoHasta: periodoHasta || undefined
+  });
+  const preview = previewQuery.data?.data;
 
   // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona
   // sola en cuanto carga la lista, en ambos formularios de esta página.
@@ -271,6 +279,59 @@ export function RendicionesCajaPage() {
           </button>
         </form>
       </article>
+
+      {periodoDesde && periodoHasta && cajaId ? (
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+          <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+            <Search size={16} className="text-[var(--color-primary)]" />
+            Vista previa del período
+          </h2>
+          <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+            Esto es lo que incluiría la rendición si la creas ahora — todavía no se guarda nada ni
+            se gasta un folio. Cambia las fechas de arriba para ver otro rango.
+          </p>
+          {previewQuery.isLoading ? (
+            <p className="text-sm text-[var(--color-on-surface-variant)]">Calculando...</p>
+          ) : preview ? (
+            <>
+              <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-4">
+                <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">Gastos incluidos</span>{preview.gastos.length}</p>
+                <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">Fondos recibidos</span>{formatMoneda(preview.totalFondos)}</p>
+                <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">Total gastos</span>{formatMoneda(preview.totalGastos)}</p>
+                <p className="font-bold">
+                  <span className="block text-[11px] font-normal text-[var(--color-on-surface-variant)]">Saldo nuevo</span>
+                  {formatMoneda(preview.saldoNuevo)}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                      <th className="py-1 pr-3">Fecha</th>
+                      <th className="py-1 pr-3">Proveedor</th>
+                      <th className="py-1 pr-3">Glosa</th>
+                      <th className="py-1 text-right">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-soft)]">
+                    {preview.gastos.map((g) => (
+                      <tr key={g.id}>
+                        <td className="py-1 pr-3">{formatFecha(g.fecha)}</td>
+                        <td className="py-1 pr-3">{g.proveedorNombre}</td>
+                        <td className="py-1 pr-3">{g.glosa}</td>
+                        <td className="py-1 text-right font-semibold">{g.moneda} {formatMoneda(g.montoTotal)}</td>
+                      </tr>
+                    ))}
+                    {preview.gastos.length === 0 ? (
+                      <tr><td colSpan={4} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin gastos registrados en este rango todavía.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </article>
+      ) : null}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

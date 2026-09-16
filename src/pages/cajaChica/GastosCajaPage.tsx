@@ -12,12 +12,14 @@ import {
   type CategoriaRetencionGasto,
   type EstadoGastoCaja,
   type MonedaCaja,
+  type OrigenGastoCaja,
   type TipoDocumentoGasto
 } from "@/features/gastoCaja/model/gastoCaja.schema";
 import {
   useCajasChicasQuery,
   useCentrosCostoCajaQuery,
   useConceptosRetencionCajaQuery,
+  useCuentasBancariasCajaQuery,
   useCuentasContablesCajaQuery,
   useFuncionesGastoCajaQuery,
   usePartidasPresupuestoCajaQuery
@@ -33,7 +35,7 @@ function today() {
 }
 
 const inputClassName =
-  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30";
 
 const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
@@ -66,6 +68,7 @@ export function GastosCajaPage() {
   const { showError, showSuccess } = useToast();
 
   const cajasQuery = useCajasChicasQuery();
+  const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
   const centrosQuery = useCentrosCostoCajaQuery();
   const funcionesQuery = useFuncionesGastoCajaQuery();
   const cuentasQuery = useCuentasContablesCajaQuery();
@@ -80,6 +83,7 @@ export function GastosCajaPage() {
   const anularGastoMutation = useAnularGastoCajaMutation();
 
   const cajas = cajasQuery.data?.data ?? [];
+  const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
   const centros = centrosQuery.data?.data.filter((c) => c.parentId !== null) ?? [];
   const funciones = funcionesQuery.data?.data.filter((f) => f.parentId !== null) ?? [];
   const cuentas = cuentasQuery.data?.data ?? [];
@@ -108,7 +112,9 @@ export function GastosCajaPage() {
   const tasaIueCompras = useMemo(() => Number(retenciones.find((r) => r.codigo === "IUE_COMPRAS")?.porcentaje ?? 0) / 100, [retenciones]);
   const tasaIt = useMemo(() => Number(retenciones.find((r) => r.codigo === "IT")?.porcentaje ?? 0) / 100, [retenciones]);
 
+  const [origen, setOrigen] = useState<OrigenGastoCaja>("CAJA");
   const [cajaId, setCajaId] = useState("");
+  const [cuentaBancariaCajaId, setCuentaBancariaCajaId] = useState("");
   const [fecha, setFecha] = useState(today);
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumentoGasto>("FACTURA");
   const [categoriaRetencion, setCategoriaRetencion] = useState<CategoriaRetencionGasto>("SERVICIO");
@@ -123,6 +129,7 @@ export function GastosCajaPage() {
   const [cuentaContableCajaId, setCuentaContableCajaId] = useState("");
   const [partidaPresupuestoId, setPartidaPresupuestoId] = useState("");
   const [categoriaRendicion, setCategoriaRendicion] = useState<CategoriaRendicionGasto>("MATERIALES_SUMINISTROS");
+  const cuentaBancariaSeleccionada = cuentasBancarias.find((c) => String(c.id) === cuentaBancariaCajaId);
 
   // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona
   // sola en cuanto carga la lista.
@@ -165,8 +172,18 @@ export function GastosCajaPage() {
       showError("Selecciona un centro de costo y una función de gasto de la lista.");
       return;
     }
+    if (origen === "CAJA" && !cajaId) {
+      showError("Elige una caja.");
+      return;
+    }
+    if (origen === "BANCO" && !cuentaBancariaCajaId) {
+      showError("Elige la cuenta bancaria de donde sale el pago.");
+      return;
+    }
     const payload = {
-      cajaId: Number(cajaId),
+      origen,
+      cajaId: origen === "CAJA" ? Number(cajaId) : undefined,
+      cuentaBancariaCajaId: origen === "BANCO" ? Number(cuentaBancariaCajaId) : undefined,
       fecha,
       tipoDocumento,
       categoriaRetencion: tipoDocumento === "CONTRATO_RETENCION" ? categoriaRetencion : undefined,
@@ -176,7 +193,7 @@ export function GastosCajaPage() {
       glosa,
       numeroRespaldo: numeroRespaldo.trim() || undefined,
       montoTotal: Number(montoTotal),
-      moneda,
+      moneda: origen === "BANCO" && cuentaBancariaSeleccionada ? cuentaBancariaSeleccionada.monedaBase : moneda,
       centroCostoCajaId: Number(centroCostoCajaId),
       funcionGastoCajaId: Number(funcionGastoCajaId),
       cuentaContableCajaId: cuentaContableCajaId ? Number(cuentaContableCajaId) : undefined,
@@ -228,7 +245,9 @@ export function GastosCajaPage() {
             <h1 className="font-headline text-3xl font-extrabold">Registro de Gastos</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
               Carga cada gasto con su respaldo. El motor tributario calcula el crédito fiscal o las
-              retenciones automáticamente, según las tasas configuradas en Parámetros. ¿Buscas registrar
+              retenciones automáticamente, según las tasas configuradas en Parámetros. Elige si el gasto
+              sale de una caja o directo del banco (ej. una transferencia sin pasar por caja chica); en
+              ambos casos no se deja registrar un gasto por más de lo que hay disponible. ¿Buscas registrar
               un fondo recibido o una salida de banco hacia la caja? Eso está en "Saldos y Movimientos".
             </p>
           </div>
@@ -242,12 +261,25 @@ export function GastosCajaPage() {
         </h2>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
           <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleCreateGasto}>
-            <select required value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={inputClassName}>
-              <option value="">Caja...</option>
-              {cajas.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
+            <select value={origen} onChange={(e) => setOrigen(e.target.value as OrigenGastoCaja)} className={inputClassName}>
+              <option value="CAJA">Sale de una caja</option>
+              <option value="BANCO">Sale directo del banco (sin pasar por caja)</option>
             </select>
+            {origen === "CAJA" ? (
+              <select required value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={inputClassName}>
+                <option value="">Caja...</option>
+                {cajas.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+            ) : (
+              <select required value={cuentaBancariaCajaId} onChange={(e) => setCuentaBancariaCajaId(e.target.value)} className={inputClassName}>
+                <option value="">Cuenta bancaria...</option>
+                {cuentasBancarias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta} ({c.monedaBase} {formatMoneda(c.saldoActual ?? 0)} disponible)</option>
+                ))}
+              </select>
+            )}
             <input required type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputClassName} title="Fecha del gasto (hoy por defecto, editable)" />
 
             <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value as TipoDocumentoGasto)} className={inputClassName}>
@@ -270,10 +302,16 @@ export function GastosCajaPage() {
 
             <div className="flex gap-2">
               <input required type="number" min="0.01" step="0.01" value={montoTotal} onChange={(e) => setMontoTotal(e.target.value)} className={inputClassName} placeholder="Monto" />
-              <select value={moneda} onChange={(e) => setMoneda(e.target.value as MonedaCaja)} className={`${inputClassName} w-24`}>
-                <option value="BOB">BOB</option>
-                <option value="USD">USD</option>
-              </select>
+              {origen === "BANCO" && cuentaBancariaSeleccionada ? (
+                <span className={`${inputClassName} flex w-24 items-center justify-center font-semibold text-[var(--color-on-surface-variant)]`}>
+                  {cuentaBancariaSeleccionada.monedaBase}
+                </span>
+              ) : (
+                <select value={moneda} onChange={(e) => setMoneda(e.target.value as MonedaCaja)} className={`${inputClassName} w-24`}>
+                  <option value="BOB">BOB</option>
+                  <option value="USD">USD</option>
+                </select>
+              )}
             </div>
 
             <AutocompleteSelect
@@ -282,6 +320,7 @@ export function GastosCajaPage() {
               options={centroOptions}
               placeholder="Buscar centro de costo..."
               className={inputClassName}
+              required
             />
             <AutocompleteSelect
               value={funcionGastoCajaId}
@@ -289,6 +328,7 @@ export function GastosCajaPage() {
               options={funcionOptions}
               placeholder="Buscar función de gasto..."
               className={inputClassName}
+              required
             />
 
             <div>
@@ -408,21 +448,26 @@ export function GastosCajaPage() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                {["Fecha", "Proveedor", "Glosa", "Monto", "Estado", "Acciones"].map((title) => (
+                {["Fecha", "Origen", "Proveedor", "Glosa", "Monto", "Estado", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{title}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {gastosQuery.isLoading ? (
-                <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando gastos...</td></tr>
+                <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando gastos...</td></tr>
               ) : null}
               {!gastosQuery.isLoading && gastos.length === 0 ? (
-                <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron gastos.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron gastos.</td></tr>
               ) : null}
               {gastos.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                   <td className="px-3 py-2 text-xs">{formatFecha(item.fecha)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {item.origen === "BANCO"
+                      ? `Banco: ${item.cuentaBancariaCaja?.banco ?? "-"}`
+                      : (item.caja?.nombre ?? "-")}
+                  </td>
                   <td className="px-3 py-2 text-xs font-semibold">{item.proveedorNombre}</td>
                   <td className="px-3 py-2 text-xs">{item.glosa}</td>
                   <td className="px-3 py-2 text-xs">{item.moneda} {formatMoneda(item.montoTotal)}</td>

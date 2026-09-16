@@ -15,6 +15,8 @@ import {
 
 export interface GastosCajaQueryParams {
   cajaId?: number;
+  cuentaBancariaCajaId?: number;
+  origen?: string;
   estado?: string;
   page?: number;
   limit?: number;

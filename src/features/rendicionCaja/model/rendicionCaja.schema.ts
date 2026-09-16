@@ -55,10 +55,25 @@ export const anularRendicionCajaPayloadSchema = z.object({
   motivo: z.string().trim().min(1, "Debes indicar el motivo de la anulación.")
 });
 
+// Vista previa de lo que incluiría una rendición para un rango de fechas,
+// sin haberla creado todavía (sin folio, sin id).
+export const previewRendicionCajaSchema = z.object({
+  caja: cajaRef,
+  gastos: z.array(gastoRef.extend({ fecha: z.string() })),
+  totalFondos: z.number(),
+  totalGastos: z.number(),
+  totalRetenciones: z.number(),
+  totalCreditoFiscal: z.number(),
+  saldoAnterior: z.number(),
+  saldoNuevo: z.number()
+});
+
 export const rendicionCajaListResponseSchema = z.object({ success: z.boolean(), data: z.array(rendicionCajaSchema) });
 export const rendicionCajaResponseSchema = z.object({ success: z.boolean(), data: rendicionCajaSchema });
+export const previewRendicionCajaResponseSchema = z.object({ success: z.boolean(), data: previewRendicionCajaSchema });
 
 export type EstadoRendicionCaja = z.infer<typeof estadoRendicionCajaSchema>;
 export type RendicionCaja = z.infer<typeof rendicionCajaSchema>;
 export type CreateRendicionCajaPayload = z.infer<typeof createRendicionCajaPayloadSchema>;
 export type AnularRendicionCajaPayload = z.infer<typeof anularRendicionCajaPayloadSchema>;
+export type PreviewRendicionCaja = z.infer<typeof previewRendicionCajaSchema>;
