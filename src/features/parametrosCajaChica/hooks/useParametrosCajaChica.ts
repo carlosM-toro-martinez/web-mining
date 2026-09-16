@@ -20,6 +20,7 @@ import {
   getFuncionesGastoCaja,
   getCuentasBancariasCaja,
   getPartidasPresupuestoCaja,
+  resetTransaccionalCajaChica,
   type PartidasPresupuestoQueryParams,
   updateCajaChica,
   updateCentroCostoCaja,
@@ -75,6 +76,25 @@ export function useDeleteCajaChicaMutation() {
     mutationFn: (id: number) => deleteCajaChica(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cajas() });
+    }
+  });
+}
+
+// Borra TODO lo transaccional (gastos, rendiciones, movimientos, partidas)
+// de todas las cajas — no toca cajas/cuentas bancarias/catálogos. Por eso
+// invalida prácticamente todo lo que depende de esos datos.
+export function useResetTransaccionalCajaChicaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => resetTransaccionalCajaChica(),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rendicionCaja.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.movimientoBancoCaja.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.reportesCajaChica.all })
+      ]);
     }
   });
 }

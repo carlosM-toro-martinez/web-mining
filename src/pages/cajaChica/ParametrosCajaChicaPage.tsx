@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Banknote, Check, FolderTree, Landmark, ListTree, Pencil, Percent, PiggyBank, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, Banknote, Check, FolderTree, Landmark, ListTree, Pencil, Percent, PiggyBank, RotateCcw, Search, Trash2, X } from "lucide-react";
 import {
   useCajasChicasQuery,
   useCentrosCostoCajaQuery,
@@ -18,6 +18,7 @@ import {
   useDeleteFuncionGastoCajaMutation,
   useDeleteCuentaBancariaCajaMutation,
   useFuncionesGastoCajaQuery,
+  useResetTransaccionalCajaChicaMutation,
   useUpdateCajaChicaMutation,
   useUpdateCentroCostoCajaMutation,
   useUpdateConceptoRetencionCajaMutation,
@@ -36,9 +37,12 @@ import type {
   TipoCosteoCaja,
   TipoRetencionCaja
 } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+
+const CONFIRMACION_REINICIO = "REINICIAR TODO";
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30";
@@ -62,6 +66,7 @@ function includesText(value: string | undefined, search: string) {
 
 export function ParametrosCajaChicaPage() {
   const { showError, showSuccess } = useToast();
+  const { isAdmin } = useAuth();
 
   // --- Queries ---
   const cajasQuery = useCajasChicasQuery();
@@ -99,6 +104,10 @@ export function ParametrosCajaChicaPage() {
 
   const createCuentaBancariaMutation = useCreateCuentaBancariaCajaMutation();
   const deleteCuentaBancariaMutation = useDeleteCuentaBancariaCajaMutation();
+  const resetTransaccionalMutation = useResetTransaccionalCajaChicaMutation();
+
+  // --- Reinicio total (solo ADMIN) ---
+  const [confirmacionReinicio, setConfirmacionReinicio] = useState("");
 
   // --- Caja chica form ---
   const [cajaCodigo, setCajaCodigo] = useState("");
@@ -328,6 +337,16 @@ export function ParametrosCajaChicaPage() {
     deleteCuentaBancariaMutation.mutate(id, {
       onSuccess: () => showSuccess("Cuenta bancaria eliminada."),
       onError: (error) => showError(normalizeError(error, "No se pudo eliminar: puede tener movimientos registrados."))
+    });
+  }
+
+  function handleResetTransaccional() {
+    resetTransaccionalMutation.mutate(undefined, {
+      onSuccess: () => {
+        showSuccess("Se reiniciaron todos los registros. Las cajas, cuentas bancarias y catálogos se conservaron.");
+        setConfirmacionReinicio("");
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo reiniciar los registros."))
     });
   }
 
@@ -647,6 +666,38 @@ export function ParametrosCajaChicaPage() {
           </div>
         </div>
       </article>
+
+      {isAdmin ? (
+        <article className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error)]/6 p-5">
+          <h3 className="mb-1 flex items-center gap-2 text-lg font-bold text-[var(--color-error)]">
+            <AlertTriangle size={16} />
+            Reiniciar todos los registros
+          </h3>
+          <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+            Borra permanentemente todos los gastos, movimientos de fondo y de banco, partidas de
+            presupuesto y rendiciones — de <strong>todas</strong> las cajas. Las cajas, cuentas
+            bancarias y catálogos (centros de costo, funciones de gasto, cuentas contables, tasas de
+            retención) no se tocan. Solo visible para el rol ADMIN, y no se puede deshacer.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={confirmacionReinicio}
+              onChange={(e) => setConfirmacionReinicio(e.target.value)}
+              className={`${inputClassName} w-auto flex-1`}
+              placeholder={`Escribe "${CONFIRMACION_REINICIO}" para confirmar`}
+            />
+            <button
+              type="button"
+              disabled={confirmacionReinicio !== CONFIRMACION_REINICIO || resetTransaccionalMutation.isPending}
+              onClick={handleResetTransaccional}
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              <RotateCcw size={14} />
+              {resetTransaccionalMutation.isPending ? "Reiniciando..." : "Reiniciar todo"}
+            </button>
+          </div>
+        </article>
+      ) : null}
     </section>
   );
 }

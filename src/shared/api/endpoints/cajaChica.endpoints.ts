@@ -1,6 +1,7 @@
 export const cajaChicaEndpoints = {
   cajas: "/api/cajas-chicas",
   cajaById: (id: number | string) => `/api/cajas-chicas/${id}`,
+  resetTransaccional: "/api/cajas-chicas/reset-transaccional",
   centrosCosto: "/api/centros-costo-caja",
   centroCostoById: (id: number | string) => `/api/centros-costo-caja/${id}`,
   funcionesGasto: "/api/funciones-gasto-caja",

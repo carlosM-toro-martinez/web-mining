@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { deleteRequest, getRequest, postRequest, putRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
@@ -60,6 +61,29 @@ export async function updateCajaChica(id: number, payload: UpdateCajaChicaPayloa
 }
 export async function deleteCajaChica(id: number) {
   return deleteRequest({ url: apiEndpoints.cajaChica.cajaById(id), schema: cajaChicaDeleteResponseSchema });
+}
+
+const resetTransaccionalResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    anulacionesRendicion: z.number(),
+    detalleGastos: z.number(),
+    anulacionesGasto: z.number(),
+    rendiciones: z.number(),
+    gastos: z.number(),
+    movimientosBanco: z.number(),
+    movimientosFondo: z.number(),
+    partidas: z.number(),
+    correlativos: z.number()
+  })
+});
+
+export async function resetTransaccionalCajaChica() {
+  return postRequest({
+    url: apiEndpoints.cajaChica.resetTransaccional,
+    body: {},
+    schema: resetTransaccionalResponseSchema
+  });
 }
 
 // --- Centros de costo ---

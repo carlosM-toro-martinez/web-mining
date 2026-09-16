@@ -8,7 +8,10 @@ import {
   usePartidasPresupuestoCajaQuery
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
-import { exportPlanillaControlPagosExcel, exportPlanillaControlPagosPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
+import {
+  exportPlanillaControlPagosExcel,
+  exportPlanillaControlPagosPdf
+} from "@/features/reportesCajaChica/lib/cajaChicaExport";
 import { useCreateMovimientoBancoCajaMutation } from "@/features/movimientoBancoCaja/hooks/useMovimientoBancoCaja";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -25,8 +28,18 @@ const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
 
 const MESES_NOMBRE = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre"
 ];
 
 function formatMoneda(value: number) {
@@ -96,8 +109,10 @@ export function PresupuestoCajaPage() {
         descripcion: `Presupuesto aprobado y asignado — ${periodoLabel}`
       },
       {
-        onSuccess: () => showSuccess(`Presupuesto de ${periodoLabel} asignado a ${bancoDestino.banco}.`),
-        onError: (error) => showError(normalizeError(error, "No se pudo asignar el presupuesto al banco."))
+        onSuccess: () =>
+          showSuccess(`Presupuesto de ${periodoLabel} asignado a ${bancoDestino.banco}.`),
+        onError: (error) =>
+          showError(normalizeError(error, "No se pudo asignar el presupuesto al banco."))
       }
     );
   }
@@ -122,7 +137,8 @@ export function PresupuestoCajaPage() {
           setDescripcion("");
           setMontoPresupuestado("");
         },
-        onError: (error) => showError(normalizeError(error, "No se pudo crear la partida de presupuesto."))
+        onError: (error) =>
+          showError(normalizeError(error, "No se pudo crear la partida de presupuesto."))
       }
     );
   }
@@ -147,10 +163,10 @@ export function PresupuestoCajaPage() {
           <div>
             <h1 className="page-title font-headline text-3xl font-extrabold">Presupuesto</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
-              Para qué se pidió el dinero de cada mes ("partidas") y cuánto queda a favor de cada una.
-              Ejemplo: presupuestas 5000 para "Combustible", si se gastaron 4800, el saldo a favor es 200.
-              Al registrar un gasto en "Gastos", puedes vincularlo a una de estas partidas para que su
-              ejecución se actualice sola.
+              Para qué se pidió el dinero de cada mes ("partidas") y cuánto queda a favor de cada
+              una. Ejemplo: presupuestas 5000 para "Combustible", si se gastaron 4800, el saldo a
+              favor es 200. Al registrar un gasto en "Gastos", puedes vincularlo a una de estas
+              partidas para que su ejecución se actualice sola.
             </p>
           </div>
         </div>
@@ -158,21 +174,42 @@ export function PresupuestoCajaPage() {
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h3 className="mb-4 text-lg font-bold">Nueva partida de presupuesto</h3>
-        <form className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={handleCreatePartida}>
-          <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={inputClassName}>
+        <form
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5"
+          onSubmit={handleCreatePartida}
+        >
+          <select
+            value={cajaId}
+            onChange={(e) => setCajaId(e.target.value)}
+            className={inputClassName}
+          >
             <option value="">Elige una caja</option>
             {cajas.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
             ))}
           </select>
-          <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} className={inputClassName}>
+          <select
+            value={anio}
+            onChange={(e) => setAnio(Number(e.target.value))}
+            className={inputClassName}
+          >
             {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {y}
+              </option>
             ))}
           </select>
-          <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className={inputClassName}>
+          <select
+            value={mes}
+            onChange={(e) => setMes(Number(e.target.value))}
+            className={inputClassName}
+          >
             {MESES_NOMBRE.map((nombre, index) => (
-              <option key={nombre} value={index + 1}>{nombre}</option>
+              <option key={nombre} value={index + 1}>
+                {nombre}
+              </option>
             ))}
           </select>
           <input
@@ -204,15 +241,21 @@ export function PresupuestoCajaPage() {
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-lg font-bold">
-            Partidas de {periodoLabel}
-          </h2>
+          <h2 className="flex items-center gap-2 text-lg font-bold">Partidas de {periodoLabel}</h2>
           {partidas.length > 0 ? (
             <div className="flex gap-2">
-              <button type="button" onClick={() => exportPlanillaControlPagosExcel(partidas, periodoLabel)} className={buttonSecondaryClassName}>
+              <button
+                type="button"
+                onClick={() => exportPlanillaControlPagosExcel(partidas, periodoLabel)}
+                className={buttonSecondaryClassName}
+              >
                 <FileSpreadsheet size={13} /> Exportar Excel
               </button>
-              <button type="button" onClick={() => exportPlanillaControlPagosPdf(partidas, periodoLabel)} className={buttonSecondaryClassName}>
+              <button
+                type="button"
+                onClick={() => exportPlanillaControlPagosPdf(partidas, periodoLabel)}
+                className={buttonSecondaryClassName}
+              >
                 <FileText size={13} /> Exportar PDF
               </button>
             </div>
@@ -220,14 +263,18 @@ export function PresupuestoCajaPage() {
         </div>
         <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
           Presupuestado vs. gastado por partida, para la caja y el mes elegidos arriba. La
-          "Reposición" es lo que sobró (presupuestado − gastado), tal cual tu planilla real.
+          "Reposición" es lo que sobró (presupuestado − gastado)
         </p>
 
         {partidas.length > 0 ? (
           <div className="mb-4 space-y-3 rounded-lg border border-[var(--color-on-surface)]/20 bg-[var(--color-surface-container-high)] p-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-extrabold uppercase tracking-wide">Total Presupuesto</span>
-              <span className="font-mono text-lg font-extrabold">{formatMoneda(totalPresupuestado)}</span>
+              <span className="text-sm font-extrabold uppercase tracking-wide">
+                Total Presupuesto
+              </span>
+              <span className="font-mono text-lg font-extrabold">
+                {formatMoneda(totalPresupuestado)}
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-border-soft)] pt-3">
               <Landmark size={14} className="shrink-0 text-[var(--color-primary)]" />
@@ -241,7 +288,9 @@ export function PresupuestoCajaPage() {
               >
                 <option value="">Cuenta bancaria destino...</option>
                 {cuentasBancarias.map((c) => (
-                  <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.banco} · {c.nombreCuenta}
+                  </option>
                 ))}
               </select>
               <button
@@ -261,23 +310,45 @@ export function PresupuestoCajaPage() {
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 <th className="border border-[var(--color-border-soft)] px-2 py-1.5">N°</th>
-                <th className="border border-[var(--color-border-soft)] px-2 py-1.5">Descripción</th>
-                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">Total Presupuestado</th>
-                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">Total Gastado</th>
-                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">Total Reposición</th>
-                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">% Ejecución</th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5">
+                  Descripción
+                </th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                  Total Presupuestado
+                </th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                  Total Gastado
+                </th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                  Total Reposición
+                </th>
+                <th className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                  % Ejecución
+                </th>
                 <th className="border border-[var(--color-border-soft)] px-2 py-1.5"></th>
               </tr>
             </thead>
             <tbody>
               {partidas.map((p, index) => (
                 <tr key={p.id} className="group">
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-[var(--color-on-surface-variant)]">{index + 1}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5">{p.descripcion}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(Number(p.montoPresupuestado))}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(p.totalGastado ?? 0)}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right font-semibold">{formatMoneda(p.saldoAFavor ?? 0)}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{(p.porcentajeEjecucion ?? 0).toFixed(1)}%</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-[var(--color-on-surface-variant)]">
+                    {index + 1}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5">
+                    {p.descripcion}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                    {formatMoneda(Number(p.montoPresupuestado))}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                    {formatMoneda(p.totalGastado ?? 0)}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right font-semibold">
+                    {formatMoneda(p.saldoAFavor ?? 0)}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                    {(p.porcentajeEjecucion ?? 0).toFixed(1)}%
+                  </td>
                   <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
                     <button
                       type="button"
@@ -290,16 +361,31 @@ export function PresupuestoCajaPage() {
                 </tr>
               ))}
               {partidas.length === 0 ? (
-                <tr><td colSpan={7} className="border border-[var(--color-border-soft)] py-3 text-center text-[var(--color-on-surface-variant)]">Sin partidas de presupuesto para este mes.</td></tr>
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="border border-[var(--color-border-soft)] py-3 text-center text-[var(--color-on-surface-variant)]"
+                  >
+                    Sin partidas de presupuesto para este mes.
+                  </td>
+                </tr>
               ) : null}
             </tbody>
             {partidas.length > 0 ? (
               <tfoot>
                 <tr className="font-bold">
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5" colSpan={2}>Total</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(totalPresupuestado)}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(totalGastado)}</td>
-                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">{formatMoneda(totalSaldoAFavor)}</td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5" colSpan={2}>
+                    Total
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                    {formatMoneda(totalPresupuestado)}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                    {formatMoneda(totalGastado)}
+                  </td>
+                  <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right">
+                    {formatMoneda(totalSaldoAFavor)}
+                  </td>
                   <td className="border border-[var(--color-border-soft)] px-2 py-1.5 text-right"></td>
                   <td className="border border-[var(--color-border-soft)] px-2 py-1.5"></td>
                 </tr>
