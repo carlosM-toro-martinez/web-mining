@@ -34,8 +34,10 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// text-base (16px) en móvil evita el zoom automático de iOS al enfocar un
+// input con font-size menor a 16px; en sm+ se reduce a como estaba antes.
 const inputClassName =
-  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30";
+  "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-3 text-base text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30 sm:py-2.5 sm:text-sm";
 
 const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
@@ -134,7 +136,9 @@ export function GastosCajaPage() {
   const [cuentaContableCajaId, setCuentaContableCajaId] = useState("");
   const [partidaPresupuestoId, setPartidaPresupuestoId] = useState("");
   const [categoriaRendicion, setCategoriaRendicion] = useState<CategoriaRendicionGasto>("MATERIALES_SUMINISTROS");
+  const [mostrarMasOpciones, setMostrarMasOpciones] = useState(false);
   const cuentaBancariaSeleccionada = cuentasBancarias.find((c) => String(c.id) === cuentaBancariaCajaId);
+  const esReciboDirecto = tipoDocumento === "RECIBO_DIRECTO";
 
   // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona
   // sola en cuanto carga la lista.
@@ -287,7 +291,11 @@ export function GastosCajaPage() {
             )}
             <input required type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputClassName} title="Fecha del gasto (hoy por defecto, editable)" />
 
-            <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value as TipoDocumentoGasto)} className={inputClassName}>
+            <select
+              value={tipoDocumento}
+              onChange={(e) => setTipoDocumento(e.target.value as TipoDocumentoGasto)}
+              className={`${inputClassName} ${tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}`}
+            >
               <option value="FACTURA">Factura</option>
               <option value="CONTRATO_RETENCION">Contrato con retención</option>
               <option value="RECIBO_DIRECTO">Recibo directo (sin respaldo)</option>
@@ -297,15 +305,26 @@ export function GastosCajaPage() {
                 <option value="SERVICIO">Servicio (RC-IVA + IT)</option>
                 <option value="COMPRA">Compra / alimentación (IUE + IT)</option>
               </select>
-            ) : <div />}
+            ) : null}
 
-            <input required value={proveedorNombre} onChange={(e) => setProveedorNombre(e.target.value)} className={inputClassName} placeholder="Proveedor / beneficiario" />
-            <input value={proveedorNitCi} onChange={(e) => setProveedorNitCi(e.target.value)} className={inputClassName} placeholder="NIT / CI (opcional)" />
+            <input
+              required
+              value={proveedorNombre}
+              onChange={(e) => setProveedorNombre(e.target.value)}
+              className={`${inputClassName} ${esReciboDirecto ? "sm:col-span-2" : ""}`}
+              placeholder="Proveedor / beneficiario"
+            />
+            {esReciboDirecto ? null : (
+              <input value={proveedorNitCi} onChange={(e) => setProveedorNitCi(e.target.value)} className={inputClassName} placeholder="NIT / CI (opcional)" />
+            )}
 
             <input required value={glosa} onChange={(e) => setGlosa(e.target.value)} className={`${inputClassName} sm:col-span-2`} placeholder="Glosa (ej. 500 Lts Gasolina)" />
-            <input value={numeroRespaldo} onChange={(e) => setNumeroRespaldo(e.target.value)} className={inputClassName} placeholder="N° factura / recibo (opcional)" />
+            {/* Un recibo directo no tiene número de factura/recibo formal — no tiene sentido pedirlo. */}
+            {esReciboDirecto ? null : (
+              <input value={numeroRespaldo} onChange={(e) => setNumeroRespaldo(e.target.value)} className={inputClassName} placeholder="N° factura / recibo (opcional)" />
+            )}
 
-            <div className="flex gap-2">
+            <div className={`flex gap-2 ${esReciboDirecto ? "sm:col-span-2" : ""}`}>
               <input required type="number" min="0.01" step="0.01" value={montoTotal} onChange={(e) => setMontoTotal(e.target.value)} className={inputClassName} placeholder="Monto" />
               {origen === "BANCO" && cuentaBancariaSeleccionada ? (
                 <span className={`${inputClassName} flex w-24 items-center justify-center font-semibold text-[var(--color-on-surface-variant)]`}>
@@ -336,30 +355,42 @@ export function GastosCajaPage() {
               required
             />
 
-            <div>
-              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                Cuenta contable (opcional; si la dejas vacía, se resuelve sola)
-              </label>
-              <AutocompleteSelect
-                value={cuentaContableCajaId}
-                onChange={setCuentaContableCajaId}
-                options={cuentaOptions}
-                placeholder="Buscar cuenta contable..."
-                className={inputClassName}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                Partida de presupuesto (opcional; para saber el saldo a favor)
-              </label>
-              <AutocompleteSelect
-                value={partidaPresupuestoId}
-                onChange={setPartidaPresupuestoId}
-                options={partidaOptions}
-                placeholder="Buscar partida de presupuesto..."
-                className={inputClassName}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setMostrarMasOpciones((v) => !v)}
+              className="sm:col-span-2 text-left text-xs font-semibold text-[var(--color-primary)]"
+            >
+              {mostrarMasOpciones ? "− Ocultar opciones avanzadas" : "+ Más opciones (cuenta contable, partida de presupuesto)"}
+            </button>
+
+            {mostrarMasOpciones ? (
+              <>
+                <div>
+                  <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                    Cuenta contable (opcional; si la dejas vacía, se resuelve sola)
+                  </label>
+                  <AutocompleteSelect
+                    value={cuentaContableCajaId}
+                    onChange={setCuentaContableCajaId}
+                    options={cuentaOptions}
+                    placeholder="Buscar cuenta contable..."
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                    Partida de presupuesto (opcional; para saber el saldo a favor)
+                  </label>
+                  <AutocompleteSelect
+                    value={partidaPresupuestoId}
+                    onChange={setPartidaPresupuestoId}
+                    options={partidaOptions}
+                    placeholder="Buscar partida de presupuesto..."
+                    className={inputClassName}
+                  />
+                </div>
+              </>
+            ) : null}
 
             <div className="sm:col-span-2">
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
@@ -424,7 +455,7 @@ export function GastosCajaPage() {
           </div>
           <div className="space-y-2 text-xs">
             {pendientes.map((item) => (
-              <div key={item.localId} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] px-3 py-2">
+              <div key={item.localId} className="flex flex-col gap-1 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <div>
                   <p className="font-semibold">{item.payload.proveedorNombre} · {item.payload.glosa}</p>
                   <p className="text-[var(--color-on-surface-variant)]">
@@ -442,14 +473,48 @@ export function GastosCajaPage() {
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Gastos registrados</h2>
-          <select value={filtroCaja} onChange={(e) => setFiltroCaja(e.target.value)} className={`${inputClassName} w-56`}>
+          <select value={filtroCaja} onChange={(e) => setFiltroCaja(e.target.value)} className={`${inputClassName} w-full sm:w-56`}>
             <option value="">Todas las cajas</option>
             {cajas.map((c) => (
               <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
           </select>
         </div>
-        <div className="overflow-x-auto">
+
+        {gastosQuery.isLoading ? (
+          <p className="px-1 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando gastos...</p>
+        ) : null}
+        {!gastosQuery.isLoading && gastos.length === 0 ? (
+          <p className="px-1 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron gastos.</p>
+        ) : null}
+
+        {/* Lista en tarjetas: mucho más legible en teléfono que una tabla ancha con scroll horizontal. */}
+        <div className="space-y-2 sm:hidden">
+          {gastos.map((item) => (
+            <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] p-3 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold">{item.proveedorNombre}</p>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+              </div>
+              <p className="text-xs text-[var(--color-on-surface-variant)]">{item.glosa}</p>
+              <div className="mt-2 flex items-center justify-between text-xs text-[var(--color-on-surface-variant)]">
+                <span>{formatFecha(item.fecha)} · {item.origen === "BANCO" ? `Banco: ${item.cuentaBancariaCaja?.banco ?? "-"}` : (item.caja?.nombre ?? "-")}</span>
+                <span className="font-mono font-bold text-[var(--color-on-surface)]">{item.moneda} {formatMoneda(item.montoTotal)}</span>
+              </div>
+              {item.estado === "REGISTRADO" ? (
+                <button
+                  type="button"
+                  onClick={() => handleAnularGasto(item.id)}
+                  className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]"
+                >
+                  <Ban size={12} /> Anular
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
@@ -459,12 +524,6 @@ export function GastosCajaPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {gastosQuery.isLoading ? (
-                <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando gastos...</td></tr>
-              ) : null}
-              {!gastosQuery.isLoading && gastos.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron gastos.</td></tr>
-              ) : null}
               {gastos.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                   <td className="px-3 py-2 text-xs">{formatFecha(item.fecha)}</td>
