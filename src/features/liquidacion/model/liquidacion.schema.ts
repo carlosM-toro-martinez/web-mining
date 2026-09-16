@@ -4,8 +4,20 @@ export const tipoPeriodoLiquidacionSchema = z.enum(["SEMANAL", "MENSUAL"]);
 export const estadoLiquidacionSchema = z.enum(["BORRADOR", "CERRADO", "ANULADO"]);
 export const tipoConceptoLiquidacionSchema = z.enum(["ABONO", "DEDUCCION"]);
 
-const remitenteRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
-const loteRef = z.object({ id: z.string().min(1), correlativo: z.string().min(1) });
+export const tipoEntidadRemitenteSchema = z.enum(["EMPRESA", "TRABAJADOR_PARTICULAR"]);
+const remitenteRef = z.object({
+  id: z.number().int().positive(),
+  nombreORazonSocial: z.string().min(1),
+  tipoEntidad: tipoEntidadRemitenteSchema.optional(),
+  nitOCi: z.string().optional()
+});
+const loteRef = z.object({
+  id: z.string().min(1),
+  correlativo: z.string().min(1),
+  fechaDespachoReal: z.string().optional(),
+  vehiculo: z.object({ id: z.number().int().positive(), placa: z.string().min(1) }).optional(),
+  tipoMineral: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional()
+});
 const conceptoRef = z.object({
   id: z.number().int().positive(),
   nombre: z.string().min(1),

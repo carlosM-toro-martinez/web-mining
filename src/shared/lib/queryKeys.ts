@@ -180,9 +180,13 @@ export const queryKeys = {
   },
   lotesDespacho: {
     all: ["lotes-despacho"] as const,
-    list: (params: { estadoLote?: string; estadoFormulario101?: string; page?: number; limit?: number }) =>
+    list: (params: { estadoLote?: string; page?: number; limit?: number }) =>
       [...queryKeys.lotesDespacho.all, "list", params] as const,
     detail: (id: string) => [...queryKeys.lotesDespacho.all, "detail", id] as const
+  },
+  formulario101: {
+    all: ["formulario-101"] as const,
+    list: (params: { estado?: string; loteId?: string }) => [...queryKeys.formulario101.all, "list", params] as const
   },
   liquidaciones: {
     all: ["liquidaciones"] as const,

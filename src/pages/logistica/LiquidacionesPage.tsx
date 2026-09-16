@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Plus, ReceiptText, Search, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, FileSpreadsheet, FileText, Plus, ReceiptText, Search, Trash2 } from "lucide-react";
 import {
   useAgregarItemConceptoMutation,
   useAnularLiquidacionMutation,
@@ -10,6 +10,12 @@ import {
   useQuitarItemConceptoMutation
 } from "@/features/liquidacion/hooks/useLiquidacion";
 import type { EstadoLiquidacion, TipoPeriodoLiquidacion } from "@/features/liquidacion/model/liquidacion.schema";
+import {
+  exportLiquidacionEmpresaExcel,
+  exportLiquidacionEmpresaPdf,
+  exportLiquidacionParticularExcel,
+  exportLiquidacionParticularPdf
+} from "@/features/logisticaReportes/lib/logisticaExport";
 import { useConceptosLiquidacionQuery } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { useRemitentesQuery } from "@/features/remitente/hooks/useRemitentes";
 import { ApiError } from "@/shared/api/core/apiError";
@@ -282,9 +288,37 @@ export function LiquidacionesPage() {
                     {liquidacion.tipoPeriodo === "SEMANAL" ? "Semanal" : "Mensual"}
                   </p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${ESTADO_CLASS[liquidacion.estado]}`}>
-                  {ESTADO_LABEL[liquidacion.estado]}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${ESTADO_CLASS[liquidacion.estado]}`}>
+                    {ESTADO_LABEL[liquidacion.estado]}
+                  </span>
+                  {liquidacion.estado === "CERRADO" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          liquidacion.remitente?.tipoEntidad === "TRABAJADOR_PARTICULAR"
+                            ? exportLiquidacionParticularExcel(liquidacion)
+                            : exportLiquidacionEmpresaExcel(liquidacion)
+                        }
+                        className={buttonSecondaryClassName}
+                      >
+                        <FileSpreadsheet size={13} /> Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          liquidacion.remitente?.tipoEntidad === "TRABAJADOR_PARTICULAR"
+                            ? exportLiquidacionParticularPdf(liquidacion)
+                            : exportLiquidacionEmpresaPdf(liquidacion)
+                        }
+                        className={buttonSecondaryClassName}
+                      >
+                        <FileText size={13} /> PDF
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </div>
 
               {liquidacion.anulacion ? (

@@ -7,17 +7,16 @@ import {
   loteDespachoListResponseSchema,
   loteDespachoResponseSchema,
   registrarPesajePayloadSchema,
-  regularizarF101PayloadSchema,
+  transbordarLotePayloadSchema,
   type AnularLotePayload,
   type AvanzarEstadoLotePayload,
   type CreateLoteDespachoPayload,
   type RegistrarPesajePayload,
-  type RegularizarF101Payload
+  type TransbordarLotePayload
 } from "@/features/loteDespacho/model/loteDespacho.schema";
 
 export interface LotesDespachoQueryParams {
   estadoLote?: string;
-  estadoFormulario101?: string;
   page?: number;
   limit?: number;
 }
@@ -39,15 +38,6 @@ export async function createLoteDespacho(payload: CreateLoteDespachoPayload) {
   return postRequest({ url: apiEndpoints.lotesDespacho.base, body, schema: loteDespachoResponseSchema });
 }
 
-export async function regularizarF101(id: string, payload: RegularizarF101Payload) {
-  const body = regularizarF101PayloadSchema.parse(payload);
-  return patchRequest({
-    url: apiEndpoints.lotesDespacho.regularizarF101(id),
-    body,
-    schema: loteDespachoResponseSchema
-  });
-}
-
 export async function avanzarEstadoLote(id: string, payload: AvanzarEstadoLotePayload) {
   const body = avanzarEstadoLotePayloadSchema.parse(payload);
   return patchRequest({ url: apiEndpoints.lotesDespacho.estado(id), body, schema: loteDespachoResponseSchema });
@@ -61,4 +51,9 @@ export async function registrarPesajeLote(id: string, payload: RegistrarPesajePa
 export async function anularLote(id: string, payload: AnularLotePayload) {
   const body = anularLotePayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.lotesDespacho.anular(id), body, schema: loteDespachoResponseSchema });
+}
+
+export async function transbordarLote(id: string, payload: TransbordarLotePayload) {
+  const body = transbordarLotePayloadSchema.parse(payload);
+  return postRequest({ url: apiEndpoints.lotesDespacho.transbordo(id), body, schema: loteDespachoResponseSchema });
 }

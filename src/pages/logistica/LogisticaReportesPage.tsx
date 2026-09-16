@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { FileBarChart2, Lock, Search } from "lucide-react";
+import { FileBarChart2, FileSpreadsheet, FileText, Lock, Search } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCerrarMesLogisticaMutation,
   useCierresLogisticaQuery,
   useCuadroMensualQuery
 } from "@/features/logisticaReportes/hooks/useLogisticaReportes";
+import { exportCuadroMensualExcel, exportCuadroMensualPdf } from "@/features/logisticaReportes/lib/logisticaExport";
 import { useMunicipiosOrigenQuery } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -13,6 +14,9 @@ import { useToast } from "@/shared/ui/toast/ToastProvider";
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
+
+const buttonSecondaryClassName =
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -148,13 +152,46 @@ export function LogisticaReportesPage() {
           </article>
 
           <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-            <h2 className="mb-4 text-lg font-bold">Lotes del período</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-bold">Lotes del período</h2>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    exportCuadroMensualExcel(
+                      cuadro,
+                      municipios.find((m) => m.id === consultado?.municipioId)?.nombre ?? "",
+                      consultado!.anio,
+                      consultado!.mes
+                    )
+                  }
+                  className={buttonSecondaryClassName}
+                >
+                  <FileSpreadsheet size={13} /> Exportar Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    exportCuadroMensualPdf(
+                      cuadro,
+                      municipios.find((m) => m.id === consultado?.municipioId)?.nombre ?? "",
+                      consultado!.anio,
+                      consultado!.mes
+                    )
+                  }
+                  className={buttonSecondaryClassName}
+                >
+                  <FileText size={13} /> Exportar PDF
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
                   <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                     <th className="py-1 pr-3">Correlativo</th>
                     <th className="py-1 pr-3">Remitente</th>
+                    <th className="py-1 pr-3">Placa</th>
                     <th className="py-1 pr-3">Mineral</th>
                     <th className="py-1 pr-3">Ingenio</th>
                     <th className="py-1 pr-3 text-right">Neto</th>
@@ -167,15 +204,16 @@ export function LogisticaReportesPage() {
                     <tr key={lote.id}>
                       <td className="py-1 pr-3 font-mono">{lote.correlativo}</td>
                       <td className="py-1 pr-3">{lote.remitente?.nombreORazonSocial ?? "-"}</td>
+                      <td className="py-1 pr-3">{lote.vehiculo?.placa ?? "-"}</td>
                       <td className="py-1 pr-3">{lote.tipoMineral?.nombre ?? "-"}</td>
                       <td className="py-1 pr-3">{lote.destinoIngenio?.nombre ?? "-"}</td>
                       <td className="py-1 pr-3 text-right">{lote.pesaje?.tonelajeNeto ?? "-"}</td>
-                      <td className="py-1 pr-3">{lote.codigoFormulario101 ?? "Pendiente"}</td>
+                      <td className="py-1 pr-3">{lote.formulario101 ? lote.formulario101.codigo : "Pendiente"}</td>
                       <td className="py-1">{formatFecha(lote.fechaDocumentalFiscal)}</td>
                     </tr>
                   ))}
                   {cuadro.lotes.length === 0 ? (
-                    <tr><td colSpan={7} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin lotes en este período.</td></tr>
+                    <tr><td colSpan={8} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin lotes en este período.</td></tr>
                   ) : null}
                 </tbody>
               </table>

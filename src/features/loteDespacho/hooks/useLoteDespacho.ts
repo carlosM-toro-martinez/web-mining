@@ -6,7 +6,7 @@ import {
   getLoteDespachoById,
   getLotesDespacho,
   registrarPesajeLote,
-  regularizarF101,
+  transbordarLote,
   type LotesDespachoQueryParams
 } from "@/features/loteDespacho/api/loteDespachoApi";
 import type {
@@ -14,7 +14,7 @@ import type {
   AvanzarEstadoLotePayload,
   CreateLoteDespachoPayload,
   RegistrarPesajePayload,
-  RegularizarF101Payload
+  TransbordarLotePayload
 } from "@/features/loteDespacho/model/loteDespacho.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
@@ -50,15 +50,6 @@ export function useCreateLoteDespachoMutation() {
   });
 }
 
-export function useRegularizarF101Mutation() {
-  const invalidate = useInvalidateLotes();
-  return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: RegularizarF101Payload }) =>
-      regularizarF101(id, payload),
-    onSuccess: (_data, variables) => invalidate(variables.id)
-  });
-}
-
 export function useAvanzarEstadoLoteMutation() {
   const invalidate = useInvalidateLotes();
   return useMutation({
@@ -81,6 +72,14 @@ export function useAnularLoteMutation() {
   const invalidate = useInvalidateLotes();
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AnularLotePayload }) => anularLote(id, payload),
+    onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useTransbordarLoteMutation() {
+  const invalidate = useInvalidateLotes();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: TransbordarLotePayload }) => transbordarLote(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
   });
 }

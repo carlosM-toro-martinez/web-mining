@@ -2,17 +2,24 @@ import { z } from "zod";
 
 const refConNombre = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
 const remitenteRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
+const vehiculoRef = z.object({ id: z.number().int().positive(), placa: z.string().min(1) });
+const formulario101Ref = z.object({
+  id: z.string().min(1),
+  codigo: z.string().min(1),
+  fecha: z.string(),
+  estado: z.enum(["DISPONIBLE", "VINCULADO", "ANULADO"])
+});
 
 export const loteCuadroMensualSchema = z.object({
   id: z.string().min(1),
   correlativo: z.string().min(1),
   fechaDespachoReal: z.string(),
   fechaDocumentalFiscal: z.string(),
-  codigoFormulario101: z.string().nullable(),
-  estadoFormulario101: z.enum(["PENDIENTE", "REGULARIZADO"]),
   remitente: remitenteRef.optional(),
+  vehiculo: vehiculoRef.optional(),
   tipoMineral: refConNombre.optional(),
   destinoIngenio: refConNombre.optional(),
+  formulario101: formulario101Ref.nullable().optional(),
   pesaje: z
     .object({ tonelajeBruto: z.union([z.string(), z.number()]), tonelajeNeto: z.union([z.string(), z.number()]) })
     .nullable()

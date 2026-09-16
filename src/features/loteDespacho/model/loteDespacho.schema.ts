@@ -10,7 +10,7 @@ export const estadoLoteDespachoSchema = z.enum([
   "ANULADO"
 ]);
 
-export const estadoFormulario101Schema = z.enum(["PENDIENTE", "REGULARIZADO"]);
+export const estadoFormulario101Schema = z.enum(["DISPONIBLE", "VINCULADO", "ANULADO"]);
 
 const refConNombre = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
 const remitenteRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
@@ -19,8 +19,25 @@ const choferRef = z.object({ id: z.number().int().positive(), nombre: z.string()
 
 export const conocimientoCargaSchema = z.object({
   id: z.string().min(1),
+  fecha: z.string(),
+  detalleCarga: z.string().min(1),
+  descripcion: z.string().nullable().optional(),
+  observaciones: z.string().nullable().optional(),
   copiasEmitidas: z.record(z.string(), z.boolean()).or(z.unknown()),
   createdAt: z.string()
+});
+
+export const formulario101RefSchema = z.object({
+  id: z.string().min(1),
+  codigo: z.string().min(1),
+  fecha: z.string(),
+  estado: estadoFormulario101Schema,
+  loteId: z.string().nullable().optional(),
+  createdAt: z.string(),
+  anulacion: z
+    .object({ id: z.string().min(1), motivo: z.string().min(1), peticionEnviada: z.boolean(), createdAt: z.string() })
+    .nullable()
+    .optional()
 });
 
 export const pesajeIngenioSchema = z.object({
@@ -28,11 +45,21 @@ export const pesajeIngenioSchema = z.object({
   tonelajeBruto: z.union([z.string(), z.number()]),
   tonelajeTara: z.union([z.string(), z.number()]),
   tonelajeNeto: z.union([z.string(), z.number()]),
-  fechaPesaje: z.string()
+  fechaPesaje: z.string(),
+  observaciones: z.string().nullable().optional()
 });
 
 export const anulacionLoteSchema = z.object({
   id: z.string().min(1),
+  motivo: z.string().min(1),
+  createdAt: z.string()
+});
+
+export const transbordoLoteSchema = z.object({
+  id: z.string().min(1),
+  vehiculoOriginal: vehiculoRef.optional(),
+  vehiculoNuevo: vehiculoRef.optional(),
+  choferNuevo: choferRef.nullable().optional(),
   motivo: z.string().min(1),
   createdAt: z.string()
 });
@@ -49,8 +76,6 @@ export const loteDespachoSchema = z.object({
   nivel: z.string().nullable().optional(),
   fechaDespachoReal: z.string(),
   fechaDocumentalFiscal: z.string(),
-  codigoFormulario101: z.string().nullable(),
-  estadoFormulario101: estadoFormulario101Schema,
   estadoLote: estadoLoteDespachoSchema,
   createdAt: z.string(),
   municipioOrigen: refConNombre.optional(),
@@ -60,8 +85,10 @@ export const loteDespachoSchema = z.object({
   tipoMineral: refConNombre.optional(),
   destinoIngenio: refConNombre.optional(),
   conocimientoCarga: conocimientoCargaSchema.nullable().optional(),
+  formulario101: formulario101RefSchema.nullable().optional(),
   pesaje: pesajeIngenioSchema.nullable().optional(),
-  anulacion: anulacionLoteSchema.nullable().optional()
+  anulacion: anulacionLoteSchema.nullable().optional(),
+  transbordos: z.array(transbordoLoteSchema).optional()
 });
 
 export const createLoteDespachoPayloadSchema = z.object({
@@ -74,11 +101,10 @@ export const createLoteDespachoPayloadSchema = z.object({
   nivel: z.string().trim().optional(),
   fechaDespachoReal: z.string().min(1, "La fecha de despacho real es obligatoria."),
   fechaDocumentalFiscal: z.string().trim().optional(),
-  codigoFormulario101: z.string().trim().optional()
-});
-
-export const regularizarF101PayloadSchema = z.object({
-  codigoFormulario101: z.string().trim().min(1, "El código del Formulario 101 es obligatorio.")
+  conocimientoFecha: z.string().trim().optional(),
+  detalleCarga: z.string().trim().optional(),
+  descripcion: z.string().trim().optional(),
+  observaciones: z.string().trim().optional()
 });
 
 export const avanzarEstadoLotePayloadSchema = z.object({
@@ -87,11 +113,18 @@ export const avanzarEstadoLotePayloadSchema = z.object({
 
 export const registrarPesajePayloadSchema = z.object({
   tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero."),
-  tonelajeTara: z.number().nonnegative("El tara no puede ser negativo.")
+  tonelajeTara: z.number().nonnegative("El tara no puede ser negativo."),
+  observaciones: z.string().trim().optional()
 });
 
 export const anularLotePayloadSchema = z.object({
   motivo: z.string().trim().min(1, "Debes indicar el motivo de la anulación.")
+});
+
+export const transbordarLotePayloadSchema = z.object({
+  vehiculoNuevoId: z.number().int().positive("Debes elegir el vehículo que completa el traslado."),
+  choferNuevoId: z.number().int().positive().optional(),
+  motivo: z.string().trim().min(1, "Debes indicar el motivo del transbordo.")
 });
 
 export const loteDespachoListResponseSchema = z.object({
@@ -107,7 +140,7 @@ export type EstadoLoteDespacho = z.infer<typeof estadoLoteDespachoSchema>;
 export type EstadoFormulario101 = z.infer<typeof estadoFormulario101Schema>;
 export type LoteDespacho = z.infer<typeof loteDespachoSchema>;
 export type CreateLoteDespachoPayload = z.infer<typeof createLoteDespachoPayloadSchema>;
-export type RegularizarF101Payload = z.infer<typeof regularizarF101PayloadSchema>;
 export type AvanzarEstadoLotePayload = z.infer<typeof avanzarEstadoLotePayloadSchema>;
 export type RegistrarPesajePayload = z.infer<typeof registrarPesajePayloadSchema>;
 export type AnularLotePayload = z.infer<typeof anularLotePayloadSchema>;
+export type TransbordarLotePayload = z.infer<typeof transbordarLotePayloadSchema>;

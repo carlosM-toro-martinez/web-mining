@@ -17,6 +17,7 @@ import { parametrosLogisticaEndpoints } from "@/shared/api/endpoints/parametrosL
 import { remitentesEndpoints } from "@/shared/api/endpoints/remitentes.endpoints";
 import { flotaEndpoints } from "@/shared/api/endpoints/flota.endpoints";
 import { lotesDespachoEndpoints } from "@/shared/api/endpoints/lotesDespacho.endpoints";
+import { formulario101Endpoints } from "@/shared/api/endpoints/formulario101.endpoints";
 import { liquidacionesEndpoints } from "@/shared/api/endpoints/liquidaciones.endpoints";
 import { logisticaReportesEndpoints } from "@/shared/api/endpoints/logisticaReportes.endpoints";
 import { cajaChicaEndpoints } from "@/shared/api/endpoints/cajaChica.endpoints";
@@ -44,6 +45,7 @@ export const apiEndpoints = {
   remitentes: remitentesEndpoints,
   flota: flotaEndpoints,
   lotesDespacho: lotesDespachoEndpoints,
+  formulario101: formulario101Endpoints,
   liquidaciones: liquidacionesEndpoints,
   logisticaReportes: logisticaReportesEndpoints,
   cajaChica: cajaChicaEndpoints,
