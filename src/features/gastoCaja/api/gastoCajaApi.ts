@@ -1,4 +1,4 @@
-import { getRequest, postRequest } from "@/shared/api/core/request";
+import { getRequest, postRequest, putRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   anularGastoCajaPayloadSchema,
@@ -8,9 +8,11 @@ import {
   gastoCajaResponseSchema,
   movimientoFondoCajaListResponseSchema,
   movimientoFondoCajaResponseSchema,
+  updateGastoCajaPayloadSchema,
   type AnularGastoCajaPayload,
   type CreateGastoCajaPayload,
-  type CreateMovimientoFondoCajaPayload
+  type CreateMovimientoFondoCajaPayload,
+  type UpdateGastoCajaPayload
 } from "@/features/gastoCaja/model/gastoCaja.schema";
 
 export interface GastosCajaQueryParams {
@@ -33,6 +35,11 @@ export async function getGastosCaja(params: GastosCajaQueryParams = {}) {
 export async function createGastoCaja(payload: CreateGastoCajaPayload) {
   const body = createGastoCajaPayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.gastoCaja.gastos, body, schema: gastoCajaResponseSchema });
+}
+
+export async function updateGastoCaja(id: string, payload: UpdateGastoCajaPayload) {
+  const body = updateGastoCajaPayloadSchema.parse(payload);
+  return putRequest({ url: apiEndpoints.gastoCaja.gastoById(id), body, schema: gastoCajaResponseSchema });
 }
 
 export async function anularGastoCaja(id: string, payload: AnularGastoCajaPayload) {

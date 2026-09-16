@@ -5,12 +5,14 @@ import {
   createMovimientoFondoCaja,
   getGastosCaja,
   getMovimientosFondoCaja,
+  updateGastoCaja,
   type GastosCajaQueryParams
 } from "@/features/gastoCaja/api/gastoCajaApi";
 import type {
   AnularGastoCajaPayload,
   CreateGastoCajaPayload,
-  CreateMovimientoFondoCajaPayload
+  CreateMovimientoFondoCajaPayload,
+  UpdateGastoCajaPayload
 } from "@/features/gastoCaja/model/gastoCaja.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
@@ -39,6 +41,14 @@ export function useCreateGastoCajaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CreateGastoCajaPayload) => createGastoCaja(payload),
+    onSuccess: () => invalidarSaldos(queryClient)
+  });
+}
+
+export function useUpdateGastoCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateGastoCajaPayload }) => updateGastoCaja(id, payload),
     onSuccess: () => invalidarSaldos(queryClient)
   });
 }

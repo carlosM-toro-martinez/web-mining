@@ -8,14 +8,17 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  Pencil,
   Plus,
   RefreshCw,
-  Wallet
+  Wallet,
+  X
 } from "lucide-react";
 import {
   useAnularGastoCajaMutation,
   useCreateGastoCajaMutation,
-  useGastosCajaQuery
+  useGastosCajaQuery,
+  useUpdateGastoCajaMutation
 } from "@/features/gastoCaja/hooks/useGastoCaja";
 import { useGastoCajaOfflineQueue } from "@/features/gastoCaja/hooks/useGastoCajaOfflineQueue";
 import {
@@ -23,6 +26,7 @@ import {
   type CategoriaRendicionGasto,
   type CategoriaRetencionGasto,
   type EstadoGastoCaja,
+  type GastoCaja,
   type MonedaCaja,
   type OrigenGastoCaja,
   type TipoDocumentoGasto
@@ -97,6 +101,7 @@ export function GastosCajaPage() {
   const gastosQuery = useGastosCajaQuery({ cajaId: filtroCaja ? Number(filtroCaja) : undefined, limit: 50 });
 
   const createGastoMutation = useCreateGastoCajaMutation();
+  const updateGastoMutation = useUpdateGastoCajaMutation();
   const anularGastoMutation = useAnularGastoCajaMutation();
 
   const cajas = cajasQuery.data?.data ?? [];
@@ -240,18 +245,6 @@ export function GastosCajaPage() {
 
   function handleCreateGasto(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!centroCostoCajaId || !funcionGastoCajaId) {
-      showError("Selecciona un centro de costo y una función de gasto de la lista.");
-      return;
-    }
-    if (!cuentaContableCajaId) {
-      showError("Selecciona la cuenta contable de la lista.");
-      return;
-    }
-    if (!partidaPresupuestoId) {
-      showError("Selecciona la partida de presupuesto que respalda este gasto.");
-      return;
-    }
     if (origen === "CAJA" && !cajaId) {
       showError("Elige una caja.");
       return;
@@ -274,10 +267,10 @@ export function GastosCajaPage() {
       numeroRespaldo: numeroRespaldo.trim() || undefined,
       montoTotal: Number(montoTotal),
       moneda: origen === "BANCO" && cuentaBancariaSeleccionada ? cuentaBancariaSeleccionada.monedaBase : moneda,
-      centroCostoCajaId: Number(centroCostoCajaId),
-      funcionGastoCajaId: Number(funcionGastoCajaId),
-      cuentaContableCajaId: Number(cuentaContableCajaId),
-      partidaPresupuestoId: Number(partidaPresupuestoId)
+      centroCostoCajaId: centroCostoCajaId ? Number(centroCostoCajaId) : undefined,
+      funcionGastoCajaId: funcionGastoCajaId ? Number(funcionGastoCajaId) : undefined,
+      cuentaContableCajaId: cuentaContableCajaId ? Number(cuentaContableCajaId) : undefined,
+      partidaPresupuestoId: partidaPresupuestoId ? Number(partidaPresupuestoId) : undefined
     };
 
     createGastoMutation.mutate(payload, {
@@ -307,6 +300,81 @@ export function GastosCajaPage() {
       {
         onSuccess: () => showSuccess("Gasto anulado."),
         onError: (error) => showError(normalizeError(error, "No se pudo anular el gasto."))
+      }
+    );
+  }
+
+  // --- Editar un gasto ya registrado (para completar clasificación
+  // faltante, o corregir cualquier otro dato, mientras siga REGISTRADO) ---
+  const [editDraft, setEditDraft] = useState<{
+    id: string;
+    fecha: string;
+    tipoDocumento: TipoDocumentoGasto;
+    categoriaRetencion: CategoriaRetencionGasto;
+    categoriaRendicion: CategoriaRendicionGasto;
+    proveedorNombre: string;
+    proveedorNitCi: string;
+    glosa: string;
+    numeroRespaldo: string;
+    montoTotal: string;
+    moneda: MonedaCaja;
+    centroCostoCajaId: string;
+    funcionGastoCajaId: string;
+    cuentaContableCajaId: string;
+    partidaPresupuestoId: string;
+  } | null>(null);
+
+  function handleStartEdit(item: GastoCaja) {
+    setEditDraft({
+      id: item.id,
+      fecha: item.fecha.slice(0, 10),
+      tipoDocumento: item.tipoDocumento,
+      categoriaRetencion: item.categoriaRetencion ?? "SERVICIO",
+      categoriaRendicion: item.categoriaRendicion,
+      proveedorNombre: item.proveedorNombre,
+      proveedorNitCi: item.proveedorNitCi ?? "",
+      glosa: item.glosa,
+      numeroRespaldo: item.numeroRespaldo ?? "",
+      montoTotal: String(item.montoTotal),
+      moneda: item.moneda,
+      centroCostoCajaId: item.centroCostoCajaId ? String(item.centroCostoCajaId) : "",
+      funcionGastoCajaId: item.funcionGastoCajaId ? String(item.funcionGastoCajaId) : "",
+      cuentaContableCajaId: item.cuentaContableCajaId ? String(item.cuentaContableCajaId) : "",
+      partidaPresupuestoId: item.partidaPresupuestoId ? String(item.partidaPresupuestoId) : ""
+    });
+  }
+
+  function handleSaveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editDraft) return;
+    const esReciboDirectoEdit = editDraft.tipoDocumento === "RECIBO_DIRECTO";
+
+    updateGastoMutation.mutate(
+      {
+        id: editDraft.id,
+        payload: {
+          fecha: editDraft.fecha,
+          tipoDocumento: editDraft.tipoDocumento,
+          categoriaRetencion: editDraft.tipoDocumento === "CONTRATO_RETENCION" ? editDraft.categoriaRetencion : null,
+          categoriaRendicion: editDraft.categoriaRendicion,
+          proveedorNombre: editDraft.proveedorNombre,
+          proveedorNitCi: esReciboDirectoEdit ? null : editDraft.proveedorNitCi.trim() || null,
+          glosa: editDraft.glosa,
+          numeroRespaldo: esReciboDirectoEdit ? null : editDraft.numeroRespaldo.trim() || null,
+          montoTotal: Number(editDraft.montoTotal),
+          moneda: editDraft.moneda,
+          centroCostoCajaId: editDraft.centroCostoCajaId ? Number(editDraft.centroCostoCajaId) : null,
+          funcionGastoCajaId: editDraft.funcionGastoCajaId ? Number(editDraft.funcionGastoCajaId) : null,
+          cuentaContableCajaId: editDraft.cuentaContableCajaId ? Number(editDraft.cuentaContableCajaId) : null,
+          partidaPresupuestoId: editDraft.partidaPresupuestoId ? Number(editDraft.partidaPresupuestoId) : null
+        }
+      },
+      {
+        onSuccess: () => {
+          showSuccess("Gasto actualizado.");
+          setEditDraft(null);
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo actualizar el gasto."))
       }
     );
   }
@@ -489,26 +557,34 @@ export function GastosCajaPage() {
               )}
             </div>
 
-            <AutocompleteSelect
-              value={centroCostoCajaId}
-              onChange={setCentroCostoCajaId}
-              options={centroOptions}
-              placeholder="Buscar centro de costo..."
-              className={inputClassName}
-              required
-            />
-            <AutocompleteSelect
-              value={funcionGastoCajaId}
-              onChange={setFuncionGastoCajaId}
-              options={funcionOptions}
-              placeholder="Buscar función de gasto..."
-              className={inputClassName}
-              required
-            />
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Centro de costo (opcional; se puede completar después)
+              </label>
+              <AutocompleteSelect
+                value={centroCostoCajaId}
+                onChange={setCentroCostoCajaId}
+                options={centroOptions}
+                placeholder="Buscar centro de costo..."
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Función de gasto (opcional; se puede completar después)
+              </label>
+              <AutocompleteSelect
+                value={funcionGastoCajaId}
+                onChange={setFuncionGastoCajaId}
+                options={funcionOptions}
+                placeholder="Buscar función de gasto..."
+                className={inputClassName}
+              />
+            </div>
 
             <div>
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                Cuenta contable
+                Cuenta contable (opcional; se puede completar después)
               </label>
               <AutocompleteSelect
                 value={cuentaContableCajaId}
@@ -516,12 +592,11 @@ export function GastosCajaPage() {
                 options={cuentaOptions}
                 placeholder="Buscar cuenta contable..."
                 className={inputClassName}
-                required
               />
             </div>
             <div>
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                Partida de presupuesto
+                Partida de presupuesto (opcional; se puede completar después)
               </label>
               <AutocompleteSelect
                 value={partidaPresupuestoId}
@@ -529,7 +604,6 @@ export function GastosCajaPage() {
                 options={partidaOptions}
                 placeholder="Buscar partida de presupuesto..."
                 className={inputClassName}
-                required
               />
             </div>
 
@@ -577,6 +651,172 @@ export function GastosCajaPage() {
           </div>
         </div>
       </article>
+
+      {editDraft ? (
+        <article className="rounded-xl border-2 border-[var(--color-primary)]/45 bg-[var(--color-primary)]/[0.06] p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
+              <Pencil size={16} /> Editando gasto
+            </h2>
+            <button
+              type="button"
+              onClick={() => setEditDraft(null)}
+              className="rounded-lg p-1.5 text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]"
+              title="Cancelar edición"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleSaveEdit}>
+            <input required type="date" value={editDraft.fecha} onChange={(e) => setEditDraft({ ...editDraft, fecha: e.target.value })} className={inputClassName} />
+
+            <select
+              value={editDraft.tipoDocumento}
+              onChange={(e) => setEditDraft({ ...editDraft, tipoDocumento: e.target.value as TipoDocumentoGasto })}
+              className={`${inputClassName} ${editDraft.tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}`}
+            >
+              <option value="FACTURA">Factura</option>
+              <option value="CONTRATO_RETENCION">Contrato con retención</option>
+              <option value="RECIBO_DIRECTO">Recibo directo (sin respaldo)</option>
+            </select>
+            {editDraft.tipoDocumento === "CONTRATO_RETENCION" ? (
+              <select
+                value={editDraft.categoriaRetencion}
+                onChange={(e) => setEditDraft({ ...editDraft, categoriaRetencion: e.target.value as CategoriaRetencionGasto })}
+                className={inputClassName}
+              >
+                <option value="SERVICIO">Servicio (RC-IVA + IT)</option>
+                <option value="COMPRA">Compra / alimentación (IUE + IT)</option>
+              </select>
+            ) : null}
+
+            <input
+              required
+              value={editDraft.proveedorNombre}
+              onChange={(e) => setEditDraft({ ...editDraft, proveedorNombre: e.target.value })}
+              className={`${inputClassName} ${editDraft.tipoDocumento === "RECIBO_DIRECTO" ? "sm:col-span-2" : ""}`}
+              placeholder="Proveedor / beneficiario"
+            />
+            {editDraft.tipoDocumento === "RECIBO_DIRECTO" ? null : (
+              <input
+                value={editDraft.proveedorNitCi}
+                onChange={(e) => setEditDraft({ ...editDraft, proveedorNitCi: e.target.value })}
+                className={inputClassName}
+                placeholder="NIT / CI (opcional)"
+              />
+            )}
+
+            <input
+              required
+              value={editDraft.glosa}
+              onChange={(e) => setEditDraft({ ...editDraft, glosa: e.target.value })}
+              className={`${inputClassName} sm:col-span-2`}
+              placeholder="Glosa"
+            />
+            {editDraft.tipoDocumento === "RECIBO_DIRECTO" ? null : (
+              <input
+                value={editDraft.numeroRespaldo}
+                onChange={(e) => setEditDraft({ ...editDraft, numeroRespaldo: e.target.value })}
+                className={inputClassName}
+                placeholder="N° factura / recibo (opcional)"
+              />
+            )}
+
+            <div className="flex gap-2">
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={editDraft.montoTotal}
+                onChange={(e) => setEditDraft({ ...editDraft, montoTotal: e.target.value })}
+                className={inputClassName}
+                placeholder="Monto"
+              />
+              <select
+                value={editDraft.moneda}
+                onChange={(e) => setEditDraft({ ...editDraft, moneda: e.target.value as MonedaCaja })}
+                className={`${inputClassName} w-24`}
+              >
+                <option value="BOB">BOB</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Centro de costo (opcional)</label>
+              <AutocompleteSelect
+                value={editDraft.centroCostoCajaId}
+                onChange={(v) => setEditDraft({ ...editDraft, centroCostoCajaId: v })}
+                options={centroOptions}
+                placeholder="Buscar centro de costo..."
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Función de gasto (opcional)</label>
+              <AutocompleteSelect
+                value={editDraft.funcionGastoCajaId}
+                onChange={(v) => setEditDraft({ ...editDraft, funcionGastoCajaId: v })}
+                options={funcionOptions}
+                placeholder="Buscar función de gasto..."
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Cuenta contable (opcional)</label>
+              <AutocompleteSelect
+                value={editDraft.cuentaContableCajaId}
+                onChange={(v) => setEditDraft({ ...editDraft, cuentaContableCajaId: v })}
+                options={cuentaOptions}
+                placeholder="Buscar cuenta contable..."
+                className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Partida de presupuesto (opcional)</label>
+              <AutocompleteSelect
+                value={editDraft.partidaPresupuestoId}
+                onChange={(v) => setEditDraft({ ...editDraft, partidaPresupuestoId: v })}
+                options={partidaOptions}
+                placeholder="Buscar partida de presupuesto..."
+                className={inputClassName}
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Categoría del reporte mensual</label>
+              <select
+                required
+                value={editDraft.categoriaRendicion}
+                onChange={(e) => setEditDraft({ ...editDraft, categoriaRendicion: e.target.value as CategoriaRendicionGasto })}
+                className={inputClassName}
+              >
+                {Object.entries(CATEGORIA_RENDICION_LABEL).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-2 sm:col-span-2">
+              <button
+                type="submit"
+                disabled={updateGastoMutation.isPending}
+                className="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+              >
+                {updateGastoMutation.isPending ? "Guardando..." : "Guardar cambios"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditDraft(null)}
+                className={buttonSecondaryClassName}
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </article>
+      ) : null}
 
       {pendientes.length > 0 ? (
         <article className="rounded-xl border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/8 p-5">
@@ -635,7 +875,14 @@ export function GastosCajaPage() {
             <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] p-3 text-sm">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold">{item.proveedorNombre}</p>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+                  {item.informacionIncompleta ? (
+                    <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
+                      <AlertTriangle size={10} /> Info incompleta
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <p className="text-xs text-[var(--color-on-surface-variant)]">{item.glosa}</p>
               <div className="mt-2 flex items-center justify-between text-xs text-[var(--color-on-surface-variant)]">
@@ -643,13 +890,22 @@ export function GastosCajaPage() {
                 <span className="font-mono font-bold text-[var(--color-on-surface)]">{item.moneda} {formatMoneda(item.montoTotal)}</span>
               </div>
               {item.estado === "REGISTRADO" ? (
-                <button
-                  type="button"
-                  onClick={() => handleAnularGasto(item.id)}
-                  className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]"
-                >
-                  <Ban size={12} /> Anular
-                </button>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit(item)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]"
+                  >
+                    <Pencil size={12} /> Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAnularGasto(item.id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]"
+                  >
+                    <Ban size={12} /> Anular
+                  </button>
+                </div>
               ) : null}
             </div>
           ))}
@@ -677,13 +933,25 @@ export function GastosCajaPage() {
                   <td className="px-3 py-2 text-xs">{item.glosa}</td>
                   <td className="px-3 py-2 text-xs">{item.moneda} {formatMoneda(item.montoTotal)}</td>
                   <td className="px-3 py-2 text-xs">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+                      {item.informacionIncompleta ? (
+                        <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
+                          <AlertTriangle size={10} /> Info incompleta
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {item.estado === "REGISTRADO" ? (
-                      <button type="button" onClick={() => handleAnularGasto(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]">
-                        <Ban size={12} /> Anular
-                      </button>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => handleStartEdit(item)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]">
+                          <Pencil size={12} /> Editar
+                        </button>
+                        <button type="button" onClick={() => handleAnularGasto(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]">
+                          <Ban size={12} /> Anular
+                        </button>
+                      </div>
                     ) : null}
                   </td>
                 </tr>

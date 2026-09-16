@@ -64,8 +64,8 @@ export const gastoCajaSchema = z.object({
   numeroRespaldo: z.string().nullable().optional(),
   montoTotal: z.union([z.string(), z.number()]),
   moneda: monedaCajaSchema,
-  centroCostoCajaId: z.number().int().positive(),
-  funcionGastoCajaId: z.number().int().positive(),
+  centroCostoCajaId: z.number().int().positive().nullable().optional(),
+  funcionGastoCajaId: z.number().int().positive().nullable().optional(),
   cuentaContableCajaId: z.number().int().positive().nullable().optional(),
   partidaPresupuestoId: z.number().int().positive().nullable().optional(),
   montoCreditoFiscalIva: z.union([z.string(), z.number()]),
@@ -74,11 +74,14 @@ export const gastoCajaSchema = z.object({
   montoRetencionIt: z.union([z.string(), z.number()]),
   esNoDeducible: z.boolean(),
   estado: estadoGastoCajaSchema,
+  // Calculado por el backend (nunca guardado): true si falta centro de
+  // costo, función de gasto, cuenta contable o partida de presupuesto.
+  informacionIncompleta: z.boolean().optional(),
   createdAt: z.string(),
   caja: refConNombre.nullable().optional(),
   cuentaBancariaCaja: cuentaBancariaRef.nullable().optional(),
-  centroCostoCaja: refConNombre.optional(),
-  funcionGastoCaja: refConNombre.optional(),
+  centroCostoCaja: refConNombre.nullable().optional(),
+  funcionGastoCaja: refConNombre.nullable().optional(),
   cuentaContableCaja: refConNombre.nullable().optional(),
   partidaPresupuesto: z.object({ id: z.number().int().positive(), descripcion: z.string().min(1) }).nullable().optional(),
   anulacion: anulacionGastoCajaSchema.nullable().optional()
@@ -99,8 +102,10 @@ export const createGastoCajaPayloadSchema = z
     numeroRespaldo: z.string().trim().optional(),
     montoTotal: z.number().positive("El monto debe ser mayor a cero."),
     moneda: monedaCajaSchema,
-    centroCostoCajaId: z.number().int().positive("Debes elegir un centro de costo."),
-    funcionGastoCajaId: z.number().int().positive("Debes elegir una función de gasto."),
+    // Ninguno de estos 4 es obligatorio: se puede completar después
+    // editando el gasto — mientras falte alguno, se ve como "info incompleta".
+    centroCostoCajaId: z.number().int().positive().optional(),
+    funcionGastoCajaId: z.number().int().positive().optional(),
     cuentaContableCajaId: z.number().int().positive().optional(),
     partidaPresupuestoId: z.number().int().positive().optional()
   })
@@ -112,6 +117,23 @@ export const createGastoCajaPayloadSchema = z
     message: "Debes elegir la cuenta bancaria.",
     path: ["cuentaBancariaCajaId"]
   });
+
+export const updateGastoCajaPayloadSchema = z.object({
+  fecha: z.string().min(1).optional(),
+  tipoDocumento: tipoDocumentoGastoSchema.optional(),
+  categoriaRetencion: categoriaRetencionGastoSchema.nullable().optional(),
+  categoriaRendicion: categoriaRendicionGastoSchema.optional(),
+  proveedorNombre: z.string().trim().min(1, "El proveedor es obligatorio.").optional(),
+  proveedorNitCi: z.string().trim().nullable().optional(),
+  glosa: z.string().trim().min(1, "La glosa es obligatoria.").optional(),
+  numeroRespaldo: z.string().trim().nullable().optional(),
+  montoTotal: z.number().positive("El monto debe ser mayor a cero.").optional(),
+  moneda: monedaCajaSchema.optional(),
+  centroCostoCajaId: z.number().int().positive().nullable().optional(),
+  funcionGastoCajaId: z.number().int().positive().nullable().optional(),
+  cuentaContableCajaId: z.number().int().positive().nullable().optional(),
+  partidaPresupuestoId: z.number().int().positive().nullable().optional()
+});
 
 export const anularGastoCajaPayloadSchema = z.object({
   motivo: z.string().trim().min(1, "Debes indicar el motivo de la anulación.")
@@ -161,6 +183,7 @@ export type OrigenGastoCaja = z.infer<typeof origenGastoCajaSchema>;
 export type TipoMovimientoFondoCaja = z.infer<typeof tipoMovimientoFondoCajaSchema>;
 export type GastoCaja = z.infer<typeof gastoCajaSchema>;
 export type CreateGastoCajaPayload = z.infer<typeof createGastoCajaPayloadSchema>;
+export type UpdateGastoCajaPayload = z.infer<typeof updateGastoCajaPayloadSchema>;
 export type AnularGastoCajaPayload = z.infer<typeof anularGastoCajaPayloadSchema>;
 export type MovimientoFondoCaja = z.infer<typeof movimientoFondoCajaSchema>;
 export type CreateMovimientoFondoCajaPayload = z.infer<typeof createMovimientoFondoCajaPayloadSchema>;
