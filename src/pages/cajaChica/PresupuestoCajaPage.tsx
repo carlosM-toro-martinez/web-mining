@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Check, FileSpreadsheet, FileText, Landmark, Trash2, Wallet } from "lucide-react";
+import { Check, FileSpreadsheet, FileText, History, Landmark, ListFilter, Plus, Trash2, Wallet } from "lucide-react";
 import {
   useCajasChicasQuery,
   useCreatePartidaPresupuestoCajaMutation,
@@ -120,7 +120,7 @@ function RemesaCard({ presupuesto, cuentasBancarias }: RemesaCardProps) {
   }
 
   return (
-    <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+    <article className="rounded-xl border border-[var(--color-outline-variant)] border-l-4 border-l-[var(--color-primary)] bg-[var(--color-surface-container-low)] p-5 shadow-sm">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-bold">{presupuesto.nombre}</h3>
@@ -344,7 +344,15 @@ export function PresupuestoCajaPage() {
         </div>
       </header>
 
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+      <article className="rounded-xl border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-secondary)]/16 text-[var(--color-secondary)]">
+            <ListFilter size={14} />
+          </span>
+          <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface)]">
+            Filtrar por caja y período
+          </h3>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={inputClassName}>
             <option value="">Elige una caja</option>
@@ -365,10 +373,15 @@ export function PresupuestoCajaPage() {
         </div>
       </article>
 
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
-          Usar una remesa anterior como plantilla
-        </h3>
+      <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.07] p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-tertiary)]/20 text-[var(--color-tertiary)]">
+            <History size={14} />
+          </span>
+          <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-tertiary)]">
+            Usar una remesa anterior como plantilla
+          </h3>
+        </div>
         <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
           Trae la estructura de una remesa ya creada (de este mes o de uno anterior) hacia {periodoLabel},
           con las mismas partidas para no tener que volver a escribirlas — puedes ajustar los montos después.
@@ -384,17 +397,22 @@ export function PresupuestoCajaPage() {
             type="button"
             onClick={handleUsarPlantilla}
             disabled={duplicarMutation.isPending}
-            className={buttonSecondaryClassName}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-tertiary)]/50 bg-[var(--color-tertiary)]/12 px-3 py-2 text-xs font-semibold text-[var(--color-tertiary)] transition hover:bg-[var(--color-tertiary)]/20 disabled:opacity-60"
           >
             {duplicarMutation.isPending ? "Creando..." : `Duplicar en ${periodoLabel}`}
           </button>
         </div>
       </article>
 
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
-          Nueva remesa de {periodoLabel}
-        </h3>
+      <article className="rounded-xl border-2 border-[var(--color-primary)]/45 bg-[var(--color-primary)]/[0.07] p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary)]/20 text-[var(--color-primary)]">
+            <Plus size={14} />
+          </span>
+          <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
+            Nueva remesa de {periodoLabel}
+          </h3>
+        </div>
         <form className="flex flex-wrap items-center gap-2" onSubmit={handleCreateRemesa}>
           <input
             required
@@ -414,10 +432,10 @@ export function PresupuestoCajaPage() {
       </article>
 
       {partidasDelPeriodo.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-on-surface)]/20 bg-[var(--color-surface-container-high)] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[var(--color-success)]/45 bg-[var(--color-success)]/[0.08] p-4">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Total Presupuesto de {periodoLabel}</span>
-            <p className="font-mono text-lg font-extrabold">{formatMoneda(totalPresupuestado)}</p>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-success)]">Total Presupuesto de {periodoLabel}</span>
+            <p className="font-mono text-2xl font-extrabold text-[var(--color-on-surface)]">{formatMoneda(totalPresupuestado)}</p>
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => exportPlanillaControlPagosExcel(partidasDelPeriodo, periodoLabel)} className={buttonSecondaryClassName}>
@@ -433,13 +451,18 @@ export function PresupuestoCajaPage() {
       {presupuestosQuery.isLoading ? (
         <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando remesas...</p>
       ) : presupuestos.length === 0 ? (
-        <p className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-sm text-[var(--color-on-surface-variant)]">
+        <p className="rounded-xl border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5 text-sm text-[var(--color-on-surface-variant)]">
           Sin remesas creadas para {periodoLabel} todavía. Crea una arriba, o duplica una anterior como plantilla.
         </p>
       ) : (
-        presupuestos.map((p) => (
-          <RemesaCard key={p.id} presupuesto={p} cuentasBancarias={cuentasBancarias} />
-        ))
+        <>
+          <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+            Remesas de {periodoLabel} ({presupuestos.length})
+          </h3>
+          {presupuestos.map((p) => (
+            <RemesaCard key={p.id} presupuesto={p} cuentasBancarias={cuentasBancarias} />
+          ))}
+        </>
       )}
     </section>
   );
