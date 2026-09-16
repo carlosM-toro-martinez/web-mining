@@ -3,6 +3,7 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   reporteComprobanteDiarioResponseSchema,
   reporteDesgloseResponseSchema,
+  reporteEstadoCuentaBancariaResponseSchema,
   reporteEstadoCuentaResponseSchema,
   reporteNoDeduciblesResponseSchema,
   reporteRendicionResponseSchema,
@@ -44,6 +45,14 @@ export async function getEstadoCuentaCaja(cajaId: number) {
     url: apiEndpoints.reportesCajaChica.estadoCuenta,
     config: { params: { cajaId } },
     schema: reporteEstadoCuentaResponseSchema
+  });
+}
+
+export async function getEstadoCuentaBancaria(cuentaBancariaId: number) {
+  return getRequest({
+    url: apiEndpoints.reportesCajaChica.estadoCuentaBancaria,
+    config: { params: { cuentaBancariaId } },
+    schema: reporteEstadoCuentaBancariaResponseSchema
   });
 }
 

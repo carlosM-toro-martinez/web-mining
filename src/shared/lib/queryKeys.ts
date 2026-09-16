@@ -243,6 +243,8 @@ export const queryKeys = {
       [...queryKeys.reportesCajaChica.all, "no-deducibles", params] as const,
     desglose: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
       [...queryKeys.reportesCajaChica.all, "desglose", params] as const,
-    estadoCuenta: (cajaId?: number) => [...queryKeys.reportesCajaChica.all, "estado-cuenta", cajaId] as const
+    estadoCuenta: (cajaId?: number) => [...queryKeys.reportesCajaChica.all, "estado-cuenta", cajaId] as const,
+    estadoCuentaBancaria: (cuentaBancariaId?: number) =>
+      [...queryKeys.reportesCajaChica.all, "estado-cuenta-bancaria", cuentaBancariaId] as const
   }
 };

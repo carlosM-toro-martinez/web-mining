@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  getEstadoCuentaBancaria,
   getEstadoCuentaCaja,
   getReporteDesglose,
   getReporteNoDeducibles,
@@ -34,5 +35,13 @@ export function useEstadoCuentaCajaQuery(cajaId: number | undefined) {
     queryKey: queryKeys.reportesCajaChica.estadoCuenta(cajaId),
     queryFn: () => getEstadoCuentaCaja(cajaId as number),
     enabled: typeof cajaId === "number"
+  });
+}
+
+export function useEstadoCuentaBancariaQuery(cuentaBancariaId: number | undefined) {
+  return useQuery({
+    queryKey: queryKeys.reportesCajaChica.estadoCuentaBancaria(cuentaBancariaId),
+    queryFn: () => getEstadoCuentaBancaria(cuentaBancariaId as number),
+    enabled: typeof cuentaBancariaId === "number"
   });
 }

@@ -1,5 +1,17 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Ban, Calculator, Plus, RefreshCw, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  Calculator,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ClipboardList,
+  Plus,
+  RefreshCw,
+  Wallet
+} from "lucide-react";
 import {
   useAnularGastoCajaMutation,
   useCreateGastoCajaMutation,
@@ -25,6 +37,7 @@ import {
   usePartidasPresupuestoCajaQuery
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
+import type { PartidaPresupuestoCaja } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -38,6 +51,8 @@ function today() {
 // input con font-size menor a 16px; en sm+ se reduce a como estaba antes.
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-3 text-base text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30 sm:py-2.5 sm:text-sm";
+
+const MESES_CORTO = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
@@ -115,6 +130,34 @@ export function GastosCajaPage() {
     [partidas]
   );
 
+  // Partidas de cualquier remesa que todavía tienen saldo disponible (más
+  // recientes primero), en una sola lista plana — con muchos pendientes
+  // acumulados, una tarjeta por remesa se vuelve interminable, así que esto
+  // se pagina de a PENDIENTES_POR_PAGINA en vez de mostrarlas todas juntas.
+  const partidasPendientes = useMemo(() => {
+    return partidas
+      .filter((p) => (p.saldoAFavor ?? Number(p.montoPresupuestado)) > 0.009)
+      .sort((a, b) => {
+        const anioA = a.presupuesto?.anio ?? 0;
+        const anioB = b.presupuesto?.anio ?? 0;
+        if (anioA !== anioB) return anioB - anioA;
+        const mesA = a.presupuesto?.mes ?? 0;
+        const mesB = b.presupuesto?.mes ?? 0;
+        if (mesA !== mesB) return mesB - mesA;
+        return a.descripcion.localeCompare(b.descripcion);
+      });
+  }, [partidas]);
+
+  const PENDIENTES_POR_PAGINA = 5;
+  const [mostrarPendientes, setMostrarPendientes] = useState(false);
+  const [paginaPendientes, setPaginaPendientes] = useState(0);
+  const totalPaginasPendientes = Math.max(1, Math.ceil(partidasPendientes.length / PENDIENTES_POR_PAGINA));
+  const paginaPendientesActual = Math.min(paginaPendientes, totalPaginasPendientes - 1);
+  const partidasPendientesPagina = partidasPendientes.slice(
+    paginaPendientesActual * PENDIENTES_POR_PAGINA,
+    paginaPendientesActual * PENDIENTES_POR_PAGINA + PENDIENTES_POR_PAGINA
+  );
+
   const tasaRcIva = useMemo(() => Number(retenciones.find((r) => r.codigo === "RC_IVA")?.porcentaje ?? 0) / 100, [retenciones]);
   const tasaIueCompras = useMemo(() => Number(retenciones.find((r) => r.codigo === "IUE_COMPRAS")?.porcentaje ?? 0) / 100, [retenciones]);
   const tasaIt = useMemo(() => Number(retenciones.find((r) => r.codigo === "IT")?.porcentaje ?? 0) / 100, [retenciones]);
@@ -136,7 +179,6 @@ export function GastosCajaPage() {
   const [cuentaContableCajaId, setCuentaContableCajaId] = useState("");
   const [partidaPresupuestoId, setPartidaPresupuestoId] = useState("");
   const [categoriaRendicion, setCategoriaRendicion] = useState<CategoriaRendicionGasto>("MATERIALES_SUMINISTROS");
-  const [mostrarMasOpciones, setMostrarMasOpciones] = useState(false);
   const cuentaBancariaSeleccionada = cuentasBancarias.find((c) => String(c.id) === cuentaBancariaCajaId);
   const esReciboDirecto = tipoDocumento === "RECIBO_DIRECTO";
 
@@ -175,10 +217,39 @@ export function GastosCajaPage() {
     setMontoTotal("");
   }
 
+  // Autocompleta el formulario con la clasificación guardada en una partida
+  // pendiente: solo queda por poner el origen (caja/banco) y el proveedor o
+  // beneficiario real de este gasto puntual.
+  function handleUsarPartida(p: PartidaPresupuestoCaja) {
+    setPartidaPresupuestoId(String(p.id));
+    setGlosa(p.descripcion);
+    const pendiente = p.saldoAFavor ?? Number(p.montoPresupuestado);
+    if (pendiente > 0) setMontoTotal(String(pendiente));
+    if (p.centroCostoCajaId) setCentroCostoCajaId(String(p.centroCostoCajaId));
+    if (p.funcionGastoCajaId) setFuncionGastoCajaId(String(p.funcionGastoCajaId));
+    if (p.cuentaContableCajaId) setCuentaContableCajaId(String(p.cuentaContableCajaId));
+    if (p.categoriaRendicion) setCategoriaRendicion(p.categoriaRendicion);
+    if (p.caja?.monedaBase) setMoneda(p.caja.monedaBase);
+    if (p.caja?.id) {
+      setOrigen("CAJA");
+      setCajaId(String(p.caja.id));
+    }
+    setMostrarPendientes(false);
+    showSuccess(`Formulario completado con "${p.descripcion}". Falta el origen y el proveedor/beneficiario.`);
+  }
+
   function handleCreateGasto(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!centroCostoCajaId || !funcionGastoCajaId) {
       showError("Selecciona un centro de costo y una función de gasto de la lista.");
+      return;
+    }
+    if (!cuentaContableCajaId) {
+      showError("Selecciona la cuenta contable de la lista.");
+      return;
+    }
+    if (!partidaPresupuestoId) {
+      showError("Selecciona la partida de presupuesto que respalda este gasto.");
       return;
     }
     if (origen === "CAJA" && !cajaId) {
@@ -205,8 +276,8 @@ export function GastosCajaPage() {
       moneda: origen === "BANCO" && cuentaBancariaSeleccionada ? cuentaBancariaSeleccionada.monedaBase : moneda,
       centroCostoCajaId: Number(centroCostoCajaId),
       funcionGastoCajaId: Number(funcionGastoCajaId),
-      cuentaContableCajaId: cuentaContableCajaId ? Number(cuentaContableCajaId) : undefined,
-      partidaPresupuestoId: partidaPresupuestoId ? Number(partidaPresupuestoId) : undefined
+      cuentaContableCajaId: Number(cuentaContableCajaId),
+      partidaPresupuestoId: Number(partidaPresupuestoId)
     };
 
     createGastoMutation.mutate(payload, {
@@ -262,6 +333,86 @@ export function GastosCajaPage() {
           </div>
         </div>
       </header>
+
+      <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.06] p-4">
+        <button
+          type="button"
+          onClick={() => setMostrarPendientes((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-tertiary)]/20 text-[var(--color-tertiary)]">
+              <ClipboardList size={14} />
+            </span>
+            <span className="text-sm font-bold uppercase tracking-wide text-[var(--color-tertiary)]">
+              Completar un gasto desde una partida pendiente
+            </span>
+            <span className="rounded-full bg-[var(--color-tertiary)]/20 px-2 py-0.5 text-[11px] font-bold text-[var(--color-tertiary)]">
+              {partidasPendientes.length}
+            </span>
+          </span>
+          {mostrarPendientes ? <ChevronUp size={16} className="text-[var(--color-tertiary)]" /> : <ChevronDown size={16} className="text-[var(--color-tertiary)]" />}
+        </button>
+
+        {mostrarPendientes ? (
+          <div className="mt-3">
+            <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
+              Elige un pendiente y el formulario de abajo se completa solo — solo faltará poner el origen
+              (caja o banco) y el proveedor o beneficiario real de este gasto.
+            </p>
+            {partidasPendientes.length === 0 ? (
+              <p className="text-xs text-[var(--color-on-surface-variant)]">
+                No hay partidas con saldo disponible todavía. Créalas en "Presupuesto".
+              </p>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  {partidasPendientesPagina.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleUsarPartida(p)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--color-tertiary)]/35 bg-[var(--color-surface-container-low)] px-3 py-2 text-left text-xs transition hover:border-[var(--color-tertiary)] hover:bg-[var(--color-tertiary)]/10"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-semibold">{p.descripcion}</span>
+                        <span className="ml-1.5 text-[var(--color-on-surface-variant)]">
+                          {p.presupuesto?.nombre ?? "Remesa"}
+                          {p.presupuesto ? ` · ${MESES_CORTO[p.presupuesto.mes - 1]} ${p.presupuesto.anio}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono font-bold text-[var(--color-tertiary)]">
+                        {formatMoneda(p.saldoAFavor ?? Number(p.montoPresupuestado))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {totalPaginasPendientes > 1 ? (
+                  <div className="mt-3 flex items-center justify-between text-xs text-[var(--color-on-surface-variant)]">
+                    <button
+                      type="button"
+                      onClick={() => setPaginaPendientes((p) => Math.max(0, p - 1))}
+                      disabled={paginaPendientesActual === 0}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-outline-variant)] px-2.5 py-1.5 font-semibold disabled:opacity-40"
+                    >
+                      <ChevronLeft size={13} /> Anterior
+                    </button>
+                    <span>Página {paginaPendientesActual + 1} de {totalPaginasPendientes}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPaginaPendientes((p) => Math.min(totalPaginasPendientes - 1, p + 1))}
+                      disabled={paginaPendientesActual >= totalPaginasPendientes - 1}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-outline-variant)] px-2.5 py-1.5 font-semibold disabled:opacity-40"
+                    >
+                      Siguiente <ChevronRight size={13} />
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : null}
+      </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
@@ -355,42 +506,32 @@ export function GastosCajaPage() {
               required
             />
 
-            <button
-              type="button"
-              onClick={() => setMostrarMasOpciones((v) => !v)}
-              className="sm:col-span-2 text-left text-xs font-semibold text-[var(--color-primary)]"
-            >
-              {mostrarMasOpciones ? "− Ocultar opciones avanzadas" : "+ Más opciones (cuenta contable, partida de presupuesto)"}
-            </button>
-
-            {mostrarMasOpciones ? (
-              <>
-                <div>
-                  <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                    Cuenta contable (opcional; si la dejas vacía, se resuelve sola)
-                  </label>
-                  <AutocompleteSelect
-                    value={cuentaContableCajaId}
-                    onChange={setCuentaContableCajaId}
-                    options={cuentaOptions}
-                    placeholder="Buscar cuenta contable..."
-                    className={inputClassName}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                    Partida de presupuesto (opcional; para saber el saldo a favor)
-                  </label>
-                  <AutocompleteSelect
-                    value={partidaPresupuestoId}
-                    onChange={setPartidaPresupuestoId}
-                    options={partidaOptions}
-                    placeholder="Buscar partida de presupuesto..."
-                    className={inputClassName}
-                  />
-                </div>
-              </>
-            ) : null}
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Cuenta contable
+              </label>
+              <AutocompleteSelect
+                value={cuentaContableCajaId}
+                onChange={setCuentaContableCajaId}
+                options={cuentaOptions}
+                placeholder="Buscar cuenta contable..."
+                className={inputClassName}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Partida de presupuesto
+              </label>
+              <AutocompleteSelect
+                value={partidaPresupuestoId}
+                onChange={setPartidaPresupuestoId}
+                options={partidaOptions}
+                placeholder="Buscar partida de presupuesto..."
+                className={inputClassName}
+                required
+              />
+            </div>
 
             <div className="sm:col-span-2">
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">

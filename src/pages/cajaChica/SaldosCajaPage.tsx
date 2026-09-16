@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Banknote, FileSpreadsheet, FileText, Landmark, PiggyBank, Scale } from "lucide-react";
-import { useEstadoCuentaCajaQuery } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
+import { useEstadoCuentaBancariaQuery, useEstadoCuentaCajaQuery } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
 import { exportEstadoCuentaExcel, exportEstadoCuentaPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
 import { useCajasChicasQuery, useCuentasBancariasCajaQuery } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
@@ -59,6 +59,21 @@ export function SaldosCajaPage() {
 
   const estadoCuentaQuery = useEstadoCuentaCajaQuery(cajaId ? Number(cajaId) : undefined);
   const estadoCuenta = estadoCuentaQuery.data?.data;
+
+  // El bloque de arriba ("Saldo de caja/banco") alterna entre mostrar el
+  // detalle de una caja o el de una cuenta bancaria — se elige con las
+  // pestañas de ahí mismo, o haciendo clic en una de las tarjetas de abajo.
+  const [vistaSaldo, setVistaSaldo] = useState<"CAJA" | "BANCO">("CAJA");
+  const [cuentaSaldoId, setCuentaSaldoId] = useState("");
+  useEffect(() => {
+    if (!cuentaSaldoId && cuentasBancarias.length > 0) setCuentaSaldoId(String(cuentasBancarias[0].id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuentasBancarias]);
+
+  const estadoCuentaBancariaQuery = useEstadoCuentaBancariaQuery(
+    vistaSaldo === "BANCO" && cuentaSaldoId ? Number(cuentaSaldoId) : undefined
+  );
+  const estadoCuentaBancaria = estadoCuentaBancariaQuery.data?.data;
 
   const movimientosFondoQuery = useMovimientosFondoCajaQuery(cajaId ? Number(cajaId) : undefined);
   const movimientosFondo = movimientosFondoQuery.data?.data ?? [];
@@ -214,20 +229,57 @@ export function SaldosCajaPage() {
         </div>
       </header>
 
-      {/* Saldo de la caja seleccionada */}
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+      {/* Saldo de la caja o cuenta bancaria seleccionada */}
+      <article
+        className={`rounded-xl border-2 p-5 ${
+          vistaSaldo === "CAJA"
+            ? "border-[var(--color-primary)]/40 bg-[var(--color-primary)]/[0.06]"
+            : "border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.06]"
+        }`}
+      >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-lg font-bold">
-            <PiggyBank size={16} className="text-[var(--color-primary)]" />
-            Saldo de caja
-          </h2>
           <div className="flex items-center gap-2">
-            <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={`${inputClassName} w-64`}>
-              {cajas.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
-            {estadoCuenta ? (
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                vistaSaldo === "CAJA"
+                  ? "bg-[var(--color-primary)]/20 text-[var(--color-primary)]"
+                  : "bg-[var(--color-tertiary)]/20 text-[var(--color-tertiary)]"
+              }`}
+            >
+              {vistaSaldo === "CAJA" ? <PiggyBank size={14} /> : <Landmark size={14} />}
+            </span>
+            <div className="flex rounded-lg border border-[var(--color-outline-variant)] p-0.5 text-xs font-bold uppercase tracking-wide">
+              <button
+                type="button"
+                onClick={() => setVistaSaldo("CAJA")}
+                className={`rounded-md px-3 py-1.5 transition ${vistaSaldo === "CAJA" ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "text-[var(--color-on-surface-variant)]"}`}
+              >
+                Caja
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaSaldo("BANCO")}
+                className={`rounded-md px-3 py-1.5 transition ${vistaSaldo === "BANCO" ? "bg-[var(--color-tertiary)] text-[var(--color-on-primary)]" : "text-[var(--color-on-surface-variant)]"}`}
+              >
+                Banco
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {vistaSaldo === "CAJA" ? (
+              <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={`${inputClassName} w-64`}>
+                {cajas.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+            ) : (
+              <select value={cuentaSaldoId} onChange={(e) => setCuentaSaldoId(e.target.value)} className={`${inputClassName} w-64`}>
+                {cuentasBancarias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
+                ))}
+              </select>
+            )}
+            {vistaSaldo === "CAJA" && estadoCuenta ? (
               <div className="flex gap-2">
                 <button type="button" onClick={() => exportEstadoCuentaExcel(estadoCuenta)} className={buttonSecondaryClassName}>
                   <FileSpreadsheet size={13} /> Excel
@@ -240,25 +292,78 @@ export function SaldosCajaPage() {
           </div>
         </div>
 
-        {estadoCuentaQuery.isLoading ? (
+        {vistaSaldo === "CAJA" ? (
+          estadoCuentaQuery.isLoading ? (
+            <p className="text-sm text-[var(--color-on-surface-variant)]">Calculando saldo...</p>
+          ) : estadoCuenta ? (
+            <>
+              <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-4">
+                <p>
+                  <span className="block text-[11px] text-[var(--color-on-surface-variant)]">
+                    Saldo inicial{estadoCuenta.fechaCorte ? ` (cierre del ${formatFecha(estadoCuenta.fechaCorte)})` : " (declarado en Parámetros)"}
+                  </span>
+                  {formatMoneda(estadoCuenta.saldoInicial)}
+                </p>
+                <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">+ Fondos recibidos</span><span className="text-[var(--color-success)]">{formatMoneda(estadoCuenta.totalIngresos)}</span></p>
+                <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">− Gastos</span><span className="text-[var(--color-error)]">{formatMoneda(estadoCuenta.totalEgresos)}</span></p>
+                <p className="font-extrabold text-[var(--color-primary)]">
+                  <span className="block text-[11px] font-normal text-[var(--color-on-surface-variant)]">= Saldo actual disponible</span>
+                  <span className="font-mono text-lg">{estadoCuenta.caja.monedaBase} {formatMoneda(estadoCuenta.saldoActual)}</span>
+                </p>
+              </div>
+              <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-lg border border-[var(--color-outline-variant)] p-2">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead className="sticky top-0 bg-[var(--color-surface-container-low)]">
+                    <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                      <th className="py-1 pr-3">Fecha</th>
+                      <th className="py-1 pr-3">Detalle</th>
+                      <th className="py-1 pr-3 text-right">Ingreso</th>
+                      <th className="py-1 pr-3 text-right">Egreso</th>
+                      <th className="py-1 text-right">Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border-soft)]">
+                    {estadoCuenta.movimientos.map((m, index) => (
+                      <tr key={index}>
+                        <td className="py-1 pr-3">{formatFecha(m.fecha)}</td>
+                        <td className="py-1 pr-3">
+                          <span className={`mr-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${m.tipo === "FONDO" ? "bg-[var(--color-success)]/18 text-[var(--color-success)]" : "bg-[var(--color-error)]/18 text-[var(--color-error)]"}`}>
+                            {m.tipo === "FONDO" ? "Fondo" : "Gasto"}
+                          </span>
+                          {m.detalle}{m.referencia ? ` · ${m.referencia}` : ""}
+                        </td>
+                        <td className="py-1 pr-3 text-right text-[var(--color-success)]">{m.ingreso > 0 ? formatMoneda(m.ingreso) : ""}</td>
+                        <td className="py-1 pr-3 text-right text-[var(--color-error)]">{m.egreso > 0 ? formatMoneda(m.egreso) : ""}</td>
+                        <td className="py-1 text-right font-semibold">{formatMoneda(m.saldo)}</td>
+                      </tr>
+                    ))}
+                    {estadoCuenta.movimientos.length === 0 ? (
+                      <tr><td colSpan={5} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin movimientos desde el saldo inicial.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--color-on-surface-variant)]">Selecciona una caja para ver su saldo.</p>
+          )
+        ) : estadoCuentaBancariaQuery.isLoading ? (
           <p className="text-sm text-[var(--color-on-surface-variant)]">Calculando saldo...</p>
-        ) : estadoCuenta ? (
+        ) : estadoCuentaBancaria ? (
           <>
-            <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-4">
+            <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-4">
               <p>
-                <span className="block text-[11px] text-[var(--color-on-surface-variant)]">
-                  Saldo inicial{estadoCuenta.fechaCorte ? ` (cierre del ${formatFecha(estadoCuenta.fechaCorte)})` : " (declarado en Parámetros)"}
-                </span>
-                {formatMoneda(estadoCuenta.saldoInicial)}
+                <span className="block text-[11px] text-[var(--color-on-surface-variant)]">Saldo inicial (declarado en Parámetros)</span>
+                {formatMoneda(estadoCuentaBancaria.saldoInicial)}
               </p>
-              <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">+ Fondos recibidos</span>{formatMoneda(estadoCuenta.totalIngresos)}</p>
-              <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">− Gastos</span>{formatMoneda(estadoCuenta.totalEgresos)}</p>
-              <p className="font-bold text-[var(--color-primary)]">
+              <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">+ Ingresos</span><span className="text-[var(--color-success)]">{formatMoneda(estadoCuentaBancaria.totalIngresos)}</span></p>
+              <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">− Salidas y gastos</span><span className="text-[var(--color-error)]">{formatMoneda(estadoCuentaBancaria.totalEgresos)}</span></p>
+              <p className="font-extrabold text-[var(--color-tertiary)]">
                 <span className="block text-[11px] font-normal text-[var(--color-on-surface-variant)]">= Saldo actual disponible</span>
-                {estadoCuenta.caja.monedaBase} {formatMoneda(estadoCuenta.saldoActual)}
+                <span className="font-mono text-lg">{estadoCuentaBancaria.cuenta.monedaBase} {formatMoneda(estadoCuentaBancaria.saldoActual)}</span>
               </p>
             </div>
-            <div className="max-h-72 overflow-y-auto overflow-x-auto">
+            <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-lg border border-[var(--color-outline-variant)] p-2">
               <table className="w-full border-collapse text-left text-xs">
                 <thead className="sticky top-0 bg-[var(--color-surface-container-low)]">
                   <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
@@ -270,12 +375,12 @@ export function SaldosCajaPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border-soft)]">
-                  {estadoCuenta.movimientos.map((m, index) => (
+                  {estadoCuentaBancaria.movimientos.map((m, index) => (
                     <tr key={index}>
                       <td className="py-1 pr-3">{formatFecha(m.fecha)}</td>
                       <td className="py-1 pr-3">
                         <span className={`mr-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${m.tipo === "FONDO" ? "bg-[var(--color-success)]/18 text-[var(--color-success)]" : "bg-[var(--color-error)]/18 text-[var(--color-error)]"}`}>
-                          {m.tipo === "FONDO" ? "Fondo" : "Gasto"}
+                          {m.tipo === "FONDO" ? "Mov." : "Gasto"}
                         </span>
                         {m.detalle}{m.referencia ? ` · ${m.referencia}` : ""}
                       </td>
@@ -284,7 +389,7 @@ export function SaldosCajaPage() {
                       <td className="py-1 text-right font-semibold">{formatMoneda(m.saldo)}</td>
                     </tr>
                   ))}
-                  {estadoCuenta.movimientos.length === 0 ? (
+                  {estadoCuentaBancaria.movimientos.length === 0 ? (
                     <tr><td colSpan={5} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin movimientos desde el saldo inicial.</td></tr>
                   ) : null}
                 </tbody>
@@ -292,34 +397,57 @@ export function SaldosCajaPage() {
             </div>
           </>
         ) : (
-          <p className="text-sm text-[var(--color-on-surface-variant)]">Selecciona una caja para ver su saldo.</p>
+          <p className="text-sm text-[var(--color-on-surface-variant)]">Selecciona una cuenta bancaria para ver su saldo.</p>
         )}
       </article>
 
       {/* Saldo de cuentas bancarias */}
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
-          <Landmark size={16} className="text-[var(--color-primary)]" />
+      <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.06] p-5">
+        <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-tertiary)]">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-tertiary)]/20 text-[var(--color-tertiary)]">
+            <Landmark size={14} />
+          </span>
           Saldo de cuentas bancarias
         </h2>
         <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
           Saldo inicial declarado + ingresos registrados − salidas hacia cajas. Si no coincide con tu
-          extracto bancario real, es porque falta registrar un ingreso o una salida — agrégalo abajo.
+          extracto bancario real, es porque falta registrar un ingreso o una salida — agrégalo abajo. Haz
+          clic en una tarjeta para ver su detalle completo arriba.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {estadoCuenta ? (
-            <div className="rounded-lg border border-[var(--color-primary)]/35 bg-[var(--color-primary)]/6 p-4">
+            <button
+              type="button"
+              onClick={() => setVistaSaldo("CAJA")}
+              className={`rounded-lg border p-4 text-left transition ${
+                vistaSaldo === "CAJA"
+                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 ring-1 ring-[var(--color-primary)]"
+                  : "border-[var(--color-primary)]/35 bg-[var(--color-primary)]/6 hover:border-[var(--color-primary)]"
+              }`}
+            >
               <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]">Para comparar — caja</p>
               <p className="font-semibold">{estadoCuenta.caja.nombre}</p>
-              <p className="mt-2 text-lg font-bold text-[var(--color-primary)]">{estadoCuenta.caja.monedaBase} {formatMoneda(estadoCuenta.saldoActual)}</p>
-            </div>
+              <p className="mt-2 font-mono text-lg font-extrabold text-[var(--color-primary)]">{estadoCuenta.caja.monedaBase} {formatMoneda(estadoCuenta.saldoActual)}</p>
+            </button>
           ) : null}
           {cuentasBancarias.map((c) => (
-            <div key={c.id} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4">
+            <button
+              type="button"
+              key={c.id}
+              onClick={() => {
+                setVistaSaldo("BANCO");
+                setCuentaSaldoId(String(c.id));
+              }}
+              className={`rounded-lg border p-4 text-left transition ${
+                vistaSaldo === "BANCO" && cuentaSaldoId === String(c.id)
+                  ? "border-[var(--color-tertiary)] bg-[var(--color-tertiary)]/10 ring-1 ring-[var(--color-tertiary)]"
+                  : "border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] hover:border-[var(--color-tertiary)]"
+              }`}
+            >
               <p className="font-semibold">{c.banco}</p>
               <p className="text-xs text-[var(--color-on-surface-variant)]">{c.nombreCuenta}{c.numeroCuenta ? ` · N° ${c.numeroCuenta}` : ""}</p>
-              <p className="mt-2 text-lg font-bold text-[var(--color-primary)]">{c.monedaBase} {formatMoneda(c.saldoActual ?? 0)}</p>
-            </div>
+              <p className="mt-2 font-mono text-lg font-extrabold text-[var(--color-tertiary)]">{c.monedaBase} {formatMoneda(c.saldoActual ?? 0)}</p>
+            </button>
           ))}
           {cuentasBancarias.length === 0 ? (
             <p className="text-xs text-[var(--color-on-surface-variant)]">Aún no hay cuentas bancarias. Créalas en Parámetros.</p>
@@ -329,9 +457,11 @@ export function SaldosCajaPage() {
 
       {/* Registrar movimientos */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
-            <PiggyBank size={16} className="text-[var(--color-primary)]" />
+        <article className="rounded-xl border-2 border-[var(--color-success)]/40 bg-[var(--color-success)]/[0.05] p-5">
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-success)]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-success)]/20 text-[var(--color-success)]">
+              <PiggyBank size={14} />
+            </span>
             Fondo directo a la caja
           </h2>
           <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
@@ -373,9 +503,11 @@ export function SaldosCajaPage() {
           </div>
         </article>
 
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
-            <Banknote size={16} className="text-[var(--color-primary)]" />
+        <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.05] p-5">
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-tertiary)]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-tertiary)]/20 text-[var(--color-tertiary)]">
+              <Banknote size={14} />
+            </span>
             Salida de banco → caja
           </h2>
           <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
@@ -422,9 +554,11 @@ export function SaldosCajaPage() {
           </form>
         </article>
 
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
-            <Landmark size={16} className="text-[var(--color-primary)]" />
+        <article className="rounded-xl border-2 border-[var(--color-primary)]/40 bg-[var(--color-primary)]/[0.05] p-5">
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary)]/20 text-[var(--color-primary)]">
+              <Landmark size={14} />
+            </span>
             Ingreso a cuenta bancaria
           </h2>
           <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">

@@ -31,7 +31,15 @@ export const reporteDesgloseSchema = z.object({
   porCentroCosto: z.array(z.object({ centro: centroRef.nullable(), total: z.number() })),
   porFuncionGasto: z.array(z.object({ funcion: funcionRef.nullable(), total: z.number() })),
   porCuentaContable: z.array(z.object({ cuenta: cuentaRef.nullable(), total: z.number() })),
-  porCategoria: z.array(z.object({ categoria: z.string(), total: z.number() }))
+  porCategoria: z.array(z.object({ categoria: z.string(), total: z.number() })),
+  porOrigen: z.array(
+    z.object({
+      origen: z.enum(["CAJA", "BANCO"]),
+      moneda: z.enum(["BOB", "USD"]),
+      total: z.number(),
+      cantidad: z.number()
+    })
+  )
 });
 
 const cajaChicaRefSchema = z.object({
@@ -62,10 +70,31 @@ export const reporteEstadoCuentaSchema = z.object({
   movimientos: z.array(movimientoEstadoCuentaSchema)
 });
 
+const cuentaBancariaRefSchema = z.object({
+  id: z.number().int().positive(),
+  banco: z.string().min(1),
+  nombreCuenta: z.string().min(1),
+  numeroCuenta: z.string().nullable().optional(),
+  monedaBase: z.enum(["BOB", "USD"])
+});
+
+export const reporteEstadoCuentaBancariaSchema = z.object({
+  cuenta: cuentaBancariaRefSchema,
+  saldoInicial: z.number(),
+  totalIngresos: z.number(),
+  totalEgresos: z.number(),
+  saldoActual: z.number(),
+  movimientos: z.array(movimientoEstadoCuentaSchema)
+});
+
 export const reporteRetencionesResponseSchema = z.object({ success: z.boolean(), data: reporteRetencionesSchema });
 export const reporteNoDeduciblesResponseSchema = z.object({ success: z.boolean(), data: reporteNoDeduciblesSchema });
 export const reporteDesgloseResponseSchema = z.object({ success: z.boolean(), data: reporteDesgloseSchema });
 export const reporteEstadoCuentaResponseSchema = z.object({ success: z.boolean(), data: reporteEstadoCuentaSchema });
+export const reporteEstadoCuentaBancariaResponseSchema = z.object({
+  success: z.boolean(),
+  data: reporteEstadoCuentaBancariaSchema
+});
 
 const movimientoFondoRefSchema = z.object({
   id: z.string().min(1),
@@ -140,5 +169,6 @@ export type ReporteRetenciones = z.infer<typeof reporteRetencionesSchema>;
 export type ReporteNoDeducibles = z.infer<typeof reporteNoDeduciblesSchema>;
 export type ReporteDesglose = z.infer<typeof reporteDesgloseSchema>;
 export type ReporteEstadoCuenta = z.infer<typeof reporteEstadoCuentaSchema>;
+export type ReporteEstadoCuentaBancaria = z.infer<typeof reporteEstadoCuentaBancariaSchema>;
 export type ReporteRendicion = z.infer<typeof reporteRendicionSchema>;
 export type ReporteComprobanteDiario = z.infer<typeof reporteComprobanteDiarioSchema>;

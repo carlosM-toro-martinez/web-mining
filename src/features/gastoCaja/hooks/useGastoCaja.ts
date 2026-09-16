@@ -21,14 +21,17 @@ export function useGastosCajaQuery(params: GastosCajaQueryParams = {}) {
   });
 }
 
-// Un gasto (de caja o directo del banco) cambia el saldo disponible, así
-// que además de refrescar la lista de gastos hay que invalidar el estado de
-// cuenta (Saldos y Movimientos) y el saldo de cuentas bancarias.
+// Un gasto (de caja o directo del banco) cambia el saldo disponible y, si
+// está imputado a una partida, también su saldo a favor — así que además de
+// refrescar la lista de gastos hay que invalidar el estado de cuenta
+// (Saldos y Movimientos), el saldo de cuentas bancarias, y todo lo de
+// parametrosCajaChica (incluye partidas-presupuesto, de donde sale el panel
+// de "partidas pendientes" de Gastos) para que se vea al instante.
 async function invalidarSaldos(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.reportesCajaChica.all }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() })
+    queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.all })
   ]);
 }
 

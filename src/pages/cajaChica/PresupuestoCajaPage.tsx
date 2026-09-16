@@ -1,10 +1,14 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Check, FileSpreadsheet, FileText, History, Landmark, ListFilter, Plus, Trash2, Wallet } from "lucide-react";
+import { CATEGORIA_RENDICION_LABEL, type CategoriaRendicionGasto } from "@/features/gastoCaja/model/gastoCaja.schema";
 import {
   useCajasChicasQuery,
+  useCentrosCostoCajaQuery,
   useCreatePartidaPresupuestoCajaMutation,
   useCuentasBancariasCajaQuery,
+  useCuentasContablesCajaQuery,
   useDeletePartidaPresupuestoCajaMutation,
+  useFuncionesGastoCajaQuery,
   usePartidasPresupuestoCajaQuery
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
@@ -18,6 +22,7 @@ import {
 } from "@/features/presupuestoCaja/hooks/usePresupuestoCaja";
 import type { PresupuestoCaja } from "@/features/presupuestoCaja/model/presupuestoCaja.schema";
 import { ApiError } from "@/shared/api/core/apiError";
+import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -52,9 +57,12 @@ function normalizeError(error: unknown, fallbackMessage: string) {
 interface RemesaCardProps {
   presupuesto: PresupuestoCaja;
   cuentasBancarias: Array<{ id: number; banco: string; nombreCuenta: string; monedaBase: string }>;
+  centroOptions: Array<{ id: string; label: string; searchText: string }>;
+  funcionOptions: Array<{ id: string; label: string; searchText: string }>;
+  cuentaOptions: Array<{ id: string; label: string; searchText: string }>;
 }
 
-function RemesaCard({ presupuesto, cuentasBancarias }: RemesaCardProps) {
+function RemesaCard({ presupuesto, cuentasBancarias, centroOptions, funcionOptions, cuentaOptions }: RemesaCardProps) {
   const { showError, showSuccess } = useToast();
 
   const partidasQuery = usePartidasPresupuestoCajaQuery({ presupuestoId: presupuesto.id });
@@ -62,6 +70,10 @@ function RemesaCard({ presupuesto, cuentasBancarias }: RemesaCardProps) {
 
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
+  const [centroCostoCajaId, setCentroCostoCajaId] = useState("");
+  const [funcionGastoCajaId, setFuncionGastoCajaId] = useState("");
+  const [cuentaContableCajaId, setCuentaContableCajaId] = useState("");
+  const [categoriaRendicion, setCategoriaRendicion] = useState<CategoriaRendicionGasto | "">("");
   const [bancoDestinoId, setBancoDestinoId] = useState("");
 
   const createPartidaMutation = useCreatePartidaPresupuestoCajaMutation();
@@ -78,7 +90,15 @@ function RemesaCard({ presupuesto, cuentasBancarias }: RemesaCardProps) {
   function handleCreatePartida(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     createPartidaMutation.mutate(
-      { presupuestoId: presupuesto.id, descripcion, montoPresupuestado: Number(monto) },
+      {
+        presupuestoId: presupuesto.id,
+        descripcion,
+        montoPresupuestado: Number(monto),
+        centroCostoCajaId: centroCostoCajaId ? Number(centroCostoCajaId) : undefined,
+        funcionGastoCajaId: funcionGastoCajaId ? Number(funcionGastoCajaId) : undefined,
+        cuentaContableCajaId: cuentaContableCajaId ? Number(cuentaContableCajaId) : undefined,
+        categoriaRendicion: categoriaRendicion || undefined
+      },
       {
         onSuccess: () => {
           showSuccess("Partida agregada.");
@@ -197,6 +217,46 @@ function RemesaCard({ presupuesto, cuentasBancarias }: RemesaCardProps) {
         >
           {createPartidaMutation.isPending ? "Guardando..." : "Agregar partida"}
         </button>
+
+        <div className="sm:col-span-3">
+          <p className="mb-1.5 text-[11px] text-[var(--color-on-surface-variant)]">
+            Clasificación (opcional): si la llenas, al registrar el gasto real que ejecuta esta partida el
+            formulario se autocompleta con esto.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <AutocompleteSelect
+              value={centroCostoCajaId}
+              onChange={setCentroCostoCajaId}
+              options={centroOptions}
+              placeholder="Centro de costo..."
+              className={inputClassName}
+            />
+            <AutocompleteSelect
+              value={funcionGastoCajaId}
+              onChange={setFuncionGastoCajaId}
+              options={funcionOptions}
+              placeholder="Función de gasto..."
+              className={inputClassName}
+            />
+            <AutocompleteSelect
+              value={cuentaContableCajaId}
+              onChange={setCuentaContableCajaId}
+              options={cuentaOptions}
+              placeholder="Cuenta contable..."
+              className={inputClassName}
+            />
+            <select
+              value={categoriaRendicion}
+              onChange={(e) => setCategoriaRendicion(e.target.value as CategoriaRendicionGasto | "")}
+              className={inputClassName}
+            >
+              <option value="">Categoría del reporte...</option>
+              {Object.entries(CATEGORIA_RENDICION_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </form>
 
       <div className="overflow-x-auto">
@@ -248,6 +308,24 @@ export function PresupuestoCajaPage() {
   const cajas = cajasQuery.data?.data ?? [];
   const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
   const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
+  const centrosQuery = useCentrosCostoCajaQuery();
+  const funcionesQuery = useFuncionesGastoCajaQuery();
+  const cuentasContablesQuery = useCuentasContablesCajaQuery();
+  const centros = centrosQuery.data?.data.filter((c) => c.parentId !== null) ?? [];
+  const funciones = funcionesQuery.data?.data.filter((f) => f.parentId !== null) ?? [];
+  const cuentasContables = cuentasContablesQuery.data?.data ?? [];
+  const centroOptions = useMemo(
+    () => centros.map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
+    [centros]
+  );
+  const funcionOptions = useMemo(
+    () => funciones.map((f) => ({ id: String(f.id), label: `${f.codigo} · ${f.nombre}`, searchText: f.codigo })),
+    [funciones]
+  );
+  const cuentaOptions = useMemo(
+    () => cuentasContables.map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
+    [cuentasContables]
+  );
 
   const [cajaId, setCajaId] = useState("");
   const [anio, setAnio] = useState(now.getFullYear());
@@ -460,7 +538,14 @@ export function PresupuestoCajaPage() {
             Remesas de {periodoLabel} ({presupuestos.length})
           </h3>
           {presupuestos.map((p) => (
-            <RemesaCard key={p.id} presupuesto={p} cuentasBancarias={cuentasBancarias} />
+            <RemesaCard
+              key={p.id}
+              presupuesto={p}
+              cuentasBancarias={cuentasBancarias}
+              centroOptions={centroOptions}
+              funcionOptions={funcionOptions}
+              cuentaOptions={cuentaOptions}
+            />
           ))}
         </>
       )}

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AlertTriangle, FileBarChart2, FileSpreadsheet, FileText, PieChart, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Banknote, FileBarChart2, FileSpreadsheet, FileText, Landmark, PieChart, Scale, Search, Wallet } from "lucide-react";
 import {
   useReporteDesgloseQuery,
   useReporteNoDeduciblesQuery,
@@ -64,6 +64,18 @@ export function ReportesCajaChicaPage() {
   const noDeducibles = noDeduciblesQuery.data?.data;
   const desglose = desgloseQuery.data?.data;
 
+  const porOrigenOrdenado = useMemo(
+    () => [...(desglose?.porOrigen ?? [])].sort((a, b) => b.total - a.total),
+    [desglose]
+  );
+  const totalCaja = porOrigenOrdenado.filter((o) => o.origen === "CAJA");
+  const totalBanco = porOrigenOrdenado.filter((o) => o.origen === "BANCO");
+
+  const porCentroOrdenado = useMemo(() => [...(desglose?.porCentroCosto ?? [])].sort((a, b) => b.total - a.total), [desglose]);
+  const porFuncionOrdenado = useMemo(() => [...(desglose?.porFuncionGasto ?? [])].sort((a, b) => b.total - a.total), [desglose]);
+  const porCuentaOrdenado = useMemo(() => [...(desglose?.porCuentaContable ?? [])].sort((a, b) => b.total - a.total), [desglose]);
+  const porCategoriaOrdenado = useMemo(() => [...(desglose?.porCategoria ?? [])].sort((a, b) => b.total - a.total), [desglose]);
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -86,7 +98,13 @@ export function ReportesCajaChicaPage() {
         </div>
       </header>
 
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+      <article className="rounded-xl border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-secondary)]/16 text-[var(--color-secondary)]">
+            <Search size={14} />
+          </span>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface)]">Período a consultar</h2>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={inputClassName}>
             <option value="">Todas las cajas</option>
@@ -108,9 +126,63 @@ export function ReportesCajaChicaPage() {
 
       {consultado ? (
         <>
-          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+          <article className="rounded-xl border-2 border-[var(--color-primary)]/40 bg-[var(--color-primary)]/[0.06] p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary)]/20 text-[var(--color-primary)]">
+                <Scale size={14} />
+              </span>
+              <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
+                Cuánto se gastó: caja vs. banco
+              </h2>
+            </div>
+            {desglose ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-4">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+                    <Wallet size={13} className="text-[var(--color-success)]" /> Desde caja
+                  </p>
+                  {totalCaja.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">Sin gastos de caja en este período.</p>
+                  ) : (
+                    <div className="mt-2 space-y-1">
+                      {totalCaja.map((o) => (
+                        <p key={`${o.origen}-${o.moneda}`} className="flex items-baseline justify-between">
+                          <span className="text-xs text-[var(--color-on-surface-variant)]">{o.cantidad} gasto(s) en {o.moneda}</span>
+                          <span className="font-mono text-xl font-extrabold text-[var(--color-success)]">{o.moneda} {formatMoneda(o.total)}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-4">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+                    <Landmark size={13} className="text-[var(--color-tertiary)]" /> Directo del banco
+                  </p>
+                  {totalBanco.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">Sin gastos directos de banco en este período.</p>
+                  ) : (
+                    <div className="mt-2 space-y-1">
+                      {totalBanco.map((o) => (
+                        <p key={`${o.origen}-${o.moneda}`} className="flex items-baseline justify-between">
+                          <span className="text-xs text-[var(--color-on-surface-variant)]">{o.cantidad} gasto(s) en {o.moneda}</span>
+                          <span className="font-mono text-xl font-extrabold text-[var(--color-tertiary)]">{o.moneda} {formatMoneda(o.total)}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando...</p>
+            )}
+          </article>
+
+          <article className="rounded-xl border-2 border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-bold">Resumen de retenciones</h2>
+              <h2 className="flex items-center gap-2 text-lg font-bold">
+                <Banknote size={16} className="text-[var(--color-on-surface-variant)]" />
+                Resumen de retenciones
+              </h2>
               {retenciones ? (
                 <div className="flex gap-2">
                   <button type="button" onClick={() => exportReporteRetencionesExcel(retenciones)} className={buttonSecondaryClassName}>
@@ -166,17 +238,19 @@ export function ReportesCajaChicaPage() {
             )}
           </article>
 
-          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-              <AlertTriangle size={16} className="text-[var(--color-warning)]" />
-              Gastos no deducibles
-            </h2>
+          <article className="rounded-xl border-2 border-[var(--color-warning)]/40 bg-[var(--color-warning)]/[0.06] p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-warning)]/20 text-[var(--color-warning)]">
+                <AlertTriangle size={14} />
+              </span>
+              <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--color-warning)]">Gastos no deducibles</h2>
+            </div>
             {noDeducibles ? (
               <>
-                <p className="mb-3 text-sm">Total: <span className="font-bold">{formatMoneda(noDeducibles.total)}</span></p>
+                <p className="mb-3 text-sm">Total: <span className="font-bold text-[var(--color-warning)]">{formatMoneda(noDeducibles.total)}</span></p>
                 <div className="space-y-2 text-sm">
                   {noDeducibles.gastos.map((g) => (
-                    <div key={g.id} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                    <div key={g.id} className="flex items-center justify-between rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] px-3 py-2">
                       <div>
                         <p className="font-semibold">{g.proveedorNombre}</p>
                         <p className="text-xs text-[var(--color-on-surface-variant)]">{g.glosa} · {formatFecha(g.fecha)}</p>
@@ -194,59 +268,63 @@ export function ReportesCajaChicaPage() {
             )}
           </article>
 
-          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-              <PieChart size={16} className="text-[var(--color-primary)]" />
-              Desglose por centro de costo, función de gasto y cuenta contable
-            </h2>
+          <article className="rounded-xl border-2 border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary)]/20 text-[var(--color-primary)]">
+                <PieChart size={14} />
+              </span>
+              <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface)]">
+                Desglose por centro de costo, función de gasto y cuenta contable
+              </h2>
+            </div>
             {desglose ? (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                  <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por centro de costo</h3>
+                  <h3 className="mb-2 border-l-2 border-[var(--color-primary)] pl-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por centro de costo</h3>
                   <div className="space-y-2 text-sm">
-                    {desglose.porCentroCosto.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                    {porCentroOrdenado.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-outline-variant)] px-3 py-2">
                         <span>{item.centro?.codigo} · {item.centro?.nombre}</span>
                         <span className="font-mono font-bold">{formatMoneda(item.total)}</span>
                       </div>
                     ))}
-                    {desglose.porCentroCosto.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
+                    {porCentroOrdenado.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
                   </div>
                 </div>
                 <div>
-                  <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por función de gasto</h3>
+                  <h3 className="mb-2 border-l-2 border-[var(--color-primary)] pl-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por función de gasto</h3>
                   <div className="space-y-2 text-sm">
-                    {desglose.porFuncionGasto.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                    {porFuncionOrdenado.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-outline-variant)] px-3 py-2">
                         <span>{item.funcion?.codigo} · {item.funcion?.nombre}</span>
                         <span className="font-mono font-bold">{formatMoneda(item.total)}</span>
                       </div>
                     ))}
-                    {desglose.porFuncionGasto.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
+                    {porFuncionOrdenado.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
                   </div>
                 </div>
                 <div>
-                  <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por cuenta contable</h3>
+                  <h3 className="mb-2 border-l-2 border-[var(--color-primary)] pl-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por cuenta contable</h3>
                   <div className="space-y-2 text-sm">
-                    {desglose.porCuentaContable.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                    {porCuentaOrdenado.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-outline-variant)] px-3 py-2">
                         <span>{item.cuenta?.codigo} · {item.cuenta?.nombre}</span>
                         <span className="font-mono font-bold">{formatMoneda(item.total)}</span>
                       </div>
                     ))}
-                    {desglose.porCuentaContable.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
+                    {porCuentaOrdenado.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
                   </div>
                 </div>
                 <div>
-                  <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por categoría del reporte mensual</h3>
+                  <h3 className="mb-2 border-l-2 border-[var(--color-primary)] pl-2 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Por categoría del reporte mensual</h3>
                   <div className="space-y-2 text-sm">
-                    {desglose.porCategoria.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                    {porCategoriaOrdenado.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-lg border border-[var(--color-outline-variant)] px-3 py-2">
                         <span>{item.categoria}</span>
                         <span className="font-mono font-bold">{formatMoneda(item.total)}</span>
                       </div>
                     ))}
-                    {desglose.porCategoria.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
+                    {porCategoriaOrdenado.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Sin datos en este período.</p> : null}
                   </div>
                 </div>
               </div>

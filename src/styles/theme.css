@@ -15,6 +15,7 @@
   --color-tertiary: #ffb14b;
   --color-success: #56d364;
   --color-error: #ff6b6b;
+  --color-warning: #fbbf24;
   --color-outline-variant: #37476d;
   --color-border-soft: rgb(255 255 255 / 5%);
   --auth-overlay: rgb(3 10 22 / 52%);
@@ -45,6 +46,7 @@
   --color-tertiary: #b67722;
   --color-success: #1f9d55;
   --color-error: #d64343;
+  --color-warning: #92660c;
   --color-outline-variant: #b4c3dc;
   --color-border-soft: rgb(16 32 58 / 9%);
   --auth-overlay: rgb(3 10 22 / 52%);

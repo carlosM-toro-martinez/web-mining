@@ -128,13 +128,32 @@ export const createCuentaBancariaCajaPayloadSchema = z.object({
 export const updateCuentaBancariaCajaPayloadSchema = createCuentaBancariaCajaPayloadSchema.partial();
 
 // --- Partida de presupuesto (línea de detalle, vive bajo una remesa/PresupuestoCaja) ---
+export const categoriaRendicionGastoSchema = z.enum([
+  "MATERIALES_SUMINISTROS",
+  "TRANSPORTES",
+  "ACTIVOS_FIJOS",
+  "MANTENIMIENTO_SERVICIOS",
+  "OBLIGACIONES_SOCIALES",
+  "OBRAS_CONSTRUCCION",
+  "GASTOS_ADMINISTRATIVOS",
+  "OTROS_GASTOS_ADMINISTRATIVOS",
+  "OTROS",
+  "MEDIO_AMBIENTE"
+]);
+
 export const partidaPresupuestoCajaSchema = z.object({
   id: z.number().int().positive(),
   presupuestoId: z.number().int().positive(),
   descripcion: z.string().min(1),
   montoPresupuestado: z.union([z.string(), z.number()]),
+  // Clasificación opcional guardada en la partida: si el usuario la llenó al
+  // crear la partida, sirve de plantilla para autocompletar el gasto real.
+  centroCostoCajaId: z.number().int().positive().nullable().optional(),
+  funcionGastoCajaId: z.number().int().positive().nullable().optional(),
+  cuentaContableCajaId: z.number().int().positive().nullable().optional(),
+  categoriaRendicion: categoriaRendicionGastoSchema.nullable().optional(),
   activo: z.boolean(),
-  caja: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).nullable().optional(),
+  caja: z.object({ id: z.number().int().positive(), nombre: z.string().min(1), monedaBase: monedaCajaSchema.optional() }).nullable().optional(),
   presupuesto: z
     .object({ id: z.number().int().positive(), nombre: z.string().min(1), anio: z.number().int(), mes: z.number().int() })
     .nullable()
@@ -146,7 +165,11 @@ export const partidaPresupuestoCajaSchema = z.object({
 export const createPartidaPresupuestoCajaPayloadSchema = z.object({
   presupuestoId: z.number().int().positive("Debes elegir una remesa/presupuesto."),
   descripcion: z.string().trim().min(1, "La descripción es obligatoria."),
-  montoPresupuestado: z.number().positive("El monto debe ser mayor a cero.")
+  montoPresupuestado: z.number().positive("El monto debe ser mayor a cero."),
+  centroCostoCajaId: z.number().int().positive().optional(),
+  funcionGastoCajaId: z.number().int().positive().optional(),
+  cuentaContableCajaId: z.number().int().positive().optional(),
+  categoriaRendicion: categoriaRendicionGastoSchema.optional()
 });
 export const updatePartidaPresupuestoCajaPayloadSchema = createPartidaPresupuestoCajaPayloadSchema.partial();
 
@@ -192,3 +215,4 @@ export type UpdateCuentaBancariaCajaPayload = z.infer<typeof updateCuentaBancari
 export type PartidaPresupuestoCaja = z.infer<typeof partidaPresupuestoCajaSchema>;
 export type CreatePartidaPresupuestoCajaPayload = z.infer<typeof createPartidaPresupuestoCajaPayloadSchema>;
 export type UpdatePartidaPresupuestoCajaPayload = z.infer<typeof updatePartidaPresupuestoCajaPayloadSchema>;
+export type CategoriaRendicionGasto = z.infer<typeof categoriaRendicionGastoSchema>;

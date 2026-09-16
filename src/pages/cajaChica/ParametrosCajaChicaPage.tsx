@@ -118,6 +118,7 @@ export function ParametrosCajaChicaPage() {
   const [editingCajaId, setEditingCajaId] = useState<number | null>(null);
   const [editCajaCodigo, setEditCajaCodigo] = useState("");
   const [editCajaNombre, setEditCajaNombre] = useState("");
+  const [editCajaSaldoInicial, setEditCajaSaldoInicial] = useState("0");
 
   // --- Centro de costo form ---
   const [centroCodigo, setCentroCodigo] = useState("");
@@ -191,11 +192,19 @@ export function ParametrosCajaChicaPage() {
     setEditingCajaId(caja.id);
     setEditCajaCodigo(caja.codigo);
     setEditCajaNombre(caja.nombre);
+    setEditCajaSaldoInicial(String(caja.saldoInicial));
   }
 
   function handleSaveCaja(id: number) {
     updateCajaMutation.mutate(
-      { id, payload: { codigo: editCajaCodigo, nombre: editCajaNombre } },
+      {
+        id,
+        payload: {
+          codigo: editCajaCodigo,
+          nombre: editCajaNombre,
+          saldoInicial: Number(editCajaSaldoInicial) || 0
+        }
+      },
       {
         onSuccess: () => {
           showSuccess("Caja actualizada.");
@@ -405,6 +414,17 @@ export function ParametrosCajaChicaPage() {
                 <div key={item.id} className="space-y-2 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5 px-3 py-2">
                   <input value={editCajaCodigo} onChange={(e) => setEditCajaCodigo(e.target.value)} className={`${inputClassName} font-mono`} />
                   <input value={editCajaNombre} onChange={(e) => setEditCajaNombre(e.target.value)} className={inputClassName} />
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Monto inicial</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editCajaSaldoInicial}
+                      onChange={(e) => setEditCajaSaldoInicial(e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => handleSaveCaja(item.id)} className="flex items-center gap-1 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)]">
                       <Check size={12} /> Guardar
