@@ -3,6 +3,7 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   centroCostoResponseSchema,
   centrosCostoListResponseSchema,
+  cuentaMovimientosResponseSchema,
   cuentaResponseSchema,
   cuentasListResponseSchema,
   createCentroCostoPayloadSchema,
@@ -166,4 +167,12 @@ export async function createSalidaMovimiento(payload: CreateSalidaPayload) {
     body,
     schema: salidaMovimientoResponseSchema
   });
+}
+
+export async function getCuentaMovimientos(id: number) {
+  const result = await getRequest({
+    url: apiEndpoints.contabilidad.cuentaMovimientos(id),
+    schema: cuentaMovimientosResponseSchema
+  });
+  return result.data;
 }

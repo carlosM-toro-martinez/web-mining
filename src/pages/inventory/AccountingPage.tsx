@@ -1,9 +1,12 @@
 import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
 import {
   Calculator,
+  ChevronDown,
+  ChevronRight,
   Download,
   FileSpreadsheet,
   Landmark,
+  Loader2,
   MapPinned,
   Pencil,
   Plus,
@@ -21,6 +24,7 @@ import {
   useCreateFuncionGastoMutation,
   useCreateSalidaMovimientoMutation,
   useCreateSectorMutation,
+  useCuentaMovimientosQuery,
   useCuentasQuery,
   useDeleteCentroCostoMutation,
   useDeleteCuentaMutation,
@@ -118,6 +122,10 @@ export function AccountingPage() {
   const [funcionSearch, setFuncionSearch] = useState("");
   const [sectorSearch, setSectorSearch] = useState("");
   const [cuentaSearch, setCuentaSearch] = useState("");
+
+  // Estado para expandir movimientos de una cuenta
+  const [expandedCuentaId, setExpandedCuentaId] = useState<number | null>(null);
+  const cuentaMovimientosQuery = useCuentaMovimientosQuery(expandedCuentaId);
 
   // Estado de edición inline
   const [editingCentroId, setEditingCentroId] = useState<number | null>(null);
@@ -1314,23 +1322,94 @@ export function AccountingPage() {
                     </td>
                   </tr>
                 ) : (
-                  <tr key={cuenta.id} className="group transition hover:bg-[var(--color-surface-container-highest)]">
-                    <td className="px-3 py-2 font-mono text-xs uppercase">{cuenta.codigoCompleto}</td>
-                    <td className="px-3 py-2 text-sm">{cuenta.centroCosto.codigo} - {cuenta.centroCosto.nombre}</td>
-                    <td className="px-3 py-2 text-sm">{cuenta.funcionGasto.codigo} - {cuenta.funcionGasto.nombre}</td>
-                    <td className="px-3 py-2 text-sm">{cuenta.sector ? `${cuenta.sector.codigo} - ${cuenta.sector.nombre}` : "Sin sector"}</td>
-                    <td className="px-3 py-2 text-right text-xs">{cuenta._count?.movimientos ?? 0}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
-                        <button type="button" onClick={() => startEditCuenta(cuenta)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
-                          <Pencil size={14} />
-                        </button>
-                        <button type="button" onClick={() => handleDeleteCuenta(cuenta.id)} disabled={deleteCuentaMutation.isPending} className="rounded p-1 hover:bg-[var(--color-error)]/10 text-[var(--color-error)]" title="Eliminar">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={cuenta.id} className="group transition hover:bg-[var(--color-surface-container-highest)]">
+                      <td className="px-3 py-2 font-mono text-xs uppercase">{cuenta.codigoCompleto}</td>
+                      <td className="px-3 py-2 text-sm">{cuenta.centroCosto.codigo} - {cuenta.centroCosto.nombre}</td>
+                      <td className="px-3 py-2 text-sm">{cuenta.funcionGasto.codigo} - {cuenta.funcionGasto.nombre}</td>
+                      <td className="px-3 py-2 text-sm">
+                        {cuenta.sector
+                          ? `${cuenta.sector.codigo} - ${cuenta.sector.nombre}`
+                          : <span className="text-[var(--color-error)] font-semibold">Sin sector</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs">
+                        {(cuenta._count?.movimientos ?? 0) > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedCuentaId(expandedCuentaId === cuenta.id ? null : cuenta.id)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition"
+                          >
+                            {expandedCuentaId === cuenta.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            {cuenta._count?.movimientos}
+                          </button>
+                        ) : (
+                          <span className="text-[var(--color-on-surface-variant)]">0</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+                          <button type="button" onClick={() => startEditCuenta(cuenta)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
+                            <Pencil size={14} />
+                          </button>
+                          <button type="button" onClick={() => handleDeleteCuenta(cuenta.id)} disabled={deleteCuentaMutation.isPending} className="rounded p-1 hover:bg-[var(--color-error)]/10 text-[var(--color-error)]" title="Eliminar">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedCuentaId === cuenta.id && (
+                      <tr key={`${cuenta.id}-movs`}>
+                        <td colSpan={6} className="bg-[var(--color-surface-container-highest)] px-4 pb-3 pt-1">
+                          {cuentaMovimientosQuery.isLoading ? (
+                            <div className="flex items-center gap-2 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                              <Loader2 size={12} className="animate-spin" /> Cargando movimientos...
+                            </div>
+                          ) : cuentaMovimientosQuery.data?.length === 0 ? (
+                            <p className="py-2 text-xs text-[var(--color-on-surface-variant)]">Sin movimientos registrados.</p>
+                          ) : (
+                            <div className="overflow-x-auto rounded-lg border border-[var(--color-border-soft)]">
+                              <table className="w-full border-collapse text-left text-xs">
+                                <thead>
+                                  <tr className="bg-[var(--color-surface-container)]">
+                                    <th className="px-3 py-1.5 font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Producto</th>
+                                    <th className="px-3 py-1.5 font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Tipo</th>
+                                    <th className="px-3 py-1.5 font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Referencia</th>
+                                    <th className="px-3 py-1.5 text-right font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Cantidad</th>
+                                    <th className="px-3 py-1.5 text-right font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Bs</th>
+                                    <th className="px-3 py-1.5 font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Período</th>
+                                    <th className="px-3 py-1.5 font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">Fecha registro</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                                  {cuentaMovimientosQuery.data?.map((mov) => {
+                                    const mes = mov.periodoAnio && mov.periodoMes
+                                      ? `${String(mov.periodoMes).padStart(2, "0")}/${mov.periodoAnio}`
+                                      : new Date(mov.createdAt).toLocaleDateString("es-BO", { month: "2-digit", year: "numeric" });
+                                    const bs = mov.tipo === "SALIDA" ? Number(mov.salidaBs) : Number(mov.entradaBs);
+                                    return (
+                                      <tr key={mov.id} className="hover:bg-[var(--color-surface-container-low)]">
+                                        <td className="px-3 py-1.5 font-mono">{mov.producto.codigo} <span className="font-sans text-[var(--color-on-surface-variant)]">{mov.producto.nombre}</span></td>
+                                        <td className="px-3 py-1.5">
+                                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${mov.tipo === "SALIDA" ? "bg-[var(--color-error)]/15 text-[var(--color-error)]" : "bg-[var(--color-success)]/15 text-[var(--color-success)]"}`}>
+                                            {mov.tipo}
+                                          </span>
+                                        </td>
+                                        <td className="px-3 py-1.5 text-[var(--color-on-surface-variant)]">{mov.referencia ?? "-"} {mov.referenciaId ? `#${mov.referenciaId}` : ""}</td>
+                                        <td className="px-3 py-1.5 text-right tabular-nums">{Number(mov.cantidad).toLocaleString("es-BO", { maximumFractionDigits: 2 })}</td>
+                                        <td className="px-3 py-1.5 text-right tabular-nums">{bs.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td className="px-3 py-1.5 tabular-nums">{mes}</td>
+                                        <td className="px-3 py-1.5 text-[var(--color-on-surface-variant)]">{new Date(mov.createdAt).toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               )}
               {!cuentasFiltered.length ? (

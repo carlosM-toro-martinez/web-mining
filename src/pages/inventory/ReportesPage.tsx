@@ -507,14 +507,14 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
 
     sectoresSorted.forEach((sector, sectorIndex) => {
       const showDetails = shouldShowDiarioSectorDetails(sector);
-      const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? [])
-        .sort((a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? ""));
+      const sectorCuentas = (sectorNombreToCuentas.get(sector.sectorNombre ?? "") ?? []).sort(
+        (a, b) => (a.codigoCompleto ?? "").localeCompare(b.codigoCompleto ?? "")
+      );
       const centroCodigo = sectorCuentas[0]?.centroCostoCodigo ?? "";
       const funcionCodigo = sector.funcionGastos[0]?.codigo ?? "";
       const aglNum = aglBySectorIndex.get(sectorIndex);
-      const aglLabel = aglNum != null
-        ? `AGL-${String(aglNum).padStart(3, "0")}/${periodo.anio}`
-        : null;
+      const aglLabel =
+        aglNum != null ? `AGL-${String(aglNum).padStart(3, "0")}/${periodo.anio}` : null;
 
       rows.push({
         key: `sector-${sectorIndex}`,
@@ -537,12 +537,14 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
 
       if (showDetails) {
         // COSTO PRODUCCION / MEDIO AMBIENTE: individual per-vale lines with CC + FG
-        const costoLineas = (sector as any).costoLineas as Array<{
-          centroCostoCodigo: string;
-          funcionGastoCodigo: string;
-          funcionGastoNombre: string;
-          importeBs: number;
-        }> | undefined;
+        const costoLineas = (sector as any).costoLineas as
+          | Array<{
+              centroCostoCodigo: string;
+              funcionGastoCodigo: string;
+              funcionGastoNombre: string;
+              importeBs: number;
+            }>
+          | undefined;
 
         if (costoLineas && costoLineas.length > 0) {
           // Per-vale per-(CC+FG) breakdown from new backend field
@@ -565,22 +567,25 @@ function DiarioAlmacenesPreview({ response }: { response: DiarioAlmacenesReportR
         } else {
           // Fallback: use cuentasHaber entries — extract FG code from codigoCompleto "CC-FG-SECTOR"
           // Works with both old and new backend (new backend also sends funcionGastoCodigo directly)
-          const fgNameMap = new Map(sector.funcionGastos.map(fg => [fg.codigo, fg.nombre ?? fg.codigo]));
+          const fgNameMap = new Map(
+            sector.funcionGastos.map((fg) => [fg.codigo, fg.nombre ?? fg.codigo])
+          );
           const ccEntries = sectorCuentas
-            .map(cuenta => {
-              const fgCode = (cuenta as any).funcionGastoCodigo
-                ?? (cuenta.codigoCompleto ?? "").split("-")[1]
-                ?? "";
-              const fgName = (cuenta as any).funcionGastoNombre
-                ?? fgNameMap.get(fgCode)
-                ?? fgCode;
+            .map((cuenta) => {
+              const fgCode =
+                (cuenta as any).funcionGastoCodigo ??
+                (cuenta.codigoCompleto ?? "").split("-")[1] ??
+                "";
+              const fgName = (cuenta as any).funcionGastoNombre ?? fgNameMap.get(fgCode) ?? fgCode;
               return { cuenta, fgCode, fgName };
             })
-            .filter(e => Boolean(e.fgCode))
+            .filter((e) => Boolean(e.fgCode))
             .sort((a, b) => {
               const fgDiff = Number(a.fgCode) - Number(b.fgCode);
               if (fgDiff !== 0) return fgDiff;
-              return Number(a.cuenta.centroCostoCodigo ?? "") - Number(b.cuenta.centroCostoCodigo ?? "");
+              return (
+                Number(a.cuenta.centroCostoCodigo ?? "") - Number(b.cuenta.centroCostoCodigo ?? "")
+              );
             });
           if (ccEntries.length > 0) {
             ccEntries.forEach(({ cuenta, fgCode, fgName }, ci) => {
@@ -791,32 +796,34 @@ function MovimientoAlmacenPreview({ response }: { response: DiarioAlmacenesRepor
     }
   ];
 
-  sortMovimientoCuentas(diarioSectoresToReportCuentas(periodo.sectoresHaber)).forEach((cuenta, cuentaIndex) => {
-    const isCostoProduccion = isCostoProduccionCuenta(cuenta);
-    rows.push({
-      key: `cuenta-${cuentaIndex}`,
-      cargo: reportMovimientoCargo(cuenta),
-      descripcion: reportMovimientoTitulo(cuenta),
-      bs: isCostoProduccion ? "" : cuenta.totalBs,
-      haber: isCostoProduccion ? "" : cuenta.totalBs,
-      strong: true
-    });
-    rows.push({
-      key: `atencion-${cuentaIndex}`,
-      descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
-      haber: isCostoProduccion ? cuenta.totalBs : ""
-    });
-    const lineas = isCostoProduccion ? movimientoLineasPorFuncion(cuenta) : [];
-    if (lineas.length) {
-      lineas.forEach((linea, index) => {
-        rows.push({
-          key: `linea-${cuentaIndex}-${index}`,
-          descripcion: `${linea.codigo} - ${linea.nombre}`.trim(),
-          bs: linea.importeBs
-        });
+  sortMovimientoCuentas(diarioSectoresToReportCuentas(periodo.sectoresHaber)).forEach(
+    (cuenta, cuentaIndex) => {
+      const isCostoProduccion = isCostoProduccionCuenta(cuenta);
+      rows.push({
+        key: `cuenta-${cuentaIndex}`,
+        cargo: reportMovimientoCargo(cuenta),
+        descripcion: reportMovimientoTitulo(cuenta),
+        bs: isCostoProduccion ? "" : cuenta.totalBs,
+        haber: isCostoProduccion ? "" : cuenta.totalBs,
+        strong: true
       });
+      rows.push({
+        key: `atencion-${cuentaIndex}`,
+        descripcion: `Aten. Material mes de ${month}- ${periodo.anio}`,
+        haber: isCostoProduccion ? cuenta.totalBs : ""
+      });
+      const lineas = isCostoProduccion ? movimientoLineasPorFuncion(cuenta) : [];
+      if (lineas.length) {
+        lineas.forEach((linea, index) => {
+          rows.push({
+            key: `linea-${cuentaIndex}-${index}`,
+            descripcion: `${linea.codigo} - ${linea.nombre}`.trim(),
+            bs: linea.importeBs
+          });
+        });
+      }
     }
-  });
+  );
 
   return (
     <div className="overflow-x-auto">
@@ -932,9 +939,14 @@ function costoSheetName(cuenta: {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   const text =
     `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
-  if (code.includes("22001008") || text.includes("TRANSPORTISTAS VARIOS") || text.includes("TRANSPORTE VARIOS"))
+  if (
+    code.includes("22001008") ||
+    text.includes("TRANSPORTISTAS VARIOS") ||
+    text.includes("TRANSPORTE VARIOS")
+  )
     return "ROMARESNI";
-  if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA")) return "EMUSA";
+  if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA"))
+    return "EMUSA";
   if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD"))
     return "PUNTUALIDAD";
   if (code.includes("35001000") || text.includes("MAQUINARIAS")) return "MAQUINARIA Y EQUIPO";
@@ -996,7 +1008,7 @@ function costoSheetMeta(sheetName: string) {
   if (sheetName === "EMUSA") {
     return {
       title: "DETALLE DE MATERIALES Y SUMINISTROS",
-      codeLine: "22.001.009 CUENTAS POR COBRAR: EMUSA S.R.L.",
+      codeLine: "22.001.009 CUENTAS POR COBRAR:  EMPRESA MINERA UNIFICADA S.A.",
       isTransport: true
     };
   }
@@ -1056,11 +1068,12 @@ function sectorMatchesCuenta(sector: ReportDiarioSector, cuenta: ReportDiarioCue
   const sectorCode = normalizeAccountCode(sector.sectorCodigo);
   const cuentaSectorCode = normalizeAccountCode(cuenta.sectorCodigo);
   const cuentaCode = normalizeAccountCode(cuenta.codigoCompleto);
-  if (sectorCode && (cuentaSectorCode === sectorCode || cuentaCode.endsWith(sectorCode))) return true;
+  if (sectorCode && (cuentaSectorCode === sectorCode || cuentaCode.endsWith(sectorCode)))
+    return true;
   return Boolean(
     sector.sectorNombre &&
-      cuenta.sectorNombre &&
-      sector.sectorNombre.trim().toUpperCase() === cuenta.sectorNombre.trim().toUpperCase()
+    cuenta.sectorNombre &&
+    sector.sectorNombre.trim().toUpperCase() === cuenta.sectorNombre.trim().toUpperCase()
   );
 }
 
@@ -1101,7 +1114,11 @@ function detalleMaterialesFromDiario(
       mesFin: response.data.mesFin,
       meses: response.data.meses.map((periodo) => {
         const lineas: CostoCuenta["lineas"] = [];
-        const subtotalesPorSubCentro: Array<{ subCentro: string; nombre: string; importeBs: number }> = [];
+        const subtotalesPorSubCentro: Array<{
+          subCentro: string;
+          nombre: string;
+          importeBs: number;
+        }> = [];
         const porCuenta = periodo.sectoresHaber
           .filter(belongsToCostoProduccionDetalle)
           .map((sector) => {
@@ -1157,10 +1174,7 @@ function detalleMaterialesFromDiario(
               });
               if (!detallesExplicitos.length) {
                 detalles.push({
-                  productoNombre:
-                    linea.subCentroNombre ??
-                    sector.sectorNombre ??
-                    "",
+                  productoNombre: linea.subCentroNombre ?? sector.sectorNombre ?? "",
                   unidad: "",
                   cantidad: 0,
                   importeBs,
@@ -1282,7 +1296,11 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
             subCuenta: parts.subCuenta,
             subCentro: parts.subCentro,
             subCentroNombre:
-              cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? detalle.destino ?? "",
+              cuenta.funcionGastoNombre ??
+              cuenta.centroCostoNombre ??
+              detalle.vehiculo ??
+              detalle.destino ??
+              "",
             importeBs: detalle.importeBs
           });
         });
@@ -1313,7 +1331,13 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
   }
 
   const firstOrder = ["ROMARESNI", "EMUSA", "PUNTUALIDAD"];
-  const lastOrder = ["MAQUINARIA Y EQUIPO", "OBRAS EN CONSTRUCCION", "LIPEÑA", "MA-HSI (3)", "CONSTRUCCION-25"];
+  const lastOrder = [
+    "MAQUINARIA Y EQUIPO",
+    "OBRAS EN CONSTRUCCION",
+    "LIPEÑA",
+    "MA-HSI (3)",
+    "CONSTRUCCION-25"
+  ];
   const allOrderedNames = [...firstOrder, ...lastOrder];
   const firstSheets = firstOrder
     .map((name) => sheets.get(name))
@@ -1321,7 +1345,9 @@ function buildCostoSheets(response: DetalleMaterialesReportResponse): CostoSheet
   const lastSheets = lastOrder
     .map((name) => sheets.get(name))
     .filter((sheet): sheet is CostoSheet => Boolean(sheet));
-  const remainingSheets = [...sheets.values()].filter((sheet) => !allOrderedNames.includes(sheet.name));
+  const remainingSheets = [...sheets.values()].filter(
+    (sheet) => !allOrderedNames.includes(sheet.name)
+  );
   const allSheets = [...firstSheets, ...remainingSheets, ...lastSheets];
   let aglCounter = 0;
   return allSheets.map((sheet) => {
@@ -1402,8 +1428,7 @@ function CostoProduccionPreview({ response }: { response: DetalleMaterialesRepor
           {activeSheet.isTransport ? (
             <>
               <p className="mt-12 max-w-[760px] text-[14px]">
-                Por lo siguiente: Por la provision de materiales de acuerdo al siguiente detalle
-                correspondiente al
+                Por la provision de materiales de acuerdo al siguiente detalle correspondiente al
                 <br />
                 mes de&nbsp;&nbsp;&nbsp;&nbsp;{costoMonthTitle(activeSheet.anio, activeSheet.mes)}
               </p>
@@ -1913,10 +1938,7 @@ export function ReportesPage() {
                       (item) => cuadroGrupoKey(item.grupo) === cuadroGrupo
                     );
                     const subtotalBs = items.reduce((sum, item) => sum + item.importeBs, 0);
-                    const subtotalSinIVA = items.reduce(
-                      (sum, item) => sum + item.importeSinIVA,
-                      0
-                    );
+                    const subtotalSinIVA = items.reduce((sum, item) => sum + item.importeSinIVA, 0);
                     return {
                       ...compra,
                       items,
@@ -2111,7 +2133,10 @@ export function ReportesPage() {
     let efectivoFin = fechaFinDraft;
     if (dateModeDraft === "month" && mesDraft) {
       const range = monthToRange(mesDraft);
-      if (range) { efectivoInicio = range.inicio; efectivoFin = range.fin; }
+      if (range) {
+        efectivoInicio = range.inicio;
+        efectivoFin = range.fin;
+      }
     }
     setFechaInicio(efectivoInicio);
     setFechaFin(efectivoFin);
@@ -2445,7 +2470,7 @@ export function ReportesPage() {
               <option value="month">Por mes</option>
             </select>
           </div>
-          {(isLegacyType || isApiType) ? (
+          {isLegacyType || isApiType ? (
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Modo de carga
@@ -2490,7 +2515,7 @@ export function ReportesPage() {
               </select>
             </div>
           ) : null}
-          {(isLegacyType || isApiType) ? (
+          {isLegacyType || isApiType ? (
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                 Registros por pagina

@@ -81,7 +81,10 @@ function asOptionalExcelNumber(value: number | null | undefined) {
 }
 
 function safeSheetName(value: string, fallback: string) {
-  const cleaned = value.replace(/[\\/?*[\]:]/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = value
+    .replace(/[\\/?*[\]:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return (cleaned || fallback).slice(0, 31);
 }
 
@@ -118,9 +121,42 @@ function monthTitleCase(anio: number, mes: number) {
 
 function integerToSpanishWords(value: number): string {
   const units = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
-  const teens = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISEIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
-  const tens = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
-  const hundreds = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+  const teens = [
+    "DIEZ",
+    "ONCE",
+    "DOCE",
+    "TRECE",
+    "CATORCE",
+    "QUINCE",
+    "DIECISEIS",
+    "DIECISIETE",
+    "DIECIOCHO",
+    "DIECINUEVE"
+  ];
+  const tens = [
+    "",
+    "",
+    "VEINTE",
+    "TREINTA",
+    "CUARENTA",
+    "CINCUENTA",
+    "SESENTA",
+    "SETENTA",
+    "OCHENTA",
+    "NOVENTA"
+  ];
+  const hundreds = [
+    "",
+    "CIENTO",
+    "DOSCIENTOS",
+    "TRESCIENTOS",
+    "CUATROCIENTOS",
+    "QUINIENTOS",
+    "SEISCIENTOS",
+    "SETECIENTOS",
+    "OCHOCIENTOS",
+    "NOVECIENTOS"
+  ];
   const underHundred = (n: number): string => {
     if (n < 10) return units[n];
     if (n < 20) return teens[n - 10];
@@ -165,14 +201,23 @@ function costoSheetName(cuenta: {
   esTransporte?: boolean;
 }) {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
-  const text = `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
-  if (code.includes("22001008") || text.includes("TRANSPORTISTAS VARIOS") || text.includes("TRANSPORTE VARIOS"))
+  const text =
+    `${cuenta.centroCostoNombre ?? ""} ${cuenta.funcionGastoNombre ?? ""} ${cuenta.vehiculo ?? ""}`.toUpperCase();
+  if (
+    code.includes("22001008") ||
+    text.includes("TRANSPORTISTAS VARIOS") ||
+    text.includes("TRANSPORTE VARIOS")
+  )
     return "ROMARESNI";
-  if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA")) return "EMUSA";
-  if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD")) return "PUNTUALIDAD";
+  if (code.includes("67001009") || code.includes("22001009") || text.includes("EMUSA"))
+    return "EMUSA";
+  if (code.includes("67001010") || code.includes("22001010") || text.includes("PUNTUALIDAD"))
+    return "PUNTUALIDAD";
   if (code.includes("35001000") || text.includes("MAQUINARIAS")) return "MAQUINARIA Y EQUIPO";
-  if (code.includes("104001000") || text.includes("MEDIO AMBIENTE") || text.includes("M.A.")) return "MA-HSI (3)";
-  if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION")) return "CONSTRUCCION-25";
+  if (code.includes("104001000") || text.includes("MEDIO AMBIENTE") || text.includes("M.A."))
+    return "MA-HSI (3)";
+  if (code.includes("44002000") || code.includes("044002000") || text.includes("CONSTRUCCION"))
+    return "CONSTRUCCION-25";
   // Cuentas por cobrar dinámicas (22.001.011, 22.001.012, …) → nombre del centro de costo
   const knownCodes = ["22001008", "22001009", "22001010"];
   if (code.startsWith("22001") && !knownCodes.some((k) => code.includes(k))) {
@@ -227,7 +272,7 @@ function costoSheetMeta(sheetName: string, codigoCompleto?: string | null) {
   if (sheetName === "EMUSA") {
     return {
       title: "DETALLE DE MATERIALES  Y SUMINISTROS",
-      codeLine: "22.001.009    CUENTAS POR COBRAR: EMUSA S.R.L.",
+      codeLine: "22.001.009    CUENTAS POR COBRAR:  EMPRESA MINERA UNIFICADA S.A. ",
       isTransport: true
     };
   }
@@ -488,7 +533,8 @@ function setCellStyle(
   style: Record<string, unknown>,
   value?: StyledCell
 ) {
-  if (!sheet[address]) sheet[address] = { t: typeof value === "number" ? "n" : "s", v: value ?? "" };
+  if (!sheet[address])
+    sheet[address] = { t: typeof value === "number" ? "n" : "s", v: value ?? "" };
   sheet[address].s = style;
 }
 
@@ -505,7 +551,9 @@ function styleRange(
       const current = sheet[address];
       setCellStyle(sheet, address, {
         ...style,
-        ...(numericColumns.has(col) && typeof current?.v === "number" ? { numFmt: numberFormat } : {})
+        ...(numericColumns.has(col) && typeof current?.v === "number"
+          ? { numFmt: numberFormat }
+          : {})
       });
     }
   }
@@ -590,7 +638,11 @@ function applyAdministrativeWorkbookStyle(
     alignment: { horizontal: "center", vertical: "center" }
   };
   const headerFill =
-    report.type === "inventario-general" ? "F4B183" : report.type === "balance-mensual" ? "FFFFFF" : "F2F2F2";
+    report.type === "inventario-general"
+      ? "F4B183"
+      : report.type === "balance-mensual"
+        ? "FFFFFF"
+        : "F2F2F2";
   const headerStyle = {
     font: { bold: true, sz: 10 },
     fill: { fgColor: { rgb: headerFill } },
@@ -632,7 +684,8 @@ function applyAdministrativeWorkbookStyle(
 
   report.rows.forEach((row, index) => {
     if (!row.type) return;
-    const style = row.type === "group" ? groupStyle : row.type === "subtotal" ? subtotalStyle : totalStyle;
+    const style =
+      row.type === "group" ? groupStyle : row.type === "subtotal" ? subtotalStyle : totalStyle;
     styleRange(
       sheet,
       { s: { r: rowStart + index, c: 0 }, e: { r: rowStart + index, c: lastCol } },
@@ -724,7 +777,8 @@ function exportBalanceMensualStyledExcel(report: InventoryReportDefinition) {
     `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
   const startDateLabel =
     periodMonth && periodYear ? dateLabel(new Date(periodYear, periodMonth - 1, 0)) : "";
-  const endDateLabel = periodMonth && periodYear ? dateLabel(new Date(periodYear, periodMonth, 0)) : "";
+  const endDateLabel =
+    periodMonth && periodYear ? dateLabel(new Date(periodYear, periodMonth, 0)) : "";
   const periodSubtitle =
     periodMonth && periodYear
       ? `CORRESPONDIENTE AL MES DE ${MONTH_NAMES[Math.max(0, Math.min(11, periodMonth - 1))]}  ${periodYear}`
@@ -787,23 +841,42 @@ function exportBalanceMensualStyledExcel(report: InventoryReportDefinition) {
     { hpt: 31 },
     ...rows.map(() => ({ hpt: 16 }))
   ];
-  sheet["!margins"] = { left: 0.25, right: 0.25, top: 0.45, bottom: 0.35, header: 0.2, footer: 0.2 };
+  sheet["!margins"] = {
+    left: 0.25,
+    right: 0.25,
+    top: 0.45,
+    bottom: 0.35,
+    header: 0.2,
+    footer: 0.2
+  };
   sheet["!pageSetup"] = { orientation: "portrait", fitToWidth: 1, fitToHeight: 0 };
   setCellStyle(sheet, "A1", { font: { name: "Arial", bold: true, sz: 18 } });
   setCellStyle(sheet, "A2", { font: { name: "Arial", bold: true, sz: 28, underline: true } });
-  styleRange(sheet, { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } }, {
-    font: { name: "Arial", bold: true, sz: 11 },
-    alignment: { horizontal: "center", vertical: "center" }
-  });
-  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } }, {
-    font: { name: "Arial", bold: true, sz: 11, underline: true },
-    alignment: { horizontal: "center", vertical: "center" }
-  });
-  styleRange(sheet, { s: { r: headerRow, c: 0 }, e: { r: headerRow, c: 4 } }, {
-    font: { name: "Arial", bold: true, sz: 10 },
-    alignment: { horizontal: "center", vertical: "center", wrapText: true },
-    border: excelThinBorder
-  });
+  styleRange(
+    sheet,
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } },
+    {
+      font: { name: "Arial", bold: true, sz: 11 },
+      alignment: { horizontal: "center", vertical: "center" }
+    }
+  );
+  styleRange(
+    sheet,
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 4 } },
+    {
+      font: { name: "Arial", bold: true, sz: 11, underline: true },
+      alignment: { horizontal: "center", vertical: "center" }
+    }
+  );
+  styleRange(
+    sheet,
+    { s: { r: headerRow, c: 0 }, e: { r: headerRow, c: 4 } },
+    {
+      font: { name: "Arial", bold: true, sz: 10 },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: excelThinBorder
+    }
+  );
   setCellStyle(sheet, cellAddress(headerRow, 4), {
     font: { name: "Arial", bold: true, sz: 10 },
     alignment: { horizontal: "center", vertical: "center", wrapText: true },
@@ -811,21 +884,33 @@ function exportBalanceMensualStyledExcel(report: InventoryReportDefinition) {
     fill: { fgColor: { rgb: "BFBFBF" } }
   });
   if (rows.length) {
-    styleRange(sheet, { s: { r: bodyStartRow, c: 0 }, e: { r: bodyEndRow, c: 4 } }, {
-      font: tableFont,
-      alignment: { vertical: "center", wrapText: true },
-      border: bodyBorder
-    });
-    styleRange(sheet, { s: { r: bodyStartRow, c: 0 }, e: { r: bodyEndRow, c: 0 } }, {
-      font: tableFont,
-      alignment: { horizontal: "center", vertical: "center" },
-      border: bodyBorder
-    });
-    styleRange(sheet, { s: { r: bodyStartRow, c: 1 }, e: { r: bodyEndRow, c: 4 } }, {
-      font: tableFont,
-      alignment: { horizontal: "right", vertical: "center" },
-      border: bodyBorder
-    });
+    styleRange(
+      sheet,
+      { s: { r: bodyStartRow, c: 0 }, e: { r: bodyEndRow, c: 4 } },
+      {
+        font: tableFont,
+        alignment: { vertical: "center", wrapText: true },
+        border: bodyBorder
+      }
+    );
+    styleRange(
+      sheet,
+      { s: { r: bodyStartRow, c: 0 }, e: { r: bodyEndRow, c: 0 } },
+      {
+        font: tableFont,
+        alignment: { horizontal: "center", vertical: "center" },
+        border: bodyBorder
+      }
+    );
+    styleRange(
+      sheet,
+      { s: { r: bodyStartRow, c: 1 }, e: { r: bodyEndRow, c: 4 } },
+      {
+        font: tableFont,
+        alignment: { horizontal: "right", vertical: "center" },
+        border: bodyBorder
+      }
+    );
   }
   numberFormatRange(sheet, bodyStartRow, bodyEndRow, [1, 2, 3, 4]);
   dataRows.forEach((row, index) => {
@@ -843,7 +928,11 @@ function exportBalanceMensualStyledExcel(report: InventoryReportDefinition) {
       new Set([1, 2, 3, 4])
     );
   });
-  appendAndSaveStyledSheet({ sheet, sheetName: "Balance Mensual", fileToken: "balance-mensual-almacenes" });
+  appendAndSaveStyledSheet({
+    sheet,
+    sheetName: "Balance Mensual",
+    fileToken: "balance-mensual-almacenes"
+  });
 }
 
 function exportInventarioGeneralStyledExcel(report: InventoryReportDefinition) {
@@ -876,10 +965,14 @@ function exportInventarioGeneralStyledExcel(report: InventoryReportDefinition) {
   sheet["!cols"] = [{ wch: 13 }, { wch: 43 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
   styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: 5 } }, excelTitleStyle);
   styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 5, c: 5 } }, excelHeaderStyle);
-  styleRange(sheet, { s: { r: 4, c: 3 }, e: { r: 5, c: 5 } }, {
-    ...excelHeaderStyle,
-    fill: { fgColor: { rgb: "F4B183" } }
-  });
+  styleRange(
+    sheet,
+    { s: { r: 4, c: 3 }, e: { r: 5, c: 5 } },
+    {
+      ...excelHeaderStyle,
+      fill: { fgColor: { rgb: "F4B183" } }
+    }
+  );
   styleRange(sheet, { s: { r: 6, c: 0 }, e: { r: 5 + rows.length, c: 5 } }, excelBodyStyle);
   numberFormatRange(sheet, 6, 5 + rows.length, [3, 4, 5]);
   report.rows
@@ -887,23 +980,44 @@ function exportInventarioGeneralStyledExcel(report: InventoryReportDefinition) {
     .forEach((row, index) => {
       const excelRow = 6 + index;
       if (row.type === "group") {
-        styleRange(sheet, { s: { r: excelRow, c: 0 }, e: { r: excelRow, c: 1 } }, {
-          ...excelBodyStyle,
-          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10 },
-          fill: { fgColor: { rgb: "002F6C" } }
-        });
-        styleRange(sheet, { s: { r: excelRow, c: 2 }, e: { r: excelRow, c: 5 } }, {
-          ...excelBodyStyle,
-          fill: { fgColor: { rgb: "F4B183" } }
-        });
+        styleRange(
+          sheet,
+          { s: { r: excelRow, c: 0 }, e: { r: excelRow, c: 1 } },
+          {
+            ...excelBodyStyle,
+            font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10 },
+            fill: { fgColor: { rgb: "002F6C" } }
+          }
+        );
+        styleRange(
+          sheet,
+          { s: { r: excelRow, c: 2 }, e: { r: excelRow, c: 5 } },
+          {
+            ...excelBodyStyle,
+            fill: { fgColor: { rgb: "F4B183" } }
+          }
+        );
       } else {
-        styleRange(sheet, { s: { r: excelRow, c: 3 }, e: { r: excelRow, c: 5 } }, {
-          ...excelBodyStyle,
-          fill: { fgColor: { rgb: row.type === "total" || row.type === "subtotal" ? "FFF200" : "F4B183" } }
-        }, new Set([3, 4, 5]));
+        styleRange(
+          sheet,
+          { s: { r: excelRow, c: 3 }, e: { r: excelRow, c: 5 } },
+          {
+            ...excelBodyStyle,
+            fill: {
+              fgColor: {
+                rgb: row.type === "total" || row.type === "subtotal" ? "FFF200" : "F4B183"
+              }
+            }
+          },
+          new Set([3, 4, 5])
+        );
       }
     });
-  appendAndSaveStyledSheet({ sheet, sheetName: "Inventario Almacen", fileToken: "inventario-almacen-general" });
+  appendAndSaveStyledSheet({
+    sheet,
+    sheetName: "Inventario Almacen",
+    fileToken: "inventario-almacen-general"
+  });
 }
 
 function exportCuadroSuministrosStyledExcel(report: InventoryReportDefinition) {
@@ -920,7 +1034,16 @@ function exportCuadroSuministrosStyledExcel(report: InventoryReportDefinition) {
     }
     if (row.type === "group") continue;
     if (row.type === "total") {
-      outputRows.push(["", "", "", "", "TOTAL GENERAL", valueOf(row, "totalBs"), valueOf(row, "sinIvaBs"), ""]);
+      outputRows.push([
+        "",
+        "",
+        "",
+        "",
+        "TOTAL GENERAL",
+        valueOf(row, "totalBs"),
+        valueOf(row, "sinIvaBs"),
+        ""
+      ]);
       sourceRows.push("total");
       continue;
     }
@@ -939,9 +1062,21 @@ function exportCuadroSuministrosStyledExcel(report: InventoryReportDefinition) {
   }
 
   const aoa: Array<Array<string | number>> = [
-    ["CUADRO DE INVENTARIOS Y SUMINISTROS CORRESPONDIENTE AL", monthLabelFromSubtitle(report.subtitle)],
+    [
+      "CUADRO DE INVENTARIOS Y SUMINISTROS CORRESPONDIENTE AL",
+      monthLabelFromSubtitle(report.subtitle)
+    ],
     [],
-    ["P R O V E E D O R", "No\nFACTU", "CANTID.", "UNIDA", "D E S C R I P C I O N", "F-total\nBs", "(-13%)\nBs", "GRUPO"],
+    [
+      "P R O V E E D O R",
+      "No\nFACTU",
+      "CANTID.",
+      "UNIDA",
+      "D E S C R I P C I O N",
+      "F-total\nBs",
+      "(-13%)\nBs",
+      "GRUPO"
+    ],
     ...outputRows
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
@@ -958,20 +1093,33 @@ function exportCuadroSuministrosStyledExcel(report: InventoryReportDefinition) {
   ];
   styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, excelTitleStyle);
   styleRange(sheet, { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, excelHeaderStyle);
-  styleRange(sheet, { s: { r: 3, c: 0 }, e: { r: 2 + outputRows.length, c: 7 } }, {
-    ...excelBodyStyle,
-    alignment: { vertical: "center", wrapText: true }
-  });
+  styleRange(
+    sheet,
+    { s: { r: 3, c: 0 }, e: { r: 2 + outputRows.length, c: 7 } },
+    {
+      ...excelBodyStyle,
+      alignment: { vertical: "center", wrapText: true }
+    }
+  );
   numberFormatRange(sheet, 3, 2 + outputRows.length, [2, 5, 6]);
   sourceRows.forEach((kind, index) => {
     if (kind !== "total") return;
-    styleRange(sheet, { s: { r: 3 + index, c: 0 }, e: { r: 3 + index, c: 7 } }, {
-      ...excelBodyStyle,
-      font: { bold: true, sz: 10 },
-      fill: { fgColor: { rgb: "FFF200" } }
-    }, new Set([5, 6]));
+    styleRange(
+      sheet,
+      { s: { r: 3 + index, c: 0 }, e: { r: 3 + index, c: 7 } },
+      {
+        ...excelBodyStyle,
+        font: { bold: true, sz: 10 },
+        fill: { fgColor: { rgb: "FFF200" } }
+      },
+      new Set([5, 6])
+    );
   });
-  appendAndSaveStyledSheet({ sheet, sheetName: "Cuadro Suministros", fileToken: "cuadro-inventarios-suministros" });
+  appendAndSaveStyledSheet({
+    sheet,
+    sheetName: "Cuadro Suministros",
+    fileToken: "cuadro-inventarios-suministros"
+  });
 }
 
 function exportDetalleMaterialesStyledExcel(report: InventoryReportDefinition) {
@@ -1010,21 +1158,33 @@ function exportDetalleMaterialesStyledExcel(report: InventoryReportDefinition) {
     .filter((row) => row.type !== "group" || row.values.subCentro)
     .forEach((row, index) => {
       if (row.type === "subtotal" || row.type === "total") {
-        styleRange(sheet, { s: { r: 7 + index, c: 0 }, e: { r: 7 + index, c: 4 } }, {
-          ...excelBodyStyle,
-          font: { bold: true, sz: 10 }
-        }, new Set([3, 4]));
+        styleRange(
+          sheet,
+          { s: { r: 7 + index, c: 0 }, e: { r: 7 + index, c: 4 } },
+          {
+            ...excelBodyStyle,
+            font: { bold: true, sz: 10 }
+          },
+          new Set([3, 4])
+        );
       }
     });
-  appendAndSaveStyledSheet({ sheet, sheetName: "Detalle Materiales", fileToken: "detalle-materiales-costo-produccion" });
+  appendAndSaveStyledSheet({
+    sheet,
+    sheetName: "Detalle Materiales",
+    fileToken: "detalle-materiales-costo-produccion"
+  });
 }
 
-function cuentaHaberTitulo(cuenta: DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number]) {
+function cuentaHaberTitulo(
+  cuenta: DiarioAlmacenesReportResponse["data"]["meses"][number]["cuentasHaber"][number]
+) {
   const code = (cuenta.codigoCompleto ?? "").replace(/[^\d]/g, "");
   const sector = cuenta.sectorNombre ? `"${cuenta.sectorNombre.toUpperCase()}"` : "";
   if (code.includes("100001000")) return "COSTO DE PRODUCCION - LIPEÑA";
   if (code.includes("104001000")) return "COSTO MEDIO AMBIENTE - LIPEÑA";
-  if (code.includes("44002000") || code.includes("044002000")) return "OBRAS EN CONSTRUCCION LIPEÑA";
+  if (code.includes("44002000") || code.includes("044002000"))
+    return "OBRAS EN CONSTRUCCION LIPEÑA";
   if (code.includes("67001097") || code.includes("67001098") || cuenta.esTransporte) {
     return `COSTO COMB.TRANSPORTE${sector}`;
   }
@@ -1187,7 +1347,11 @@ function buildFuncionGastoLookup(value: unknown, lookup = new Map<string, string
   return lookup;
 }
 
-function buildSectorCodigoLookup(value: unknown, lookup = new Map<string, string>(), currentSectorCodigo = "") {
+function buildSectorCodigoLookup(
+  value: unknown,
+  lookup = new Map<string, string>(),
+  currentSectorCodigo = ""
+) {
   if (!value || typeof value !== "object") return lookup;
   if (Array.isArray(value)) {
     value.forEach((item) => buildSectorCodigoLookup(item, lookup, currentSectorCodigo));
@@ -1308,9 +1472,20 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
   const aoa: Array<Array<string | number>> = [
     ["COMPROBANTE  DE  DIARIO"],
     ["DIARIO  ALMACENES"],
-    ["SECTOR:  LIPEÑA", periodo ? `MES:  DE ${monthName}  ${periodo.anio}` : monthLabelFromSubtitle(report.subtitle)],
+    [
+      "SECTOR:  LIPEÑA",
+      periodo ? `MES:  DE ${monthName}  ${periodo.anio}` : monthLabelFromSubtitle(report.subtitle)
+    ],
     [],
-    ["D E S C R I P C I O N", "CENTRO\nDE COSTO", "FUNCION\nDEL GASTO", "PARCIALES\nBs.", "No  DE CUENTA", "BOLIVIANOS\nD E B E", "BOLIVIANOS\nH A B E R"],
+    [
+      "D E S C R I P C I O N",
+      "CENTRO\nDE COSTO",
+      "FUNCION\nDEL GASTO",
+      "PARCIALES\nBs.",
+      "No  DE CUENTA",
+      "BOLIVIANOS\nD E B E",
+      "BOLIVIANOS\nH A B E R"
+    ],
     ...bodyRows.map((row) => row.values)
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
@@ -1319,7 +1494,15 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
     { s: { r: 1, c: 0 }, e: { r: 1, c: LAST_COL } },
     { s: { r: 2, c: 1 }, e: { r: 2, c: LAST_COL } }
   ];
-  sheet["!cols"] = [{ wch: 45 }, { wch: 13 }, { wch: 13 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }];
+  sheet["!cols"] = [
+    { wch: 45 },
+    { wch: 13 },
+    { wch: 13 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 14 }
+  ];
   styleRange(sheet, { s: { r: 0, c: 0 }, e: { r: 2, c: LAST_COL } }, excelTitleStyle);
   styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 4, c: LAST_COL } }, excelHeaderStyle);
   styleRange(
@@ -1331,10 +1514,15 @@ function exportDiarioAlmacenesStyledExcel(report: InventoryReportDefinition) {
   );
   bodyRows.forEach((row, index) => {
     if (row.kind === "title" || row.kind === "total") {
-      styleRange(sheet, { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: LAST_COL } }, {
-        ...excelBodyStyle,
-        font: { bold: true, sz: 10 }
-      }, new Set([3, 5, 6]));
+      styleRange(
+        sheet,
+        { s: { r: 5 + index, c: 0 }, e: { r: 5 + index, c: LAST_COL } },
+        {
+          ...excelBodyStyle,
+          font: { bold: true, sz: 10 }
+        },
+        new Set([3, 5, 6])
+      );
     }
   });
   appendAndSaveStyledSheet({ sheet, sheetName: "Diario Almacenes", fileToken: "diario-almacenes" });
@@ -1526,7 +1714,12 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
             sheet.lineas.push({
               subCuenta: parts.subCuenta,
               subCentro: parts.subCentro,
-              subCentroNombre: cuenta.funcionGastoNombre ?? cuenta.centroCostoNombre ?? detalle.vehiculo ?? detalle.destino ?? "",
+              subCentroNombre:
+                cuenta.funcionGastoNombre ??
+                cuenta.centroCostoNombre ??
+                detalle.vehiculo ??
+                detalle.destino ??
+                "",
               importeBs: detalle.importeBs
             });
           });
@@ -1566,13 +1759,16 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
       "MA-HSI (3)",
       "CONSTRUCCION-25"
     ];
-    const remainingSheetNames = [...groupedCuentas.keys()].filter((sheetName) => !orderedSheetNames.includes(sheetName));
+    const remainingSheetNames = [...groupedCuentas.keys()].filter(
+      (sheetName) => !orderedSheetNames.includes(sheetName)
+    );
     // Compute AGL numbers: count only transport sheets that have data, in order
     let aglCounter = 0;
     const aglBySheet = new Map<string, number>();
     for (const sn of [...orderedSheetNames, ...remainingSheetNames]) {
       if (!groupedCuentas.has(sn)) continue;
-      if (costoSheetMeta(sn, groupedCuentas.get(sn)?.codigoCompleto).isTransport) aglBySheet.set(sn, ++aglCounter);
+      if (costoSheetMeta(sn, groupedCuentas.get(sn)?.codigoCompleto).isTransport)
+        aglBySheet.set(sn, ++aglCounter);
     }
     for (const sheetName of [...orderedSheetNames, ...remainingSheetNames]) {
       const cuenta = groupedCuentas.get(sheetName);
@@ -1604,7 +1800,11 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(7, 1, title);
         put(8, 1, `LIPEÑA    ${monthPhrase(periodo.anio, periodo.mes)}`);
         put(10, 1, codeLine);
-        put(13, 1, "Por lo siguiente: Por la provision de materiales de acuerdo al siguiente detalle correspondiente al                                   ");
+        put(
+          13,
+          1,
+          "Por la provision de materiales de acuerdo al siguiente detalle correspondiente al                                   "
+        );
         put(15, 1, `mes de     ${monthTitleCase(periodo.anio, periodo.mes)}`);
         if (!sheetName.toUpperCase().includes("EMUSA")) put(15, 7, "T-C. $us  6,96");
         const headerRow = sheetName === "PUNTUALIDAD" ? 18 : 17;
@@ -1628,7 +1828,11 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(totalRow, 4, asExcelNumber(cuenta.totalBs));
         put(totalRow + 5, 1, bolivianosLiteral(cuenta.totalBs));
         const signatureRow = totalRow + 17;
-        put(signatureRow, 1, "    JEFE DE ALMACENES                                         JEFE DE OFICINAS                                        SUPDTE. GENERAL");
+        put(
+          signatureRow,
+          1,
+          "    JEFE DE ALMACENES                                         JEFE DE OFICINAS                                        SUPDTE. GENERAL"
+        );
         put(signatureRow + 5, 1, "cc. Archivo");
         blankTo(signatureRow + 5);
 
@@ -1662,7 +1866,9 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
           totalsBySubCentro.set(key, (totalsBySubCentro.get(key) ?? 0) + linea.importeBs);
         });
         const lastIndexBySubCentro = new Map<string, number>();
-        groupedLineas.forEach((linea, index) => lastIndexBySubCentro.set(linea.subCentro ?? "", index));
+        groupedLineas.forEach((linea, index) =>
+          lastIndexBySubCentro.set(linea.subCentro ?? "", index)
+        );
         let row = headerRow + 2;
         if (!isMainProduction) row += 1;
         groupedLineas.forEach((linea, index) => {
@@ -1683,9 +1889,12 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(totalRow + 4, 2, "TOTAL");
         put(totalRow + 4, 4, asExcelNumber(cuenta.totalBs));
         const signatureRow = totalRow + 14;
-        put(signatureRow, 1, isMainProduction
-          ? "    JEFE DE ALMACENES                                              JEFE DE OFICINAS                                                       SUPDTE. GENERAL"
-          : "    JEFE DE ALMACENES                         JEFE DE OFICINAS                                    SUPDTE. GENERAL"
+        put(
+          signatureRow,
+          1,
+          isMainProduction
+            ? "    JEFE DE ALMACENES                                              JEFE DE OFICINAS                                                       SUPDTE. GENERAL"
+            : "    JEFE DE ALMACENES                         JEFE DE OFICINAS                                    SUPDTE. GENERAL"
         );
         put(signatureRow + 5, 1, isMainProduction ? "CC. Archivo" : "cc. Archivo");
         blankTo(signatureRow + 5);
@@ -1736,14 +1945,24 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
       });
       if (!meta.isTransport && sheetName === "LIPEÑA") {
         setCellStyle(sheet, "B1", companyStyle);
-        setCellStyle(sheet, "B2", { ...companyStyle, font: { bold: true, sz: 22, name: "Arial", underline: true } });
+        setCellStyle(sheet, "B2", {
+          ...companyStyle,
+          font: { bold: true, sz: 22, name: "Arial", underline: true }
+        });
       } else {
         setCellStyle(sheet, "B3", companyStyle);
-        setCellStyle(sheet, "B4", { ...companyStyle, font: { bold: true, sz: 22, name: "Arial", underline: true } });
+        setCellStyle(sheet, "B4", {
+          ...companyStyle,
+          font: { bold: true, sz: 22, name: "Arial", underline: true }
+        });
       }
 
       const titleRow = meta.isTransport ? 7 : sheetName === "LIPEÑA" ? 2 : 7;
-      styleRange(sheet, { s: { r: titleRow, c: 1 }, e: { r: titleRow + 1, c: 7 } }, centeredNoBorder);
+      styleRange(
+        sheet,
+        { s: { r: titleRow, c: 1 }, e: { r: titleRow + 1, c: 7 } },
+        centeredNoBorder
+      );
       if (meta.isTransport) {
         const headerRow = sheetName === "PUNTUALIDAD" ? 18 : 17;
         const boxTop = headerRow - 1;
@@ -1751,7 +1970,11 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
           headerRow + 2 + cuenta.detalles.length + 5,
           sheetName === "PUNTUALIDAD" ? 32 : 31
         );
-        styleRange(sheet, { s: { r: headerRow, c: 1 }, e: { r: headerRow, c: 4 } }, smallItalicHeader);
+        styleRange(
+          sheet,
+          { s: { r: headerRow, c: 1 }, e: { r: headerRow, c: 4 } },
+          smallItalicHeader
+        );
         for (let row = boxTop; row <= totalRow; row += 1) {
           for (let col = 1; col <= 5; col += 1) {
             addBorder(row, col, {
@@ -1767,7 +1990,11 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         }
       } else {
         const headerRow = sheetName === "LIPEÑA" ? 6 : 16;
-        styleRange(sheet, { s: { r: headerRow, c: 1 }, e: { r: headerRow + 1, c: 7 } }, smallItalicHeader);
+        styleRange(
+          sheet,
+          { s: { r: headerRow, c: 1 }, e: { r: headerRow + 1, c: 7 } },
+          smallItalicHeader
+        );
         const dataStart = headerRow + (sheetName === "LIPEÑA" ? 2 : 3);
         const totalRow = dataStart + groupedLineas.length + 1;
         for (let col = 1; col <= 7; col += 1) {
@@ -1781,11 +2008,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         }
       }
 
-      XLSX.utils.book_append_sheet(
-        workbook,
-        sheet,
-        uniqueSheetName(sheetName, usedSheetNames)
-      );
+      XLSX.utils.book_append_sheet(workbook, sheet, uniqueSheetName(sheetName, usedSheetNames));
     }
   }
 
@@ -1802,7 +2025,10 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
   const periodo = source.data.meses[0];
   const monthName = MONTH_NAMES[periodo.mes - 1];
   const rows: Array<{ kind?: "header" | "detail" | "total"; values: Array<string | number> }> = [
-    { kind: "header", values: ["C A R G O", "D E S C R I P C I O N", "Bs", "DEBE\nBs.", "HABER\nBs."] },
+    {
+      kind: "header",
+      values: ["C A R G O", "D E S C R I P C I O N", "Bs", "DEBE\nBs.", "HABER\nBs."]
+    },
     {
       kind: "header",
       values: [
@@ -1833,13 +2059,7 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
     },
     {
       kind: "header",
-      values: [
-        "87 002 000",
-        "LIQUIDACION PROVISIONAL MATERIAL LIPEÑA",
-        "",
-        "",
-        0
-      ]
+      values: ["87 002 000", "LIQUIDACION PROVISIONAL MATERIAL LIPEÑA", "", "", 0]
     },
     {
       values: [
@@ -1852,22 +2072,10 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
     },
     {
       kind: "header",
-      values: [
-        "26 002 000",
-        "INVENTARIO MATERIAL Y SUMIN. LIPEÑA",
-        "",
-        "",
-        ""
-      ]
+      values: ["26 002 000", "INVENTARIO MATERIAL Y SUMIN. LIPEÑA", "", "", ""]
     },
     {
-      values: [
-        "",
-        "Cancelacion Liq. Provisional por Uf. Sig. anexos",
-        "",
-        "",
-        ""
-      ]
+      values: ["", "Cancelacion Liq. Provisional por Uf. Sig. anexos", "", "", ""]
     }
   ];
 
@@ -1898,7 +2106,13 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
       for (const linea of lineas) {
         rows.push({
           kind: "detail",
-          values: ["", `${linea.codigo} - ${linea.nombre}`.trim(), asExcelNumber(linea.importeBs), "", ""]
+          values: [
+            "",
+            `${linea.codigo} - ${linea.nombre}`.trim(),
+            asExcelNumber(linea.importeBs),
+            "",
+            ""
+          ]
         });
       }
     }
@@ -1907,14 +2121,32 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
   const saldoFinal = periodo.saldoInventarioFinal ?? periodo.saldoFinal;
   rows.push({
     kind: "total",
-    values: ["", "", "", asExcelNumber(periodo.totalInventarioDebe), asExcelNumber(periodo.totalSalidasHaber)]
+    values: [
+      "",
+      "",
+      "",
+      asExcelNumber(periodo.totalInventarioDebe),
+      asExcelNumber(periodo.totalSalidasHaber)
+    ]
   });
   rows.push({
-    values: ["", `saldo al ${new Date(periodo.anio, periodo.mes, 0).getDate()} de ${monthName.toLowerCase()} de ${periodo.anio}`, "", "", asOptionalExcelNumber(saldoFinal)]
+    values: [
+      "",
+      `saldo al ${new Date(periodo.anio, periodo.mes, 0).getDate()} de ${monthName.toLowerCase()} de ${periodo.anio}`,
+      "",
+      "",
+      asOptionalExcelNumber(saldoFinal)
+    ]
   });
   rows.push({
     kind: "total",
-    values: ["", "", "", asExcelNumber(periodo.totalInventarioDebe), asExcelNumber(periodo.totalInventarioDebe)]
+    values: [
+      "",
+      "",
+      "",
+      asExcelNumber(periodo.totalInventarioDebe),
+      asExcelNumber(periodo.totalInventarioDebe)
+    ]
   });
 
   const aoa: Array<Array<string | number>> = [
@@ -1940,40 +2172,67 @@ function exportMovimientoAlmacenStyledExcel(report: InventoryReportDefinition) {
   setCellStyle(sheet, "A1", { font: { bold: true, sz: 10, name: "Arial" } });
   setCellStyle(sheet, "A2", { font: { bold: true, sz: 10, name: "Arial", underline: true } });
   setCellStyle(sheet, "A3", { font: { sz: 10, name: "Arial" } });
-  styleRange(sheet, { s: { r: 4, c: 0 }, e: { r: 5, c: 4 } }, {
-    font: { sz: 10, name: "Arial", underline: true },
-    alignment: { horizontal: "center", vertical: "center" }
-  });
+  styleRange(
+    sheet,
+    { s: { r: 4, c: 0 }, e: { r: 5, c: 4 } },
+    {
+      font: { sz: 10, name: "Arial", underline: true },
+      alignment: { horizontal: "center", vertical: "center" }
+    }
+  );
   const tableStart = 7;
   const tableEnd = tableStart + rows.length - 1;
-  styleRange(sheet, { s: { r: tableStart, c: 0 }, e: { r: tableEnd, c: 4 } }, {
-    font: { sz: 9, name: "Arial" },
-    alignment: { vertical: "center", wrapText: true },
-    border: excelThinBorder
-  }, new Set([2, 3, 4]));
-  styleRange(sheet, { s: { r: tableStart, c: 0 }, e: { r: tableStart, c: 4 } }, {
-    ...excelHeaderStyle,
-    font: { bold: true, sz: 9, name: "Arial" }
-  });
+  styleRange(
+    sheet,
+    { s: { r: tableStart, c: 0 }, e: { r: tableEnd, c: 4 } },
+    {
+      font: { sz: 9, name: "Arial" },
+      alignment: { vertical: "center", wrapText: true },
+      border: excelThinBorder
+    },
+    new Set([2, 3, 4])
+  );
+  styleRange(
+    sheet,
+    { s: { r: tableStart, c: 0 }, e: { r: tableStart, c: 4 } },
+    {
+      ...excelHeaderStyle,
+      font: { bold: true, sz: 9, name: "Arial" }
+    }
+  );
   rows.forEach((row, index) => {
     const excelRow = tableStart + index;
     if (row.kind === "header") {
-      styleRange(sheet, { s: { r: excelRow, c: 0 }, e: { r: excelRow, c: 4 } }, {
-        font: { bold: true, sz: 9, name: "Arial" },
-        alignment: { vertical: "center", wrapText: true },
-        border: excelThinBorder
-      }, new Set([2, 3, 4]));
+      styleRange(
+        sheet,
+        { s: { r: excelRow, c: 0 }, e: { r: excelRow, c: 4 } },
+        {
+          font: { bold: true, sz: 9, name: "Arial" },
+          alignment: { vertical: "center", wrapText: true },
+          border: excelThinBorder
+        },
+        new Set([2, 3, 4])
+      );
     }
     if (row.kind === "total") {
-      styleRange(sheet, { s: { r: excelRow, c: 3 }, e: { r: excelRow, c: 4 } }, {
-        font: { sz: 9, name: "Arial" },
-        alignment: { horizontal: "right", vertical: "center" },
-        border: excelThinBorder
-      }, new Set([3, 4]));
+      styleRange(
+        sheet,
+        { s: { r: excelRow, c: 3 }, e: { r: excelRow, c: 4 } },
+        {
+          font: { sz: 9, name: "Arial" },
+          alignment: { horizontal: "right", vertical: "center" },
+          border: excelThinBorder
+        },
+        new Set([3, 4])
+      );
     }
   });
 
-  appendAndSaveStyledSheet({ sheet, sheetName: "Movimiento Almacen", fileToken: "movimiento-almacen" });
+  appendAndSaveStyledSheet({
+    sheet,
+    sheetName: "Movimiento Almacen",
+    fileToken: "movimiento-almacen"
+  });
 }
 
 export function exportInventoryReportExcel(report: InventoryReportDefinition) {
@@ -2081,9 +2340,27 @@ export function exportComprasProveedorExcel(params: {
       comprasProveedorPeriodLabel(params.fechaInicio, params.fechaFin)
     ],
     [],
-    ["P R O V E E D O R", "No FACTURA", "CANTIDAD", "UNIDAD", "D E S C R I P C I O N", "F-total Bs", "(-13%) Bs", "GRUPO"],
+    [
+      "P R O V E E D O R",
+      "No FACTURA",
+      "CANTIDAD",
+      "UNIDAD",
+      "D E S C R I P C I O N",
+      "F-total Bs",
+      "(-13%) Bs",
+      "GRUPO"
+    ],
     ...rows,
-    ["", "", "", "", "TOTAL GENERAL", asExcelNumber(params.response.totalGeneral), asExcelNumber(params.response.totalGeneralSinIVA), ""]
+    [
+      "",
+      "",
+      "",
+      "",
+      "TOTAL GENERAL",
+      asExcelNumber(params.response.totalGeneral),
+      asExcelNumber(params.response.totalGeneralSinIVA),
+      ""
+    ]
   ];
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
@@ -2213,7 +2490,12 @@ export function exportValesReportExcel(params: {
       "Cant. Entregada"
     ],
     rows,
-    footerRows: [["Total registros", "total" in params.response.meta ? params.response.meta.total : rows.length]],
+    footerRows: [
+      [
+        "Total registros",
+        "total" in params.response.meta ? params.response.meta.total : rows.length
+      ]
+    ],
     columns: [
       { wch: 12 },
       { wch: 16 },
@@ -2301,7 +2583,10 @@ export function exportComprasReportExcel(params: {
     ],
     rows,
     footerRows: [
-      ["Total registros", "total" in params.response.meta ? params.response.meta.total : params.response.data.length],
+      [
+        "Total registros",
+        "total" in params.response.meta ? params.response.meta.total : params.response.data.length
+      ],
       ["Total general Bs.", asExcelNumber(params.response.totalGeneral)]
     ],
     columns: [

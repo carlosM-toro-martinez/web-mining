@@ -10,6 +10,7 @@ import {
   deleteFuncionGasto,
   deleteSector,
   getCentrosCosto,
+  getCuentaMovimientos,
   getCuentas,
   getFuncionesGasto,
   getSectores,
@@ -56,6 +57,14 @@ export function useCuentasQuery() {
   return useQuery({
     queryKey: queryKeys.contabilidad.cuentas(),
     queryFn: getCuentas
+  });
+}
+
+export function useCuentaMovimientosQuery(id: number | null) {
+  return useQuery({
+    queryKey: ["contabilidad", "cuenta-movimientos", id],
+    queryFn: () => getCuentaMovimientos(id!),
+    enabled: id !== null
   });
 }
 

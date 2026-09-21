@@ -199,6 +199,33 @@ export const updateCuentaPayloadSchema = z.object({
   sectorId: z.number().int().positive().nullable().optional()
 });
 
+export const cuentaMovimientoItemSchema = z.object({
+  id: z.string(),
+  tipo: z.string(),
+  cantidad: z.union([z.string(), z.number()]),
+  precioUnit: z.union([z.string(), z.number()]),
+  salidaBs: z.union([z.string(), z.number()]),
+  entradaBs: z.union([z.string(), z.number()]),
+  referencia: z.string().nullable().optional(),
+  referenciaId: z.string().nullable().optional(),
+  createdAt: z.string(),
+  periodoAnio: z.number().nullable().optional(),
+  periodoMes: z.number().nullable().optional(),
+  esRetroactivo: z.boolean().optional(),
+  producto: z.object({
+    id: z.number(),
+    codigo: z.string(),
+    nombre: z.string().nullable().optional()
+  })
+});
+
+export const cuentaMovimientosResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(cuentaMovimientoItemSchema)
+});
+
+export type CuentaMovimientoItem = z.infer<typeof cuentaMovimientoItemSchema>;
+
 export const deleteResponseSchema = z.object({
   success: z.boolean()
 });
