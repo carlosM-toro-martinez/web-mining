@@ -3,7 +3,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   Boxes,
   HardHat,
-  History,
   IdCard,
   LayoutDashboard,
   Leaf,
@@ -49,13 +48,9 @@ export function HomePage() {
       description: "Vista general del sistema y estado operativo.",
       to: "/",
       icon: LayoutDashboard
-    },
-    {
-      title: "Kardex Valorado",
-      description: "Historial valorado de movimientos de almacén.",
-      to: "/kardex-valorado",
-      icon: History
     }
+    // Kardex Valorado queda deliberadamente fuera del panel por ahora — sigue
+    // sin card ni entrada de menú, igual que antes de este cambio.
   ];
 
   if (canSeeInventario) {
