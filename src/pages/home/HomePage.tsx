@@ -1,6 +1,17 @@
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
-import { Boxes, LayoutDashboard, MoveRight, UserPlus } from "lucide-react";
+import {
+  Boxes,
+  HardHat,
+  History,
+  IdCard,
+  LayoutDashboard,
+  Leaf,
+  MoveRight,
+  PiggyBank,
+  Truck,
+  UserPlus
+} from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 interface DashboardItem {
@@ -11,10 +22,26 @@ interface DashboardItem {
 }
 
 export function HomePage() {
-  const { user, canManageUsers } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const { user, isAdmin, isSuperintendente, canManageUsers } = useAuth();
+
+  // Mismas condiciones de rol que el menú lateral (AppShell.tsx) y los guards
+  // de ruta (app/router/guards/*.tsx) — si un rol no puede entrar al módulo,
+  // tampoco debe ver su tarjeta acá. Al cambiar el acceso de un módulo, hay
+  // que actualizar los 3 lugares juntos (guard, menú, este panel).
   const isAlmacenero = user?.role === "ALMACENERO";
   const isRecepcionista = user?.role === "RECEPCIONISTA";
+  const isAdministrador = user?.role === "ADMINISTRADOR";
+  const isAsistenteAdministrativo = user?.role === "ASISTENTE_ADMINISTRATIVO";
+  const isContador = user?.role === "CONTADOR";
+
+  const canSeeInventario = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
+  const canSeePersonal = isAdmin || isAdministrador || isSuperintendente;
+  const canSeeLogistica = isAdmin || isSuperintendente || isAsistenteAdministrativo;
+  const canSeeCajaChica = isAdmin || isAdministrador || isContador || isSuperintendente;
+  // EPP y Ambiental: solo ADMIN por ahora, a pedido explícito, hasta que se
+  // creen roles específicos (ej. Seguridad, Medioambiente) que deban verlos.
+  const canSeeEpp = isAdmin;
+  const canSeeAmbiental = isAdmin;
 
   const items: DashboardItem[] = [
     {
@@ -22,27 +49,66 @@ export function HomePage() {
       description: "Vista general del sistema y estado operativo.",
       to: "/",
       icon: LayoutDashboard
+    },
+    {
+      title: "Kardex Valorado",
+      description: "Historial valorado de movimientos de almacén.",
+      to: "/kardex-valorado",
+      icon: History
     }
-    // {
-    //   title: "Mapa",
-    //   description: "Visualiza ubicaciones operativas y tu geolocalizacion en tiempo real.",
-    //   to: "/mapa",
-    //   icon: Map
-    // },
-    // {
-    //   title: "Exploraciones",
-    //   description: "Registro de muestras geologicas en campo con soporte offline y sync.",
-    //   to: "/exploraciones",
-    //   icon: FlaskConical
-    // }
   ];
 
-  if (isAdmin || isAlmacenero || isRecepcionista) {
+  if (canSeeInventario) {
     items.push({
       title: "Inventario",
       description: "Gestión de categorías, productos y flujos de almacén.",
       to: "/inventario",
       icon: Boxes
+    });
+  }
+
+  if (canSeePersonal) {
+    items.push({
+      title: "Personal",
+      description: "Empleados, horarios, asignaciones y ausencias.",
+      to: "/personal",
+      icon: IdCard
+    });
+  }
+
+  if (canSeeLogistica) {
+    items.push({
+      title: "Logística",
+      description: "Flota, lotes de despacho, liquidaciones y remitentes.",
+      to: "/logistica",
+      icon: Truck
+    });
+  }
+
+  if (canSeeCajaChica) {
+    items.push({
+      title: "Caja Chica",
+      description: "Gastos, presupuesto, saldos y rendiciones de caja.",
+      to: "/caja-chica",
+      icon: PiggyBank
+    });
+  }
+
+  if (canSeeEpp) {
+    items.push({
+      title: "EPP",
+      description: "Equipos de protección personal asignados al personal.",
+      to: "/epp",
+      icon: HardHat
+    });
+  }
+
+  if (canSeeAmbiental) {
+    items.push({
+      title: "Ambiental",
+      description: "Registros hídricos, de residuos, ruido y suelo.",
+      to: "/ambiental",
+      icon: Leaf
     });
   }
 

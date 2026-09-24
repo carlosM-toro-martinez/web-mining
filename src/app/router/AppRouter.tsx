@@ -57,6 +57,7 @@ import { LogisticaRoute } from "@/app/router/guards/LogisticaRoute";
 import { CajaChicaRoute } from "@/app/router/guards/CajaChicaRoute";
 import { PersonalRoute } from "@/app/router/guards/PersonalRoute";
 import { EppRoute } from "@/app/router/guards/EppRoute";
+import { AmbientalRoute } from "@/app/router/guards/AmbientalRoute";
 
 export function AppRouter() {
   return (
@@ -140,7 +141,9 @@ export function AppRouter() {
           <Route element={<EppRoute />}>
             <Route path="/epp" element={<EppPage />} />
           </Route>
-          <Route path="/ambiental" element={<AmbientalPage />} />
+          <Route element={<AmbientalRoute />}>
+            <Route path="/ambiental" element={<AmbientalPage />} />
+          </Route>
           <Route path="/ajustes" element={<NotFoundPage />} />
 
           <Route element={<AdminRoute />}>

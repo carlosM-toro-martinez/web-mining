@@ -67,20 +67,25 @@ export function AppShell() {
   const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
   const canSeeLogisticaRoute = isAdmin || isSuperintendente || isAsistenteAdministrativo;
   const canSeeCajaChicaRoute = isAdmin || isAdministrador || isContador || isSuperintendente;
-  const canSeeEppRoute =
-    isAdmin || isAdministrador || isSuperintendente || user?.role === "TRABAJADOR";
+  // EPP y Ambiental restringidos solo a ADMIN por ahora, a pedido explícito,
+  // hasta que se creen roles específicos (ej. Seguridad, Medioambiente) que
+  // deban verlos también.
+  const canSeeEppRoute = isAdmin;
+  const canSeeAmbientalRoute = isAdmin;
 
   const topNavItems = useMemo(() => {
     const items: NavItem[] = [{ label: "Dashboard", icon: LayoutDashboard, to: "/" }];
     if (canSeeEppRoute) {
       items.push({ label: "EPP", icon: HardHat, to: "/epp" });
     }
-    items.push({ label: "Ambiental", icon: Leaf, to: "/ambiental" });
+    if (canSeeAmbientalRoute) {
+      items.push({ label: "Ambiental", icon: Leaf, to: "/ambiental" });
+    }
     if (canManageUsers) {
       items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
     return items;
-  }, [canManageUsers, canSeeEppRoute]);
+  }, [canManageUsers, canSeeEppRoute, canSeeAmbientalRoute]);
 
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventoryRoute) return [];
