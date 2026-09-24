@@ -21,7 +21,8 @@ const roleOptions: AuthRole[] = [
   "VISITANTE",
   "GEOLOGOADMIN",
   "GEOLOGO",
-  "ADMINISTRADOR"
+  "ADMINISTRADOR",
+  "CONTADOR"
 ];
 
 interface EditFormState {
