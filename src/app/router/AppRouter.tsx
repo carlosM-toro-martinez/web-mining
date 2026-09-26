@@ -30,7 +30,6 @@ import { AmbientalPage } from "@/pages/ambiental/AmbientalPage";
 import { LogisticaPage } from "@/pages/logistica/LogisticaPage";
 import { ParametrosLogisticaPage } from "@/pages/logistica/ParametrosLogisticaPage";
 import { FlotaPage } from "@/pages/logistica/FlotaPage";
-import { RemitentesPage } from "@/pages/logistica/RemitentesPage";
 import { LotesDespachoPage } from "@/pages/logistica/LotesDespachoPage";
 import { LiquidacionesPage } from "@/pages/logistica/LiquidacionesPage";
 import { LogisticaReportesPage } from "@/pages/logistica/LogisticaReportesPage";
@@ -121,7 +120,6 @@ export function AppRouter() {
             <Route path="/logistica" element={<LogisticaPage />} />
             <Route path="/logistica/parametros" element={<ParametrosLogisticaPage />} />
             <Route path="/logistica/flota" element={<FlotaPage />} />
-            <Route path="/logistica/remitentes" element={<RemitentesPage />} />
             <Route path="/logistica/lotes" element={<LotesDespachoPage />} />
             <Route path="/logistica/liquidaciones" element={<LiquidacionesPage />} />
             <Route path="/logistica/reportes" element={<LogisticaReportesPage />} />

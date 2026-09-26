@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Check,
   Coins,
   Factory,
@@ -10,9 +11,12 @@ import {
   Percent,
   Plus,
   Search,
+  ShieldAlert,
   Trash2,
   X
 } from "lucide-react";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { useResetLogisticaMutation } from "@/features/logisticaReset/hooks/useLogisticaReset";
 import {
   useAlicuotasRegaliaQuery,
   useConceptosLiquidacionQuery,
@@ -37,8 +41,9 @@ import {
 } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import type {
   CatalogoSimple,
-  TipoEntidadRemitente
+  TipoEntidadTransportista
 } from "@/features/parametrosLogistica/model/parametrosLogistica.schema";
+import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -48,7 +53,7 @@ const inputClassName =
 
 const MAX_ROWS = 12;
 
-const TIPO_ENTIDAD_LABEL: Record<TipoEntidadRemitente, string> = {
+const TIPO_ENTIDAD_LABEL: Record<TipoEntidadTransportista, string> = {
   EMPRESA: "Empresa",
   TRABAJADOR_PARTICULAR: "Trabajador particular"
 };
@@ -66,8 +71,14 @@ function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO");
 }
 
+const FRASE_CONFIRMACION_RESET = "ELIMINAR TODO";
+
 export function ParametrosLogisticaPage() {
   const { showError, showSuccess } = useToast();
+  const { user } = useAuth();
+  const esAdmin = user?.role === "ADMIN";
+  const resetLogisticaMutation = useResetLogisticaMutation();
+  const [confirmacionReset, setConfirmacionReset] = useState("");
 
   const municipiosQuery = useMunicipiosOrigenQuery();
   const tiposMineralQuery = useTiposMineralQuery();
@@ -94,6 +105,7 @@ export function ParametrosLogisticaPage() {
 
   const createAlicuotaMutation = useCreateAlicuotaRegaliaMutation();
   const createTarifaMutation = useCreateTarifaLiquidacionMutation();
+  const transportistasQuery = useTransportistasQuery();
 
   const municipios = municipiosQuery.data?.data ?? [];
   const tiposMineral = tiposMineralQuery.data?.data ?? [];
@@ -101,6 +113,7 @@ export function ParametrosLogisticaPage() {
   const conceptos = conceptosQuery.data?.data ?? [];
   const alicuotas = alicuotasQuery.data?.data ?? [];
   const tarifas = tarifasQuery.data?.data ?? [];
+  const transportistas = transportistasQuery.data?.data ?? [];
 
   // --- Municipio ---
   const [municipioCodigo, setMunicipioCodigo] = useState("");
@@ -139,10 +152,21 @@ export function ParametrosLogisticaPage() {
   const [alicuotaVigenteDesde, setAlicuotaVigenteDesde] = useState("");
 
   // --- Tarifa de liquidación ---
-  const [tarifaTipoEntidad, setTarifaTipoEntidad] = useState<TipoEntidadRemitente>("EMPRESA");
+  const [tarifaModo, setTarifaModo] = useState<"FIJO" | "ESPECIAL">("FIJO");
+  const [tarifaTipoEntidad, setTarifaTipoEntidad] = useState<TipoEntidadTransportista>("EMPRESA");
+  const [tarifaTransportistaId, setTarifaTransportistaId] = useState("");
   const [tarifaTipoMineralId, setTarifaTipoMineralId] = useState("");
   const [tarifaPrecio, setTarifaPrecio] = useState("");
   const [tarifaVigenteDesde, setTarifaVigenteDesde] = useState("");
+
+  // Precio fijo vigente por tipo de entidad: el que aplica cuando el
+  // transportista NO tiene contrato especial (transportistaId y
+  // tipoMineralId ambos vacíos, sin fecha de fin todavía).
+  const preciosFijosActuales = useMemo(() => {
+    const encontrar = (tipoEntidad: TipoEntidadTransportista) =>
+      tarifas.find((t) => t.tipoEntidad === tipoEntidad && !t.transportistaId && !t.tipoMineralId && !t.vigenteHasta);
+    return { EMPRESA: encontrar("EMPRESA"), TRABAJADOR_PARTICULAR: encontrar("TRABAJADOR_PARTICULAR") };
+  }, [tarifas]);
 
   const municipioMap = useMemo(() => new Map(municipios.map((m) => [m.id, m])), [municipios]);
   const tipoMineralMap = useMemo(() => new Map(tiposMineral.map((t) => [t.id, t])), [tiposMineral]);
@@ -358,22 +382,51 @@ export function ParametrosLogisticaPage() {
 
   function handleCreateTarifa(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (tarifaModo === "ESPECIAL" && !tarifaTransportistaId) {
+      showError("Elige el transportista con contrato especial.");
+      return;
+    }
     createTarifaMutation.mutate(
       {
         tipoEntidad: tarifaTipoEntidad,
+        transportistaId: tarifaModo === "ESPECIAL" ? Number(tarifaTransportistaId) : null,
         tipoMineralId: tarifaTipoMineralId ? Number(tarifaTipoMineralId) : null,
         precioPorTonelada: Number(tarifaPrecio),
         vigenteDesde: tarifaVigenteDesde
       },
       {
         onSuccess: () => {
-          showSuccess("Tarifa de liquidación registrada. La vigencia anterior (si existía) quedó cerrada automáticamente.");
+          showSuccess(
+            tarifaModo === "FIJO"
+              ? "Precio fijo actualizado. El anterior (si existía) quedó cerrado automáticamente."
+              : "Precio especial registrado para este transportista. El anterior (si existía) quedó cerrado automáticamente."
+          );
+          setTarifaTransportistaId("");
           setTarifaPrecio("");
           setTarifaVigenteDesde("");
         },
         onError: (error) => showError(normalizeError(error, "No se pudo registrar la tarifa de liquidación."))
       }
     );
+  }
+
+  function handleResetLogistica() {
+    if (confirmacionReset !== FRASE_CONFIRMACION_RESET) return;
+    const confirmed = window.confirm(
+      "Esto elimina PERMANENTEMENTE todos los municipios, tipos de mineral, ingenios, conceptos, alícuotas, tarifas, transportistas, vehículos, choferes, lotes de despacho, Formularios 101 y liquidaciones. No afecta Caja Chica, Inventario ni usuarios. ¿Continuar?"
+    );
+    if (!confirmed) return;
+
+    resetLogisticaMutation.mutate(undefined, {
+      onSuccess: (response) => {
+        const r = response.data;
+        showSuccess(
+          `Logística reiniciada: ${r.lotes} lotes, ${r.liquidaciones} liquidaciones, ${r.vehiculos} vehículos, ${r.choferes} choferes, ${r.transportistas} transportistas, ${r.municipios} municipios, ${r.tiposMineral} tipos de mineral, ${r.ingenios} ingenios eliminados.`
+        );
+        setConfirmacionReset("");
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo reiniciar el módulo de Logística."))
+    });
   }
 
   return (
@@ -937,19 +990,84 @@ export function ParametrosLogisticaPage() {
             <Coins size={16} className="text-[var(--color-primary)]" />
             Tarifas de liquidación (precio por tonelada)
           </h3>
-          <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
-            Igual que las alícuotas: registrar una nueva tarifa cierra la vigencia anterior para el mismo
-            tipo de entidad y tipo de mineral (deja el tipo de mineral vacío para "aplica a todos").
+          <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
+            El <strong>precio fijo</strong> es el que se cobra por defecto a cualquier transportista de ese
+            tipo. Un transportista con contrato especial puede tener su propio <strong>precio especial</strong>,
+            que siempre gana sobre el fijo. Registrar una tarifa nueva reemplaza (cierra) la anterior de esa
+            misma combinación — así se "edita" el precio.
           </p>
+
+          <div className="mb-4 grid grid-cols-1 gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 sm:grid-cols-2">
+            {(["EMPRESA", "TRABAJADOR_PARTICULAR"] as const).map((tipo) => {
+              const actual = preciosFijosActuales[tipo];
+              return (
+                <div key={tipo} className="text-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+                    Precio fijo — {TIPO_ENTIDAD_LABEL[tipo]}
+                  </p>
+                  {actual ? (
+                    <p className="font-bold">
+                      Bs {actual.precioPorTonelada} / ton{" "}
+                      <span className="font-normal text-[var(--color-on-surface-variant)]">
+                        desde {formatFecha(actual.vigenteDesde)}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="font-semibold text-[var(--color-warning)]">Sin definir todavía</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
           <form className="grid grid-cols-2 gap-3" onSubmit={handleCreateTarifa}>
+            <div className="col-span-2 flex gap-2 rounded-lg border border-[var(--color-border-soft)] p-1">
+              <button
+                type="button"
+                onClick={() => setTarifaModo("FIJO")}
+                className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                  tarifaModo === "FIJO"
+                    ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)]"
+                }`}
+              >
+                Precio fijo (todos los de este tipo)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTarifaModo("ESPECIAL")}
+                className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition ${
+                  tarifaModo === "ESPECIAL"
+                    ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)]"
+                }`}
+              >
+                Precio especial (un transportista puntual)
+              </button>
+            </div>
             <select
               value={tarifaTipoEntidad}
-              onChange={(event) => setTarifaTipoEntidad(event.target.value as TipoEntidadRemitente)}
+              onChange={(event) => setTarifaTipoEntidad(event.target.value as TipoEntidadTransportista)}
               className={`${inputClassName} col-span-2`}
             >
               <option value="EMPRESA">Empresa</option>
               <option value="TRABAJADOR_PARTICULAR">Trabajador particular</option>
             </select>
+            {tarifaModo === "ESPECIAL" ? (
+              <select
+                required
+                value={tarifaTransportistaId}
+                onChange={(event) => setTarifaTransportistaId(event.target.value)}
+                className={`${inputClassName} col-span-2`}
+              >
+                <option value="">Elige el transportista con contrato especial...</option>
+                {transportistas.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombreORazonSocial}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <select
               value={tarifaTipoMineralId}
               onChange={(event) => setTarifaTipoMineralId(event.target.value)}
@@ -992,7 +1110,7 @@ export function ParametrosLogisticaPage() {
             {tarifas.slice(0, MAX_ROWS).map((item) => (
               <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
                 <p className="font-semibold">
-                  {TIPO_ENTIDAD_LABEL[item.tipoEntidad]} ·{" "}
+                  {item.transportista ? item.transportista.nombreORazonSocial : TIPO_ENTIDAD_LABEL[item.tipoEntidad]} ·{" "}
                   {item.tipoMineral?.nombre ?? "Todos los tipos"}
                 </p>
                 <p className="text-xs text-[var(--color-on-surface-variant)]">
@@ -1007,6 +1125,37 @@ export function ParametrosLogisticaPage() {
           </div>
         </article>
       </div>
+
+      {esAdmin ? (
+        <article className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error)]/5 p-5">
+          <h3 className="mb-1 flex items-center gap-2 text-lg font-bold text-[var(--color-error)]">
+            <ShieldAlert size={16} />
+            Zona de peligro — reiniciar Logística
+          </h3>
+          <p className="mb-4 max-w-2xl text-xs text-[var(--color-on-surface-variant)]">
+            Elimina PERMANENTEMENTE todos los datos de este módulo (catálogos, transportistas, flota,
+            lotes de despacho, Formularios 101 y liquidaciones) para volver a probar todo desde cero.
+            No afecta Caja Chica, Inventario ni usuarios. Esta acción no se puede deshacer.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={confirmacionReset}
+              onChange={(event) => setConfirmacionReset(event.target.value)}
+              className={`${inputClassName} max-w-xs border-[var(--color-error)]/40`}
+              placeholder={`Escribe "${FRASE_CONFIRMACION_RESET}" para habilitar`}
+            />
+            <button
+              type="button"
+              onClick={handleResetLogistica}
+              disabled={confirmacionReset !== FRASE_CONFIRMACION_RESET || resetLogisticaMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              <AlertTriangle size={14} />
+              {resetLogisticaMutation.isPending ? "Eliminando..." : "Eliminar todo y empezar de cero"}
+            </button>
+          </div>
+        </article>
+      ) : null}
     </section>
   );
 }

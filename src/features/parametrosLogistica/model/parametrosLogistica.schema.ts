@@ -18,7 +18,7 @@ export const createCatalogoSimplePayloadSchema = z.object({
 export const updateCatalogoSimplePayloadSchema = createCatalogoSimplePayloadSchema.partial();
 
 export const tipoConceptoLiquidacionSchema = z.enum(["ABONO", "DEDUCCION"]);
-export const tipoEntidadRemitenteSchema = z.enum(["EMPRESA", "TRABAJADOR_PARTICULAR"]);
+export const tipoEntidadTransportistaSchema = z.enum(["EMPRESA", "TRABAJADOR_PARTICULAR"]);
 
 export const conceptoLiquidacionSchema = z.object({
   id: z.number().int().positive(),
@@ -59,18 +59,26 @@ export const createAlicuotaRegaliaPayloadSchema = z.object({
   vigenteDesde: z.string().min(1, "La fecha de vigencia es obligatoria.")
 });
 
+const transportistaRefSchema = z.object({
+  id: z.number().int().positive(),
+  nombreORazonSocial: z.string().min(1)
+});
+
 export const tarifaLiquidacionSchema = z.object({
   id: z.number().int().positive(),
-  tipoEntidad: tipoEntidadRemitenteSchema,
+  tipoEntidad: tipoEntidadTransportistaSchema,
+  transportistaId: z.number().int().positive().nullable().optional(),
   tipoMineralId: z.number().int().positive().nullable(),
   precioPorTonelada: z.union([z.string(), z.number()]),
   vigenteDesde: z.string(),
   vigenteHasta: z.string().nullable(),
-  tipoMineral: catalogoRefSchema.nullable()
+  tipoMineral: catalogoRefSchema.nullable(),
+  transportista: transportistaRefSchema.nullable().optional()
 });
 
 export const createTarifaLiquidacionPayloadSchema = z.object({
-  tipoEntidad: tipoEntidadRemitenteSchema,
+  tipoEntidad: tipoEntidadTransportistaSchema,
+  transportistaId: z.number().int().positive().nullable().optional(),
   tipoMineralId: z.number().int().positive().nullable().optional(),
   precioPorTonelada: z.number().positive("El precio debe ser mayor a cero."),
   vigenteDesde: z.string().min(1, "La fecha de vigencia es obligatoria.")
@@ -122,5 +130,5 @@ export type AlicuotaRegalia = z.infer<typeof alicuotaRegaliaSchema>;
 export type CreateAlicuotaRegaliaPayload = z.infer<typeof createAlicuotaRegaliaPayloadSchema>;
 export type TarifaLiquidacion = z.infer<typeof tarifaLiquidacionSchema>;
 export type CreateTarifaLiquidacionPayload = z.infer<typeof createTarifaLiquidacionPayloadSchema>;
-export type TipoEntidadRemitente = z.infer<typeof tipoEntidadRemitenteSchema>;
+export type TipoEntidadTransportista = z.infer<typeof tipoEntidadTransportistaSchema>;
 export type TipoConceptoLiquidacion = z.infer<typeof tipoConceptoLiquidacionSchema>;

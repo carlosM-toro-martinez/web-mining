@@ -13,7 +13,7 @@ export const estadoLoteDespachoSchema = z.enum([
 export const estadoFormulario101Schema = z.enum(["DISPONIBLE", "VINCULADO", "ANULADO"]);
 
 const refConNombre = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
-const remitenteRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
+const transportistaRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
 const vehiculoRef = z.object({ id: z.number().int().positive(), placa: z.string().min(1), tipo: z.string().min(1) });
 const choferRef = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
 
@@ -68,7 +68,7 @@ export const loteDespachoSchema = z.object({
   id: z.string().min(1),
   correlativo: z.string().min(1),
   municipioOrigenId: z.number().int().positive(),
-  remitenteId: z.number().int().positive(),
+  transportistaId: z.number().int().positive(),
   vehiculoId: z.number().int().positive(),
   choferId: z.number().int().positive(),
   tipoMineralId: z.number().int().positive(),
@@ -79,7 +79,7 @@ export const loteDespachoSchema = z.object({
   estadoLote: estadoLoteDespachoSchema,
   createdAt: z.string(),
   municipioOrigen: refConNombre.optional(),
-  remitente: remitenteRef.optional(),
+  transportista: transportistaRef.optional(),
   vehiculo: vehiculoRef.optional(),
   chofer: choferRef.optional(),
   tipoMineral: refConNombre.optional(),
@@ -93,7 +93,7 @@ export const loteDespachoSchema = z.object({
 
 export const createLoteDespachoPayloadSchema = z.object({
   municipioOrigenId: z.number().int().positive("Debes elegir un municipio de origen."),
-  remitenteId: z.number().int().positive("Debes elegir un remitente."),
+  transportistaId: z.number().int().positive("Debes elegir un transportista."),
   vehiculoId: z.number().int().positive("Debes elegir un vehículo disponible."),
   choferId: z.number().int().positive("Debes elegir un chofer."),
   tipoMineralId: z.number().int().positive("Debes elegir un tipo de mineral."),

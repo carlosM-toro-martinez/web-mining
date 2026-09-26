@@ -1,5 +1,6 @@
 export const liquidacionesEndpoints = {
   base: "/api/liquidaciones",
+  preview: "/api/liquidaciones/preview",
   byId: (id: string) => `/api/liquidaciones/${id}`,
   itemsConcepto: (id: string) => `/api/liquidaciones/${id}/items-concepto`,
   itemConceptoById: (id: string, itemId: string) => `/api/liquidaciones/${id}/items-concepto/${itemId}`,

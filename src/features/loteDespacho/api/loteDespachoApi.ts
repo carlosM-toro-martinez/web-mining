@@ -17,6 +17,11 @@ import {
 
 export interface LotesDespachoQueryParams {
   estadoLote?: string;
+  transportistaId?: number;
+  vehiculoId?: number;
+  fechaInicio?: string;
+  fechaFin?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }

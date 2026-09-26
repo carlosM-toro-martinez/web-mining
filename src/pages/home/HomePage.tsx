@@ -74,7 +74,7 @@ export function HomePage() {
   if (canSeeLogistica) {
     items.push({
       title: "Logística",
-      description: "Flota, lotes de despacho, liquidaciones y remitentes.",
+      description: "Flota, lotes de despacho, liquidaciones y transportistas.",
       to: "/logistica",
       icon: Truck
     });

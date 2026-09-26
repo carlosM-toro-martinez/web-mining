@@ -1,5 +1,27 @@
-import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, Ban, CheckCircle2, FileText, PackageSearch, Recycle, Scale, Search, Send, Truck } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Ban,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+  PackageSearch,
+  Recycle,
+  Scale,
+  Search,
+  Send,
+  Truck,
+  X
+} from "lucide-react";
+import {
+  exportBoletaPesajeExcel,
+  exportBoletaPesajePdf,
+  exportConocimientoExcel,
+  exportConocimientoPdf
+} from "@/features/logisticaReportes/lib/logisticaExport";
 import {
   useAnularLoteMutation,
   useAvanzarEstadoLoteMutation,
@@ -22,9 +44,10 @@ import {
   useMunicipiosOrigenQuery,
   useTiposMineralQuery
 } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
-import { useRemitentesQuery } from "@/features/remitente/hooks/useRemitentes";
+import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
 import { useChoferesQuery, useVehiculosQuery } from "@/features/flota/hooks/useFlota";
 import { ApiError } from "@/shared/api/core/apiError";
+import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -63,18 +86,57 @@ function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO");
 }
 
+// Texto boilerplate del Conocimiento real ("Carga para Ingenio del sector
+// Lipeña"), precargado y editable — así el usuario no tiene que escribirlo
+// cada vez y el Conocimiento exportado no sale con la descripción vacía.
+const DESCRIPCION_CONOCIMIENTO_DEFAULT = "Carga para Ingenio del sector Lipeña";
+
+const LOTES_POR_PAGINA = 20;
+
+function isoDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 export function LotesDespachoPage() {
   const { showError, showSuccess } = useToast();
 
+  const hoy = useMemo(() => new Date(), []);
+  const haceUnaSemana = useMemo(() => new Date(hoy.getTime() - 7 * 24 * 60 * 60 * 1000), [hoy]);
+
   const [filtroEstado, setFiltroEstado] = useState<string>("");
-  const lotesQuery = useLotesDespachoQuery({ estadoLote: filtroEstado || undefined, limit: 50 });
+  const [busqueda, setBusqueda] = useState("");
+  const [busquedaDebounced, setBusquedaDebounced] = useState("");
+  const [filtroFechaInicio, setFiltroFechaInicio] = useState(isoDate(haceUnaSemana));
+  const [filtroFechaFin, setFiltroFechaFin] = useState(isoDate(hoy));
+  const [pagina, setPagina] = useState(1);
+
+  // La búsqueda se manda al servidor (y se pagina sobre el resultado YA
+  // filtrado) en vez de filtrar solo la página que ya está cargada en el
+  // navegador — si no, un resultado que cae en otra página nunca aparecía.
+  // Debounce para no disparar una consulta por cada tecla.
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setBusquedaDebounced(busqueda.trim());
+      setPagina(1);
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [busqueda]);
+
+  const lotesQuery = useLotesDespachoQuery({
+    estadoLote: filtroEstado || undefined,
+    fechaInicio: filtroFechaInicio || undefined,
+    fechaFin: filtroFechaFin || undefined,
+    search: busquedaDebounced || undefined,
+    page: pagina,
+    limit: LOTES_POR_PAGINA
+  });
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const loteDetalleQuery = useLoteDespachoDetailQuery(selectedId);
 
   const municipiosQuery = useMunicipiosOrigenQuery();
   const tiposMineralQuery = useTiposMineralQuery();
   const ingeniosQuery = useIngeniosQuery();
-  const remitentesQuery = useRemitentesQuery();
+  const transportistasQuery = useTransportistasQuery();
   const choferesQuery = useChoferesQuery();
   const vehiculosQuery = useVehiculosQuery();
   const f101DisponiblesQuery = useFormularios101Query({ estado: "DISPONIBLE" });
@@ -90,11 +152,28 @@ export function LotesDespachoPage() {
   const peticionEnviadaMutation = useMarcarPeticionEnviadaMutation();
 
   const lotes = lotesQuery.data?.data ?? [];
+  const metaLotes = lotesQuery.data?.meta;
+  const totalPaginas = Math.max(metaLotes?.totalPages ?? 1, 1);
+
+  function handleCambiarFiltroEstado(value: string) {
+    setFiltroEstado(value);
+    setPagina(1);
+  }
+
+  function handleCambiarFechaInicio(value: string) {
+    setFiltroFechaInicio(value);
+    setPagina(1);
+  }
+
+  function handleCambiarFechaFin(value: string) {
+    setFiltroFechaFin(value);
+    setPagina(1);
+  }
   const lote = loteDetalleQuery.data?.data ?? null;
   const municipios = municipiosQuery.data?.data ?? [];
   const tiposMineral = tiposMineralQuery.data?.data ?? [];
   const ingenios = ingeniosQuery.data?.data ?? [];
-  const remitentes = remitentesQuery.data?.data ?? [];
+  const transportistas = transportistasQuery.data?.data ?? [];
   const choferes = choferesQuery.data?.data ?? [];
   const f101Disponibles = f101DisponiblesQuery.data?.data ?? [];
   const vehiculosDisponibles = useMemo(
@@ -102,9 +181,34 @@ export function LotesDespachoPage() {
     [vehiculosQuery.data]
   );
 
+  const municipioOptions = useMemo(
+    () => municipios.map((m) => ({ id: String(m.id), label: m.nombre, searchText: m.codigo })),
+    [municipios]
+  );
+  const transportistaOptions = useMemo(
+    () => transportistas.map((r) => ({ id: String(r.id), label: r.nombreORazonSocial, searchText: r.nitOCi })),
+    [transportistas]
+  );
+  const vehiculoDisponibleOptions = useMemo(
+    () => vehiculosDisponibles.map((v) => ({ id: String(v.id), label: `${v.placa} · ${v.tipo}`, searchText: v.placa })),
+    [vehiculosDisponibles]
+  );
+  const choferOptions = useMemo(
+    () => choferes.map((c) => ({ id: String(c.id), label: c.nombre, searchText: c.ci })),
+    [choferes]
+  );
+  const tipoMineralOptions = useMemo(
+    () => tiposMineral.map((t) => ({ id: String(t.id), label: t.nombre, searchText: t.codigo })),
+    [tiposMineral]
+  );
+  const ingenioOptions = useMemo(
+    () => ingenios.map((i) => ({ id: String(i.id), label: i.nombre, searchText: i.codigo })),
+    [ingenios]
+  );
+
   // --- Form: nuevo lote (+ Conocimiento) ---
   const [municipioOrigenId, setMunicipioOrigenId] = useState("");
-  const [remitenteId, setRemitenteId] = useState("");
+  const [transportistaId, setTransportistaId] = useState("");
   const [vehiculoId, setVehiculoId] = useState("");
   const [choferId, setChoferId] = useState("");
   const [tipoMineralId, setTipoMineralId] = useState("");
@@ -113,7 +217,7 @@ export function LotesDespachoPage() {
   const [fechaDespachoReal, setFechaDespachoReal] = useState("");
   const [fechaDocumentalFiscal, setFechaDocumentalFiscal] = useState("");
   const [detalleCarga, setDetalleCarga] = useState("Carga Chami");
-  const [descripcionConocimiento, setDescripcionConocimiento] = useState("");
+  const [descripcionConocimiento, setDescripcionConocimiento] = useState(DESCRIPCION_CONOCIMIENTO_DEFAULT);
   const [observacionesConocimiento, setObservacionesConocimiento] = useState("");
 
   // --- Form: vincular / reutilizar Formulario 101 ---
@@ -134,9 +238,22 @@ export function LotesDespachoPage() {
   const tonelajeNetoPreview =
     tonelajeBruto && tonelajeTara ? Number(tonelajeBruto) - Number(tonelajeTara) : null;
 
+  // El backend exige que la fecha del F101 coincida EXACTO con la del
+  // Conocimiento (mismaFechaCalendario en formulario101.service.ts) — se
+  // precarga para que el usuario no choque con ese error por defecto; si
+  // el Municipio realmente puso otra fecha, la puede cambiar a mano.
+  const loteTieneF101 = Boolean(lote?.formulario101);
+  useEffect(() => {
+    if (lote && !loteTieneF101 && lote.conocimientoCarga) {
+      setF101Fecha(lote.conocimientoCarga.fecha.slice(0, 10));
+    } else {
+      setF101Fecha("");
+    }
+  }, [lote?.id, loteTieneF101, lote?.conocimientoCarga?.fecha]);
+
   function resetForm() {
     setMunicipioOrigenId("");
-    setRemitenteId("");
+    setTransportistaId("");
     setVehiculoId("");
     setChoferId("");
     setTipoMineralId("");
@@ -145,16 +262,20 @@ export function LotesDespachoPage() {
     setFechaDespachoReal("");
     setFechaDocumentalFiscal("");
     setDetalleCarga("Carga Chami");
-    setDescripcionConocimiento("");
+    setDescripcionConocimiento(DESCRIPCION_CONOCIMIENTO_DEFAULT);
     setObservacionesConocimiento("");
   }
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!municipioOrigenId || !transportistaId || !vehiculoId || !choferId || !tipoMineralId || !destinoIngenioId) {
+      showError("Elige municipio, transportista, vehículo, chofer, tipo de mineral e ingenio de las listas (no solo escribas texto).");
+      return;
+    }
     createMutation.mutate(
       {
         municipioOrigenId: Number(municipioOrigenId),
-        remitenteId: Number(remitenteId),
+        transportistaId: Number(transportistaId),
         vehiculoId: Number(vehiculoId),
         choferId: Number(choferId),
         tipoMineralId: Number(tipoMineralId),
@@ -328,42 +449,48 @@ export function LotesDespachoPage() {
           Nuevo lote de despacho (Conocimiento)
         </h2>
         <form className="grid grid-cols-1 gap-3 lg:grid-cols-3" onSubmit={handleCreate}>
-          <select required value={municipioOrigenId} onChange={(e) => setMunicipioOrigenId(e.target.value)} className={inputClassName}>
-            <option value="">Municipio de origen...</option>
-            {municipios.map((m) => (
-              <option key={m.id} value={m.id}>{m.nombre}</option>
-            ))}
-          </select>
-          <select required value={remitenteId} onChange={(e) => setRemitenteId(e.target.value)} className={inputClassName}>
-            <option value="">Remitente (A la Empresa)...</option>
-            {remitentes.map((r) => (
-              <option key={r.id} value={r.id}>{r.nombreORazonSocial}</option>
-            ))}
-          </select>
-          <select required value={vehiculoId} onChange={(e) => setVehiculoId(e.target.value)} className={inputClassName}>
-            <option value="">Vehículo disponible...</option>
-            {vehiculosDisponibles.map((v) => (
-              <option key={v.id} value={v.id}>{v.placa} · {v.tipo}</option>
-            ))}
-          </select>
-          <select required value={choferId} onChange={(e) => setChoferId(e.target.value)} className={inputClassName}>
-            <option value="">Chofer...</option>
-            {choferes.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
-          <select required value={tipoMineralId} onChange={(e) => setTipoMineralId(e.target.value)} className={inputClassName}>
-            <option value="">Tipo de mineral...</option>
-            {tiposMineral.map((t) => (
-              <option key={t.id} value={t.id}>{t.nombre}</option>
-            ))}
-          </select>
-          <select required value={destinoIngenioId} onChange={(e) => setDestinoIngenioId(e.target.value)} className={inputClassName}>
-            <option value="">Ingenio destino...</option>
-            {ingenios.map((i) => (
-              <option key={i.id} value={i.id}>{i.nombre}</option>
-            ))}
-          </select>
+          <AutocompleteSelect
+            value={municipioOrigenId}
+            onChange={setMunicipioOrigenId}
+            options={municipioOptions}
+            placeholder="Municipio de origen..."
+            className={inputClassName}
+          />
+          <AutocompleteSelect
+            value={transportistaId}
+            onChange={setTransportistaId}
+            options={transportistaOptions}
+            placeholder="Transportista..."
+            className={inputClassName}
+          />
+          <AutocompleteSelect
+            value={vehiculoId}
+            onChange={setVehiculoId}
+            options={vehiculoDisponibleOptions}
+            placeholder="Vehículo disponible..."
+            className={inputClassName}
+          />
+          <AutocompleteSelect
+            value={choferId}
+            onChange={setChoferId}
+            options={choferOptions}
+            placeholder="Chofer..."
+            className={inputClassName}
+          />
+          <AutocompleteSelect
+            value={tipoMineralId}
+            onChange={setTipoMineralId}
+            options={tipoMineralOptions}
+            placeholder="Tipo de mineral..."
+            className={inputClassName}
+          />
+          <AutocompleteSelect
+            value={destinoIngenioId}
+            onChange={setDestinoIngenioId}
+            options={ingenioOptions}
+            placeholder="Ingenio destino..."
+            className={inputClassName}
+          />
           <input value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName} placeholder="Nivel (ej. 80, opcional)" />
           <div>
             <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Fecha de despacho real</label>
@@ -404,19 +531,64 @@ export function LotesDespachoPage() {
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Lotes registrados</h2>
-          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className={`${inputClassName} w-56`}>
-            <option value="">Todos los estados</option>
-            {Object.entries(ESTADO_LOTE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          <span className="text-xs text-[var(--color-on-surface-variant)]">
+            {(metaLotes?.total ?? lotes.length).toLocaleString("es-BO")} en total
+          </span>
+        </div>
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="min-w-[260px] flex-1">
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Buscar</label>
+            <div className="relative">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-on-surface-variant)]"
+              />
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className={`${inputClassName} pl-9`}
+                placeholder="Busca en todos los lotes: correlativo, conocimiento, transportista, placa o F101"
+              />
+            </div>
+          </div>
+          <div className="w-full sm:w-52">
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Estado</label>
+            <select
+              value={filtroEstado}
+              onChange={(e) => handleCambiarFiltroEstado(e.target.value)}
+              className={inputClassName}
+            >
+              <option value="">Todos los estados</option>
+              {Object.entries(ESTADO_LOTE_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="w-[calc(50%-0.375rem)] sm:w-40">
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Desde</label>
+            <input
+              type="date"
+              value={filtroFechaInicio}
+              onChange={(e) => handleCambiarFechaInicio(e.target.value)}
+              className={inputClassName}
+            />
+          </div>
+          <div className="w-[calc(50%-0.375rem)] sm:w-40">
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Hasta</label>
+            <input
+              type="date"
+              value={filtroFechaFin}
+              onChange={(e) => handleCambiarFechaFin(e.target.value)}
+              className={inputClassName}
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                {["Correlativo", "Remitente", "Vehículo", "Mineral", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
+                {["Correlativo", "Transportista", "Vehículo", "Mineral", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     {title}
                   </th>
@@ -433,7 +605,7 @@ export function LotesDespachoPage() {
               {lotes.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                   <td className="px-3 py-2 font-mono text-xs">{item.correlativo}</td>
-                  <td className="px-3 py-2 text-xs">{item.remitente?.nombreORazonSocial ?? "-"}</td>
+                  <td className="px-3 py-2 text-xs">{item.transportista?.nombreORazonSocial ?? "-"}</td>
                   <td className="px-3 py-2 text-xs">{item.vehiculo?.placa ?? "-"}</td>
                   <td className="px-3 py-2 text-xs">{item.tipoMineral?.nombre ?? "-"}</td>
                   <td className="px-3 py-2 text-xs">
@@ -464,23 +636,63 @@ export function LotesDespachoPage() {
             </tbody>
           </table>
         </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs text-[var(--color-on-surface-variant)]">
+            Página {metaLotes?.page ?? pagina} de {totalPaginas}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina <= 1 || lotesQuery.isFetching}
+              className={buttonSecondaryClassName}
+            >
+              <ChevronLeft size={14} /> Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina >= totalPaginas || lotesQuery.isFetching}
+              className={buttonSecondaryClassName}
+            >
+              Siguiente <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
       </article>
 
       {selectedId ? (
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+          onClick={() => setSelectedId(undefined)}
+        >
+          <div
+            className="relative my-8 w-full max-w-4xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedId(undefined)}
+              aria-label="Cerrar"
+              className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--color-on-surface-variant)] transition hover:bg-[var(--color-surface-container-highest)] hover:text-[var(--color-on-surface)]"
+            >
+              <X size={20} />
+            </button>
+
           {loteDetalleQuery.isLoading ? (
             <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando detalle del lote...</p>
           ) : lote ? (
-            <div className="space-y-5">
+            <div className="space-y-5 pr-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="font-mono text-xl font-bold">{lote.correlativo}</h2>
                   <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-                    {lote.remitente?.nombreORazonSocial} · {lote.vehiculo?.placa} · {lote.chofer?.nombre} ·{" "}
+                    {lote.transportista?.nombreORazonSocial} · {lote.vehiculo?.placa} · {lote.chofer?.nombre} ·{" "}
                     {lote.tipoMineral?.nombre} → {lote.destinoIngenio?.nombre}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${ESTADO_LOTE_CLASS[lote.estadoLote]}`}>
                     {ESTADO_LOTE_LABEL[lote.estadoLote]}
                   </span>
@@ -493,6 +705,22 @@ export function LotesDespachoPage() {
                   >
                     {lote.formulario101 ? `F101 ${lote.formulario101.codigo}` : "F101 pendiente"}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => exportConocimientoExcel(lote)}
+                    className={buttonSecondaryClassName}
+                    title="Exportar Conocimiento a Excel"
+                  >
+                    <FileSpreadsheet size={13} /> Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportConocimientoPdf(lote)}
+                    className={buttonSecondaryClassName}
+                    title="Exportar Conocimiento a PDF"
+                  >
+                    <FileDown size={13} /> PDF
+                  </button>
                 </div>
               </div>
 
@@ -597,18 +825,20 @@ export function LotesDespachoPage() {
                           <Truck size={13} /> Transbordo (falla mecánica: otro vehículo completa el traslado)
                         </p>
                         <div className="flex flex-wrap items-end gap-2">
-                          <select value={transbordoVehiculoId} onChange={(e) => setTransbordoVehiculoId(e.target.value)} className={`${inputClassName} w-40`}>
-                            <option value="">Vehículo nuevo...</option>
-                            {vehiculosDisponibles.map((v) => (
-                              <option key={v.id} value={v.id}>{v.placa} · {v.tipo}</option>
-                            ))}
-                          </select>
-                          <select value={transbordoChoferId} onChange={(e) => setTransbordoChoferId(e.target.value)} className={`${inputClassName} w-40`}>
-                            <option value="">Chofer nuevo (opcional)</option>
-                            {choferes.map((c) => (
-                              <option key={c.id} value={c.id}>{c.nombre}</option>
-                            ))}
-                          </select>
+                          <AutocompleteSelect
+                            value={transbordoVehiculoId}
+                            onChange={setTransbordoVehiculoId}
+                            options={vehiculoDisponibleOptions}
+                            placeholder="Vehículo nuevo..."
+                            className={`${inputClassName} w-40`}
+                          />
+                          <AutocompleteSelect
+                            value={transbordoChoferId}
+                            onChange={setTransbordoChoferId}
+                            options={choferOptions}
+                            placeholder="Chofer nuevo (opcional)"
+                            className={`${inputClassName} w-40`}
+                          />
                           <input value={transbordoMotivo} onChange={(e) => setTransbordoMotivo(e.target.value)} className={`${inputClassName} w-56`} placeholder="Motivo (ej. falla mecánica)" />
                           <button
                             type="button"
@@ -654,10 +884,30 @@ export function LotesDespachoPage() {
                   ) : null}
 
                   {lote.pesaje ? (
-                    <div className="rounded-lg border border-[var(--color-success)]/30 bg-[var(--color-success)]/8 px-3 py-2 text-xs">
-                      Bruto {lote.pesaje.tonelajeBruto} · Tara {lote.pesaje.tonelajeTara} · Neto{" "}
-                      <span className="font-bold">{lote.pesaje.tonelajeNeto}</span>
-                      {lote.pesaje.observaciones ? ` · ${lote.pesaje.observaciones}` : ""}
+                    <div className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-success)]/30 bg-[var(--color-success)]/8 px-3 py-2 text-xs">
+                      <span>
+                        Bruto {lote.pesaje.tonelajeBruto} · Tara {lote.pesaje.tonelajeTara} · Neto{" "}
+                        <span className="font-bold">{lote.pesaje.tonelajeNeto}</span>
+                        {lote.pesaje.observaciones ? ` · ${lote.pesaje.observaciones}` : ""}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => exportBoletaPesajeExcel(lote)}
+                          className={buttonSecondaryClassName}
+                          title="Exportar Boleta de Pesaje a Excel"
+                        >
+                          <FileSpreadsheet size={13} /> Excel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => exportBoletaPesajePdf(lote)}
+                          className={buttonSecondaryClassName}
+                          title="Exportar Boleta de Pesaje a PDF"
+                        >
+                          <FileDown size={13} /> PDF
+                        </button>
+                      </div>
                     </div>
                   ) : null}
 
@@ -707,7 +957,8 @@ export function LotesDespachoPage() {
           ) : (
             <p className="text-sm text-[var(--color-on-surface-variant)]">No se encontró el lote seleccionado.</p>
           )}
-        </article>
+          </div>
+        </div>
       ) : null}
     </section>
   );

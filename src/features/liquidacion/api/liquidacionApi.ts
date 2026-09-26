@@ -7,13 +7,15 @@ import {
   liquidacionItemResponseSchema,
   liquidacionListResponseSchema,
   liquidacionResponseSchema,
+  previewLiquidacionResponseSchema,
   type AgregarItemConceptoPayload,
   type AnularLiquidacionPayload,
-  type CreateLiquidacionPayload
+  type CreateLiquidacionPayload,
+  type PreviewLiquidacionQuery
 } from "@/features/liquidacion/model/liquidacion.schema";
 
 export interface LiquidacionesQueryParams {
-  remitenteId?: number;
+  transportistaId?: number;
   estado?: string;
 }
 
@@ -22,6 +24,14 @@ export async function getLiquidaciones(params: LiquidacionesQueryParams = {}) {
     url: apiEndpoints.liquidaciones.base,
     config: { params },
     schema: liquidacionListResponseSchema
+  });
+}
+
+export async function getLiquidacionPreview(params: PreviewLiquidacionQuery) {
+  return getRequest({
+    url: apiEndpoints.liquidaciones.preview,
+    config: { params },
+    schema: previewLiquidacionResponseSchema
   });
 }
 

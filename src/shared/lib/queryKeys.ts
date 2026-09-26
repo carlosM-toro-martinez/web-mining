@@ -169,8 +169,8 @@ export const queryKeys = {
     alicuotasRegalia: () => [...queryKeys.parametrosLogistica.all, "alicuotas-regalia"] as const,
     tarifasLiquidacion: () => [...queryKeys.parametrosLogistica.all, "tarifas-liquidacion"] as const
   },
-  remitentes: {
-    all: ["remitentes"] as const
+  transportistas: {
+    all: ["transportistas"] as const
   },
   flota: {
     all: ["flota"] as const,
@@ -180,8 +180,16 @@ export const queryKeys = {
   },
   lotesDespacho: {
     all: ["lotes-despacho"] as const,
-    list: (params: { estadoLote?: string; page?: number; limit?: number }) =>
-      [...queryKeys.lotesDespacho.all, "list", params] as const,
+    list: (params: {
+      estadoLote?: string;
+      transportistaId?: number;
+      vehiculoId?: number;
+      fechaInicio?: string;
+      fechaFin?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) => [...queryKeys.lotesDespacho.all, "list", params] as const,
     detail: (id: string) => [...queryKeys.lotesDespacho.all, "detail", id] as const
   },
   formulario101: {
@@ -190,9 +198,11 @@ export const queryKeys = {
   },
   liquidaciones: {
     all: ["liquidaciones"] as const,
-    list: (params: { remitenteId?: number; estado?: string }) =>
+    list: (params: { transportistaId?: number; estado?: string }) =>
       [...queryKeys.liquidaciones.all, "list", params] as const,
-    detail: (id: string) => [...queryKeys.liquidaciones.all, "detail", id] as const
+    detail: (id: string) => [...queryKeys.liquidaciones.all, "detail", id] as const,
+    preview: (params?: { transportistaId: number; fechaInicio: string; fechaFin: string }) =>
+      [...queryKeys.liquidaciones.all, "preview", params ?? {}] as const
   },
   logisticaReportes: {
     all: ["logistica-reportes"] as const,

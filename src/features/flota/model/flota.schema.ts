@@ -8,7 +8,7 @@ export const estadoVehiculoSchema = z.enum([
   "EN_MANTENIMIENTO"
 ]);
 
-const remitenteRefSchema = z.object({
+const transportistaRefSchema = z.object({
   id: z.number().int().positive(),
   nombreORazonSocial: z.string().min(1)
 });
@@ -21,7 +21,7 @@ export const vehiculoSchema = z.object({
   propietarioId: z.number().int().positive().nullable(),
   estadoActual: estadoVehiculoSchema,
   activo: z.boolean(),
-  propietario: remitenteRefSchema.nullable().optional()
+  propietario: transportistaRefSchema.nullable().optional()
 });
 
 export const createVehiculoPayloadSchema = z.object({

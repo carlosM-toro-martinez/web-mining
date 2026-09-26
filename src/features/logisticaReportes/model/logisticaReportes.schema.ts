@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const refConNombre = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
-const remitenteRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
+const transportistaRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
 const vehiculoRef = z.object({ id: z.number().int().positive(), placa: z.string().min(1) });
 const formulario101Ref = z.object({
   id: z.string().min(1),
@@ -15,7 +15,7 @@ export const loteCuadroMensualSchema = z.object({
   correlativo: z.string().min(1),
   fechaDespachoReal: z.string(),
   fechaDocumentalFiscal: z.string(),
-  remitente: remitenteRef.optional(),
+  transportista: transportistaRef.optional(),
   vehiculo: vehiculoRef.optional(),
   tipoMineral: refConNombre.optional(),
   destinoIngenio: refConNombre.optional(),

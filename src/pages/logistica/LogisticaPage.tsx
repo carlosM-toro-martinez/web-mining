@@ -1,19 +1,12 @@
 import { Link } from "react-router-dom";
-import { Landmark, Truck, Building2, PackageSearch, ReceiptText, FileBarChart2 } from "lucide-react";
+import { Landmark, Truck, PackageSearch, ReceiptText, FileBarChart2 } from "lucide-react";
 
 const cards = [
   {
     title: "Flota",
-    description: "Tablero drag-and-drop de estado de vehículos: disponible, en tránsito, en balanza, mantenimiento.",
+    description: "Vehículos, choferes y transportistas (empresas y particulares), con tablero de estado.",
     to: "/logistica/flota",
     icon: Truck,
-    available: true
-  },
-  {
-    title: "Remitentes",
-    description: "Empresas y trabajadores particulares que despachan mineral hacia el ingenio.",
-    to: "/logistica/remitentes",
-    icon: Building2,
     available: true
   },
   {

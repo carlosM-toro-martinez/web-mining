@@ -6,7 +6,7 @@ const loteRef = z.object({
   id: z.string().min(1),
   correlativo: z.string().min(1),
   estadoLote: z.string().min(1),
-  remitente: z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) }).optional(),
+  transportista: z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) }).optional(),
   vehiculo: z.object({ id: z.number().int().positive(), placa: z.string().min(1) }).optional()
 });
 

@@ -1,13 +1,20 @@
 import { useMemo, useState } from "react";
-import { FileBarChart2, FileSpreadsheet, FileText, Lock, Search } from "lucide-react";
+import { FileBarChart2, FileSpreadsheet, FileText, Lock, Search, Truck } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCerrarMesLogisticaMutation,
   useCierresLogisticaQuery,
   useCuadroMensualQuery
 } from "@/features/logisticaReportes/hooks/useLogisticaReportes";
-import { exportCuadroMensualExcel, exportCuadroMensualPdf } from "@/features/logisticaReportes/lib/logisticaExport";
+import {
+  exportCuadroMensualExcel,
+  exportCuadroMensualPdf,
+  exportDetalleVolquetaExcel,
+  exportDetalleVolquetaPdf
+} from "@/features/logisticaReportes/lib/logisticaExport";
+import { useLotesDespachoQuery } from "@/features/loteDespacho/hooks/useLoteDespacho";
 import { useMunicipiosOrigenQuery } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
+import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -59,6 +66,41 @@ export function LogisticaReportesPage() {
       return;
     }
     setConsultado({ municipioId: Number(municipioId), anio: Number(anio), mes: Number(mes) });
+  }
+
+  // --- Detalle de despachos por volqueta (un bloque por vehículo/chofer) ---
+  const transportistasQuery = useTransportistasQuery();
+  const transportistas = transportistasQuery.data?.data ?? [];
+  const [volquetaTransportistaId, setVolquetaTransportistaId] = useState("");
+  const [volquetaFechaInicio, setVolquetaFechaInicio] = useState("");
+  const [volquetaFechaFin, setVolquetaFechaFin] = useState("");
+  const [volquetaConsultado, setVolquetaConsultado] = useState<
+    { transportistaId: number; fechaInicio: string; fechaFin: string } | undefined
+  >();
+
+  const lotesVolquetaQuery = useLotesDespachoQuery(
+    volquetaConsultado
+      ? {
+          transportistaId: volquetaConsultado.transportistaId,
+          fechaInicio: volquetaConsultado.fechaInicio,
+          fechaFin: volquetaConsultado.fechaFin,
+          limit: 500
+        }
+      : { limit: 0 }
+  );
+  const lotesVolqueta = volquetaConsultado ? lotesVolquetaQuery.data?.data ?? [] : [];
+  const transportistaVolqueta = transportistas.find((t) => t.id === volquetaConsultado?.transportistaId);
+
+  function handleConsultarVolquetas() {
+    if (!volquetaTransportistaId || !volquetaFechaInicio || !volquetaFechaFin) {
+      showError("Elige el transportista y el rango de fechas.");
+      return;
+    }
+    setVolquetaConsultado({
+      transportistaId: Number(volquetaTransportistaId),
+      fechaInicio: volquetaFechaInicio,
+      fechaFin: volquetaFechaFin
+    });
   }
 
   function handleCerrarMes() {
@@ -190,7 +232,7 @@ export function LogisticaReportesPage() {
                 <thead>
                   <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                     <th className="py-1 pr-3">Correlativo</th>
-                    <th className="py-1 pr-3">Remitente</th>
+                    <th className="py-1 pr-3">Transportista</th>
                     <th className="py-1 pr-3">Placa</th>
                     <th className="py-1 pr-3">Mineral</th>
                     <th className="py-1 pr-3">Ingenio</th>
@@ -203,7 +245,7 @@ export function LogisticaReportesPage() {
                   {cuadro.lotes.map((lote) => (
                     <tr key={lote.id}>
                       <td className="py-1 pr-3 font-mono">{lote.correlativo}</td>
-                      <td className="py-1 pr-3">{lote.remitente?.nombreORazonSocial ?? "-"}</td>
+                      <td className="py-1 pr-3">{lote.transportista?.nombreORazonSocial ?? "-"}</td>
                       <td className="py-1 pr-3">{lote.vehiculo?.placa ?? "-"}</td>
                       <td className="py-1 pr-3">{lote.tipoMineral?.nombre ?? "-"}</td>
                       <td className="py-1 pr-3">{lote.destinoIngenio?.nombre ?? "-"}</td>
@@ -239,6 +281,94 @@ export function LogisticaReportesPage() {
           </div>
         </article>
       ) : null}
+
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+          <Truck size={16} className="text-[var(--color-primary)]" />
+          Detalle de despachos por volqueta
+        </h2>
+        <p className="mb-4 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
+          Un bloque por cada vehículo del transportista, con sus viajes (Nº viaje, fecha, Conocimiento) y su
+          total — igual al reporte semanal en papel, con los datos bancarios del transportista al costado.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <select
+            value={volquetaTransportistaId}
+            onChange={(e) => setVolquetaTransportistaId(e.target.value)}
+            className={inputClassName}
+          >
+            <option value="">Transportista...</option>
+            {transportistas.map((t) => (
+              <option key={t.id} value={t.id}>{t.nombreORazonSocial}</option>
+            ))}
+          </select>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Desde</label>
+            <input type="date" value={volquetaFechaInicio} onChange={(e) => setVolquetaFechaInicio(e.target.value)} className={inputClassName} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Hasta</label>
+            <input type="date" value={volquetaFechaFin} onChange={(e) => setVolquetaFechaFin(e.target.value)} className={inputClassName} />
+          </div>
+          <button
+            type="button"
+            onClick={handleConsultarVolquetas}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]"
+          >
+            <Search size={14} /> Consultar
+          </button>
+        </div>
+
+        {volquetaConsultado ? (
+          lotesVolquetaQuery.isLoading ? (
+            <p className="mt-4 text-sm text-[var(--color-on-surface-variant)]">Cargando despachos...</p>
+          ) : lotesVolqueta.length === 0 ? (
+            <p className="mt-4 text-sm text-[var(--color-on-surface-variant)]">
+              No hay lotes de este transportista en ese rango de fechas.
+            </p>
+          ) : (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
+              <p className="text-sm">
+                <span className="font-bold">{lotesVolqueta.length}</span> lote{lotesVolqueta.length === 1 ? "" : "s"} de{" "}
+                <span className="font-semibold">{transportistaVolqueta?.nombreORazonSocial}</span> entre{" "}
+                {formatFecha(volquetaConsultado.fechaInicio)} y {formatFecha(volquetaConsultado.fechaFin)}.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    transportistaVolqueta &&
+                    exportDetalleVolquetaExcel(
+                      transportistaVolqueta,
+                      lotesVolqueta,
+                      volquetaConsultado.fechaInicio,
+                      volquetaConsultado.fechaFin
+                    )
+                  }
+                  className={buttonSecondaryClassName}
+                >
+                  <FileSpreadsheet size={13} /> Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    transportistaVolqueta &&
+                    exportDetalleVolquetaPdf(
+                      transportistaVolqueta,
+                      lotesVolqueta,
+                      volquetaConsultado.fechaInicio,
+                      volquetaConsultado.fechaFin
+                    )
+                  }
+                  className={buttonSecondaryClassName}
+                >
+                  <FileText size={13} /> PDF
+                </button>
+              </div>
+            </div>
+          )
+        ) : null}
+      </article>
     </section>
   );
 }

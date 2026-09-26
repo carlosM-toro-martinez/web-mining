@@ -14,12 +14,13 @@ import { inventarioImportEndpoints } from "@/shared/api/endpoints/inventarioImpo
 import { eppEndpoints } from "@/shared/api/endpoints/epp.endpoints";
 import { ambientalEndpoints } from "@/shared/api/endpoints/ambiental.endpoints";
 import { parametrosLogisticaEndpoints } from "@/shared/api/endpoints/parametrosLogistica.endpoints";
-import { remitentesEndpoints } from "@/shared/api/endpoints/remitentes.endpoints";
+import { transportistasEndpoints } from "@/shared/api/endpoints/transportistas.endpoints";
 import { flotaEndpoints } from "@/shared/api/endpoints/flota.endpoints";
 import { lotesDespachoEndpoints } from "@/shared/api/endpoints/lotesDespacho.endpoints";
 import { formulario101Endpoints } from "@/shared/api/endpoints/formulario101.endpoints";
 import { liquidacionesEndpoints } from "@/shared/api/endpoints/liquidaciones.endpoints";
 import { logisticaReportesEndpoints } from "@/shared/api/endpoints/logisticaReportes.endpoints";
+import { logisticaResetEndpoints } from "@/shared/api/endpoints/logisticaReset.endpoints";
 import { cajaChicaEndpoints } from "@/shared/api/endpoints/cajaChica.endpoints";
 import { gastoCajaEndpoints } from "@/shared/api/endpoints/gastoCaja.endpoints";
 import { rendicionCajaEndpoints } from "@/shared/api/endpoints/rendicionCaja.endpoints";
@@ -42,12 +43,13 @@ export const apiEndpoints = {
   epp: eppEndpoints,
   ambiental: ambientalEndpoints,
   parametrosLogistica: parametrosLogisticaEndpoints,
-  remitentes: remitentesEndpoints,
+  transportistas: transportistasEndpoints,
   flota: flotaEndpoints,
   lotesDespacho: lotesDespachoEndpoints,
   formulario101: formulario101Endpoints,
   liquidaciones: liquidacionesEndpoints,
   logisticaReportes: logisticaReportesEndpoints,
+  logisticaReset: logisticaResetEndpoints,
   cajaChica: cajaChicaEndpoints,
   gastoCaja: gastoCajaEndpoints,
   rendicionCaja: rendicionCajaEndpoints,

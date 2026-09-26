@@ -126,7 +126,6 @@ export function AppShell() {
       { label: "Lotes de despacho", icon: PackageSearch, to: "/logistica/lotes" },
       { label: "Liquidaciones", icon: ReceiptText, to: "/logistica/liquidaciones" },
       { label: "Reportes", icon: FileBarChart2, to: "/logistica/reportes" },
-      { label: "Remitentes", icon: Building2, to: "/logistica/remitentes" },
       { label: "Parámetros", icon: Landmark, to: "/logistica/parametros" }
     ] as NavItem[];
   }, [canSeeLogisticaRoute]);
