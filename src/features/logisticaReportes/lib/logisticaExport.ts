@@ -48,6 +48,18 @@ function num(value: number) {
   return Number(value.toFixed(2));
 }
 
+// Para el nombre del archivo exportado (día de HOY, no un dato guardado):
+// año/mes/día LOCAL, nunca toISOString() sobre el instante actual — esa
+// conversión corre a UTC antes de recortar, así que entre las 20:00 y las
+// 23:59 hora boliviana el archivo salía fechado para mañana.
+function hoyLocal() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function formatBs(value: number) {
   return value.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -685,7 +697,7 @@ export function exportCuadroMensualExcel(cuadro: CuadroMensual, municipioNombre:
     ["EMPRESA MINERA MARTE S.R.L.", "", "", "", "", "", ""],
     [`CUADRO MENSUAL DE DESPACHOS — ${municipioNombre.toUpperCase()} — ${MESES_MAYUSCULA[mes - 1]} ${anio}`, "", "", "", "", "", ""],
     [],
-    ["Correlativo", "Transportista", "Placa", "Mineral", "Ingenio", "Neto (Kg)", "Formulario 101"]
+    ["N° Lote / Conocimiento", "Transportista", "Placa", "Mineral", "Ingenio", "Neto (Kg)", "Formulario 101"]
   ];
   const rowKinds: Array<"title" | "subtitle" | "header" | "normal"> = ["title", "subtitle", "normal", "header"];
 
@@ -708,7 +720,7 @@ export function exportCuadroMensualExcel(cuadro: CuadroMensual, municipioNombre:
   rowKinds.push("normal");
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 16 }, { wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 16 }];
+  sheet["!cols"] = [{ wch: 22 }, { wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 16 }];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
@@ -747,7 +759,7 @@ export function exportCuadroMensualPdf(cuadro: CuadroMensual, municipioNombre: s
 
   drawPlainTable(doc, {
     startY: 64,
-    head: [["Correlativo", "Transportista", "Placa", "Mineral", "Ingenio", "Neto (Kg)", "Formulario 101"]],
+    head: [["N° Lote / Conocimiento", "Transportista", "Placa", "Mineral", "Ingenio", "Neto (Kg)", "Formulario 101"]],
     body: rows,
     styles: pdfTableStyles,
     headStyles: pdfHeadStyles,
@@ -1332,4 +1344,98 @@ export function exportDetalleVolquetaPdf(
   }
 
   openBrowserPrintDialog(doc, `detalle-volquetas-${transportista.nombreORazonSocial.replace(/\s+/g, "-")}.pdf`);
+}
+
+// ============================================================================
+// Exportador genérico para los reportes "tabla simple" del hub de Reportes
+// de Logística (resumen por mineral, ranking de transportistas, estado de
+// F101, resumen de liquidaciones, tarifas vigentes): mismo look blanco y
+// negro que el resto (título + subtítulo centrados, tabla con bordes finos,
+// fila de totales en negrita) sin repetir el boilerplate de estilos en cada
+// reporte nuevo — a diferencia de Conocimiento/Boleta/Liquidación, estos no
+// imitan un documento físico específico, así que no hace falta una función
+// a medida por cada uno.
+// ============================================================================
+export interface TablaReporteConfig {
+  subtitulo: string;
+  columnas: string[];
+  filas: Array<Array<string | number>>;
+  filaTotales?: Array<string | number>;
+  nombreArchivo: string;
+  colsNumericas?: number[];
+  anchoColumnas?: number[];
+}
+
+export function exportTablaReporteExcel(config: TablaReporteConfig) {
+  const lastCol = config.columnas.length - 1;
+  const aoa: Array<Array<string | number>> = [
+    ["EMPRESA MINERA MARTE S.R.L.", ...Array(lastCol).fill("")],
+    [config.subtitulo, ...Array(lastCol).fill("")],
+    [],
+    config.columnas
+  ];
+  const rowKinds: Array<"title" | "subtitle" | "normal" | "header"> = ["title", "subtitle", "normal", "header"];
+
+  for (const fila of config.filas) {
+    aoa.push(fila);
+    rowKinds.push("normal");
+  }
+  if (config.filaTotales) {
+    aoa.push(config.filaTotales);
+    rowKinds.push("normal");
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!cols"] = config.anchoColumnas?.map((wch) => ({ wch })) ?? config.columnas.map(() => ({ wch: 18 }));
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
+  ];
+  rowKinds.forEach((kind, index) => {
+    const isTotales = config.filaTotales && index === aoa.length - 1;
+    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : isTotales ? totalStyle : bodyStyle;
+    styleRow(sheet, index, lastCol, style);
+  });
+  for (const col of config.colsNumericas ?? []) {
+    for (let r = 4; r < aoa.length; r += 1) numberFormatCell(sheet, r, col);
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, config.nombreArchivo.slice(0, 31));
+  XLSX.writeFile(workbook, `${config.nombreArchivo}-${hoyLocal()}.xlsx`);
+}
+
+export function exportTablaReportePdf(config: TablaReporteConfig) {
+  const orientation = config.columnas.length > 5 ? "landscape" : "portrait";
+  const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const centerX = pageWidth / 2;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("EMPRESA MINERA MARTE S.R.L.", centerX, 34, { align: "center" });
+  doc.setFontSize(10);
+  doc.text(config.subtitulo, centerX, 50, { align: "center" });
+
+  const rows: RowInput[] = config.filas.map((fila) => fila as RowInput);
+  if (config.filaTotales) rows.push(config.filaTotales as RowInput);
+
+  const columnStyles: Record<number, { halign: "right" }> = {};
+  for (const col of config.colsNumericas ?? []) columnStyles[col] = { halign: "right" };
+
+  drawPlainTable(doc, {
+    startY: 64,
+    head: [config.columnas],
+    body: rows,
+    styles: pdfTableStyles,
+    headStyles: pdfHeadStyles,
+    columnStyles,
+    didParseCell: (hook) => {
+      if (config.filaTotales && hook.section === "body" && hook.row.index === rows.length - 1) {
+        hook.cell.styles.fontStyle = "bold";
+      }
+    }
+  });
+
+  openBrowserPrintDialog(doc, `${config.nombreArchivo}-${hoyLocal()}.pdf`);
 }

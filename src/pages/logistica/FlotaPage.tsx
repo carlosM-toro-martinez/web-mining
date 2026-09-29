@@ -98,8 +98,23 @@ function normalizeError(error: unknown, fallbackMessage: string) {
   return fallbackMessage;
 }
 
+// timeZone: "UTC" es a propósito: estas fechas son calendario (elegidas en
+// un <input type="date">, guardadas como medianoche UTC), no un instante —
+// sin esto, un navegador en Bolivia (UTC-4) las corre un día para atrás al
+// mostrarlas (medianoche UTC del 29 se ve como las 20:00 del 28 en local).
 function formatFecha(value: string) {
-  return new Date(value).toLocaleDateString("es-BO");
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
+}
+
+// Igual de importante para el lado contrario: hoy() debe leer el
+// año/mes/día LOCAL (Bolivia), nunca toISOString() — esa función convierte
+// a UTC antes de recortar, así que entre las 20:00 y las 23:59 hora
+// boliviana ya muestra la fecha de MAÑANA.
+function fechaLocalISO(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 const ESTADO_LOTE_LABEL: Record<EstadoLoteDespacho, string> = {
@@ -166,6 +181,14 @@ const COLUMNAS: ColumnaEstilo[] = [
     cardBorder: "border-[var(--color-tertiary)]/40"
   },
   {
+    estado: "EN_RETORNO",
+    label: "En retorno",
+    badgeClass: "bg-[var(--color-warning)]/20 text-[var(--color-warning)]",
+    accentBar: "bg-[var(--color-warning)]",
+    cardBg: "bg-[var(--color-warning)]/12",
+    cardBorder: "border-[var(--color-warning)]/40"
+  },
+  {
     estado: "CON_FALLA_MECANICA",
     label: "Con falla mecánica",
     badgeClass: "bg-[var(--color-error)]/18 text-[var(--color-error)]",
@@ -190,6 +213,7 @@ const COLUMNA_LABEL: Record<EstadoVehiculo, string> = {
   DISPONIBLE: "Disponible",
   EN_TRANSITO: "En tránsito",
   EN_BALANZA: "En balanza",
+  EN_RETORNO: "En retorno",
   CON_FALLA_MECANICA: "Con falla mecánica",
   EN_MANTENIMIENTO: "En mantenimiento"
 };
@@ -197,8 +221,11 @@ const COLUMNA_LABEL: Record<EstadoVehiculo, string> = {
 // Un vehículo con un lote activo (en tránsito o en balanza) es "gestionable":
 // hacer clic (no arrastrar) en su tarjeta abre el modal con todo lo que se
 // puede hacer con ese lote (F101, pesaje, transbordo, anular) sin salir de
-// esta pantalla.
+// esta pantalla. "En retorno" también responde al clic, pero abre un modal
+// distinto (solo confirmar que ya volvió y marcarlo Disponible) — no tiene
+// lote activo, ya se entregó y pesó.
 const ESTADOS_CON_LOTE_GESTIONABLE: EstadoVehiculo[] = ["EN_TRANSITO", "EN_BALANZA"];
+const ESTADOS_TARJETA_CLICKEABLE: EstadoVehiculo[] = ["EN_TRANSITO", "EN_BALANZA", "EN_RETORNO"];
 
 function VehiculoCard({
   vehiculo,
@@ -219,7 +246,7 @@ function VehiculoCard({
     opacity: isDragging ? 0.5 : 1
   };
 
-  const esGestionable = onGestionar && ESTADOS_CON_LOTE_GESTIONABLE.includes(vehiculo.estadoActual);
+  const esClickeable = onGestionar && ESTADOS_TARJETA_CLICKEABLE.includes(vehiculo.estadoActual);
 
   return (
     <div
@@ -228,7 +255,7 @@ function VehiculoCard({
       {...listeners}
       {...attributes}
       onClick={() => {
-        if (esGestionable) onGestionar!(vehiculo);
+        if (esClickeable) onGestionar!(vehiculo);
       }}
       className={`flex shrink-0 cursor-grab touch-none overflow-hidden rounded-lg border ${cardBorder} ${cardBg} active:cursor-grabbing`}
     >
@@ -242,8 +269,10 @@ function VehiculoCard({
               {vehiculo.propietario.nombreORazonSocial}
             </p>
           ) : null}
-          {esGestionable ? (
-            <p className="mt-1 text-[10px] font-semibold text-[var(--color-primary)]">Toca para gestionar el lote →</p>
+          {esClickeable ? (
+            <p className="mt-1 text-[10px] font-semibold text-[var(--color-primary)]">
+              {vehiculo.estadoActual === "EN_RETORNO" ? "Toca para marcar como disponible →" : "Toca para gestionar el lote →"}
+            </p>
           ) : null}
         </div>
         <Truck size={16} className="shrink-0 text-[var(--color-on-surface-variant)]/50" />
@@ -378,7 +407,7 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
   const [tipoMineralId, setTipoMineralId] = useState("");
   const [destinoIngenioId, setDestinoIngenioId] = useState("");
   const [nivel, setNivel] = useState("");
-  const [fechaDespachoReal, setFechaDespachoReal] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaDespachoReal, setFechaDespachoReal] = useState(() => fechaLocalISO(new Date()));
   const [detalleCarga, setDetalleCarga] = useState("Carga Chami");
   const [descripcion, setDescripcion] = useState("Carga para Ingenio del sector Lipeña");
   const [observaciones, setObservaciones] = useState("");
@@ -616,12 +645,164 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
   );
 }
 
-// Cualquier otro arrastre (a falla mecánica, a mantenimiento, o hacia
-// atrás) ya no es un simple cambio de bandera: se pide motivo con un
-// formulario, igual que las otras dos transiciones especiales. Si el
-// vehículo tenía un lote activo (en tránsito/balanza) y se manda a falla
-// mecánica, se le avisa que probablemente lo que necesita es un Transbordo
-// (que reasigna el lote a otro vehículo) en vez de solo mover la tarjeta.
+// Clic en una tarjeta "En retorno": el viaje ya se entregó y pesó (el lote
+// quedó ACOPIADO), pero el vehículo todavía viene volviendo físicamente al
+// punto de origen — no hay ningún lote que gestionar acá, solo confirmar a
+// mano que ya llegó para liberarlo.
+function MarcarDisponibleModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: () => void }) {
+  const { showError, showSuccess } = useToast();
+  const cambiarEstadoMutation = useCambiarEstadoVehiculoMutation();
+  const [observaciones, setObservaciones] = useState("");
+
+  function handleConfirmar() {
+    cambiarEstadoMutation.mutate(
+      { id: vehiculo.id, payload: { estado: "DISPONIBLE", motivo: observaciones.trim() || undefined } },
+      {
+        onSuccess: () => {
+          showSuccess(`${vehiculo.placa} ya está disponible de nuevo.`);
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo marcar el vehículo como disponible."))
+      }
+    );
+  }
+
+  return (
+    <ModalShell onClose={onClose} maxWidthClassName="max-w-md">
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <CheckCircle2 size={16} className="text-[var(--color-primary)]" />
+        Confirmar regreso
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        <span className="font-mono font-bold uppercase">{vehiculo.placa}</span> ya entregó y se pesó. Confirma que
+        ya volvió al punto de origen para liberarlo.
+      </p>
+      <div className="space-y-3">
+        <input
+          value={observaciones}
+          onChange={(e) => setObservaciones(e.target.value)}
+          className={inputClassName}
+          placeholder="Observaciones (opcional)"
+        />
+        <button
+          type="button"
+          onClick={handleConfirmar}
+          disabled={cambiarEstadoMutation.isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+        >
+          <CheckCircle2 size={14} /> {cambiarEstadoMutation.isPending ? "Guardando..." : "Marcar como disponible"}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// Arrastrar de "En tránsito"/"En balanza" a "Con falla mecánica" o "En
+// mantenimiento": el vehículo tenía un lote activo que ya no va a
+// completar el viaje, así que ese lote se anula en el mismo paso (con el
+// mismo motivo) — si no, quedaba "colgado" en tránsito con un vehículo que
+// en realidad ya no lo estaba llevando. Si el lote todavía está EN_TRANSITO
+// (no en balanza), se avisa que Transbordo es la alternativa cuando otro
+// vehículo va a completar el traslado en vez de perder la carga.
+function FallaConLoteModal({
+  vehiculo,
+  estadoDestino,
+  onClose
+}: {
+  vehiculo: Vehiculo;
+  estadoDestino: EstadoVehiculo;
+  onClose: () => void;
+}) {
+  const { showError, showSuccess } = useToast();
+  const lotesQuery = useLotesDespachoQuery({ vehiculoId: vehiculo.id, limit: 5 });
+  const lote = useMemo(
+    () => (lotesQuery.data?.data ?? []).find((l) => !ESTADOS_LOTE_TERMINALES.includes(l.estadoLote)),
+    [lotesQuery.data]
+  );
+  const anularMutation = useAnularLoteMutation();
+  const cambiarEstadoMutation = useCambiarEstadoVehiculoMutation();
+  const [motivo, setMotivo] = useState("");
+  const enviando = anularMutation.isPending || cambiarEstadoMutation.isPending;
+
+  async function handleConfirmar() {
+    if (!lote) return;
+    if (!motivo.trim()) {
+      showError("Indica el motivo.");
+      return;
+    }
+    try {
+      await anularMutation.mutateAsync({ id: lote.id, payload: { motivo: motivo.trim() } });
+      await cambiarEstadoMutation.mutateAsync({ id: vehiculo.id, payload: { estado: estadoDestino, motivo: motivo.trim() } });
+      showSuccess(`Lote ${lote.correlativo} anulado. ${vehiculo.placa} pasó a ${COLUMNA_LABEL[estadoDestino]}.`);
+      onClose();
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo anular el lote o actualizar el vehículo."));
+    }
+  }
+
+  return (
+    <ModalShell onClose={onClose} maxWidthClassName="max-w-md">
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <Ban size={16} className="text-[var(--color-error)]" />
+        Anular carga y mover a {COLUMNA_LABEL[estadoDestino]}
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        <span className="font-mono font-bold uppercase">{vehiculo.placa}</span> tiene un lote en curso: al mover el
+        vehículo a {COLUMNA_LABEL[estadoDestino]}, ese lote se anula porque el viaje no se va a completar.
+      </p>
+
+      {lotesQuery.isLoading ? (
+        <p className="text-sm text-[var(--color-on-surface-variant)]">Buscando el lote activo de este vehículo...</p>
+      ) : !lote ? (
+        <p className="text-sm text-[var(--color-error)]">
+          No se encontró un lote activo para este vehículo. Puede que ya se haya anulado o completado.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <p className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs">
+            Se anulará el lote <span className="font-mono font-bold">{lote.correlativo}</span>
+            {lote.tipoMineral ? ` · ${lote.tipoMineral.nombre}` : ""}
+          </p>
+
+          {lote.estadoLote === "EN_TRANSITO" ? (
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/8 p-3 text-xs">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
+              <span>
+                Si otro vehículo va a completar el traslado (para no perder la carga), cierra esto y usa{" "}
+                <strong>Transbordo</strong> haciendo clic en la tarjeta, en vez de anular.
+              </span>
+            </div>
+          ) : null}
+
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Motivo</label>
+            <input
+              required
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              className={inputClassName}
+              placeholder="Ej. falla en el motor a mitad de camino"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleConfirmar}
+            disabled={enviando}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            <Ban size={14} /> {enviando ? "Guardando..." : "Anular lote y mover vehículo"}
+          </button>
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+// Cualquier otro arrastre que no tenga un lote activo de por medio (a falla
+// mecánica, a mantenimiento, o hacia atrás) tampoco es un simple cambio de
+// bandera: pide motivo con un formulario. El caso con lote activo lo maneja
+// FallaConLoteModal, arriba — nunca llega hasta acá.
 function CambiarEstadoModal({
   vehiculo,
   estadoDestino,
@@ -636,7 +817,6 @@ function CambiarEstadoModal({
   const [motivo, setMotivo] = useState("");
 
   const requiereMotivo = estadoDestino === "CON_FALLA_MECANICA" || estadoDestino === "EN_MANTENIMIENTO";
-  const tieneLoteActivo = ESTADOS_CON_LOTE_GESTIONABLE.includes(vehiculo.estadoActual);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -663,16 +843,6 @@ function CambiarEstadoModal({
         <span className="font-mono font-bold uppercase">{vehiculo.placa}</span>: {COLUMNA_LABEL[vehiculo.estadoActual]} →{" "}
         {COLUMNA_LABEL[estadoDestino]}
       </p>
-
-      {tieneLoteActivo && estadoDestino === "CON_FALLA_MECANICA" ? (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/8 p-3 text-xs">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
-          <span>
-            Este vehículo tiene un lote en curso. Si otro vehículo va a completar el traslado, cierra esto y usa{" "}
-            <strong>Transbordo</strong> haciendo clic en la tarjeta, para que el envío no se pierda.
-          </span>
-        </div>
-      ) : null}
 
       <form className="space-y-3" onSubmit={handleSubmit}>
         <div>
@@ -1463,6 +1633,21 @@ export function FlotaPage() {
   const [balanzaModalVehiculo, setBalanzaModalVehiculo] = useState<Vehiculo | null>(null);
   const [estadoModal, setEstadoModal] = useState<{ vehiculo: Vehiculo; estadoDestino: EstadoVehiculo } | null>(null);
   const [gestionModalVehiculo, setGestionModalVehiculo] = useState<Vehiculo | null>(null);
+  const [retornoModalVehiculo, setRetornoModalVehiculo] = useState<Vehiculo | null>(null);
+  const [fallaModalState, setFallaModalState] = useState<{ vehiculo: Vehiculo; estadoDestino: EstadoVehiculo } | null>(
+    null
+  );
+
+  // Una tarjeta clickeable abre un modal distinto según qué representa: un
+  // lote activo que gestionar (en tránsito/balanza) o solo confirmar el
+  // regreso físico del vehículo (en retorno).
+  function handleCardClick(vehiculo: Vehiculo) {
+    if (vehiculo.estadoActual === "EN_TRANSITO" || vehiculo.estadoActual === "EN_BALANZA") {
+      setGestionModalVehiculo(vehiculo);
+    } else if (vehiculo.estadoActual === "EN_RETORNO") {
+      setRetornoModalVehiculo(vehiculo);
+    }
+  }
 
   const [busquedaChofer, setBusquedaChofer] = useState("");
   const [paginaChofer, setPaginaChofer] = useState(1);
@@ -1526,6 +1711,17 @@ export function FlotaPage() {
       return;
     }
 
+    // El vehículo tenía un lote activo (en tránsito o en balanza) y se lo
+    // manda a falla mecánica o mantenimiento: ese lote se anula en el mismo
+    // paso, en vez de quedar "colgado" en tránsito con un vehículo que ya
+    // no lo está llevando.
+    const teniaLoteActivo = vehiculo.estadoActual === "EN_TRANSITO" || vehiculo.estadoActual === "EN_BALANZA";
+    const vaAFallaOMantenimiento = nuevoEstado === "CON_FALLA_MECANICA" || nuevoEstado === "EN_MANTENIMIENTO";
+    if (teniaLoteActivo && vaAFallaOMantenimiento) {
+      setFallaModalState({ vehiculo, estadoDestino: nuevoEstado });
+      return;
+    }
+
     setEstadoModal({ vehiculo, estadoDestino: nuevoEstado });
   }
 
@@ -1583,9 +1779,13 @@ export function FlotaPage() {
               Todo lo relacionado a vehículos vive aquí: transportistas (dueños), vehículos con su
               tablero de estado, y choferes. Arrastra un vehículo a la columna correspondiente: de
               Disponible a En tránsito abre el formulario del Conocimiento, y de ahí a En balanza abre
-              la boleta de pesaje. Cualquier otro movimiento pide un motivo. Mientras un vehículo esté
-              "En tránsito" o "En balanza", haz clic en su tarjeta para gestionar su lote (Formulario
-              101, transbordo, pesaje o anulación) sin salir de esta pantalla.
+              la boleta de pesaje — al pesar, pasa a "En retorno" (todavía viene de vuelta), no directo
+              a Disponible. Si un vehículo con un lote activo se manda a Con falla mecánica o
+              Mantenimiento, ese lote se anula (o usa Transbordo, haciendo clic en la tarjeta, si otro
+              vehículo va a completar el traslado). Cualquier otro movimiento solo pide un motivo. Haz
+              clic (sin arrastrar) en una tarjeta "En tránsito"/"En balanza" para gestionar su lote
+              (Formulario 101, transbordo, pesaje, anulación), o en "En retorno" para confirmar que ya
+              volvió y marcarlo disponible.
             </p>
           </div>
         </div>
@@ -1616,7 +1816,7 @@ export function FlotaPage() {
                   key={columna.estado}
                   {...columna}
                   vehiculos={vehiculosPorEstado.get(columna.estado) ?? []}
-                  onGestionar={setGestionModalVehiculo}
+                  onGestionar={handleCardClick}
                 />
               ))}
             </div>
@@ -1789,6 +1989,16 @@ export function FlotaPage() {
         />
       ) : null}
       {gestionModalVehiculo ? <LoteActivoModal vehiculo={gestionModalVehiculo} onClose={() => setGestionModalVehiculo(null)} /> : null}
+      {retornoModalVehiculo ? (
+        <MarcarDisponibleModal vehiculo={retornoModalVehiculo} onClose={() => setRetornoModalVehiculo(null)} />
+      ) : null}
+      {fallaModalState ? (
+        <FallaConLoteModal
+          vehiculo={fallaModalState.vehiculo}
+          estadoDestino={fallaModalState.estadoDestino}
+          onClose={() => setFallaModalState(null)}
+        />
+      ) : null}
     </section>
   );
 }

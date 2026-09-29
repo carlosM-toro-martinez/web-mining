@@ -62,8 +62,11 @@ function formatMoneda(value: string | number) {
   });
 }
 
+// timeZone: "UTC" es a propósito: estas fechas son calendario (medianoche
+// UTC guardada desde un <input type="date">), no un instante — sin esto,
+// un navegador en Bolivia (UTC-4) las corre un día para atrás al mostrarlas.
 function formatFecha(value: string) {
-  return new Date(value).toLocaleDateString("es-BO");
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
 export function RendicionesCajaPage() {

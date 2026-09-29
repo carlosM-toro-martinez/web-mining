@@ -4,6 +4,7 @@ import {
   anularLiquidacion,
   cerrarLiquidacion,
   createLiquidacion,
+  eliminarBorradorLiquidacion,
   getLiquidacionById,
   getLiquidacionPreview,
   getLiquidaciones,
@@ -92,5 +93,13 @@ export function useAnularLiquidacionMutation() {
     mutationFn: ({ id, payload }: { id: string; payload: AnularLiquidacionPayload }) =>
       anularLiquidacion(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useEliminarBorradorLiquidacionMutation() {
+  const invalidate = useInvalidateLiquidaciones();
+  return useMutation({
+    mutationFn: (id: string) => eliminarBorradorLiquidacion(id),
+    onSuccess: () => invalidate()
   });
 }

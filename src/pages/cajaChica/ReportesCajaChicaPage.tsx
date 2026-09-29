@@ -23,8 +23,11 @@ function formatMoneda(value: number) {
   return value.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// timeZone: "UTC" es a propósito: estas fechas son calendario (medianoche
+// UTC guardada desde un <input type="date">), no un instante — sin esto,
+// un navegador en Bolivia (UTC-4) las corre un día para atrás al mostrarlas.
 function formatFecha(value: string) {
-  return new Date(value).toLocaleDateString("es-BO");
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
 function inicioDeMesActual() {
@@ -32,8 +35,15 @@ function inicioDeMesActual() {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
 
+// Año/mes/día LOCAL (Bolivia), nunca toISOString() sobre el instante
+// actual: esa conversión corre a UTC antes de recortar, así que entre las
+// 20:00 y las 23:59 hora boliviana ya devolvía la fecha de MAÑANA.
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function ReportesCajaChicaPage() {

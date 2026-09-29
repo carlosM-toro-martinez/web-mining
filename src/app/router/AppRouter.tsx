@@ -122,7 +122,11 @@ export function AppRouter() {
             <Route path="/logistica/flota" element={<FlotaPage />} />
             <Route path="/logistica/lotes" element={<LotesDespachoPage />} />
             <Route path="/logistica/liquidaciones" element={<LiquidacionesPage />} />
-            <Route path="/logistica/reportes" element={<LogisticaReportesPage />} />
+            <Route
+              path="/logistica/reportes"
+              element={<Navigate to="/logistica/reportes/cuadro-mensual" replace />}
+            />
+            <Route path="/logistica/reportes/:tipo" element={<LogisticaReportesPage />} />
           </Route>
 
           <Route element={<CajaChicaRoute />}>

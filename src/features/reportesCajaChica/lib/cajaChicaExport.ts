@@ -49,6 +49,18 @@ function formatFecha(value: string) {
   return `${dd}/${mm}/${date.getUTCFullYear()}`;
 }
 
+// Para el nombre del archivo exportado (día de HOY, no un dato guardado):
+// año/mes/día LOCAL, nunca toISOString() sobre el instante actual — esa
+// conversión corre a UTC antes de recortar, así que entre las 20:00 y las
+// 23:59 hora boliviana el archivo salía fechado para mañana.
+function hoyLocal() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function diaMesLargo(date: Date, utc = true) {
   const dia = utc ? date.getUTCDate() : date.getDate();
   const mes = utc ? date.getUTCMonth() : date.getMonth();
@@ -727,7 +739,7 @@ export function exportEstadoCuentaExcel(estado: ReporteEstadoCuenta) {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Saldo y Movimientos".slice(0, 31));
-  XLSX.writeFile(workbook, `saldo-movimientos-${estado.caja.codigo}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(workbook, `saldo-movimientos-${estado.caja.codigo}-${hoyLocal()}.xlsx`);
 }
 
 export function exportEstadoCuentaPdf(estado: ReporteEstadoCuenta) {
@@ -778,7 +790,7 @@ export function exportEstadoCuentaPdf(estado: ReporteEstadoCuenta) {
   y += 14;
   doc.text(`Saldo actual disponible (${estado.caja.monedaBase}): ${formatBs(estado.saldoActual)}`, 34, y);
 
-  openBrowserPrintDialog(doc, `saldo-movimientos-${estado.caja.codigo}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  openBrowserPrintDialog(doc, `saldo-movimientos-${estado.caja.codigo}-${hoyLocal()}.pdf`);
 }
 
 // ============================================================================
@@ -823,7 +835,7 @@ export function exportReporteRetencionesExcel(reporte: ReporteRetenciones) {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Resumen de Retenciones".slice(0, 31));
-  XLSX.writeFile(workbook, `resumen-retenciones-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(workbook, `resumen-retenciones-${hoyLocal()}.xlsx`);
 }
 
 export function exportReporteRetencionesPdf(reporte: ReporteRetenciones) {
@@ -865,7 +877,7 @@ export function exportReporteRetencionesPdf(reporte: ReporteRetenciones) {
     }
   });
 
-  openBrowserPrintDialog(doc, `resumen-retenciones-${new Date().toISOString().slice(0, 10)}.pdf`);
+  openBrowserPrintDialog(doc, `resumen-retenciones-${hoyLocal()}.pdf`);
 }
 
 // ============================================================================
@@ -921,7 +933,7 @@ export function exportPlanillaControlPagosExcel(partidas: PartidaPresupuestoCaja
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Control de Pagos".slice(0, 31));
-  XLSX.writeFile(workbook, `planilla-control-pagos-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(workbook, `planilla-control-pagos-${hoyLocal()}.xlsx`);
 }
 
 export function exportPlanillaControlPagosPdf(partidas: PartidaPresupuestoCaja[], periodoLabel: string) {
@@ -973,5 +985,5 @@ export function exportPlanillaControlPagosPdf(partidas: PartidaPresupuestoCaja[]
     }
   });
 
-  openBrowserPrintDialog(doc, `planilla-control-pagos-${new Date().toISOString().slice(0, 10)}.pdf`);
+  openBrowserPrintDialog(doc, `planilla-control-pagos-${hoyLocal()}.pdf`);
 }

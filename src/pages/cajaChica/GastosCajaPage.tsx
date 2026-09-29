@@ -47,8 +47,15 @@ import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
+// Año/mes/día LOCAL (Bolivia), nunca toISOString(): esa función convierte a
+// UTC antes de recortar, así que entre las 20:00 y las 23:59 hora boliviana
+// ya devolvía la fecha de MAÑANA.
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 // text-base (16px) en móvil evita el zoom automático de iOS al enfocar un
@@ -81,7 +88,16 @@ function formatMoneda(value: string | number) {
   return Number(value).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// timeZone: "UTC" es a propósito: item.fecha es una fecha calendario
+// (medianoche UTC guardada desde un <input type="date">), no un instante —
+// sin esto, un navegador en Bolivia (UTC-4) la corre un día para atrás.
 function formatFecha(value: string) {
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
+}
+
+// Para timestamps de verdad (createdAt: cuándo se guardó algo), NO se fuerza
+// UTC — ahí sí queremos la hora local de Bolivia en la que ocurrió.
+function formatFechaHora(value: string) {
   return new Date(value).toLocaleDateString("es-BO");
 }
 
@@ -865,7 +881,7 @@ export function GastosCajaPage() {
                 <div>
                   <p className="font-semibold">{item.payload.proveedorNombre} · {item.payload.glosa}</p>
                   <p className="text-[var(--color-on-surface-variant)]">
-                    Guardado en este dispositivo el {formatFecha(item.createdAt)}
+                    Guardado en este dispositivo el {formatFechaHora(item.createdAt)}
                     {item.ultimoError ? ` · último intento falló: ${item.ultimoError}` : ""}
                   </p>
                 </div>

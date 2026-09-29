@@ -82,8 +82,11 @@ function normalizeError(error: unknown, fallbackMessage: string) {
   return fallbackMessage;
 }
 
+// timeZone: "UTC" es a propósito: estas fechas son calendario (medianoche
+// UTC guardada desde un <input type="date">), no un instante — sin esto,
+// un navegador en Bolivia (UTC-4) las corre un día para atrás al mostrarlas.
 function formatFecha(value: string) {
-  return new Date(value).toLocaleDateString("es-BO");
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
 // Texto boilerplate del Conocimiento real ("Carga para Ingenio del sector
@@ -93,8 +96,14 @@ const DESCRIPCION_CONOCIMIENTO_DEFAULT = "Carga para Ingenio del sector Lipeña"
 
 const LOTES_POR_PAGINA = 20;
 
+// Año/mes/día LOCAL (Bolivia), nunca toISOString(): esa función convierte a
+// UTC antes de recortar, así que entre las 20:00 y las 23:59 hora boliviana
+// ya devolvía la fecha de MAÑANA.
 function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function LotesDespachoPage() {
@@ -588,7 +597,7 @@ export function LotesDespachoPage() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                {["Correlativo", "Transportista", "Vehículo", "Mineral", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
+                {["N° Lote / Conocimiento", "Transportista", "Vehículo", "Mineral", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     {title}
                   </th>

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { deleteRequest, getRequest, postRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
@@ -71,4 +72,8 @@ export async function cerrarLiquidacion(id: string) {
 export async function anularLiquidacion(id: string, payload: AnularLiquidacionPayload) {
   const body = anularLiquidacionPayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.liquidaciones.anular(id), body, schema: liquidacionResponseSchema });
+}
+
+export async function eliminarBorradorLiquidacion(id: string) {
+  return deleteRequest({ url: apiEndpoints.liquidaciones.byId(id), schema: z.object({ success: z.boolean() }) });
 }

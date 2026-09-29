@@ -29,8 +29,15 @@ import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
+// Año/mes/día LOCAL (Bolivia), nunca toISOString(): esa función convierte a
+// UTC antes de recortar, así que entre las 20:00 y las 23:59 hora boliviana
+// ya devolvía la fecha de MAÑANA.
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 const inputClassName =

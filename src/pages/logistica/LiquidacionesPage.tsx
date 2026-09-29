@@ -17,6 +17,7 @@ import {
   useAnularLiquidacionMutation,
   useCerrarLiquidacionMutation,
   useCreateLiquidacionMutation,
+  useEliminarBorradorLiquidacionMutation,
   useLiquidacionDetailQuery,
   useLiquidacionPreviewQuery,
   useLiquidacionesQuery,
@@ -67,8 +68,11 @@ function formatMoneda(value: string | number) {
   return Number(value).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// timeZone: "UTC" es a propósito: estas fechas son calendario (medianoche
+// UTC guardada desde un <input type="date">), no un instante — sin esto,
+// un navegador en Bolivia (UTC-4) las corre un día para atrás al mostrarlas.
 function formatFecha(value: string) {
-  return new Date(value).toLocaleDateString("es-BO");
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
 export function LiquidacionesPage() {
@@ -88,6 +92,7 @@ export function LiquidacionesPage() {
   const quitarItemMutation = useQuitarItemConceptoMutation();
   const cerrarMutation = useCerrarLiquidacionMutation();
   const anularMutation = useAnularLiquidacionMutation();
+  const eliminarBorradorMutation = useEliminarBorradorLiquidacionMutation();
 
   const liquidacionesSinFiltrar = liquidacionesQuery.data?.data ?? [];
   const liquidaciones = useMemo(() => {
@@ -264,6 +269,22 @@ export function LiquidacionesPage() {
     );
   }
 
+  // Solo para BORRADOR: a diferencia de anular (que deja un registro
+  // permanente), esto la borra de verdad — no tuvo ningún efecto real
+  // todavía (sin folio, sin lotes marcados LIQUIDADO).
+  function handleEliminarBorrador(id: string) {
+    const confirmed = window.confirm("¿Eliminar este borrador? No se puede deshacer.");
+    if (!confirmed) return;
+
+    eliminarBorradorMutation.mutate(id, {
+      onSuccess: () => {
+        showSuccess("Borrador eliminado.");
+        if (selectedId === id) setSelectedId(undefined);
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo eliminar el borrador."))
+    });
+  }
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -366,7 +387,7 @@ export function LiquidacionesPage() {
                 <table className="w-full border-collapse text-left text-xs">
                   <thead>
                     <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                      <th className="py-1 pr-3">Correlativo</th>
+                      <th className="py-1 pr-3">N° Lote / Conocimiento</th>
                       <th className="py-1 pr-3">Fecha</th>
                       <th className="py-1 pr-3">Placa</th>
                       <th className="py-1 pr-3">Mineral</th>
@@ -520,10 +541,23 @@ export function LiquidacionesPage() {
                   </td>
                   <td className="px-3 py-2 text-xs">Bs {formatMoneda(item.totalNeto)}</td>
                   <td className="px-3 py-2 text-xs">
-                    <button type="button" onClick={() => setSelectedId(item.id)} className={buttonSecondaryClassName}>
-                      <Search size={13} />
-                      Ver
-                    </button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setSelectedId(item.id)} className={buttonSecondaryClassName}>
+                        <Search size={13} />
+                        Ver
+                      </button>
+                      {item.estado === "BORRADOR" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarBorrador(item.id)}
+                          disabled={eliminarBorradorMutation.isPending}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-2 text-xs font-semibold text-[var(--color-error)] disabled:opacity-50"
+                          title="Eliminar este borrador"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -646,7 +680,7 @@ export function LiquidacionesPage() {
                     <table className="w-full border-collapse text-left text-xs">
                       <thead>
                         <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
-                          <th className="py-1 pr-3">Correlativo</th>
+                          <th className="py-1 pr-3">N° Lote / Conocimiento</th>
                           <th className="py-1 pr-3">Placa</th>
                           <th className="py-1 pr-3 text-right">Tonelaje neto</th>
                           <th className="py-1 pr-3 text-right">Precio/ton</th>
@@ -739,16 +773,27 @@ export function LiquidacionesPage() {
 
               <div className="flex flex-wrap gap-2">
                 {liquidacion.estado === "BORRADOR" ? (
-                  <button
-                    type="button"
-                    onClick={() => handleCerrar(liquidacion.id)}
-                    disabled={cerrarMutation.isPending}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-                  >
-                    <CheckCircle2 size={14} /> Cerrar liquidación
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleCerrar(liquidacion.id)}
+                      disabled={cerrarMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                    >
+                      <CheckCircle2 size={14} /> Cerrar liquidación
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEliminarBorrador(liquidacion.id)}
+                      disabled={eliminarBorradorMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/45 px-4 py-2 text-sm font-semibold text-[var(--color-error)] disabled:opacity-50"
+                      title="Borra el borrador por completo (no queda registro)"
+                    >
+                      <Trash2 size={14} /> Eliminar borrador
+                    </button>
+                  </>
                 ) : null}
-                {liquidacion.estado !== "ANULADO" ? (
+                {liquidacion.estado === "CERRADO" ? (
                   <button
                     type="button"
                     onClick={() => handleAnular(liquidacion.id)}
