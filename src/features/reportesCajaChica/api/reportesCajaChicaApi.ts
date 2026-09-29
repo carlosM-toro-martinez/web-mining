@@ -40,18 +40,18 @@ export async function getReporteDesglose(params: ReporteCajaChicaParams) {
   });
 }
 
-export async function getEstadoCuentaCaja(cajaId: number) {
+export async function getEstadoCuentaCaja(cajaId: number, fechaInicio?: string, fechaFin?: string) {
   return getRequest({
     url: apiEndpoints.reportesCajaChica.estadoCuenta,
-    config: { params: { cajaId } },
+    config: { params: { cajaId, fechaInicio, fechaFin } },
     schema: reporteEstadoCuentaResponseSchema
   });
 }
 
-export async function getEstadoCuentaBancaria(cuentaBancariaId: number) {
+export async function getEstadoCuentaBancaria(cuentaBancariaId: number, fechaInicio?: string, fechaFin?: string) {
   return getRequest({
     url: apiEndpoints.reportesCajaChica.estadoCuentaBancaria,
-    config: { params: { cuentaBancariaId } },
+    config: { params: { cuentaBancariaId, fechaInicio, fechaFin } },
     schema: reporteEstadoCuentaBancariaResponseSchema
   });
 }

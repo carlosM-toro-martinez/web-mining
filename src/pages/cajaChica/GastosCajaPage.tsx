@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Ban,
@@ -83,6 +83,33 @@ function formatMoneda(value: string | number) {
 
 function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO");
+}
+
+// Mismo patrón de overlay que FlotaPage.tsx (duplicado, no compartido, para
+// no arriesgar esa pantalla): fondo fijo + panel centrado, clic afuera o la
+// X para cerrar.
+function ModalShell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative my-8 w-full max-w-3xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--color-on-surface-variant)] transition hover:bg-[var(--color-surface-container-highest)] hover:text-[var(--color-on-surface)]"
+        >
+          <X size={20} />
+        </button>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function GastosCajaPage() {
@@ -206,6 +233,9 @@ export function GastosCajaPage() {
     }
     if (tipoDocumento === "RECIBO_DIRECTO") {
       return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: true };
+    }
+    if (tipoDocumento === "RECIBO") {
+      return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: false };
     }
     const retencionIt = monto * tasaIt;
     if (categoriaRetencion === "SERVICIO") {
@@ -517,6 +547,7 @@ export function GastosCajaPage() {
             >
               <option value="FACTURA">Factura</option>
               <option value="CONTRATO_RETENCION">Contrato con retención</option>
+              <option value="RECIBO">Recibo (con respaldo, sin impuestos)</option>
               <option value="RECIBO_DIRECTO">Recibo directo (sin respaldo)</option>
             </select>
             {tipoDocumento === "CONTRATO_RETENCION" ? (
@@ -644,6 +675,9 @@ export function GastosCajaPage() {
                 {preview.retencionIueCompras > 0 ? <p>Retención IUE Compras: <span className="font-bold">{formatMoneda(preview.retencionIueCompras)}</span></p> : null}
                 {preview.retencionIt > 0 ? <p>Retención IT: <span className="font-bold">{formatMoneda(preview.retencionIt)}</span></p> : null}
                 {preview.noDeducible ? <p className="text-[var(--color-warning)]">100% a Gastos No Deducibles</p> : null}
+                {tipoDocumento === "RECIBO" ? (
+                  <p className="text-[var(--color-on-surface-variant)]">Sin crédito fiscal ni retenciones — con respaldo, gasto deducible.</p>
+                ) : null}
               </div>
             ) : (
               <p className="text-xs text-[var(--color-on-surface-variant)]">Ingresa un monto para ver el cálculo.</p>
@@ -653,20 +687,10 @@ export function GastosCajaPage() {
       </article>
 
       {editDraft ? (
-        <article className="rounded-xl border-2 border-[var(--color-primary)]/45 bg-[var(--color-primary)]/[0.06] p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
-              <Pencil size={16} /> Editando gasto
-            </h2>
-            <button
-              type="button"
-              onClick={() => setEditDraft(null)}
-              className="rounded-lg p-1.5 text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]"
-              title="Cancelar edición"
-            >
-              <X size={16} />
-            </button>
-          </div>
+        <ModalShell onClose={() => setEditDraft(null)}>
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
+            <Pencil size={16} /> Editando gasto
+          </h2>
           <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleSaveEdit}>
             <input required type="date" value={editDraft.fecha} onChange={(e) => setEditDraft({ ...editDraft, fecha: e.target.value })} className={inputClassName} />
 
@@ -677,6 +701,7 @@ export function GastosCajaPage() {
             >
               <option value="FACTURA">Factura</option>
               <option value="CONTRATO_RETENCION">Contrato con retención</option>
+              <option value="RECIBO">Recibo (con respaldo, sin impuestos)</option>
               <option value="RECIBO_DIRECTO">Recibo directo (sin respaldo)</option>
             </select>
             {editDraft.tipoDocumento === "CONTRATO_RETENCION" ? (
@@ -815,7 +840,7 @@ export function GastosCajaPage() {
               </button>
             </div>
           </form>
-        </article>
+        </ModalShell>
       ) : null}
 
       {pendientes.length > 0 ? (

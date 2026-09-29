@@ -64,6 +64,7 @@ export const reporteEstadoCuentaSchema = z.object({
   caja: cajaChicaRefSchema,
   saldoInicial: z.number(),
   fechaCorte: z.string().nullable().optional(),
+  fechaInicioPeriodo: z.string().nullable().optional(),
   totalIngresos: z.number(),
   totalEgresos: z.number(),
   saldoActual: z.number(),
@@ -81,6 +82,7 @@ const cuentaBancariaRefSchema = z.object({
 export const reporteEstadoCuentaBancariaSchema = z.object({
   cuenta: cuentaBancariaRefSchema,
   saldoInicial: z.number(),
+  fechaInicioPeriodo: z.string().nullable().optional(),
   totalIngresos: z.number(),
   totalEgresos: z.number(),
   saldoActual: z.number(),

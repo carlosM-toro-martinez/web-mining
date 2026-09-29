@@ -15,7 +15,7 @@ import {
   useCreateValeMutation,
   useEliminarValeMutation,
   useEntregarValeMutation,
-  useProductosPorUsuarioQuery,
+  useHistorialSolicitanteQuery,
   useResumenSolicitantesQuery,
   useValesQuery
 } from "@/features/vales/hooks/useVales";
@@ -79,7 +79,7 @@ export function ValesPage() {
     mes: number;
     estado?: string;
     solicitanteId?: number;
-  } | null>(null);
+  } | null>({ anio: currentYear, mes: currentMonth });
   const [valesPage, setValesPage] = useState(1);
   const [anulacionesSearchProducto, setAnulacionesSearchProducto] = useState("");
   const [anulacionesFilterAnulador, setAnulacionesFilterAnulador] = useState("");
@@ -113,7 +113,7 @@ export function ValesPage() {
   const syncOfflineMutation = useSyncInventoryOfflineMutation();
 
   const [historialUserId, setHistorialUserId] = useState("");
-  const [historialProductoFilter, setHistorialProductoFilter] = useState("");
+  const [historialPage, setHistorialPage] = useState(1);
   const [solicitanteCreateId, setSolicitanteCreateId] = useState("");
   const [isCreateWorkerModalOpen, setIsCreateWorkerModalOpen] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState("");
@@ -129,9 +129,10 @@ export function ValesPage() {
   const [isEliminarModalOpen, setIsEliminarModalOpen] = useState(false);
   const [eliminarValeId, setEliminarValeId] = useState("");
 
-  const productosPorUsuarioQuery = useProductosPorUsuarioQuery(
+  const historialSolicitanteQuery = useHistorialSolicitanteQuery(
     historialUserId ? Number(historialUserId) : null,
-    canUseFlow
+    historialPage,
+    50
   );
 
   const usuarios = usersQuery.data?.data ?? [];
@@ -168,14 +169,13 @@ export function ValesPage() {
       })),
     [resumenSolicitantesQuery.data?.data]
   );
-  const productosHistoricosFiltrados = useMemo(() => {
-    const rows = productosPorUsuarioQuery.data?.data.productos ?? [];
-    const q = historialProductoFilter.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((item) =>
-      `${item.codigo ?? ""} ${item.nombre ?? ""} ${item.unidad ?? ""}`.toLowerCase().includes(q)
-    );
-  }, [productosPorUsuarioQuery.data?.data.productos, historialProductoFilter]);
+  const productoStockMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const p of productos) {
+      if (p.stock?.cantidad != null) map.set(p.id, String(p.stock.cantidad));
+    }
+    return map;
+  }, [productos]);
 
   const valesRecientes = useMemo(
     () =>
@@ -250,7 +250,9 @@ export function ValesPage() {
   }
 
   function handleLimpiarConsultaVales() {
-    setConsultaValesParams(null);
+    setConsultaValesParams({ anio: currentYear, mes: currentMonth });
+    setValesConsultaAnio(String(currentYear));
+    setValesConsultaMes(String(currentMonth));
     setValesPage(1);
     setValesConsultaEstado("");
     setValesConsultaSolicitanteId("");
@@ -550,71 +552,123 @@ export function ValesPage() {
           <Search size={16} className="text-[var(--color-primary)]" />
           Revisión histórica por solicitante
         </h2>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <AutocompleteSelect
-            value={historialUserId}
-            onChange={setHistorialUserId}
-            options={solicitantesOptions}
-            placeholder="Selecciona solicitante"
-            className={inputClassName}
-            maxVisibleOptions={30}
-          />
-          <input
-            value={historialProductoFilter}
-            onChange={(event) => setHistorialProductoFilter(event.target.value)}
-            className={inputClassName}
-            placeholder="Filtrar producto/código"
-          />
-        </div>
-        <div className="mt-3 table-scroll overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Producto
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Veces
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Cantidad total
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Última vez
-                </th>
-                <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Último estado
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {productosHistoricosFiltrados.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
-                  >
-                    Sin datos para el solicitante/filtro.
-                  </td>
-                </tr>
-              ) : (
-                productosHistoricosFiltrados.map((item) => (
-                  <tr key={`${item.productoId}-${item.ultimoValeId ?? "na"}`}>
-                    <td className="px-3 py-2 text-xs">
-                      {item.codigo ?? "-"} - {item.nombre ?? "-"}
-                    </td>
-                    <td className="px-3 py-2 text-xs">{item.vecessolicitado}</td>
-                    <td className="px-3 py-2 text-xs">{item.cantidadTotal}</td>
-                    <td className="px-3 py-2 text-xs">
-                      {item.ultimaFecha ? new Date(item.ultimaFecha).toLocaleString() : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-xs">{item.ultimoEstado ?? "-"}</td>
+        <AutocompleteSelect
+          value={historialUserId}
+          onChange={(id) => { setHistorialUserId(id); setHistorialPage(1); }}
+          options={solicitantesOptions}
+          placeholder="Selecciona solicitante"
+          className={inputClassName}
+          maxVisibleOptions={30}
+        />
+        {!historialUserId ? (
+          <p className="mt-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">
+            Selecciona un solicitante para ver sus últimos vales.
+          </p>
+        ) : (
+          <>
+            <div className="mt-3 table-scroll overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Fecha
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Estado
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Tipo
+                    </th>
+                    <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                      Productos
+                    </th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {historialSolicitanteQuery.isFetching && (historialSolicitanteQuery.data?.data ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                        Cargando...
+                      </td>
+                    </tr>
+                  ) : (historialSolicitanteQuery.data?.data ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
+                        Sin vales para este solicitante.
+                      </td>
+                    </tr>
+                  ) : (
+                    (historialSolicitanteQuery.data?.data ?? []).map((vale) => (
+                      <tr key={vale.id}>
+                        <td className="px-3 py-2 text-xs">
+                          {vale.createdAt ? new Date(vale.createdAt).toLocaleDateString() : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(vale.estado)}`}>
+                            {vale.estado}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            vale.fechaOperacion
+                              ? "border-[var(--color-tertiary)]/35 bg-[var(--color-tertiary)]/10 text-[var(--color-tertiary)]"
+                              : "border-[var(--color-primary)]/35 bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                          }`}>
+                            {vale.fechaOperacion ? "Histórica" : "Actual"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <div className="flex flex-col gap-0.5">
+                            {(vale.items ?? []).map((item) => (
+                              <span key={item.id} className="text-[10px] text-[var(--color-on-surface-variant)]">
+                                {item.producto?.codigo ? `${item.producto.codigo} - ` : ""}
+                                {item.producto?.nombre ?? `Prod. ${item.productoId}`}
+                                {" "}×{" "}
+                                <span className="font-semibold text-[var(--color-on-surface)]">
+                                  {item.cantidadEntregada ?? item.cantidadSolicitada}
+                                </span>
+                                {" "}{item.producto?.unidad ?? ""}
+                                {" · "}<span className="text-[var(--color-primary)]">stock: {productoStockMap.get(item.productoId) ?? "-"}</span>
+                              </span>
+                            ))}
+                            {!(vale.items ?? []).length ? (
+                              <span className="text-[10px] text-[var(--color-on-surface-variant)]">—</span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {(historialSolicitanteQuery.data?.meta?.totalPages ?? 1) > 1 ? (
+              <div className="mt-3 flex items-center justify-between gap-2 text-xs text-[var(--color-on-surface-variant)]">
+                <span>
+                  Página {historialPage} de {historialSolicitanteQuery.data?.meta?.totalPages ?? 1} — {historialSolicitanteQuery.data?.meta?.total ?? 0} vales
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={historialPage <= 1}
+                    onClick={() => setHistorialPage((p) => Math.max(1, p - 1))}
+                    className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 font-semibold disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    disabled={historialPage >= (historialSolicitanteQuery.data?.meta?.totalPages ?? 1)}
+                    onClick={() => setHistorialPage((p) => Math.min(historialSolicitanteQuery.data?.meta?.totalPages ?? 1, p + 1))}
+                    className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 font-semibold disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
       </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
@@ -866,12 +920,7 @@ export function ValesPage() {
           </div>
         </form>
 
-        {consultaValesParams === null ? (
-          <p className="py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
-            Completa el formulario y pulsa <strong>Consultar</strong> para cargar los vales.
-          </p>
-        ) : (
-          <>
+        <>
             <div className="table-scroll overflow-x-auto">
               <table className="w-full border-collapse text-left">
                 <thead>
@@ -934,6 +983,7 @@ export function ValesPage() {
                                 {item.cantidadEntregada ?? item.cantidadSolicitada}
                               </span>
                               {" "}{item.producto?.unidad ?? ""}
+                              {" · "}<span className="text-[var(--color-primary)]">stock: {productoStockMap.get(item.productoId) ?? "-"}</span>
                             </span>
                           ))}
                           {!(vale.items ?? []).length ? (
@@ -1009,7 +1059,6 @@ export function ValesPage() {
               </div>
             ) : null}
           </>
-        )}
       </article>
 
       {user?.role === "ADMIN" ? (

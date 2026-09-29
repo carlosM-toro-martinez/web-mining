@@ -30,18 +30,22 @@ export function useReporteDesgloseQuery(params: ReporteCajaChicaParams) {
   });
 }
 
-export function useEstadoCuentaCajaQuery(cajaId: number | undefined) {
+export function useEstadoCuentaCajaQuery(cajaId: number | undefined, fechaInicio?: string, fechaFin?: string) {
   return useQuery({
-    queryKey: queryKeys.reportesCajaChica.estadoCuenta(cajaId),
-    queryFn: () => getEstadoCuentaCaja(cajaId as number),
+    queryKey: queryKeys.reportesCajaChica.estadoCuenta(cajaId, fechaInicio, fechaFin),
+    queryFn: () => getEstadoCuentaCaja(cajaId as number, fechaInicio, fechaFin),
     enabled: typeof cajaId === "number"
   });
 }
 
-export function useEstadoCuentaBancariaQuery(cuentaBancariaId: number | undefined) {
+export function useEstadoCuentaBancariaQuery(
+  cuentaBancariaId: number | undefined,
+  fechaInicio?: string,
+  fechaFin?: string
+) {
   return useQuery({
-    queryKey: queryKeys.reportesCajaChica.estadoCuentaBancaria(cuentaBancariaId),
-    queryFn: () => getEstadoCuentaBancaria(cuentaBancariaId as number),
+    queryKey: queryKeys.reportesCajaChica.estadoCuentaBancaria(cuentaBancariaId, fechaInicio, fechaFin),
+    queryFn: () => getEstadoCuentaBancaria(cuentaBancariaId as number, fechaInicio, fechaFin),
     enabled: typeof cuentaBancariaId === "number"
   });
 }

@@ -25,6 +25,11 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function primerDiaDelMes() {
+  const hoy = new Date();
+  return new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
+}
+
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] invalid:border-[var(--color-error)] invalid:ring-1 invalid:ring-[var(--color-error)]/30";
 
@@ -57,7 +62,14 @@ export function SaldosCajaPage() {
     if (!cajaId && cajas.length > 0) setCajaId(String(encontrarCajaLipena(cajas)?.id ?? ""));
   }, [cajas, cajaId]);
 
-  const estadoCuentaQuery = useEstadoCuentaCajaQuery(cajaId ? Number(cajaId) : undefined);
+  // Rango del libro de movimientos: por defecto del 1° del mes actual a hoy,
+  // editable. El saldo inicial que se muestra (y la primera fila de la
+  // tabla) ya viene recalculado por el backend para reflejar todo lo
+  // anterior a "Desde" — no es el saldo declarado en Parámetros a secas.
+  const [fechaDesde, setFechaDesde] = useState(primerDiaDelMes);
+  const [fechaHasta, setFechaHasta] = useState(today);
+
+  const estadoCuentaQuery = useEstadoCuentaCajaQuery(cajaId ? Number(cajaId) : undefined, fechaDesde, fechaHasta);
   const estadoCuenta = estadoCuentaQuery.data?.data;
 
   // El bloque de arriba ("Saldo de caja/banco") alterna entre mostrar el
@@ -71,7 +83,9 @@ export function SaldosCajaPage() {
   }, [cuentasBancarias]);
 
   const estadoCuentaBancariaQuery = useEstadoCuentaBancariaQuery(
-    vistaSaldo === "BANCO" && cuentaSaldoId ? Number(cuentaSaldoId) : undefined
+    vistaSaldo === "BANCO" && cuentaSaldoId ? Number(cuentaSaldoId) : undefined,
+    fechaDesde,
+    fechaHasta
   );
   const estadoCuentaBancaria = estadoCuentaBancariaQuery.data?.data;
 
@@ -265,20 +279,28 @@ export function SaldosCajaPage() {
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {vistaSaldo === "CAJA" ? (
-              <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={`${inputClassName} w-64`}>
+              <select value={cajaId} onChange={(e) => setCajaId(e.target.value)} className={`${inputClassName} w-56`}>
                 {cajas.map((c) => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             ) : (
-              <select value={cuentaSaldoId} onChange={(e) => setCuentaSaldoId(e.target.value)} className={`${inputClassName} w-64`}>
+              <select value={cuentaSaldoId} onChange={(e) => setCuentaSaldoId(e.target.value)} className={`${inputClassName} w-56`}>
                 {cuentasBancarias.map((c) => (
                   <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
                 ))}
               </select>
             )}
+            <div className="flex items-center gap-1">
+              <label className="text-[11px] text-[var(--color-on-surface-variant)]">Desde</label>
+              <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className={`${inputClassName} w-40`} />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-[11px] text-[var(--color-on-surface-variant)]">Hasta</label>
+              <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className={`${inputClassName} w-40`} />
+            </div>
             {vistaSaldo === "CAJA" && estadoCuenta ? (
               <div className="flex gap-2">
                 <button type="button" onClick={() => exportEstadoCuentaExcel(estadoCuenta)} className={buttonSecondaryClassName}>
@@ -300,7 +322,8 @@ export function SaldosCajaPage() {
               <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-4">
                 <p>
                   <span className="block text-[11px] text-[var(--color-on-surface-variant)]">
-                    Saldo inicial{estadoCuenta.fechaCorte ? ` (cierre del ${formatFecha(estadoCuenta.fechaCorte)})` : " (declarado en Parámetros)"}
+                    Saldo inicial (al {formatFecha(fechaDesde)}
+                    {estadoCuenta.fechaCorte ? `, desde el cierre del ${formatFecha(estadoCuenta.fechaCorte)}` : ""})
                   </span>
                   {formatMoneda(estadoCuenta.saldoInicial)}
                 </p>
@@ -323,6 +346,13 @@ export function SaldosCajaPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-border-soft)]">
+                    <tr className="bg-[var(--color-surface-container-highest)] font-semibold italic">
+                      <td className="py-1 pr-3">{formatFecha(fechaDesde)}</td>
+                      <td className="py-1 pr-3">Saldo inicial</td>
+                      <td className="py-1 pr-3 text-right">—</td>
+                      <td className="py-1 pr-3 text-right">—</td>
+                      <td className="py-1 text-right">{formatMoneda(estadoCuenta.saldoInicial)}</td>
+                    </tr>
                     {estadoCuenta.movimientos.map((m, index) => (
                       <tr key={index}>
                         <td className="py-1 pr-3">{formatFecha(m.fecha)}</td>
@@ -353,7 +383,9 @@ export function SaldosCajaPage() {
           <>
             <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-4">
               <p>
-                <span className="block text-[11px] text-[var(--color-on-surface-variant)]">Saldo inicial (declarado en Parámetros)</span>
+                <span className="block text-[11px] text-[var(--color-on-surface-variant)]">
+                  Saldo inicial (al {formatFecha(fechaDesde)}, declarado en Parámetros)
+                </span>
                 {formatMoneda(estadoCuentaBancaria.saldoInicial)}
               </p>
               <p><span className="block text-[11px] text-[var(--color-on-surface-variant)]">+ Ingresos</span><span className="text-[var(--color-success)]">{formatMoneda(estadoCuentaBancaria.totalIngresos)}</span></p>
@@ -375,6 +407,13 @@ export function SaldosCajaPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  <tr className="bg-[var(--color-surface-container-highest)] font-semibold italic">
+                    <td className="py-1 pr-3">{formatFecha(fechaDesde)}</td>
+                    <td className="py-1 pr-3">Saldo inicial</td>
+                    <td className="py-1 pr-3 text-right">—</td>
+                    <td className="py-1 pr-3 text-right">—</td>
+                    <td className="py-1 text-right">{formatMoneda(estadoCuentaBancaria.saldoInicial)}</td>
+                  </tr>
                   {estadoCuentaBancaria.movimientos.map((m, index) => (
                     <tr key={index}>
                       <td className="py-1 pr-3">{formatFecha(m.fecha)}</td>
