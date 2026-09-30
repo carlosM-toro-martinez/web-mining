@@ -1,10 +1,12 @@
 import { getRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
+  comprobanteEgresoGastoResponseSchema,
   reporteComprobanteDiarioResponseSchema,
   reporteDesgloseResponseSchema,
   reporteEstadoCuentaBancariaResponseSchema,
   reporteEstadoCuentaResponseSchema,
+  reporteImpuestosResponseSchema,
   reporteNoDeduciblesResponseSchema,
   reporteRendicionResponseSchema,
   reporteRetencionesResponseSchema
@@ -21,6 +23,14 @@ export async function getReporteRetenciones(params: ReporteCajaChicaParams) {
     url: apiEndpoints.reportesCajaChica.retenciones,
     config: { params },
     schema: reporteRetencionesResponseSchema
+  });
+}
+
+export async function getReporteImpuestos(params: ReporteCajaChicaParams) {
+  return getRequest({
+    url: apiEndpoints.reportesCajaChica.impuestos,
+    config: { params },
+    schema: reporteImpuestosResponseSchema
   });
 }
 
@@ -67,5 +77,12 @@ export async function getComprobanteDiario(rendicionId: string) {
   return getRequest({
     url: apiEndpoints.reportesCajaChica.comprobanteDiario(rendicionId),
     schema: reporteComprobanteDiarioResponseSchema
+  });
+}
+
+export async function getComprobanteEgresoGasto(gastoId: string) {
+  return getRequest({
+    url: apiEndpoints.reportesCajaChica.comprobanteEgresoGasto(gastoId),
+    schema: comprobanteEgresoGastoResponseSchema
   });
 }

@@ -3,11 +3,15 @@ import {
   AlertTriangle,
   Ban,
   Calculator,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  Eye,
+  FileSpreadsheet,
+  FileText,
   Pencil,
   Plus,
   RefreshCw,
@@ -42,8 +46,10 @@ import {
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import type { PartidaPresupuestoCaja } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
+import { getComprobanteEgresoGasto } from "@/features/reportesCajaChica/api/reportesCajaChicaApi";
 import { ApiError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
+import { exportComprobanteEgresoExcel, exportComprobanteEgresoPdf } from "@/shared/lib/comprobanteEgresoExport";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -57,6 +63,25 @@ function today() {
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+function inicioDeMesActual() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoGasto, string> = {
+  FACTURA: "Factura",
+  CONTRATO_RETENCION: "Contrato con retención",
+  RECIBO: "Recibo (con respaldo)",
+  RECIBO_DIRECTO: "Recibo directo (sin respaldo)"
+};
+
+const CAMPO_FALTANTE_LABEL: Record<"centroCostoCaja" | "funcionGastoCaja" | "cuentaContableCaja" | "partidaPresupuesto", string> = {
+  centroCostoCaja: "Centro de costo",
+  funcionGastoCaja: "Función de gasto",
+  cuentaContableCaja: "Cuenta contable",
+  partidaPresupuesto: "Partida de presupuesto"
+};
 
 // text-base (16px) en móvil evita el zoom automático de iOS al enfocar un
 // input con font-size menor a 16px; en sm+ se reduce a como estaba antes.
@@ -141,7 +166,29 @@ export function GastosCajaPage() {
   const { pendientes, encolar, sincronizar, sincronizando } = useGastoCajaOfflineQueue();
 
   const [filtroCaja, setFiltroCaja] = useState("");
-  const gastosQuery = useGastosCajaQuery({ cajaId: filtroCaja ? Number(filtroCaja) : undefined, limit: 50 });
+  const [filtroFechaInicio, setFiltroFechaInicio] = useState(inicioDeMesActual);
+  const [filtroFechaFin, setFiltroFechaFin] = useState(today);
+  const [pagina, setPagina] = useState(1);
+  const gastosQuery = useGastosCajaQuery({
+    cajaId: filtroCaja ? Number(filtroCaja) : undefined,
+    fechaInicio: filtroFechaInicio || undefined,
+    fechaFin: filtroFechaFin || undefined,
+    page: pagina,
+    limit: 20
+  });
+
+  function handleCambiarFiltroCaja(value: string) {
+    setFiltroCaja(value);
+    setPagina(1);
+  }
+  function handleCambiarFiltroFechaInicio(value: string) {
+    setFiltroFechaInicio(value);
+    setPagina(1);
+  }
+  function handleCambiarFiltroFechaFin(value: string) {
+    setFiltroFechaFin(value);
+    setPagina(1);
+  }
 
   const createGastoMutation = useCreateGastoCajaMutation();
   const updateGastoMutation = useUpdateGastoCajaMutation();
@@ -155,6 +202,8 @@ export function GastosCajaPage() {
   const retenciones = retencionesQuery.data?.data ?? [];
   const partidas = partidasQuery.data?.data ?? [];
   const gastos = gastosQuery.data?.data ?? [];
+  const metaGastos = gastosQuery.data?.meta;
+  const totalPaginasGastos = Math.max(metaGastos?.totalPages ?? 1, 1);
 
   const centroOptions = useMemo(
     () => centros.map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
@@ -350,6 +399,43 @@ export function GastosCajaPage() {
     );
   }
 
+  // Comprobante de Egresos: solo para gastos pagados desde banco (el
+  // documento físico real es "Bancos - Moneda Nacional"). El folio se
+  // asigna en el backend la primera vez que se pide, y queda fijo desde
+  // entonces — reimprimir después muestra el mismo número.
+  const [generandoComprobante, setGenerandoComprobante] = useState<string | null>(null);
+
+  async function handleExportComprobante(id: string, formato: "excel" | "pdf") {
+    setGenerandoComprobante(`${id}-${formato}`);
+    try {
+      const response = await getComprobanteEgresoGasto(id);
+      const c = response.data;
+      const config = {
+        numero: c.numero,
+        fecha: c.fecha,
+        subtitulo: c.moneda === "USD" ? "BANCOS - MONEDA EXTRANJERA" : "BANCOS - MONEDA NACIONAL",
+        monedaLabel: c.moneda === "USD" ? ("Dólares Americanos" as const) : ("Bolivianos" as const),
+        montoTotal: c.montoTotal,
+        glosaPrincipal: `O/ ${c.glosa}${c.numeroRespaldo ? ` FACTURA ${c.numeroRespaldo}` : ""}`.toUpperCase(),
+        lineas: c.lineas.map((l) => ({
+          cuentaCodigo: l.codigo,
+          cuentaNombre: l.cuentaNombre,
+          debeBs: l.debeBs,
+          haberBs: l.haberBs,
+          debeUsd: l.debeUsd || undefined,
+          haberUsd: l.haberUsd || undefined
+        })),
+        nombreArchivo: `comprobante-egreso-${String(c.numero).padStart(6, "0")}`
+      };
+      if (formato === "excel") exportComprobanteEgresoExcel(config);
+      else exportComprobanteEgresoPdf(config);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo generar el comprobante de egresos."));
+    } finally {
+      setGenerandoComprobante(null);
+    }
+  }
+
   // --- Editar un gasto ya registrado (para completar clasificación
   // faltante, o corregir cualquier otro dato, mientras siga REGISTRADO) ---
   const [editDraft, setEditDraft] = useState<{
@@ -369,6 +455,8 @@ export function GastosCajaPage() {
     cuentaContableCajaId: string;
     partidaPresupuestoId: string;
   } | null>(null);
+
+  const [viewingGasto, setViewingGasto] = useState<GastoCaja | null>(null);
 
   function handleStartEdit(item: GastoCaja) {
     setEditDraft({
@@ -585,9 +673,21 @@ export function GastosCajaPage() {
             )}
 
             <input required value={glosa} onChange={(e) => setGlosa(e.target.value)} className={`${inputClassName} sm:col-span-2`} placeholder="Glosa (ej. 500 Lts Gasolina)" />
-            {/* Un recibo directo no tiene número de factura/recibo formal — no tiene sentido pedirlo. */}
+            {/* Un recibo directo no tiene número de factura/recibo formal — no tiene sentido pedirlo.
+                Factura y Recibo SÍ tienen respaldo físico por definición, así que aquí es obligatorio;
+                Contrato con retención queda opcional (a veces el contrato en sí no trae un número). */}
             {esReciboDirecto ? null : (
-              <input value={numeroRespaldo} onChange={(e) => setNumeroRespaldo(e.target.value)} className={inputClassName} placeholder="N° factura / recibo (opcional)" />
+              <input
+                required={tipoDocumento === "FACTURA" || tipoDocumento === "RECIBO"}
+                value={numeroRespaldo}
+                onChange={(e) => setNumeroRespaldo(e.target.value)}
+                className={inputClassName}
+                placeholder={
+                  tipoDocumento === "FACTURA" || tipoDocumento === "RECIBO"
+                    ? "N° factura / recibo"
+                    : "N° factura / recibo (opcional)"
+                }
+              />
             )}
 
             <div className={`flex gap-2 ${esReciboDirecto ? "sm:col-span-2" : ""}`}>
@@ -756,10 +856,15 @@ export function GastosCajaPage() {
             />
             {editDraft.tipoDocumento === "RECIBO_DIRECTO" ? null : (
               <input
+                required={editDraft.tipoDocumento === "FACTURA" || editDraft.tipoDocumento === "RECIBO"}
                 value={editDraft.numeroRespaldo}
                 onChange={(e) => setEditDraft({ ...editDraft, numeroRespaldo: e.target.value })}
                 className={inputClassName}
-                placeholder="N° factura / recibo (opcional)"
+                placeholder={
+                  editDraft.tipoDocumento === "FACTURA" || editDraft.tipoDocumento === "RECIBO"
+                    ? "N° factura / recibo"
+                    : "N° factura / recibo (opcional)"
+                }
               />
             )}
 
@@ -895,12 +1000,32 @@ export function GastosCajaPage() {
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Gastos registrados</h2>
-          <select value={filtroCaja} onChange={(e) => setFiltroCaja(e.target.value)} className={`${inputClassName} w-full sm:w-56`}>
-            <option value="">Todas las cajas</option>
-            {cajas.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={filtroCaja}
+              onChange={(e) => handleCambiarFiltroCaja(e.target.value)}
+              className={`${inputClassName} w-full sm:w-56`}
+            >
+              <option value="">Todas las cajas</option>
+              {cajas.map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={filtroFechaInicio}
+              onChange={(e) => handleCambiarFiltroFechaInicio(e.target.value)}
+              className={`${inputClassName} w-full sm:w-40`}
+              title="Desde"
+            />
+            <input
+              type="date"
+              value={filtroFechaFin}
+              onChange={(e) => handleCambiarFiltroFechaFin(e.target.value)}
+              className={`${inputClassName} w-full sm:w-40`}
+              title="Hasta"
+            />
+          </div>
         </div>
 
         {gastosQuery.isLoading ? (
@@ -930,24 +1055,55 @@ export function GastosCajaPage() {
                 <span>{formatFecha(item.fecha)} · {item.origen === "BANCO" ? `Banco: ${item.cuentaBancariaCaja?.banco ?? "-"}` : (item.caja?.nombre ?? "-")}</span>
                 <span className="font-mono font-bold text-[var(--color-on-surface)]">{item.moneda} {formatMoneda(item.montoTotal)}</span>
               </div>
-              {item.estado === "REGISTRADO" ? (
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleStartEdit(item)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]"
-                  >
-                    <Pencil size={12} /> Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAnularGasto(item.id)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]"
-                  >
-                    <Ban size={12} /> Anular
-                  </button>
-                </div>
-              ) : null}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingGasto(item)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]"
+                >
+                  <Eye size={12} /> Ver
+                </button>
+                {item.estado === "REGISTRADO" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(item)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]"
+                    >
+                      <Pencil size={12} /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAnularGasto(item.id)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]"
+                    >
+                      <Ban size={12} /> Anular
+                    </button>
+                  </>
+                ) : null}
+                {item.origen === "BANCO" && item.estado !== "ANULADO" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleExportComprobante(item.id, "excel")}
+                      disabled={generandoComprobante === `${item.id}-excel`}
+                      className={buttonSecondaryClassName}
+                      title="Comprobante de Egresos (Excel)"
+                    >
+                      <FileSpreadsheet size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportComprobante(item.id, "pdf")}
+                      disabled={generandoComprobante === `${item.id}-pdf`}
+                      className={buttonSecondaryClassName}
+                      title="Comprobante de Egresos (PDF)"
+                    >
+                      <FileText size={12} />
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
@@ -984,23 +1140,208 @@ export function GastosCajaPage() {
                     </div>
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {item.estado === "REGISTRADO" ? (
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => handleStartEdit(item)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]">
-                          <Pencil size={12} /> Editar
-                        </button>
-                        <button type="button" onClick={() => handleAnularGasto(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]">
-                          <Ban size={12} /> Anular
-                        </button>
-                      </div>
-                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setViewingGasto(item)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]"
+                      >
+                        <Eye size={12} /> Ver
+                      </button>
+                      {item.estado === "REGISTRADO" ? (
+                        <>
+                          <button type="button" onClick={() => handleStartEdit(item)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]">
+                            <Pencil size={12} /> Editar
+                          </button>
+                          <button type="button" onClick={() => handleAnularGasto(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-error)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-error)]">
+                            <Ban size={12} /> Anular
+                          </button>
+                        </>
+                      ) : null}
+                      {item.origen === "BANCO" && item.estado !== "ANULADO" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleExportComprobante(item.id, "excel")}
+                            disabled={generandoComprobante === `${item.id}-excel`}
+                            className={buttonSecondaryClassName}
+                            title="Comprobante de Egresos (Excel)"
+                          >
+                            <FileSpreadsheet size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExportComprobante(item.id, "pdf")}
+                            disabled={generandoComprobante === `${item.id}-pdf`}
+                            className={buttonSecondaryClassName}
+                            title="Comprobante de Egresos (PDF)"
+                          >
+                            <FileText size={12} />
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {gastos.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-[var(--color-on-surface-variant)]">
+              Página {metaGastos?.page ?? pagina} de {totalPaginasGastos} · {metaGastos?.total ?? gastos.length} gasto(s)
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                disabled={pagina <= 1 || gastosQuery.isFetching}
+                className={buttonSecondaryClassName}
+              >
+                <ChevronLeft size={14} /> Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.min(totalPaginasGastos, p + 1))}
+                disabled={pagina >= totalPaginasGastos || gastosQuery.isFetching}
+                className={buttonSecondaryClassName}
+              >
+                Siguiente <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </article>
+
+      {viewingGasto ? (
+        <ModalShell onClose={() => setViewingGasto(null)}>
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-primary)]">
+            <Eye size={16} /> Detalle del gasto
+          </h2>
+          <div className="space-y-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[viewingGasto.estado]}`}>
+                {ESTADO_LABEL[viewingGasto.estado]}
+              </span>
+              <span className="rounded-full bg-[var(--color-surface-container-highest)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                {TIPO_DOCUMENTO_LABEL[viewingGasto.tipoDocumento]}
+              </span>
+              {viewingGasto.esNoDeducible ? (
+                <span className="rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
+                  No deducible
+                </span>
+              ) : null}
+            </div>
+
+            {viewingGasto.estado === "ANULADO" && viewingGasto.anulacion ? (
+              <p className="rounded-lg border border-[var(--color-error)]/35 bg-[var(--color-error)]/8 px-3 py-2 text-xs text-[var(--color-error)]">
+                Anulado el {formatFechaHora(viewingGasto.anulacion.createdAt)}: {viewingGasto.anulacion.motivo}
+              </p>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Fecha</p>
+                <p className="font-semibold">{formatFecha(viewingGasto.fecha)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Origen</p>
+                <p className="font-semibold">
+                  {viewingGasto.origen === "BANCO"
+                    ? `Banco: ${viewingGasto.cuentaBancariaCaja?.banco ?? "-"} · ${viewingGasto.cuentaBancariaCaja?.nombreCuenta ?? "-"}`
+                    : (viewingGasto.caja?.nombre ?? "-")}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Proveedor / beneficiario</p>
+                <p className="font-semibold">{viewingGasto.proveedorNombre}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">NIT / CI</p>
+                <p className="font-semibold">{viewingGasto.proveedorNitCi || "-"}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Glosa</p>
+                <p className="font-semibold">{viewingGasto.glosa}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">N° factura / recibo</p>
+                <p className="font-semibold">{viewingGasto.numeroRespaldo || "-"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Monto</p>
+                <p className="font-mono font-bold">{viewingGasto.moneda} {formatMoneda(viewingGasto.montoTotal)}</p>
+              </div>
+              {viewingGasto.tipoDocumento === "CONTRATO_RETENCION" ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Categoría de retención</p>
+                  <p className="font-semibold">{viewingGasto.categoriaRetencion === "SERVICIO" ? "Servicio (RC-IVA + IT)" : "Compra / alimentación (IUE + IT)"}</p>
+                </div>
+              ) : null}
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--color-on-surface-variant)]">Categoría del reporte mensual</p>
+                <p className="font-semibold">{CATEGORIA_RENDICION_LABEL[viewingGasto.categoriaRendicion]}</p>
+              </div>
+            </div>
+
+            {Number(viewingGasto.montoCreditoFiscalIva) > 0 ||
+            Number(viewingGasto.montoRetencionRcIva) > 0 ||
+            Number(viewingGasto.montoRetencionIueCompras) > 0 ||
+            Number(viewingGasto.montoRetencionIt) > 0 ? (
+              <div className="rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+                  <Calculator size={12} /> Desglose tributario
+                </p>
+                <div className="space-y-1 text-xs">
+                  {Number(viewingGasto.montoCreditoFiscalIva) > 0 ? <p>Crédito fiscal IVA: <span className="font-bold">{formatMoneda(viewingGasto.montoCreditoFiscalIva)}</span></p> : null}
+                  {Number(viewingGasto.montoRetencionRcIva) > 0 ? <p>Retención RC-IVA: <span className="font-bold">{formatMoneda(viewingGasto.montoRetencionRcIva)}</span></p> : null}
+                  {Number(viewingGasto.montoRetencionIueCompras) > 0 ? <p>Retención IUE Compras: <span className="font-bold">{formatMoneda(viewingGasto.montoRetencionIueCompras)}</span></p> : null}
+                  {Number(viewingGasto.montoRetencionIt) > 0 ? <p>Retención IT: <span className="font-bold">{formatMoneda(viewingGasto.montoRetencionIt)}</span></p> : null}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="rounded-lg border border-[var(--color-outline-variant)] p-3">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">Clasificación</p>
+              <div className="space-y-1.5 text-xs">
+                {(["centroCostoCaja", "funcionGastoCaja", "cuentaContableCaja", "partidaPresupuesto"] as const).map((campo) => {
+                  const ref = viewingGasto[campo];
+                  const label = CAMPO_FALTANTE_LABEL[campo];
+                  return (
+                    <div key={campo} className="flex items-center justify-between gap-2">
+                      <span className="text-[var(--color-on-surface-variant)]">{label}</span>
+                      {ref ? (
+                        <span className="flex items-center gap-1 font-semibold text-[var(--color-success)]">
+                          <CheckCircle2 size={12} />
+                          {"codigo" in ref ? `${ref.codigo} · ${ref.nombre}` : ref.descripcion}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 font-semibold text-[var(--color-warning)]">
+                          <AlertTriangle size={12} /> Falta completar
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {viewingGasto.informacionIncompleta && viewingGasto.estado === "REGISTRADO" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleStartEdit(viewingGasto);
+                    setViewingGasto(null);
+                  }}
+                  className="mt-3 inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)]"
+                >
+                  <Pencil size={12} /> Completar clasificación
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </ModalShell>
+      ) : null}
     </section>
   );
 }

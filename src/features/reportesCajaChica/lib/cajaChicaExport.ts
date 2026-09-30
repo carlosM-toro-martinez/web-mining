@@ -987,3 +987,97 @@ export function exportPlanillaControlPagosPdf(partidas: PartidaPresupuestoCaja[]
 
   openBrowserPrintDialog(doc, `planilla-control-pagos-${hoyLocal()}.pdf`);
 }
+
+// ============================================================================
+// Exportador genérico para los reportes "tabla simple" del hub de Reportes
+// de Caja Chica (no deducibles, desglose, resumen caja vs. banco): mismo
+// look blanco y negro que el resto, sin repetir el boilerplate de estilos
+// en cada reporte nuevo — igual que el equivalente en Logística.
+// ============================================================================
+export interface TablaReporteCajaChicaConfig {
+  subtitulo: string;
+  columnas: string[];
+  filas: Array<Array<string | number>>;
+  filaTotales?: Array<string | number>;
+  nombreArchivo: string;
+  colsNumericas?: number[];
+  anchoColumnas?: number[];
+}
+
+export function exportTablaReporteCajaChicaExcel(config: TablaReporteCajaChicaConfig) {
+  const lastCol = config.columnas.length - 1;
+  const aoa: Array<Array<string | number>> = [
+    ["EMPRESA MINERA MARTE S.R.L.", ...Array(lastCol).fill("")],
+    [config.subtitulo, ...Array(lastCol).fill("")],
+    [],
+    config.columnas
+  ];
+  const rowKinds: Array<"title" | "subtitle" | "normal" | "header"> = ["title", "subtitle", "normal", "header"];
+
+  for (const fila of config.filas) {
+    aoa.push(fila);
+    rowKinds.push("normal");
+  }
+  if (config.filaTotales) {
+    aoa.push(config.filaTotales);
+    rowKinds.push("normal");
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!cols"] = config.anchoColumnas?.map((wch) => ({ wch })) ?? config.columnas.map(() => ({ wch: 18 }));
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
+  ];
+  rowKinds.forEach((kind, index) => {
+    const isTotales = config.filaTotales && index === aoa.length - 1;
+    const style = kind === "title" ? titleStyle : kind === "subtitle" ? { font: { bold: true, sz: 10 }, alignment: { horizontal: "center" } } : kind === "header" ? headerStyle : isTotales ? totalStyle : bodyStyle;
+    styleRow(sheet, index, lastCol, style);
+  });
+  for (const col of config.colsNumericas ?? []) {
+    for (let r = 4; r < aoa.length; r += 1) numberFormatCell(sheet, r, col);
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, config.nombreArchivo.slice(0, 31));
+  XLSX.writeFile(workbook, `${config.nombreArchivo}-${hoyLocal()}.xlsx`);
+}
+
+export function exportTablaReporteCajaChicaPdf(config: TablaReporteCajaChicaConfig) {
+  const orientation = config.columnas.length > 5 ? "landscape" : "portrait";
+  const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const centerX = pageWidth / 2;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("EMPRESA MINERA MARTE S.R.L.", centerX, 34, { align: "center" });
+  doc.setFontSize(10);
+  doc.text(config.subtitulo, centerX, 50, { align: "center" });
+
+  const rows: RowInput[] = config.filas.map((fila) => fila as RowInput);
+  if (config.filaTotales) rows.push(config.filaTotales as RowInput);
+
+  const columnStyles: Record<number, { halign: "right" }> = {};
+  for (const col of config.colsNumericas ?? []) columnStyles[col] = { halign: "right" };
+
+  autoTable(doc, {
+    theme: "plain",
+    startY: 64,
+    head: [config.columnas],
+    body: rows,
+    styles: pdfTableStyles,
+    headStyles: pdfHeadStyles,
+    columnStyles,
+    margin: { left: 30, right: 30 },
+    didParseCell: (hook) => {
+      if (config.filaTotales && hook.section === "body" && hook.row.index === rows.length - 1) {
+        hook.cell.styles.fontStyle = "bold";
+      }
+    }
+  });
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(0, 0, 0);
+
+  openBrowserPrintDialog(doc, `${config.nombreArchivo}-${hoyLocal()}.pdf`);
+}

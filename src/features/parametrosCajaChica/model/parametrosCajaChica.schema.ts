@@ -114,6 +114,10 @@ export const cuentaBancariaCajaSchema = z.object({
   monedaBase: monedaCajaSchema,
   saldoInicial: z.union([z.string(), z.number()]),
   activo: z.boolean(),
+  // Cuenta contable propia de este banco (ej. "11.002.000"): la que se
+  // acredita en el Comprobante de Egresos de cada gasto pagado desde acá.
+  cuentaContableCajaId: z.number().int().positive().nullable().optional(),
+  cuentaContableCaja: cuentaContableCajaSchema.nullable().optional(),
   totalIngresos: z.number().optional(),
   totalSalidas: z.number().optional(),
   saldoActual: z.number().optional()
@@ -123,7 +127,8 @@ export const createCuentaBancariaCajaPayloadSchema = z.object({
   numeroCuenta: z.string().trim().optional(),
   nombreCuenta: z.string().trim().min(1, "El nombre de la cuenta es obligatorio."),
   monedaBase: monedaCajaSchema.optional(),
-  saldoInicial: z.number().min(0).optional()
+  saldoInicial: z.number().min(0).optional(),
+  cuentaContableCajaId: z.number().int().positive().nullable().optional()
 });
 export const updateCuentaBancariaCajaPayloadSchema = createCuentaBancariaCajaPayloadSchema.partial();
 

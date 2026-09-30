@@ -22,6 +22,7 @@ import {
   useUpdateCajaChicaMutation,
   useUpdateCentroCostoCajaMutation,
   useUpdateConceptoRetencionCajaMutation,
+  useUpdateCuentaBancariaCajaMutation,
   useUpdateCuentaContableCajaMutation,
   useUpdateFuncionGastoCajaMutation
 } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
@@ -103,6 +104,7 @@ export function ParametrosCajaChicaPage() {
   const updateRetencionMutation = useUpdateConceptoRetencionCajaMutation();
 
   const createCuentaBancariaMutation = useCreateCuentaBancariaCajaMutation();
+  const updateCuentaBancariaMutation = useUpdateCuentaBancariaCajaMutation();
   const deleteCuentaBancariaMutation = useDeleteCuentaBancariaCajaMutation();
   const resetTransaccionalMutation = useResetTransaccionalCajaChicaMutation();
 
@@ -151,6 +153,7 @@ export function ParametrosCajaChicaPage() {
   const [bancoNombreCuenta, setBancoNombreCuenta] = useState("");
   const [bancoMonedaBase, setBancoMonedaBase] = useState<MonedaCaja>("BOB");
   const [bancoSaldoInicial, setBancoSaldoInicial] = useState("0");
+  const [bancoCuentaContableId, setBancoCuentaContableId] = useState("");
 
   const centrosRaiz = useMemo(() => centros.filter((c) => c.parentId === null), [centros]);
   const funcionesRaiz = useMemo(() => funciones.filter((f) => f.parentId === null), [funciones]);
@@ -327,7 +330,8 @@ export function ParametrosCajaChicaPage() {
         numeroCuenta: bancoNumeroCuenta.trim() || undefined,
         nombreCuenta: bancoNombreCuenta,
         monedaBase: bancoMonedaBase,
-        saldoInicial: Number(bancoSaldoInicial) || 0
+        saldoInicial: Number(bancoSaldoInicial) || 0,
+        cuentaContableCajaId: bancoCuentaContableId ? Number(bancoCuentaContableId) : undefined
       },
       {
         onSuccess: () => {
@@ -336,6 +340,7 @@ export function ParametrosCajaChicaPage() {
           setBancoNumeroCuenta("");
           setBancoNombreCuenta("");
           setBancoSaldoInicial("0");
+          setBancoCuentaContableId("");
         },
         onError: (error) => showError(normalizeError(error, "No se pudo crear la cuenta bancaria."))
       }
@@ -347,6 +352,19 @@ export function ParametrosCajaChicaPage() {
       onSuccess: () => showSuccess("Cuenta bancaria eliminada."),
       onError: (error) => showError(normalizeError(error, "No se pudo eliminar: puede tener movimientos registrados."))
     });
+  }
+
+  // Cuenta contable del banco (la que se acredita en el Comprobante de
+  // Egresos): se guarda sola al cambiar el select, sin un botón aparte de
+  // "guardar" — mismo patrón que otros ajustes rápidos de esta pantalla.
+  function handleCambiarCuentaContableBanco(id: number, cuentaContableCajaId: string) {
+    updateCuentaBancariaMutation.mutate(
+      { id, payload: { cuentaContableCajaId: cuentaContableCajaId ? Number(cuentaContableCajaId) : null } },
+      {
+        onSuccess: () => showSuccess("Cuenta contable actualizada."),
+        onError: (error) => showError(normalizeError(error, "No se pudo actualizar la cuenta contable."))
+      }
+    );
   }
 
   function handleResetTransaccional() {
@@ -664,22 +682,48 @@ export function ParametrosCajaChicaPage() {
               </label>
               <input type="number" min="0" step="0.01" value={bancoSaldoInicial} onChange={(e) => setBancoSaldoInicial(e.target.value)} className={inputClassName} placeholder="0.00" />
             </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                Cuenta contable (opcional — la que se acredita en el Comprobante de Egresos)
+              </label>
+              <select value={bancoCuentaContableId} onChange={(e) => setBancoCuentaContableId(e.target.value)} className={inputClassName}>
+                <option value="">Sin cuenta contable</option>
+                {cuentas.map((c: CuentaContableCaja) => (
+                  <option key={c.id} value={c.id}>{c.codigo} · {c.nombre}</option>
+                ))}
+              </select>
+            </div>
             <button type="submit" disabled={createCuentaBancariaMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
               {createCuentaBancariaMutation.isPending ? "Guardando..." : "Guardar cuenta bancaria"}
             </button>
           </form>
           <div className="space-y-2 text-sm">
             {cuentasBancarias.map((item: CuentaBancariaCaja) => (
-              <div key={item.id} className="group flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
-                <div>
-                  <p className="font-semibold">{item.banco} · {item.nombreCuenta}</p>
-                  <p className="text-[10px] text-[var(--color-on-surface-variant)]">
-                    {item.numeroCuenta ? `N° ${item.numeroCuenta} · ` : ""}{item.monedaBase} · Saldo inicial: {Number(item.saldoInicial).toFixed(2)}
-                  </p>
+              <div key={item.id} className="group rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold">{item.banco} · {item.nombreCuenta}</p>
+                    <p className="text-[10px] text-[var(--color-on-surface-variant)]">
+                      {item.numeroCuenta ? `N° ${item.numeroCuenta} · ` : ""}{item.monedaBase} · Saldo inicial: {Number(item.saldoInicial).toFixed(2)}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => handleDeleteCuentaBancaria(item.id)} className="rounded p-1 text-[var(--color-error)] opacity-0 transition hover:bg-[var(--color-error)]/10 group-hover:opacity-100">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <button type="button" onClick={() => handleDeleteCuentaBancaria(item.id)} className="rounded p-1 text-[var(--color-error)] opacity-0 transition hover:bg-[var(--color-error)]/10 group-hover:opacity-100">
-                  <Trash2 size={14} />
-                </button>
+                <div className="mt-2 flex items-center gap-2">
+                  <label className="text-[10px] text-[var(--color-on-surface-variant)]">Cuenta contable:</label>
+                  <select
+                    value={item.cuentaContableCajaId ? String(item.cuentaContableCajaId) : ""}
+                    onChange={(e) => handleCambiarCuentaContableBanco(item.id, e.target.value)}
+                    className={`${inputClassName} w-auto flex-1 py-1.5 text-xs`}
+                  >
+                    <option value="">Sin cuenta contable</option>
+                    {cuentas.map((c: CuentaContableCaja) => (
+                      <option key={c.id} value={c.id}>{c.codigo} · {c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             ))}
             {cuentasBancarias.length === 0 ? <p className="text-xs text-[var(--color-on-surface-variant)]">Aún no hay cuentas bancarias.</p> : null}

@@ -20,6 +20,8 @@ export interface GastosCajaQueryParams {
   cuentaBancariaCajaId?: number;
   origen?: string;
   estado?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
   page?: number;
   limit?: number;
 }

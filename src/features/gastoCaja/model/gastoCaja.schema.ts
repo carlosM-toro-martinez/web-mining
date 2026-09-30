@@ -116,6 +116,10 @@ export const createGastoCajaPayloadSchema = z
   .refine((data) => data.origen !== "BANCO" || Boolean(data.cuentaBancariaCajaId), {
     message: "Debes elegir la cuenta bancaria.",
     path: ["cuentaBancariaCajaId"]
+  })
+  .refine((data) => !["FACTURA", "RECIBO"].includes(data.tipoDocumento) || Boolean(data.numeroRespaldo?.trim()), {
+    message: "El número de factura/recibo es obligatorio para este tipo de documento.",
+    path: ["numeroRespaldo"]
   });
 
 export const updateGastoCajaPayloadSchema = z.object({

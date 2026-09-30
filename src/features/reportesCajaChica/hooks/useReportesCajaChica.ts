@@ -3,6 +3,7 @@ import {
   getEstadoCuentaBancaria,
   getEstadoCuentaCaja,
   getReporteDesglose,
+  getReporteImpuestos,
   getReporteNoDeducibles,
   getReporteRetenciones,
   type ReporteCajaChicaParams
@@ -13,6 +14,13 @@ export function useReporteRetencionesQuery(params: ReporteCajaChicaParams) {
   return useQuery({
     queryKey: queryKeys.reportesCajaChica.retenciones(params),
     queryFn: () => getReporteRetenciones(params)
+  });
+}
+
+export function useReporteImpuestosQuery(params: ReporteCajaChicaParams) {
+  return useQuery({
+    queryKey: queryKeys.reportesCajaChica.impuestos(params),
+    queryFn: () => getReporteImpuestos(params)
   });
 }
 

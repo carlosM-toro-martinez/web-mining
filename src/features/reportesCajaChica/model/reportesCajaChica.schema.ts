@@ -8,9 +8,11 @@ const cuentaRef = z.object({ id: z.number().int().positive(), codigo: z.string()
 const gastoReporteSchema = z.object({
   id: z.string().min(1),
   fecha: z.string(),
+  tipoDocumento: z.enum(["FACTURA", "CONTRATO_RETENCION", "RECIBO", "RECIBO_DIRECTO"]).optional(),
   proveedorNombre: z.string().min(1),
   glosa: z.string().min(1),
   montoTotal: z.union([z.string(), z.number()]),
+  montoCreditoFiscalIva: z.union([z.string(), z.number()]).optional(),
   montoRetencionRcIva: z.union([z.string(), z.number()]),
   montoRetencionIueCompras: z.union([z.string(), z.number()]),
   montoRetencionIt: z.union([z.string(), z.number()]),
@@ -20,6 +22,28 @@ const gastoReporteSchema = z.object({
 export const reporteRetencionesSchema = z.object({
   gastos: z.array(gastoReporteSchema),
   totales: z.object({ rcIva: z.number(), iueCompras: z.number(), it: z.number() })
+});
+
+export const reporteImpuestosSchema = z.object({
+  gastos: z.array(gastoReporteSchema),
+  porTipoDocumento: z.array(
+    z.object({
+      tipoDocumento: z.string(),
+      cantidad: z.number(),
+      montoTotal: z.number(),
+      creditoFiscalIva: z.number(),
+      rcIva: z.number(),
+      iueCompras: z.number(),
+      it: z.number()
+    })
+  ),
+  totales: z.object({
+    creditoFiscalIva: z.number(),
+    rcIva: z.number(),
+    iueCompras: z.number(),
+    it: z.number(),
+    totalRetenciones: z.number()
+  })
 });
 
 export const reporteNoDeduciblesSchema = z.object({
@@ -90,6 +114,7 @@ export const reporteEstadoCuentaBancariaSchema = z.object({
 });
 
 export const reporteRetencionesResponseSchema = z.object({ success: z.boolean(), data: reporteRetencionesSchema });
+export const reporteImpuestosResponseSchema = z.object({ success: z.boolean(), data: reporteImpuestosSchema });
 export const reporteNoDeduciblesResponseSchema = z.object({ success: z.boolean(), data: reporteNoDeduciblesSchema });
 export const reporteDesgloseResponseSchema = z.object({ success: z.boolean(), data: reporteDesgloseSchema });
 export const reporteEstadoCuentaResponseSchema = z.object({ success: z.boolean(), data: reporteEstadoCuentaSchema });
@@ -167,6 +192,27 @@ export const reporteComprobanteDiarioResponseSchema = z.object({
   data: reporteComprobanteDiarioSchema
 });
 
+// Comprobante de Egresos de UN gasto (a diferencia del Comprobante Diario,
+// que agrega todos los gastos de una rendición) — el documento físico real
+// "Bancos - Moneda Nacional", solo para gastos pagados desde banco.
+export const comprobanteEgresoGastoSchema = z.object({
+  numero: z.number().int().positive(),
+  fecha: z.string(),
+  proveedorNombre: z.string().min(1),
+  glosa: z.string().min(1),
+  numeroRespaldo: z.string().nullable().optional(),
+  montoTotal: z.number(),
+  moneda: z.enum(["BOB", "USD"]),
+  cuentaBancaria: z.object({ banco: z.string().min(1), nombreCuenta: z.string().min(1) }),
+  tipoCambio: z.number(),
+  lineas: z.array(lineaComprobanteSchema),
+  totales: z.object({ debeBs: z.number(), haberBs: z.number(), debeUsd: z.number(), haberUsd: z.number() })
+});
+export const comprobanteEgresoGastoResponseSchema = z.object({
+  success: z.boolean(),
+  data: comprobanteEgresoGastoSchema
+});
+
 export type ReporteRetenciones = z.infer<typeof reporteRetencionesSchema>;
 export type ReporteNoDeducibles = z.infer<typeof reporteNoDeduciblesSchema>;
 export type ReporteDesglose = z.infer<typeof reporteDesgloseSchema>;
@@ -174,3 +220,4 @@ export type ReporteEstadoCuenta = z.infer<typeof reporteEstadoCuentaSchema>;
 export type ReporteEstadoCuentaBancaria = z.infer<typeof reporteEstadoCuentaBancariaSchema>;
 export type ReporteRendicion = z.infer<typeof reporteRendicionSchema>;
 export type ReporteComprobanteDiario = z.infer<typeof reporteComprobanteDiarioSchema>;
+export type ComprobanteEgresoGasto = z.infer<typeof comprobanteEgresoGastoSchema>;

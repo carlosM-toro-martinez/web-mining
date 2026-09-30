@@ -136,7 +136,11 @@ export function AppRouter() {
             <Route path="/caja-chica/saldos" element={<SaldosCajaPage />} />
             <Route path="/caja-chica/presupuesto" element={<PresupuestoCajaPage />} />
             <Route path="/caja-chica/rendiciones" element={<RendicionesCajaPage />} />
-            <Route path="/caja-chica/reportes" element={<ReportesCajaChicaPage />} />
+            <Route
+              path="/caja-chica/reportes"
+              element={<Navigate to="/caja-chica/reportes/resumen-caja-banco" replace />}
+            />
+            <Route path="/caja-chica/reportes/:tipo" element={<ReportesCajaChicaPage />} />
           </Route>
 
           <Route path="/entregas" element={<Navigate to="/inventario/entregas" replace />} />

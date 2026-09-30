@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import {
   Ban,
   CheckCircle2,
@@ -10,7 +10,8 @@ import {
   ReceiptText,
   Search,
   Trash2,
-  Truck
+  Truck,
+  X
 } from "lucide-react";
 import {
   useAgregarItemConceptoMutation,
@@ -23,8 +24,10 @@ import {
   useLiquidacionesQuery,
   useQuitarItemConceptoMutation
 } from "@/features/liquidacion/hooks/useLiquidacion";
+import { getComprobanteEgresoLiquidacion } from "@/features/liquidacion/api/liquidacionApi";
 import type {
   EstadoLiquidacion,
+  Liquidacion,
   PreviewLoteLiquidacion,
   TipoPeriodoLiquidacion
 } from "@/features/liquidacion/model/liquidacion.schema";
@@ -38,6 +41,7 @@ import {
 import { useConceptosLiquidacionQuery } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
 import { ApiError } from "@/shared/api/core/apiError";
+import { exportComprobanteEgresoExcel, exportComprobanteEgresoPdf } from "@/shared/lib/comprobanteEgresoExport";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -75,6 +79,121 @@ function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
+function ModalShell({ children, onClose, maxWidthClassName = "max-w-lg" }: { children: ReactNode; onClose: () => void; maxWidthClassName?: string }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className={`relative my-8 w-full ${maxWidthClassName} rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl sm:p-6`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--color-on-surface-variant)] transition hover:bg-[var(--color-surface-container-highest)] hover:text-[var(--color-on-surface)]"
+        >
+          <X size={20} />
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Logística no tiene catálogo de cuentas contables (a diferencia de Caja
+// Chica) — las dos cuentas del asiento se piden a mano cada vez que se
+// genera el comprobante. "85.001.000" viene precargado porque el usuario
+// confirmó que es la cuenta que suele usarse para liquidaciones de
+// transporte, pero queda editable por si cambia.
+function ComprobanteEgresoLiquidacionModal({ liquidacion, onClose }: { liquidacion: Liquidacion; onClose: () => void }) {
+  const { showError } = useToast();
+  const [cuentaDebeCodigo, setCuentaDebeCodigo] = useState("85.001.000");
+  const [cuentaDebeNombre, setCuentaDebeNombre] = useState("Liquidaciones de Transporte");
+  const [cuentaHaberCodigo, setCuentaHaberCodigo] = useState("");
+  const [cuentaHaberNombre, setCuentaHaberNombre] = useState("");
+  const [generando, setGenerando] = useState<"excel" | "pdf" | null>(null);
+
+  async function handleGenerar(formato: "excel" | "pdf") {
+    if (!cuentaDebeCodigo.trim() || !cuentaDebeNombre.trim() || !cuentaHaberCodigo.trim() || !cuentaHaberNombre.trim()) {
+      showError("Completa las dos cuentas (código y nombre) antes de generar el comprobante.");
+      return;
+    }
+    setGenerando(formato);
+    try {
+      const response = await getComprobanteEgresoLiquidacion(liquidacion.id, {
+        cuentaDebeCodigo: cuentaDebeCodigo.trim(),
+        cuentaDebeNombre: cuentaDebeNombre.trim(),
+        cuentaHaberCodigo: cuentaHaberCodigo.trim(),
+        cuentaHaberNombre: cuentaHaberNombre.trim()
+      });
+      const c = response.data;
+      const config = {
+        numero: c.numero,
+        fecha: c.fechaFin,
+        subtitulo: "BANCOS - MONEDA NACIONAL",
+        monedaLabel: "Bolivianos" as const,
+        montoTotal: c.montoTotal,
+        glosaPrincipal:
+          `PAGO LIQUIDACIÓN DE TRANSPORTE Nº ${c.liquidacionNumero ?? "S/N"} — ${c.transportista.nombreORazonSocial} (${formatFecha(c.fechaInicio)} al ${formatFecha(c.fechaFin)})`.toUpperCase(),
+        lineas: c.lineas.map((l) => ({ cuentaCodigo: l.codigo, cuentaNombre: l.cuentaNombre, debeBs: l.debeBs, haberBs: l.haberBs })),
+        nombreArchivo: `comprobante-egreso-liquidacion-${String(c.numero).padStart(6, "0")}`
+      };
+      if (formato === "excel") exportComprobanteEgresoExcel(config);
+      else exportComprobanteEgresoPdf(config);
+      onClose();
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo generar el comprobante de egresos."));
+    } finally {
+      setGenerando(null);
+    }
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <FileText size={16} className="text-[var(--color-primary)]" />
+        Comprobante de Egresos
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        Pago a <span className="font-semibold">{liquidacion.transportista?.nombreORazonSocial}</span> — Bs{" "}
+        {formatMoneda(liquidacion.totalNeto)}. Logística no tiene un catálogo de cuentas contables, así que las
+        dos cuentas del asiento se completan acá antes de generar el documento.
+      </p>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <input value={cuentaDebeCodigo} onChange={(e) => setCuentaDebeCodigo(e.target.value)} className={inputClassName} placeholder="Código cuenta DEBE" />
+          <input value={cuentaDebeNombre} onChange={(e) => setCuentaDebeNombre(e.target.value)} className={inputClassName} placeholder="Nombre cuenta DEBE" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input value={cuentaHaberCodigo} onChange={(e) => setCuentaHaberCodigo(e.target.value)} className={inputClassName} placeholder="Código cuenta HABER (banco/caja)" />
+          <input value={cuentaHaberNombre} onChange={(e) => setCuentaHaberNombre(e.target.value)} className={inputClassName} placeholder="Nombre cuenta HABER" />
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => handleGenerar("excel")}
+            disabled={generando !== null}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+          >
+            <FileSpreadsheet size={14} /> {generando === "excel" ? "Generando..." : "Excel"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGenerar("pdf")}
+            disabled={generando !== null}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+          >
+            <FileText size={14} /> {generando === "pdf" ? "Generando..." : "PDF"}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 export function LiquidacionesPage() {
   const { showError, showSuccess } = useToast();
 
@@ -83,6 +202,7 @@ export function LiquidacionesPage() {
   const liquidacionesQuery = useLiquidacionesQuery({ estado: filtroEstado || undefined });
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const detalleQuery = useLiquidacionDetailQuery(selectedId);
+  const [comprobanteModalLiquidacion, setComprobanteModalLiquidacion] = useState<Liquidacion | null>(null);
 
   const transportistasQuery = useTransportistasQuery();
   const conceptosQuery = useConceptosLiquidacionQuery();
@@ -794,14 +914,23 @@ export function LiquidacionesPage() {
                   </>
                 ) : null}
                 {liquidacion.estado === "CERRADO" ? (
-                  <button
-                    type="button"
-                    onClick={() => handleAnular(liquidacion.id)}
-                    disabled={anularMutation.isPending}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/45 px-4 py-2 text-sm font-semibold text-[var(--color-error)] disabled:opacity-50"
-                  >
-                    <Ban size={14} /> Anular liquidación
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setComprobanteModalLiquidacion(liquidacion)}
+                      className={buttonSecondaryClassName}
+                    >
+                      <FileText size={14} /> Comprobante de Egresos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAnular(liquidacion.id)}
+                      disabled={anularMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/45 px-4 py-2 text-sm font-semibold text-[var(--color-error)] disabled:opacity-50"
+                    >
+                      <Ban size={14} /> Anular liquidación
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -809,6 +938,13 @@ export function LiquidacionesPage() {
             <p className="text-sm text-[var(--color-on-surface-variant)]">No se encontró la liquidación seleccionada.</p>
           )}
         </article>
+      ) : null}
+
+      {comprobanteModalLiquidacion ? (
+        <ComprobanteEgresoLiquidacionModal
+          liquidacion={comprobanteModalLiquidacion}
+          onClose={() => setComprobanteModalLiquidacion(null)}
+        />
       ) : null}
     </section>
   );

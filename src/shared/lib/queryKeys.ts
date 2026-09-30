@@ -249,6 +249,8 @@ export const queryKeys = {
     all: ["reportes-caja-chica"] as const,
     retenciones: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
       [...queryKeys.reportesCajaChica.all, "retenciones", params] as const,
+    impuestos: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
+      [...queryKeys.reportesCajaChica.all, "impuestos", params] as const,
     noDeducibles: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>
       [...queryKeys.reportesCajaChica.all, "no-deducibles", params] as const,
     desglose: (params: { cajaId?: number; fechaInicio?: string; fechaFin?: string }) =>

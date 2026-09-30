@@ -5,5 +5,6 @@ export const liquidacionesEndpoints = {
   itemsConcepto: (id: string) => `/api/liquidaciones/${id}/items-concepto`,
   itemConceptoById: (id: string, itemId: string) => `/api/liquidaciones/${id}/items-concepto/${itemId}`,
   cerrar: (id: string) => `/api/liquidaciones/${id}/cerrar`,
-  anular: (id: string) => `/api/liquidaciones/${id}/anular`
+  anular: (id: string) => `/api/liquidaciones/${id}/anular`,
+  comprobanteEgreso: (id: string) => `/api/liquidaciones/${id}/comprobante-egreso`
 } as const;
