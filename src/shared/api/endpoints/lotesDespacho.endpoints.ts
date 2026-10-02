@@ -3,6 +3,7 @@ export const lotesDespachoEndpoints = {
   byId: (id: string) => `/api/lotes-despacho/${id}`,
   estado: (id: string) => `/api/lotes-despacho/${id}/estado`,
   pesaje: (id: string) => `/api/lotes-despacho/${id}/pesaje`,
+  combustibleEntregado: (id: string) => `/api/lotes-despacho/${id}/combustible-entregado`,
   anular: (id: string) => `/api/lotes-despacho/${id}/anular`,
   transbordo: (id: string) => `/api/lotes-despacho/${id}/transbordo`
 } as const;

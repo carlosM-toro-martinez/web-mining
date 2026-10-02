@@ -41,6 +41,7 @@ import {
 } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import type {
   CatalogoSimple,
+  TipoCombustibleViaje,
   TipoEntidadTransportista
 } from "@/features/parametrosLogistica/model/parametrosLogistica.schema";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
@@ -56,6 +57,11 @@ const MAX_ROWS = 12;
 const TIPO_ENTIDAD_LABEL: Record<TipoEntidadTransportista, string> = {
   EMPRESA: "Empresa",
   TRABAJADOR_PARTICULAR: "Trabajador particular"
+};
+
+const TIPO_COMBUSTIBLE_LABEL: Record<TipoCombustibleViaje, string> = {
+  CON_COMBUSTIBLE: "Con combustible",
+  SIN_COMBUSTIBLE: "Sin combustible"
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
@@ -159,15 +165,39 @@ export function ParametrosLogisticaPage() {
   const [tarifaTipoEntidad, setTarifaTipoEntidad] = useState<TipoEntidadTransportista>("EMPRESA");
   const [tarifaTransportistaId, setTarifaTransportistaId] = useState("");
   const [tarifaTipoMineralId, setTarifaTipoMineralId] = useState("");
+  // "" = no distingue (aplica sin importar si el viaje llevó combustible de
+  // la empresa o no, el comportamiento de siempre); solo se elige un valor
+  // puntual cuando de verdad hay un precio distinto para ese caso.
+  const [tarifaIncluyeCombustible, setTarifaIncluyeCombustible] = useState<"" | TipoCombustibleViaje>("");
   const [tarifaPrecio, setTarifaPrecio] = useState("");
   const [tarifaVigenteDesde, setTarifaVigenteDesde] = useState("");
 
+  // En modo ESPECIAL, el tipo de entidad NO se elige: es un dato fijo del
+  // transportista que ya elegiste (igual que en logistica/flota, donde cada
+  // volqueta ya pertenece a un transportista con su tipo definido). Antes se
+  // podía elegir "Trabajador particular" en el selector y luego un
+  // transportista que en realidad es "Empresa" — la tarifa quedaba guardada
+  // con un tipoEntidad que nunca coincide con el real, así que el motor que
+  // busca la tarifa aplicable (liquidacion.service.ts) jamás la encontraba:
+  // el precio especial quedaba registrado pero nunca se aplicaba.
+  const transportistaSeleccionado = transportistas.find((t) => String(t.id) === tarifaTransportistaId);
+  const tipoEntidadEfectiva: TipoEntidadTransportista | null =
+    tarifaModo === "ESPECIAL" ? (transportistaSeleccionado?.tipoEntidad ?? null) : tarifaTipoEntidad;
+
   // Precio fijo vigente por tipo de entidad: el que aplica cuando el
-  // transportista NO tiene contrato especial (transportistaId y
-  // tipoMineralId ambos vacíos, sin fecha de fin todavía).
+  // transportista NO tiene contrato especial (transportistaId, tipoMineralId
+  // e incluyeCombustible los 3 vacíos, sin fecha de fin todavía) — la regla
+  // más genérica posible.
   const preciosFijosActuales = useMemo(() => {
     const encontrar = (tipoEntidad: TipoEntidadTransportista) =>
-      tarifas.find((t) => t.tipoEntidad === tipoEntidad && !t.transportistaId && !t.tipoMineralId && !t.vigenteHasta);
+      tarifas.find(
+        (t) =>
+          t.tipoEntidad === tipoEntidad &&
+          !t.transportistaId &&
+          !t.tipoMineralId &&
+          !t.incluyeCombustible &&
+          !t.vigenteHasta
+      );
     return { EMPRESA: encontrar("EMPRESA"), TRABAJADOR_PARTICULAR: encontrar("TRABAJADOR_PARTICULAR") };
   }, [tarifas]);
 
@@ -389,11 +419,16 @@ export function ParametrosLogisticaPage() {
       showError("Elige el transportista con contrato especial.");
       return;
     }
+    if (!tipoEntidadEfectiva) {
+      showError("No se pudo determinar el tipo de entidad del transportista elegido.");
+      return;
+    }
     createTarifaMutation.mutate(
       {
-        tipoEntidad: tarifaTipoEntidad,
+        tipoEntidad: tipoEntidadEfectiva,
         transportistaId: tarifaModo === "ESPECIAL" ? Number(tarifaTransportistaId) : null,
         tipoMineralId: tarifaTipoMineralId ? Number(tarifaTipoMineralId) : null,
+        incluyeCombustible: tarifaIncluyeCombustible || null,
         precioPorTonelada: Number(tarifaPrecio),
         vigenteDesde: tarifaVigenteDesde
       },
@@ -405,6 +440,7 @@ export function ParametrosLogisticaPage() {
               : "Precio especial registrado para este transportista. El anterior (si existía) quedó cerrado automáticamente."
           );
           setTarifaTransportistaId("");
+          setTarifaIncluyeCombustible("");
           setTarifaPrecio("");
           setTarifaVigenteDesde("");
         },
@@ -996,8 +1032,10 @@ export function ParametrosLogisticaPage() {
           <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
             El <strong>precio fijo</strong> es el que se cobra por defecto a cualquier transportista de ese
             tipo. Un transportista con contrato especial puede tener su propio <strong>precio especial</strong>,
-            que siempre gana sobre el fijo. Registrar una tarifa nueva reemplaza (cierra) la anterior de esa
-            misma combinación — así se "edita" el precio.
+            que siempre gana sobre el fijo. Si además cobra distinto según si la empresa puso el combustible
+            del viaje o no, puedes registrar una tarifa marcada "Con combustible" y otra "Sin combustible" —
+            eso se indica al crear cada lote de despacho. Registrar una tarifa nueva reemplaza (cierra) la
+            anterior de esa misma combinación — así se "edita" el precio.
           </p>
 
           <div className="mb-4 grid grid-cols-1 gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 sm:grid-cols-2">
@@ -1048,29 +1086,40 @@ export function ParametrosLogisticaPage() {
                 Precio especial (un transportista puntual)
               </button>
             </div>
-            <select
-              value={tarifaTipoEntidad}
-              onChange={(event) => setTarifaTipoEntidad(event.target.value as TipoEntidadTransportista)}
-              className={`${inputClassName} col-span-2`}
-            >
-              <option value="EMPRESA">Empresa</option>
-              <option value="TRABAJADOR_PARTICULAR">Trabajador particular</option>
-            </select>
-            {tarifaModo === "ESPECIAL" ? (
+            {/* En FIJO sí se elige a mano: es una regla genérica para toda la
+                categoría, no hay un transportista puntual del que derivarla. */}
+            {tarifaModo === "FIJO" ? (
               <select
-                required
-                value={tarifaTransportistaId}
-                onChange={(event) => setTarifaTransportistaId(event.target.value)}
+                value={tarifaTipoEntidad}
+                onChange={(event) => setTarifaTipoEntidad(event.target.value as TipoEntidadTransportista)}
                 className={`${inputClassName} col-span-2`}
               >
-                <option value="">Elige el transportista con contrato especial...</option>
-                {transportistas.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nombreORazonSocial}
-                  </option>
-                ))}
+                <option value="EMPRESA">Empresa</option>
+                <option value="TRABAJADOR_PARTICULAR">Trabajador particular</option>
               </select>
-            ) : null}
+            ) : (
+              <div className="col-span-2 space-y-1.5">
+                <select
+                  required
+                  value={tarifaTransportistaId}
+                  onChange={(event) => setTarifaTransportistaId(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Elige el transportista con contrato especial...</option>
+                  {transportistas.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombreORazonSocial} ({TIPO_ENTIDAD_LABEL[t.tipoEntidad]})
+                    </option>
+                  ))}
+                </select>
+                {transportistaSeleccionado ? (
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">
+                    Tipo de entidad: <span className="font-semibold">{TIPO_ENTIDAD_LABEL[transportistaSeleccionado.tipoEntidad]}</span>{" "}
+                    (se toma del transportista, no se elige aquí)
+                  </p>
+                ) : null}
+              </div>
+            )}
             <select
               value={tarifaTipoMineralId}
               onChange={(event) => setTarifaTipoMineralId(event.target.value)}
@@ -1082,6 +1131,16 @@ export function ParametrosLogisticaPage() {
                   {t.nombre}
                 </option>
               ))}
+            </select>
+            <select
+              value={tarifaIncluyeCombustible}
+              onChange={(event) => setTarifaIncluyeCombustible(event.target.value as "" | TipoCombustibleViaje)}
+              className={`${inputClassName} col-span-2`}
+              title="Deja 'Sin distinguir' si el precio es el mismo sin importar si la empresa puso el combustible del viaje o no"
+            >
+              <option value="">Sin distinguir combustible (precio único)</option>
+              <option value="CON_COMBUSTIBLE">Solo viajes con combustible de la empresa</option>
+              <option value="SIN_COMBUSTIBLE">Solo viajes sin combustible de la empresa</option>
             </select>
             <input
               required
@@ -1113,8 +1172,12 @@ export function ParametrosLogisticaPage() {
             {tarifas.slice(0, MAX_ROWS).map((item) => (
               <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
                 <p className="font-semibold">
-                  {item.transportista ? item.transportista.nombreORazonSocial : TIPO_ENTIDAD_LABEL[item.tipoEntidad]} ·{" "}
+                  {item.transportista
+                    ? `${item.transportista.nombreORazonSocial} (${TIPO_ENTIDAD_LABEL[item.tipoEntidad]})`
+                    : TIPO_ENTIDAD_LABEL[item.tipoEntidad]}{" "}
+                  ·{" "}
                   {item.tipoMineral?.nombre ?? "Todos los tipos"}
+                  {item.incluyeCombustible ? ` · ${TIPO_COMBUSTIBLE_LABEL[item.incluyeCombustible]}` : ""}
                 </p>
                 <p className="text-xs text-[var(--color-on-surface-variant)]">
                   Bs {item.precioPorTonelada} / ton · desde {formatFecha(item.vigenteDesde)}
@@ -1136,9 +1199,12 @@ export function ParametrosLogisticaPage() {
             Zona de peligro — reiniciar Logística
           </h3>
           <p className="mb-4 max-w-2xl text-xs text-[var(--color-on-surface-variant)]">
-            Elimina PERMANENTEMENTE todos los datos de este módulo (catálogos, transportistas, flota,
-            lotes de despacho, Formularios 101 y liquidaciones) para volver a probar todo desde cero.
-            No afecta Caja Chica, Inventario ni usuarios. Esta acción no se puede deshacer.
+            Elimina PERMANENTEMENTE todos los datos de prueba de este módulo (lotes de despacho,
+            Formularios 101 y liquidaciones, además de los transportistas/flota/municipios/tipos de
+            mineral/ingenios/tarifas que hayas creado a mano) para volver a probar todo desde cero. Los
+            datos reales ya sembrados (flota de la Nota de Remisión, municipio/mineral/ingenio base y
+            las tarifas fijas vigentes) quedan protegidos y no se borran. No afecta Caja Chica,
+            Inventario ni usuarios. Esta acción no se puede deshacer.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input

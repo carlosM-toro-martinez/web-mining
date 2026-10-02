@@ -19,6 +19,7 @@ export const updateCatalogoSimplePayloadSchema = createCatalogoSimplePayloadSche
 
 export const tipoConceptoLiquidacionSchema = z.enum(["ABONO", "DEDUCCION"]);
 export const tipoEntidadTransportistaSchema = z.enum(["EMPRESA", "TRABAJADOR_PARTICULAR"]);
+export const tipoCombustibleViajeSchema = z.enum(["CON_COMBUSTIBLE", "SIN_COMBUSTIBLE"]);
 
 export const conceptoLiquidacionSchema = z.object({
   id: z.number().int().positive(),
@@ -69,6 +70,7 @@ export const tarifaLiquidacionSchema = z.object({
   tipoEntidad: tipoEntidadTransportistaSchema,
   transportistaId: z.number().int().positive().nullable().optional(),
   tipoMineralId: z.number().int().positive().nullable(),
+  incluyeCombustible: tipoCombustibleViajeSchema.nullable().optional(),
   precioPorTonelada: z.union([z.string(), z.number()]),
   vigenteDesde: z.string(),
   vigenteHasta: z.string().nullable(),
@@ -80,6 +82,7 @@ export const createTarifaLiquidacionPayloadSchema = z.object({
   tipoEntidad: tipoEntidadTransportistaSchema,
   transportistaId: z.number().int().positive().nullable().optional(),
   tipoMineralId: z.number().int().positive().nullable().optional(),
+  incluyeCombustible: tipoCombustibleViajeSchema.nullable().optional(),
   precioPorTonelada: z.number().positive("El precio debe ser mayor a cero."),
   vigenteDesde: z.string().min(1, "La fecha de vigencia es obligatoria.")
 });
@@ -131,4 +134,5 @@ export type CreateAlicuotaRegaliaPayload = z.infer<typeof createAlicuotaRegaliaP
 export type TarifaLiquidacion = z.infer<typeof tarifaLiquidacionSchema>;
 export type CreateTarifaLiquidacionPayload = z.infer<typeof createTarifaLiquidacionPayloadSchema>;
 export type TipoEntidadTransportista = z.infer<typeof tipoEntidadTransportistaSchema>;
+export type TipoCombustibleViaje = z.infer<typeof tipoCombustibleViajeSchema>;
 export type TipoConceptoLiquidacion = z.infer<typeof tipoConceptoLiquidacionSchema>;

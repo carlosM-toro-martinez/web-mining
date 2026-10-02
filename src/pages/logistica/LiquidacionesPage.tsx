@@ -511,6 +511,7 @@ export function LiquidacionesPage() {
                       <th className="py-1 pr-3">Fecha</th>
                       <th className="py-1 pr-3">Placa</th>
                       <th className="py-1 pr-3">Mineral</th>
+                      <th className="py-1 pr-3">Combustible</th>
                       <th className="py-1 pr-3 text-right">Tonelaje neto</th>
                       <th className="py-1 pr-3 text-right">Precio/ton</th>
                       <th className="py-1 text-right">Subtotal</th>
@@ -523,6 +524,7 @@ export function LiquidacionesPage() {
                         <td className="py-1 pr-3">{formatFecha(l.fechaDespachoReal)}</td>
                         <td className="py-1 pr-3 font-mono">{l.vehiculoPlaca}</td>
                         <td className="py-1 pr-3">{l.tipoMineral}</td>
+                        <td className="py-1 pr-3">{l.incluyeCombustible === "CON_COMBUSTIBLE" ? "Con" : "Sin"}</td>
                         <td className="py-1 pr-3 text-right">{formatMoneda(l.tonelajeNeto)}</td>
                         <td className="py-1 pr-3 text-right">{formatMoneda(l.precioAplicado)}</td>
                         <td className="py-1 text-right font-semibold">Bs {formatMoneda(l.subtotal)}</td>
@@ -802,6 +804,7 @@ export function LiquidacionesPage() {
                         <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                           <th className="py-1 pr-3">N° Lote / Conocimiento</th>
                           <th className="py-1 pr-3">Placa</th>
+                          <th className="py-1 pr-3">Combustible</th>
                           <th className="py-1 pr-3 text-right">Tonelaje neto</th>
                           <th className="py-1 pr-3 text-right">Precio/ton</th>
                           <th className="py-1 text-right">Subtotal</th>
@@ -812,6 +815,9 @@ export function LiquidacionesPage() {
                           <tr key={d.id}>
                             <td className="py-1 pr-3 font-mono">{d.lote?.correlativo ?? d.loteId}</td>
                             <td className="py-1 pr-3 font-mono">{d.lote?.vehiculo?.placa ?? "-"}</td>
+                            <td className="py-1 pr-3">
+                              {d.lote?.incluyeCombustible ? (d.lote.incluyeCombustible === "CON_COMBUSTIBLE" ? "Con" : "Sin") : "-"}
+                            </td>
                             <td className="py-1 pr-3 text-right">{formatMoneda(d.tonelajeNeto)}</td>
                             <td className="py-1 pr-3 text-right">{formatMoneda(d.precioAplicado)}</td>
                             <td className="py-1 text-right font-semibold">Bs {formatMoneda(d.subtotal)}</td>

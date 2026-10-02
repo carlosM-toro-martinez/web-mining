@@ -48,10 +48,11 @@ import {
   useCreateLoteDespachoMutation,
   useLoteDespachoDetailQuery,
   useLotesDespachoQuery,
+  useRegistrarCombustibleEntregadoMutation,
   useRegistrarPesajeMutation,
   useTransbordarLoteMutation
 } from "@/features/loteDespacho/hooks/useLoteDespacho";
-import type { EstadoLoteDespacho } from "@/features/loteDespacho/model/loteDespacho.schema";
+import type { EstadoLoteDespacho, TipoCombustibleViaje } from "@/features/loteDespacho/model/loteDespacho.schema";
 import {
   useAnularFormulario101Mutation,
   useFormularios101Query,
@@ -102,6 +103,10 @@ function normalizeError(error: unknown, fallbackMessage: string) {
 // un <input type="date">, guardadas como medianoche UTC), no un instante —
 // sin esto, un navegador en Bolivia (UTC-4) las corre un día para atrás al
 // mostrarlas (medianoche UTC del 29 se ve como las 20:00 del 28 en local).
+function formatLitros(value: string | number | null | undefined) {
+  return Number(value ?? 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
@@ -407,6 +412,8 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
   const [tipoMineralId, setTipoMineralId] = useState("");
   const [destinoIngenioId, setDestinoIngenioId] = useState("");
   const [nivel, setNivel] = useState("");
+  const [incluyeCombustible, setIncluyeCombustible] = useState<TipoCombustibleViaje>("SIN_COMBUSTIBLE");
+  const [combustibleAsignadoLitros, setCombustibleAsignadoLitros] = useState("");
   const [fechaDespachoReal, setFechaDespachoReal] = useState(() => fechaLocalISO(new Date()));
   const [detalleCarga, setDetalleCarga] = useState("Carga Chami");
   const [descripcion, setDescripcion] = useState("Carga para Ingenio del sector Lipeña");
@@ -429,6 +436,10 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
       showError("Completa municipio, transportista, chofer, tipo de mineral, ingenio y fecha de despacho.");
       return;
     }
+    if (incluyeCombustible === "CON_COMBUSTIBLE" && !combustibleAsignadoLitros) {
+      showError("Indica cuántos litros de combustible se le asignan a este viaje.");
+      return;
+    }
     createMutation.mutate(
       {
         municipioOrigenId: Number(municipioOrigenId),
@@ -438,6 +449,9 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
         tipoMineralId: Number(tipoMineralId),
         destinoIngenioId: Number(destinoIngenioId),
         nivel: nivel.trim() || undefined,
+        incluyeCombustible,
+        combustibleAsignadoLitros:
+          incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : undefined,
         fechaDespachoReal,
         detalleCarga: detalleCarga.trim() || undefined,
         descripcion: descripcion.trim() || undefined,
@@ -493,6 +507,27 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
         <AutocompleteSelect value={tipoMineralId} onChange={setTipoMineralId} options={tipoMineralOptions} placeholder="Tipo de mineral..." className={inputClassName} />
         <AutocompleteSelect value={destinoIngenioId} onChange={setDestinoIngenioId} options={ingenioOptions} placeholder="Ingenio destino..." className={inputClassName} />
         <input value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName} placeholder="Nivel (ej. 80, opcional)" />
+        <select
+          value={incluyeCombustible}
+          onChange={(e) => setIncluyeCombustible(e.target.value as TipoCombustibleViaje)}
+          className={inputClassName}
+          title="¿La empresa puso el combustible de este viaje?"
+        >
+          <option value="SIN_COMBUSTIBLE">Sin combustible de la empresa</option>
+          <option value="CON_COMBUSTIBLE">Con combustible de la empresa</option>
+        </select>
+        {incluyeCombustible === "CON_COMBUSTIBLE" ? (
+          <input
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            value={combustibleAsignadoLitros}
+            onChange={(e) => setCombustibleAsignadoLitros(e.target.value)}
+            className={inputClassName}
+            placeholder="Combustible asignado (litros)"
+          />
+        ) : null}
         <div>
           <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Fecha de despacho real</label>
           <input required type="date" value={fechaDespachoReal} onChange={(e) => setFechaDespachoReal(e.target.value)} className={inputClassName} />
@@ -898,12 +933,32 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
 
   const avanzarEstadoMutation = useAvanzarEstadoLoteMutation();
   const registrarPesajeMutation = useRegistrarPesajeMutation();
+  const registrarCombustibleEntregadoMutation = useRegistrarCombustibleEntregadoMutation();
   const anularMutation = useAnularLoteMutation();
   const transbordarMutation = useTransbordarLoteMutation();
   const vincularF101Mutation = useVincularFormulario101Mutation();
   const reutilizarF101Mutation = useReutilizarFormulario101Mutation();
   const anularF101Mutation = useAnularFormulario101Mutation();
   const peticionEnviadaMutation = useMarcarPeticionEnviadaMutation();
+  const [combustibleEntregadoLitros, setCombustibleEntregadoLitros] = useState("");
+
+  function handleRegistrarCombustibleEntregado(id: string) {
+    const litros = Number(combustibleEntregadoLitros);
+    if (!combustibleEntregadoLitros || litros < 0) {
+      showError("Indica cuántos litros se le entregaron realmente.");
+      return;
+    }
+    registrarCombustibleEntregadoMutation.mutate(
+      { id, payload: { combustibleEntregadoLitros: litros } },
+      {
+        onSuccess: () => {
+          showSuccess("Combustible entregado registrado.");
+          setCombustibleEntregadoLitros("");
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo registrar el combustible entregado."))
+      }
+    );
+  }
 
   const f101Disponibles = f101DisponiblesQuery.data?.data ?? [];
   const vehiculosDisponibles = useMemo(
@@ -1116,12 +1171,63 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
             <div className="grid grid-cols-1 gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4 text-sm sm:grid-cols-2">
               <p><span className="text-[var(--color-on-surface-variant)]">Fecha del Conocimiento:</span> {formatFecha(lote.conocimientoCarga.fecha)}</p>
               <p><span className="text-[var(--color-on-surface-variant)]">Con:</span> {lote.conocimientoCarga.detalleCarga}</p>
+              <p>
+                <span className="text-[var(--color-on-surface-variant)]">Combustible:</span>{" "}
+                {lote.incluyeCombustible === "CON_COMBUSTIBLE" ? "Con combustible de la empresa" : "Sin combustible de la empresa"}
+              </p>
               {lote.conocimientoCarga.descripcion ? (
                 <p className="sm:col-span-2"><span className="text-[var(--color-on-surface-variant)]">Descripción:</span> {lote.conocimientoCarga.descripcion}</p>
               ) : null}
               {lote.nivel ? <p><span className="text-[var(--color-on-surface-variant)]">Nivel:</span> {lote.nivel}</p> : null}
               {lote.conocimientoCarga.observaciones ? (
                 <p className="sm:col-span-2"><span className="text-[var(--color-on-surface-variant)]">Observaciones:</span> {lote.conocimientoCarga.observaciones}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {lote.incluyeCombustible === "CON_COMBUSTIBLE" ? (
+            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4 text-sm">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+                Combustible de la empresa
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <p><span className="text-[var(--color-on-surface-variant)]">Asignado:</span> {formatLitros(lote.combustibleAsignadoLitros)} L</p>
+                {lote.combustibleEntregadoLitros != null ? (
+                  <>
+                    <p><span className="text-[var(--color-on-surface-variant)]">Entregado:</span> {formatLitros(lote.combustibleEntregadoLitros)} L</p>
+                    <p>
+                      <span className="text-[var(--color-on-surface-variant)]">Sobrante:</span>{" "}
+                      <span className="font-semibold">
+                        {formatLitros(Number(lote.combustibleAsignadoLitros ?? 0) - Number(lote.combustibleEntregadoLitros))} L
+                      </span>
+                    </p>
+                  </>
+                ) : null}
+              </div>
+              {lote.combustibleEntregadoLitros == null && lote.estadoLote !== "ANULADO" ? (
+                <div className="mt-3 flex flex-wrap items-end gap-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                      Combustible entregado realmente (litros)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={combustibleEntregadoLitros}
+                      onChange={(e) => setCombustibleEntregadoLitros(e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRegistrarCombustibleEntregado(lote.id)}
+                    disabled={registrarCombustibleEntregadoMutation.isPending}
+                    className={buttonSecondaryClassName}
+                  >
+                    Registrar entregado
+                  </button>
+                </div>
               ) : null}
             </div>
           ) : null}

@@ -11,6 +11,7 @@ export const estadoLoteDespachoSchema = z.enum([
 ]);
 
 export const estadoFormulario101Schema = z.enum(["DISPONIBLE", "VINCULADO", "ANULADO"]);
+export const tipoCombustibleViajeSchema = z.enum(["CON_COMBUSTIBLE", "SIN_COMBUSTIBLE"]);
 
 const refConNombre = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
 const transportistaRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
@@ -74,6 +75,9 @@ export const loteDespachoSchema = z.object({
   tipoMineralId: z.number().int().positive(),
   destinoIngenioId: z.number().int().positive(),
   nivel: z.string().nullable().optional(),
+  incluyeCombustible: tipoCombustibleViajeSchema,
+  combustibleAsignadoLitros: z.union([z.string(), z.number()]).nullable().optional(),
+  combustibleEntregadoLitros: z.union([z.string(), z.number()]).nullable().optional(),
   fechaDespachoReal: z.string(),
   fechaDocumentalFiscal: z.string(),
   estadoLote: estadoLoteDespachoSchema,
@@ -99,6 +103,8 @@ export const createLoteDespachoPayloadSchema = z.object({
   tipoMineralId: z.number().int().positive("Debes elegir un tipo de mineral."),
   destinoIngenioId: z.number().int().positive("Debes elegir un ingenio destino."),
   nivel: z.string().trim().optional(),
+  incluyeCombustible: tipoCombustibleViajeSchema.optional(),
+  combustibleAsignadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.").optional(),
   fechaDespachoReal: z.string().min(1, "La fecha de despacho real es obligatoria."),
   fechaDocumentalFiscal: z.string().trim().optional(),
   conocimientoFecha: z.string().trim().optional(),
@@ -115,6 +121,10 @@ export const registrarPesajePayloadSchema = z.object({
   tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero."),
   tonelajeTara: z.number().nonnegative("El tara no puede ser negativo."),
   observaciones: z.string().trim().optional()
+});
+
+export const registrarCombustibleEntregadoPayloadSchema = z.object({
+  combustibleEntregadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.")
 });
 
 export const anularLotePayloadSchema = z.object({
@@ -138,9 +148,11 @@ export const loteDespachoResponseSchema = z.object({ success: z.boolean(), data:
 
 export type EstadoLoteDespacho = z.infer<typeof estadoLoteDespachoSchema>;
 export type EstadoFormulario101 = z.infer<typeof estadoFormulario101Schema>;
+export type TipoCombustibleViaje = z.infer<typeof tipoCombustibleViajeSchema>;
 export type LoteDespacho = z.infer<typeof loteDespachoSchema>;
 export type CreateLoteDespachoPayload = z.infer<typeof createLoteDespachoPayloadSchema>;
 export type AvanzarEstadoLotePayload = z.infer<typeof avanzarEstadoLotePayloadSchema>;
 export type RegistrarPesajePayload = z.infer<typeof registrarPesajePayloadSchema>;
+export type RegistrarCombustibleEntregadoPayload = z.infer<typeof registrarCombustibleEntregadoPayloadSchema>;
 export type AnularLotePayload = z.infer<typeof anularLotePayloadSchema>;
 export type TransbordarLotePayload = z.infer<typeof transbordarLotePayloadSchema>;

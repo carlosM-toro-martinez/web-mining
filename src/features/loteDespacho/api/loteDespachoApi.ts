@@ -6,11 +6,13 @@ import {
   createLoteDespachoPayloadSchema,
   loteDespachoListResponseSchema,
   loteDespachoResponseSchema,
+  registrarCombustibleEntregadoPayloadSchema,
   registrarPesajePayloadSchema,
   transbordarLotePayloadSchema,
   type AnularLotePayload,
   type AvanzarEstadoLotePayload,
   type CreateLoteDespachoPayload,
+  type RegistrarCombustibleEntregadoPayload,
   type RegistrarPesajePayload,
   type TransbordarLotePayload
 } from "@/features/loteDespacho/model/loteDespacho.schema";
@@ -51,6 +53,11 @@ export async function avanzarEstadoLote(id: string, payload: AvanzarEstadoLotePa
 export async function registrarPesajeLote(id: string, payload: RegistrarPesajePayload) {
   const body = registrarPesajePayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.lotesDespacho.pesaje(id), body, schema: loteDespachoResponseSchema });
+}
+
+export async function registrarCombustibleEntregadoLote(id: string, payload: RegistrarCombustibleEntregadoPayload) {
+  const body = registrarCombustibleEntregadoPayloadSchema.parse(payload);
+  return postRequest({ url: apiEndpoints.lotesDespacho.combustibleEntregado(id), body, schema: loteDespachoResponseSchema });
 }
 
 export async function anularLote(id: string, payload: AnularLotePayload) {

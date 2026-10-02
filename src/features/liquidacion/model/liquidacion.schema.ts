@@ -5,6 +5,7 @@ export const estadoLiquidacionSchema = z.enum(["BORRADOR", "CERRADO", "ANULADO"]
 export const tipoConceptoLiquidacionSchema = z.enum(["ABONO", "DEDUCCION"]);
 
 export const tipoEntidadTransportistaSchema = z.enum(["EMPRESA", "TRABAJADOR_PARTICULAR"]);
+export const tipoCombustibleViajeSchema = z.enum(["CON_COMBUSTIBLE", "SIN_COMBUSTIBLE"]);
 const transportistaRef = z.object({
   id: z.number().int().positive(),
   nombreORazonSocial: z.string().min(1),
@@ -17,6 +18,7 @@ const loteRef = z.object({
   id: z.string().min(1),
   correlativo: z.string().min(1),
   fechaDespachoReal: z.string().optional(),
+  incluyeCombustible: tipoCombustibleViajeSchema.optional(),
   vehiculo: z.object({ id: z.number().int().positive(), placa: z.string().min(1) }).optional(),
   tipoMineral: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
   municipioOrigen: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
@@ -97,6 +99,7 @@ export const previewLoteLiquidacionSchema = z.object({
   fechaDespachoReal: z.string(),
   vehiculoPlaca: z.string().min(1),
   tipoMineral: z.string().min(1),
+  incluyeCombustible: tipoCombustibleViajeSchema,
   tonelajeNeto: z.number(),
   precioAplicado: z.number(),
   subtotal: z.number()
@@ -156,6 +159,7 @@ export const comprobanteEgresoLiquidacionResponseSchema = z.object({
 });
 
 export type TipoPeriodoLiquidacion = z.infer<typeof tipoPeriodoLiquidacionSchema>;
+export type TipoCombustibleViaje = z.infer<typeof tipoCombustibleViajeSchema>;
 export type EstadoLiquidacion = z.infer<typeof estadoLiquidacionSchema>;
 export type Liquidacion = z.infer<typeof liquidacionSchema>;
 export type CreateLiquidacionPayload = z.infer<typeof createLiquidacionPayloadSchema>;

@@ -5,6 +5,7 @@ import {
   createLoteDespacho,
   getLoteDespachoById,
   getLotesDespacho,
+  registrarCombustibleEntregadoLote,
   registrarPesajeLote,
   transbordarLote,
   type LotesDespachoQueryParams
@@ -13,6 +14,7 @@ import type {
   AnularLotePayload,
   AvanzarEstadoLotePayload,
   CreateLoteDespachoPayload,
+  RegistrarCombustibleEntregadoPayload,
   RegistrarPesajePayload,
   TransbordarLotePayload
 } from "@/features/loteDespacho/model/loteDespacho.schema";
@@ -64,6 +66,15 @@ export function useRegistrarPesajeMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: RegistrarPesajePayload }) =>
       registrarPesajeLote(id, payload),
+    onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useRegistrarCombustibleEntregadoMutation() {
+  const invalidate = useInvalidateLotes();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: RegistrarCombustibleEntregadoPayload }) =>
+      registrarCombustibleEntregadoLote(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
   });
 }
