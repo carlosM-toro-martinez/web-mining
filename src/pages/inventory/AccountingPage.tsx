@@ -38,6 +38,7 @@ import {
   useUpdateSectorMutation
 } from "@/features/contabilidad/hooks/useContabilidad";
 import { useProductosQuery } from "@/features/productos/hooks/useProductos";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { ApiError } from "@/shared/api/core/apiError";
 import {
   downloadContabilidadCsvTemplate,
@@ -68,6 +69,8 @@ function includesText(value: string | undefined, search: string) {
 
 export function AccountingPage() {
   const { showError, showSuccess } = useToast();
+  const { user } = useAuth();
+  const isContador = user?.role === "CONTADOR";
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const importFuncionesInputRef = useRef<HTMLInputElement | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -805,6 +808,7 @@ export function AccountingPage() {
             </div>
           </div>
 
+          {!isContador && (
           <div className="page-toolbar flex items-center gap-3">
             <button
               type="button"
@@ -832,6 +836,7 @@ export function AccountingPage() {
               Plantilla Excel
             </button>
           </div>
+          )}
         </div>
 
         <input
@@ -855,6 +860,7 @@ export function AccountingPage() {
             <Plus size={16} className="text-[var(--color-primary)]" />
             Centro de costo
           </h3>
+          {!isContador && (
           <form className="space-y-3" onSubmit={handleCreateCentro}>
             <input
               required
@@ -878,6 +884,7 @@ export function AccountingPage() {
               {createCentroMutation.isPending ? "Guardando..." : "Guardar centro"}
             </button>
           </form>
+          )}
           <div className="relative mt-4">
             <Search
               size={14}
@@ -926,6 +933,7 @@ export function AccountingPage() {
                     <p className="font-mono text-xs uppercase">{item.codigo}</p>
                     <p>{item.nombre}</p>
                   </div>
+                  {!isContador && (
                   <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                     <button type="button" onClick={() => startEditCentro(item)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
                       <Pencil size={14} />
@@ -934,6 +942,7 @@ export function AccountingPage() {
                       <Trash2 size={14} />
                     </button>
                   </div>
+                  )}
                 </div>
               )
             )}
@@ -945,6 +954,7 @@ export function AccountingPage() {
             <Plus size={16} className="text-[var(--color-primary)]" />
             Funcion de gasto
           </h3>
+          {!isContador && (
           <form className="space-y-3" onSubmit={handleCreateFuncion}>
             <input
               required
@@ -968,6 +978,8 @@ export function AccountingPage() {
               {createFuncionMutation.isPending ? "Guardando..." : "Guardar funcion"}
             </button>
           </form>
+          )}
+          {!isContador && (
           <button
             type="button"
             onClick={openImportFuncionesDialog}
@@ -978,6 +990,7 @@ export function AccountingPage() {
               ? "Importando función de gasto..."
               : "Importar función de gasto CSV/Excel"}
           </button>
+          )}
           <div className="relative mt-4">
             <Search
               size={14}
@@ -1026,6 +1039,7 @@ export function AccountingPage() {
                     <p className="font-mono text-xs uppercase">{item.codigo}</p>
                     <p>{item.nombre}</p>
                   </div>
+                  {!isContador && (
                   <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                     <button type="button" onClick={() => startEditFuncion(item)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
                       <Pencil size={14} />
@@ -1034,6 +1048,7 @@ export function AccountingPage() {
                       <Trash2 size={14} />
                     </button>
                   </div>
+                  )}
                 </div>
               )
             )}
@@ -1045,6 +1060,7 @@ export function AccountingPage() {
             <MapPinned size={16} className="text-[var(--color-primary)]" />
             Sector
           </h3>
+          {!isContador && (
           <form className="space-y-3" onSubmit={handleCreateSector}>
             <input
               required
@@ -1068,6 +1084,7 @@ export function AccountingPage() {
               {createSectorMutation.isPending ? "Guardando..." : "Guardar sector"}
             </button>
           </form>
+          )}
           <div className="relative mt-4">
             <Search
               size={14}
@@ -1116,6 +1133,7 @@ export function AccountingPage() {
                     <p className="font-mono text-xs uppercase">{item.codigo}</p>
                     <p>{item.nombre}</p>
                   </div>
+                  {!isContador && (
                   <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                     <button type="button" onClick={() => startEditSector(item)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
                       <Pencil size={14} />
@@ -1124,6 +1142,7 @@ export function AccountingPage() {
                       <Trash2 size={14} />
                     </button>
                   </div>
+                  )}
                 </div>
               )
             )}
@@ -1139,6 +1158,7 @@ export function AccountingPage() {
         onChange={handleImportFuncionesGasto}
       />
 
+      {!isContador && (
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
           <Calculator size={16} className="text-[var(--color-primary)]" />
@@ -1224,6 +1244,7 @@ export function AccountingPage() {
           </div>
         </form>
       </article>
+      )}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -1347,6 +1368,7 @@ export function AccountingPage() {
                         )}
                       </td>
                       <td className="px-3 py-2">
+                        {!isContador && (
                         <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
                           <button type="button" onClick={() => startEditCuenta(cuenta)} className="rounded p-1 hover:bg-[var(--color-primary)]/10 text-[var(--color-primary)]" title="Editar">
                             <Pencil size={14} />
@@ -1355,6 +1377,7 @@ export function AccountingPage() {
                             <Trash2 size={14} />
                           </button>
                         </div>
+                        )}
                       </td>
                     </tr>
                     {expandedCuentaId === cuenta.id && (

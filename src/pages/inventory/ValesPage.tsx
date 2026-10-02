@@ -601,7 +601,9 @@ export function ValesPage() {
                     (historialSolicitanteQuery.data?.data ?? []).map((vale) => (
                       <tr key={vale.id}>
                         <td className="px-3 py-2 text-xs">
-                          {vale.createdAt ? new Date(vale.createdAt).toLocaleDateString() : "-"}
+                          {vale.fechaOperacion
+                            ? new Date(vale.fechaOperacion).toLocaleDateString()
+                            : vale.createdAt ? new Date(vale.createdAt).toLocaleDateString() : "-"}
                         </td>
                         <td className="px-3 py-2 text-xs">
                           <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${estadoValeClassName(vale.estado)}`}>
@@ -970,7 +972,9 @@ export function ValesPage() {
                         {vale.solicitante?.nombre ?? vale.solicitanteId ?? "-"}
                       </td>
                       <td className="px-3 py-2 text-xs">
-                        {vale.createdAt ? new Date(vale.createdAt).toLocaleDateString() : "-"}
+                        {vale.fechaOperacion
+                          ? new Date(vale.fechaOperacion).toLocaleDateString()
+                          : vale.createdAt ? new Date(vale.createdAt).toLocaleDateString() : "-"}
                       </td>
                       <td className="px-3 py-2 text-xs">
                         <div className="flex flex-col gap-0.5">

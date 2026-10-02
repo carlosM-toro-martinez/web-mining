@@ -51,6 +51,7 @@ import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
 import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
+import { InventarioReportesRoute } from "@/app/router/guards/InventarioReportesRoute";
 import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
 import { LogisticaRoute } from "@/app/router/guards/LogisticaRoute";
 import { CajaChicaRoute } from "@/app/router/guards/CajaChicaRoute";
@@ -96,11 +97,6 @@ export function AppRouter() {
             <Route path="/inventario/categorias" element={<CategoriesPage />} />
             <Route path="/inventario/productos" element={<ProductsPage />} />
             <Route path="/inventario/stock" element={<StockActualPage />} />
-            <Route
-              path="/inventario/reportes"
-              element={<Navigate to="/inventario/reportes/bin-card" replace />}
-            />
-            <Route path="/inventario/reportes/:tipo" element={<ReportesPage />} />
             <Route path="/inventario/proveedores" element={<ProveedoresPage />} />
             <Route path="/inventario/ajustes" element={<AjustesPage />} />
             <Route element={<WarehouseOpsRoute />}>
@@ -110,10 +106,18 @@ export function AppRouter() {
                 element={<Navigate to="/inventario/entregas" replace />}
               />
             </Route>
-            <Route path="/inventario/contabilidad" element={<AccountingPage />} />
             <Route element={<AdminRoute />}>
               <Route path="/inventario/offline-monitor" element={<InventoryOfflineMonitorPage />} />
             </Route>
+          </Route>
+
+          <Route element={<InventarioReportesRoute />}>
+            <Route
+              path="/inventario/reportes"
+              element={<Navigate to="/inventario/reportes/bin-card" replace />}
+            />
+            <Route path="/inventario/reportes/:tipo" element={<ReportesPage />} />
+            <Route path="/inventario/contabilidad" element={<AccountingPage />} />
           </Route>
 
           <Route element={<LogisticaRoute />}>

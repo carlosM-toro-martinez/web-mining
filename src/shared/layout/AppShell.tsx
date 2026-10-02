@@ -65,6 +65,7 @@ export function AppShell() {
   const isAsistenteAdministrativo = user?.role === "ASISTENTE_ADMINISTRATIVO";
   const isContador = user?.role === "CONTADOR";
   const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
+  const canSeeInventorySection = canSeeInventoryRoute || isContador;
   const canSeeLogisticaRoute = isAdmin || isSuperintendente || isAsistenteAdministrativo;
   const canSeeCajaChicaRoute = isAdmin || isAdministrador || isContador || isSuperintendente;
   // EPP y Ambiental restringidos solo a ADMIN por ahora, a pedido explícito,
@@ -88,7 +89,13 @@ export function AppShell() {
   }, [canManageUsers, canSeeEppRoute, canSeeAmbientalRoute]);
 
   const inventoryNavItems = useMemo(() => {
-    if (!canSeeInventoryRoute) return [];
+    if (!canSeeInventorySection) return [];
+    if (isContador) {
+      return [
+        { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },
+        { label: "Contabilidad", icon: Landmark, to: "/inventario/contabilidad" },
+      ] as NavItem[];
+    }
     const items: NavItem[] = [
       // { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
       { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
@@ -105,7 +112,7 @@ export function AppShell() {
       items.push({ label: "Monitoreo offline", icon: Truck, to: "/inventario/offline-monitor" });
     }
     return items;
-  }, [canSeeInventoryRoute, isAdmin]);
+  }, [canSeeInventorySection, canSeeInventoryRoute, isAdmin, isContador]);
 
   const personalNavItems = useMemo(() => {
     if (!(isAdmin || isAdministrador || isSuperintendente)) return [];
@@ -308,7 +315,7 @@ export function AppShell() {
                 }`}
               >
                 <NavLink
-                  to="/inventario"
+                  to={isContador ? "/inventario/reportes" : "/inventario"}
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center py-3 text-sm font-semibold transition-all ${
                     isSidebarCollapsed ? "w-full justify-center px-2" : "flex-1 gap-3 px-4"
