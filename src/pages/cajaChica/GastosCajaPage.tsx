@@ -220,7 +220,7 @@ function ImportarGastosModal({ onClose }: { onClose: () => void }) {
               No se pudo detectar el mes/año del reporte — los gastos se cargaron con la fecha de hoy.
             </p>
           )}
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
             <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
               <p className="text-lg font-extrabold">{resultado.procesadas}</p>
               <p className="text-[11px] text-[var(--color-on-surface-variant)]">Filas leídas</p>
@@ -233,11 +233,24 @@ function ImportarGastosModal({ onClose }: { onClose: () => void }) {
               <p className="text-lg font-extrabold">{resultado.omitidas}</p>
               <p className="text-[11px] text-[var(--color-on-surface-variant)]">Ya existían</p>
             </div>
+            <div className="rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/8 p-2 text-center">
+              <p className="text-lg font-extrabold text-[var(--color-warning)]">{resultado.paraRevisar}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Para revisar</p>
+            </div>
             <div className="rounded-lg border border-[var(--color-error)]/35 bg-[var(--color-error)]/8 p-2 text-center">
               <p className="text-lg font-extrabold text-[var(--color-error)]">{resultado.errores}</p>
               <p className="text-[11px] text-[var(--color-on-surface-variant)]">Con error</p>
             </div>
           </div>
+          {resultado.paraRevisar > 0 ? (
+            <p className="rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/8 p-2 text-xs text-[var(--color-on-surface-variant)]">
+              {resultado.paraRevisar === 1
+                ? "Hay 1 fila que no se creó ni se descartó"
+                : `Hay ${resultado.paraRevisar} filas que no se crearon ni se descartaron`}{" "}
+              porque coinciden en monto con un gasto ya registrado pero no en texto ni n° de respaldo — revísalas
+              abajo y agrégalas a mano desde "Nuevo gasto" si de verdad son gastos distintos.
+            </p>
+          ) : null}
           <div className="max-h-96 overflow-y-auto rounded-lg border border-[var(--color-outline-variant)]">
             <table className="w-full border-collapse text-left text-xs">
               <thead className="sticky top-0 bg-[var(--color-surface-container-high)]">
@@ -260,7 +273,9 @@ function ImportarGastosModal({ onClose }: { onClose: () => void }) {
                             ? "bg-[var(--color-success)]/18 text-[var(--color-success)]"
                             : r.accion === "omitido"
                               ? "bg-[var(--color-on-surface-variant)]/15 text-[var(--color-on-surface-variant)]"
-                              : "bg-[var(--color-error)]/18 text-[var(--color-error)]"
+                              : r.accion === "revisar"
+                                ? "bg-[var(--color-warning)]/18 text-[var(--color-warning)]"
+                                : "bg-[var(--color-error)]/18 text-[var(--color-error)]"
                         }`}
                       >
                         {r.accion}

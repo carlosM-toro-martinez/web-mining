@@ -183,7 +183,7 @@ export const movimientoFondoCajaResponseSchema = z.object({ success: z.boolean()
 export const filaImportGastoCajaResultadoSchema = z.object({
   fila: z.number(),
   tipo: z.enum(["fondo", "gasto"]),
-  accion: z.enum(["creado", "omitido", "error"]),
+  accion: z.enum(["creado", "omitido", "revisar", "error"]),
   mensaje: z.string()
 });
 
@@ -191,6 +191,7 @@ export const resultadoImportacionGastosCajaSchema = z.object({
   procesadas: z.number(),
   creadas: z.number(),
   omitidas: z.number(),
+  paraRevisar: z.number(),
   errores: z.number(),
   mes: z.number().nullable(),
   anio: z.number().nullable(),

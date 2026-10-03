@@ -234,13 +234,11 @@ export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
     [`MES DE: ${mesDelAnioLabel(reporte.periodoHasta)}`, "", "", "", ""],
     [reporte.caja.encargadoNombre?.toUpperCase() ?? "", "", "", "", ""],
     [],
-    ["FONDOS RECIBIDOS:", "", "", "Bs.", "Bs."],
-    ["", "", "", "DEBE", "HABER"],
-    [`Saldo deudor al ${fechaCorteAnterior(reporte.periodoDesde)}`, "", "", num(reporte.saldoAnterior), ""],
-    ["RECIBIDO EN EFECTIVO:", "", "", "", ""]
+    ["FONDOS RECIBIDOS", "Ref.", "Detalle", "Bs. DEBE", "Bs. HABER"],
+    [`Saldo deudor al ${fechaCorteAnterior(reporte.periodoDesde)}`, "", "", num(reporte.saldoAnterior), ""]
   ];
-  const rowKinds: Array<"title" | "subtitle" | "encargado" | "section" | "header" | "normal" | "subtotal" | "total"> =
-    ["title", "subtitle", "encargado", "normal", "section", "header", "normal", "section"];
+  const rowKinds: Array<"title" | "subtitle" | "encargado" | "section" | "header" | "normal" | "subtotal" | "total" | "plain">
+    = ["title", "subtitle", "encargado", "normal", "header", "normal"];
 
   for (const f of reporte.fondos) {
     aoa.push([formatFecha(f.fecha), f.referencia ?? "", TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo, num(Number(f.monto)), ""]);
@@ -250,9 +248,7 @@ export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
   rowKinds.push("subtotal");
   aoa.push([]);
   rowKinds.push("normal");
-  aoa.push(["DETALLE DE GASTOS", "", "", "", ""]);
-  rowKinds.push("section");
-  aoa.push(["DESCRIPCION", "", "", "FACTURA O RECIBO", "IMPORTE"]);
+  aoa.push(["DETALLE DE GASTOS", "", "", "FACTURA O RECIBO", "IMPORTE"]);
   rowKinds.push("header");
 
   for (const grupo of reporte.grupos) {
@@ -266,10 +262,10 @@ export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
     rowKinds.push("subtotal");
   }
 
-  aoa.push(["TOTAL GASTOS EN EL MES", "", "", "", num(reporte.totalGastos)]);
-  rowKinds.push("total");
-  aoa.push(["SALDO DEUDOR O ACREEDOR", "", "", "", num(reporte.saldoNuevo)]);
-  rowKinds.push("total");
+  aoa.push([`TOTAL GASTOS EN EL MES: ${formatBs(reporte.totalGastos)}`, "", "", "", ""]);
+  rowKinds.push("plain");
+  aoa.push([`SALDO DEUDOR O ACREEDOR: ${formatBs(reporte.saldoNuevo)}`, "", "", "", ""]);
+  rowKinds.push("plain");
   aoa.push([]);
   rowKinds.push("normal");
   aoa.push([`Mina ${reporte.caja.nombre}, ${diaMesLargo(new Date(), false)}`, "", "", "", ""]);
@@ -287,9 +283,7 @@ export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: lastCol } },
-    { s: { r: 4, c: 0 }, e: { r: 4, c: 2 } },
-    { s: { r: 6, c: 0 }, e: { r: 6, c: 2 } },
-    { s: { r: 7, c: 0 }, e: { r: 7, c: lastCol } }
+    { s: { r: 5, c: 0 }, e: { r: 5, c: 2 } }
   ];
 
   rowKinds.forEach((kind, index) => {
@@ -308,7 +302,9 @@ export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
                   ? subtotalStyle
                   : kind === "total"
                     ? totalStyle
-                    : bodyStyle;
+                    : kind === "plain"
+                      ? { font: { bold: true, sz: 10 } }
+                      : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
 
