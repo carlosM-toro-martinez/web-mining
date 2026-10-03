@@ -19,7 +19,9 @@ const loteRef = z.object({
   correlativo: z.string().min(1),
   fechaDespachoReal: z.string().optional(),
   incluyeCombustible: tipoCombustibleViajeSchema.optional(),
+  vehiculoId: z.number().int().positive().optional(),
   vehiculo: z.object({ id: z.number().int().positive(), placa: z.string().min(1) }).optional(),
+  chofer: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
   tipoMineral: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
   municipioOrigen: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional(),
   destinoIngenio: z.object({ id: z.number().int().positive(), nombre: z.string().min(1) }).optional()
@@ -97,7 +99,9 @@ export const previewLoteLiquidacionSchema = z.object({
   loteId: z.string().min(1),
   correlativo: z.string().min(1),
   fechaDespachoReal: z.string(),
+  vehiculoId: z.number().int().positive(),
   vehiculoPlaca: z.string().min(1),
+  choferNombre: z.string().min(1),
   tipoMineral: z.string().min(1),
   incluyeCombustible: tipoCombustibleViajeSchema,
   tonelajeNeto: z.number(),
@@ -105,9 +109,25 @@ export const previewLoteLiquidacionSchema = z.object({
   subtotal: z.number()
 });
 
+// Agrupado por (vehículo + precio): el total real de la liquidación se
+// calcula a partir de ESTOS grupos (sumar tonelaje crudo del grupo,
+// redondear una sola vez, multiplicar por precio), nunca sumando los
+// `subtotal` por-viaje de `lotes` ya redondeados — ver
+// agruparPorVehiculoYPrecio() en liquidacion.service.ts (backend).
+export const grupoLiquidacionSchema = z.object({
+  vehiculoId: z.number().int().positive(),
+  vehiculoPlaca: z.string().min(1),
+  precioAplicado: z.number(),
+  loteIds: z.array(z.string().min(1)),
+  tonelajeNetoSumado: z.number(),
+  tonelajeNetoRedondeado: z.number(),
+  subtotal: z.number()
+});
+
 export const previewLiquidacionSchema = z.object({
   transportista: transportistaRef,
   lotes: z.array(previewLoteLiquidacionSchema),
+  grupos: z.array(grupoLiquidacionSchema),
   totalLotes: z.number(),
   totalBruto: z.number()
 });
@@ -123,41 +143,6 @@ export const liquidacionResponseSchema = z.object({ success: z.boolean(), data: 
 export const liquidacionItemResponseSchema = z.object({ success: z.boolean(), data: liquidacionItemConceptoSchema });
 export const previewLiquidacionResponseSchema = z.object({ success: z.boolean(), data: previewLiquidacionSchema });
 
-// Comprobante de Egresos del pago al transportista: a diferencia de Caja
-// Chica, acá no hay catálogo de cuentas contables — las dos cuentas del
-// asiento se piden a mano cada vez (ver ComprobanteEgresoLiquidacionPayload),
-// nunca se guardan.
-const lineaComprobanteLiquidacionSchema = z.object({
-  codigo: z.string(),
-  cuentaNombre: z.string(),
-  detalle: z.string(),
-  debeBs: z.number(),
-  haberBs: z.number()
-});
-
-export const comprobanteEgresoLiquidacionSchema = z.object({
-  numero: z.number().int().positive(),
-  liquidacionNumero: z.number().int().positive().nullable().optional(),
-  transportista: transportistaRef,
-  fechaInicio: z.string(),
-  fechaFin: z.string(),
-  montoTotal: z.number(),
-  lineas: z.array(lineaComprobanteLiquidacionSchema),
-  totales: z.object({ debeBs: z.number(), haberBs: z.number() })
-});
-
-export const comprobanteEgresoLiquidacionPayloadSchema = z.object({
-  cuentaDebeCodigo: z.string().trim().min(1, "El código de la cuenta a debitar es obligatorio."),
-  cuentaDebeNombre: z.string().trim().min(1, "El nombre de la cuenta a debitar es obligatorio."),
-  cuentaHaberCodigo: z.string().trim().min(1, "El código de la cuenta a acreditar es obligatorio."),
-  cuentaHaberNombre: z.string().trim().min(1, "El nombre de la cuenta a acreditar es obligatorio.")
-});
-
-export const comprobanteEgresoLiquidacionResponseSchema = z.object({
-  success: z.boolean(),
-  data: comprobanteEgresoLiquidacionSchema
-});
-
 export type TipoPeriodoLiquidacion = z.infer<typeof tipoPeriodoLiquidacionSchema>;
 export type TipoCombustibleViaje = z.infer<typeof tipoCombustibleViajeSchema>;
 export type EstadoLiquidacion = z.infer<typeof estadoLiquidacionSchema>;
@@ -168,5 +153,4 @@ export type AnularLiquidacionPayload = z.infer<typeof anularLiquidacionPayloadSc
 export type PreviewLiquidacionQuery = z.infer<typeof previewLiquidacionQuerySchema>;
 export type PreviewLiquidacion = z.infer<typeof previewLiquidacionSchema>;
 export type PreviewLoteLiquidacion = z.infer<typeof previewLoteLiquidacionSchema>;
-export type ComprobanteEgresoLiquidacion = z.infer<typeof comprobanteEgresoLiquidacionSchema>;
-export type ComprobanteEgresoLiquidacionPayload = z.infer<typeof comprobanteEgresoLiquidacionPayloadSchema>;
+export type GrupoLiquidacion = z.infer<typeof grupoLiquidacionSchema>;

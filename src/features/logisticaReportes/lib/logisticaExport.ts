@@ -48,6 +48,12 @@ function num(value: number) {
   return Number(value.toFixed(2));
 }
 
+// Para el peso crudo por viaje (3 decimales, como el documento físico real
+// — ej. "19.709") a diferencia de `num()` que redondea a 2 para montos/TMB.
+function num3(value: number) {
+  return Number(value.toFixed(3));
+}
+
 // Para el nombre del archivo exportado (día de HOY, no un dato guardado):
 // año/mes/día LOCAL, nunca toISOString() sobre el instante actual — esa
 // conversión corre a UTC antes de recortar, así que entre las 20:00 y las
@@ -122,6 +128,10 @@ const subtitleStyle = { font: { bold: true, sz: 10 }, alignment: { horizontal: "
 const headerStyle = { font: { bold: true, sz: 9 }, alignment: { horizontal: "center", vertical: "center" }, border: thinBorder };
 const bodyStyle = { font: { sz: 9 }, border: thinBorder };
 const totalStyle = { font: { bold: true, sz: 10 }, border: thinBorder };
+// Texto suelto (fecha, firmas, "Son: ...", C.c.) fuera de la tabla: mismo
+// tamaño de letra que el cuerpo, pero SIN borde — a diferencia de `bodyStyle`,
+// que lo pinta porque está pensado para celdas dentro de la tabla.
+const plainStyle = { font: { sz: 9 } };
 
 function setStyle(sheet: XLSX.WorkSheet, address: string, style: Record<string, unknown>) {
   if (!sheet[address]) sheet[address] = { t: "s", v: "" };
@@ -134,10 +144,10 @@ function styleRow(sheet: XLSX.WorkSheet, row: number, lastCol: number, style: Re
   }
 }
 
-function numberFormatCell(sheet: XLSX.WorkSheet, row: number, col: number) {
+function numberFormatCell(sheet: XLSX.WorkSheet, row: number, col: number, formato = "#,##0.00") {
   const address = XLSX.utils.encode_cell({ r: row, c: col });
   if (sheet[address] && typeof sheet[address].v === "number") {
-    sheet[address].s = { ...(sheet[address].s ?? {}), numFmt: "#,##0.00", alignment: { horizontal: "right" } };
+    sheet[address].s = { ...(sheet[address].s ?? {}), numFmt: formato, alignment: { horizontal: "right" } };
   }
 }
 
@@ -215,30 +225,76 @@ export interface FilaPorPlaca {
   subtotal: number;
 }
 
-export function agruparPorPlaca(liquidacion: Liquidacion): FilaPorPlaca[] {
-  const mapa = new Map<string, FilaPorPlaca>();
+export interface ViajeDetalle {
+  correlativo: string;
+  numeroViaje: string;
+  fecha: string;
+  choferNombre: string;
+  tonelajeNeto: number;
+}
+
+export interface FilaPorPlacaDetallada extends FilaPorPlaca {
+  pesoTotalCrudo: number;
+  viajesDetalle: ViajeDetalle[];
+}
+
+// Agrupa por (vehículo + precio), igual que el backend (ver
+// agruparPorVehiculoYPrecio en liquidacion.service.ts): suma el tonelaje
+// CRUDO de todo el grupo, redondea esa suma UNA sola vez a 2 decimales y
+// recién ahí multiplica por el precio — nunca suma los `subtotal` por-viaje
+// ya redondeados, porque eso puede diferir del total real (verificado
+// contra los documentos físicos: redondear cada viaje y sumar no da lo
+// mismo que sumar crudo y redondear una vez). Conserva el detalle de cada
+// viaje (correlativo, chofer, fecha) para el reporte de respaldo por
+// volqueta (exportLiquidacionPorViaje*).
+function agruparPorPlacaConViajes(liquidacion: Liquidacion): FilaPorPlacaDetallada[] {
+  const mapa = new Map<string, FilaPorPlacaDetallada>();
   for (const d of liquidacion.detalleLotes ?? []) {
     const placa = d.lote?.vehiculo?.placa ?? "-";
+    const vehiculoClave = d.lote?.vehiculoId ?? placa;
+    const precioAplicado = Number(d.precioAplicado);
+    const clave = `${vehiculoClave}_${precioAplicado}`;
     const origen = d.lote?.municipioOrigen?.nombre?.toUpperCase();
     const destino = d.lote?.destinoIngenio?.nombre?.toUpperCase();
     const descripcionServicio =
       origen && destino ? `CARGA BRUTA DE MINERAL ${origen} - ${destino}` : "CARGA BRUTA DE MINERAL";
     const fila =
-      mapa.get(placa) ?? { placa, descripcionServicio, pesoTotal: 0, precioAplicado: Number(d.precioAplicado), viajes: 0, subtotal: 0 };
-    fila.pesoTotal += Number(d.tonelajeNeto);
+      mapa.get(clave) ??
+      { placa, descripcionServicio, pesoTotal: 0, pesoTotalCrudo: 0, precioAplicado, viajes: 0, subtotal: 0, viajesDetalle: [] };
+    const tonelajeNeto = Number(d.tonelajeNeto);
+    fila.pesoTotalCrudo += tonelajeNeto;
     fila.viajes += 1;
-    fila.subtotal += Number(d.subtotal);
-    mapa.set(placa, fila);
+    const correlativo = d.lote?.correlativo ?? "-";
+    fila.viajesDetalle.push({
+      correlativo,
+      numeroViaje: correlativo.split("/")[0] ?? correlativo,
+      fecha: d.lote?.fechaDespachoReal ?? "",
+      choferNombre: d.lote?.chofer?.nombre ?? "-",
+      tonelajeNeto
+    });
+    mapa.set(clave, fila);
+  }
+  for (const fila of mapa.values()) {
+    fila.viajesDetalle.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    fila.pesoTotalCrudo = Number(fila.pesoTotalCrudo.toFixed(3));
+    fila.pesoTotal = num(fila.pesoTotalCrudo);
+    fila.subtotal = num(fila.pesoTotal * fila.precioAplicado);
   }
   return Array.from(mapa.values());
+}
+
+export function agruparPorPlaca(liquidacion: Liquidacion): FilaPorPlaca[] {
+  return agruparPorPlacaConViajes(liquidacion).map(({ viajesDetalle, pesoTotalCrudo, ...resto }) => resto);
 }
 
 // Se calcula siempre en vivo a partir del detalle (nunca leyendo
 // liquidacion.totalBruto/totalNeto directo) porque esos campos solo quedan
 // guardados en la BD al CERRAR — así los reportes también sirven de vista
-// previa mientras la liquidación sigue en BORRADOR.
+// previa mientras la liquidación sigue en BORRADOR. El bruto sale de
+// agruparPorPlaca() (ya con el redondeo agrupado correcto), no de sumar
+// directo los `subtotal` por-viaje.
 export function calcularTotales(liquidacion: Liquidacion) {
-  const bruto = (liquidacion.detalleLotes ?? []).reduce((acc, d) => acc + Number(d.subtotal), 0);
+  const bruto = agruparPorPlaca(liquidacion).reduce((acc, f) => acc + f.subtotal, 0);
   const abonos = (liquidacion.itemsConcepto ?? [])
     .filter((i) => i.concepto?.tipo === "ABONO")
     .reduce((acc, i) => acc + Number(i.monto), 0);
@@ -285,11 +341,17 @@ function dibujarPiePagina(doc: jsPDF, firmas: Array<{ nombre: string; cargo: str
   }
 
   const n = firmas.length;
+  // El ancho de cada raya se adapta al espacio disponible por firma — en
+  // portrait (más angosto) 3 firmas lado a lado con un ancho fijo de 150pt
+  // se encimaban entre sí; acá nunca pasa de la mitad del espacio libre
+  // entre firmas.
+  const slotWidth = pageWidth / (n + 1);
+  const lineHalfWidth = Math.min(75, slotWidth / 2 - 10);
   firmas.forEach((firma, index) => {
     const x = (pageWidth / (n + 1)) * (index + 1);
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.6);
-    doc.line(x - 75, yFirmas - 14, x + 75, yFirmas - 14);
+    doc.line(x - lineHalfWidth, yFirmas - 14, x + lineHalfWidth, yFirmas - 14);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.text(firma.nombre, x, yFirmas, { align: "center" });
@@ -323,8 +385,8 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
     [],
     ["ITEM", "PLACA", "DESCRIPCION DEL SERVICIO", "PESO TMB", "BS/TMB", "VIAJES", "BS/DIA", "TOTAL", "OBSERVACIONES"]
   ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total"> = [
-    "subtitle", "subtitle", "normal", "title", "subtitle", "subtitle", "normal", "header"
+  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> = [
+    "subtitle", "subtitle", "blank", "title", "subtitle", "subtitle", "blank", "header"
   ];
 
   let item = 1;
@@ -342,8 +404,8 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   rowKinds.push("total");
 
   const totalLiquidacion = totales.bruto + totales.abonos;
-  aoa.push(["", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  aoa.push([]);
+  rowKinds.push("blank");
   aoa.push(["TOTAL LIQUIDACION", "", "", "", "", "", "", num(totalLiquidacion), ""]);
   rowKinds.push("total");
   for (const d of deducciones) {
@@ -353,39 +415,39 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   aoa.push(["LIQUIDO A PAGAR", "", "", "", "", "", "", num(totales.neto), ""]);
   rowKinds.push("total");
   aoa.push([`Fecha: ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push([`Son: ${montoEnLetras(totales.neto)}`, "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push([FIRMA_SUPERINTENDENTE, "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([FIRMA_SUPERINTENDENTE_CARGO, "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push([FIRMA_ASISTENTE, "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([FIRMA_ASISTENTE_CARGO, "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push([liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["Contratista", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push(["C.c. Presidente Ejecutivo", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["C.c. Contabilidad La Paz", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["C.c. Archivos Mina", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["C.c. Contratista", "", "", "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
   sheet["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 16 }];
@@ -396,7 +458,14 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
     { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } }
   ];
   rowKinds.forEach((kind, index) => {
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : kind === "total" ? totalStyle : bodyStyle;
+    if (kind === "blank") return;
+    const style =
+      kind === "title" ? titleStyle
+      : kind === "subtitle" ? subtitleStyle
+      : kind === "header" ? headerStyle
+      : kind === "total" ? totalStyle
+      : kind === "plain" ? plainStyle
+      : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
   for (const col of [3, 4, 7]) {
@@ -415,7 +484,7 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   const totales = calcularTotales(liquidacion);
   const pesoTotalTmb = filas.reduce((acc, f) => acc + f.pesoTotal, 0);
 
-  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const centerX = pageWidth / 2;
 
@@ -457,13 +526,27 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   }
   rows.push(["", "", "TOTAL TMB", formatBs(pesoTotalTmb), "", "", "", "", ""]);
 
+  // Anchos fijos (en vez de dejar que autoTable los reparta solo): en
+  // portrait hay mucho menos ancho que en landscape, así que sin esto la
+  // tabla se veía desbalanceada — estos anchos sí suman el ancho usable de
+  // la página (595pt - 2×30pt de margen = 535pt).
   drawPlainTable(doc, {
     startY: 74,
     head: [["ITEM", "PLACA", "DESCRIPCION DEL SERVICIO", "PESO TMB", "BS/TMB", "VIAJES", "BS/DIA", "TOTAL", "OBSERVACIONES"]],
     body: rows,
-    styles: pdfTableStyles,
-    headStyles: pdfHeadStyles,
-    columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
+    styles: { ...pdfTableStyles, fontSize: 7, cellPadding: 2.5 },
+    headStyles: { ...pdfHeadStyles, fontSize: 7 },
+    columnStyles: {
+      0: { cellWidth: 20, halign: "right" },
+      1: { cellWidth: 48 },
+      2: { cellWidth: 138 },
+      3: { cellWidth: 42, halign: "right" },
+      4: { cellWidth: 38, halign: "right" },
+      5: { cellWidth: 30, halign: "right" },
+      6: { cellWidth: 42, halign: "right" },
+      7: { cellWidth: 52, halign: "right" },
+      8: { cellWidth: 125 }
+    },
     margin: { left: 30, right: 30 }
   });
 
@@ -479,10 +562,10 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   drawPlainTable(doc, {
     startY: (doc as any).lastAutoTable.finalY + 16,
     body: totalesRows,
-    styles: { ...pdfTableStyles, fontStyle: "bold" },
-    columnStyles: { 0: { cellWidth: 180 }, 1: { cellWidth: 90, halign: "right" } },
-    margin: { left: pageWidth - 30 - 270 },
-    tableWidth: 270
+    styles: { ...pdfTableStyles, fontSize: 8, fontStyle: "bold" },
+    columnStyles: { 0: { cellWidth: 160 }, 1: { cellWidth: 90, halign: "right" } },
+    margin: { left: pageWidth - 30 - 250 },
+    tableWidth: 250
   });
 
   let y = (doc as any).lastAutoTable.finalY + 20;
@@ -491,7 +574,7 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   doc.text(`Fecha: ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, pageWidth - 30, y, { align: "right" });
 
   y += 24;
-  doc.text(`Son: ${montoEnLetras(totales.neto)}`, 30, y);
+  doc.text(`Son: ${montoEnLetras(totales.neto)}`, 30, y, { maxWidth: pageWidth - 60 });
 
   dibujarPiePagina(
     doc,
@@ -540,8 +623,8 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
     [],
     ["ITEM", "PLACA", "PESO", "PRECIO TMB", "TOTAL", "OBSERVACIONES"]
   ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total"> = [
-    "normal", "subtitle", "subtitle", "normal", "title", "title", "subtitle", "normal", "normal", "header"
+  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> = [
+    "plain", "subtitle", "subtitle", "blank", "title", "title", "subtitle", "plain", "blank", "header"
   ];
 
   let item = 1;
@@ -553,35 +636,35 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
   aoa.push(["", "TOTAL TMB", num(pesoTotalTmb), "", "", ""]);
   rowKinds.push("total");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push(["TOTAL LIQUIDACION", "", "", "", num(totalLiquidacion), ""]);
   rowKinds.push("total");
   aoa.push([`LIQUIDO A PAGAR.... ${montoEnLetras(totales.neto)}`, "", "", "", num(totales.neto), ""]);
   rowKinds.push("total");
   aoa.push([`Fecha, ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push([FIRMA_SUPERINTENDENTE, "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["Sup.te Mina Lipeña", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push([liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["Contratista", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push([]);
-  rowKinds.push("normal");
+  rowKinds.push("blank");
   aoa.push(["C.c. Presidente Ejecutivo", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["C.c. Jefe de Personal", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["C.c. Archivos Mina", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
   aoa.push(["C.c. Contratista", "", "", "", "", ""]);
-  rowKinds.push("normal");
+  rowKinds.push("plain");
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
   sheet["!cols"] = [{ wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
@@ -591,7 +674,14 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
     { s: { r: 6, c: 0 }, e: { r: 6, c: lastCol } }
   ];
   rowKinds.forEach((kind, index) => {
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : kind === "total" ? totalStyle : bodyStyle;
+    if (kind === "blank") return;
+    const style =
+      kind === "title" ? titleStyle
+      : kind === "subtitle" ? subtitleStyle
+      : kind === "header" ? headerStyle
+      : kind === "total" ? totalStyle
+      : kind === "plain" ? plainStyle
+      : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
   for (const col of [2, 3, 4]) {
@@ -684,6 +774,213 @@ export function exportLiquidacionParticularPdf(liquidacion: Liquidacion) {
   );
 
   openBrowserPrintDialog(doc, `liquidacion-particular-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.pdf`);
+}
+
+// ============================================================================
+// Liquidación — Respaldo por viaje (un bloque por volqueta): el documento
+// real que sustenta los totales de la planilla consolidada de arriba —
+// detalle de cada viaje (conocimiento, chofer, fecha, peso) y, en la fila
+// "Total", el peso crudo de 3 decimales sumado Y el redondeado a 2
+// decimales lado a lado, para auditar exactamente cómo se llegó al monto
+// que cobra cada vehículo (mismo método que agruparPorVehiculoYPrecio en
+// liquidacion.service.ts, verificado contra el documento físico real).
+// ============================================================================
+
+export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
+  const grupos = agruparPorPlacaConViajes(liquidacion);
+  const fin = parseFecha(liquidacion.fechaFin);
+  const banco = liquidacion.transportista?.banco;
+  const numeroCuenta = liquidacion.transportista?.numeroCuenta;
+  const lastCol = 7;
+
+  const aoa: Array<Array<string | number>> = [
+    ["Empresa Minera", "", "", "", "", "", "N°", liquidacion.numero ?? "BORRADOR"],
+    [`MARTE S.R.L. — NIT: ${MARTE_NIT}`, "", "", "", "", "", "", ""],
+    [],
+    ["RESPALDO POR VIAJE", "", "", "", "", "", "", ""],
+    ["TRANSPORTE DE CARGA CHAMI DE MINA LIPEÑA A CHILCOBIJA", "", "", "", "", "", "", ""],
+    [`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, "", "", "", "", "", "", ""],
+    [
+      `FECHA: ${fin.getUTCDate()}    MES: ${MESES_MAYUSCULA[fin.getUTCMonth()]}    AÑO: ${fin.getUTCFullYear()}`,
+      "", "", "", "", "", "", ""
+    ]
+  ];
+  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> = [
+    "subtitle", "subtitle", "blank", "title", "subtitle", "plain", "plain"
+  ];
+  const decimalCells: Array<{ row: number; col: number; formato: string }> = [];
+  const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } },
+    { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } },
+    { s: { r: 6, c: 0 }, e: { r: 6, c: lastCol } }
+  ];
+
+  for (const grupo of grupos) {
+    aoa.push([]);
+    rowKinds.push("blank");
+    merges.push({ s: { r: aoa.length, c: 0 }, e: { r: aoa.length, c: lastCol } });
+    aoa.push([`PLACA: ${grupo.placa}`, "", "", "", "", "", "", ""]);
+    rowKinds.push("subtitle");
+    aoa.push(["Pre.", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PLACA", "PESO", "PESO REDONDEADO"]);
+    rowKinds.push("header");
+
+    grupo.viajesDetalle.forEach((v, index) => {
+      decimalCells.push({ row: aoa.length, col: 6, formato: "#,##0.000" });
+      aoa.push([index + 1, v.numeroViaje, formatFecha(v.fecha), v.correlativo, v.choferNombre, grupo.placa, num3(v.tonelajeNeto), ""]);
+      rowKinds.push("normal");
+    });
+
+    decimalCells.push({ row: aoa.length, col: 6, formato: "#,##0.000" });
+    decimalCells.push({ row: aoa.length, col: 7, formato: "#,##0.00" });
+    aoa.push(["", "", "", "", "", "Total", num3(grupo.pesoTotalCrudo), num(grupo.pesoTotal)]);
+    rowKinds.push("total");
+
+    decimalCells.push({ row: aoa.length, col: 7, formato: "#,##0.00" });
+    // Merges para que CONTRATISTA/BANCO/NUMERO DE CUENTA no se corten en la
+    // celda angosta de "Pre." — cada dato ocupa 2 columnas.
+    const filaResumen = aoa.length;
+    merges.push({ s: { r: filaResumen, c: 0 }, e: { r: filaResumen, c: 1 } });
+    merges.push({ s: { r: filaResumen, c: 2 }, e: { r: filaResumen, c: 3 } });
+    merges.push({ s: { r: filaResumen, c: 4 }, e: { r: filaResumen, c: 5 } });
+    aoa.push([
+      `CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`,
+      "",
+      banco ? `BANCO: ${banco.toUpperCase()}` : "",
+      "",
+      numeroCuenta ? `NUMERO DE CUENTA: ${numeroCuenta}` : "",
+      "",
+      "TOTAL",
+      num(grupo.subtotal)
+    ]);
+    rowKinds.push("total");
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 26 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+  sheet["!merges"] = merges;
+  rowKinds.forEach((kind, index) => {
+    if (kind === "blank") return;
+    const style =
+      kind === "title" ? titleStyle
+      : kind === "subtitle" ? subtitleStyle
+      : kind === "header" ? headerStyle
+      : kind === "total" ? totalStyle
+      : kind === "plain" ? plainStyle
+      : bodyStyle;
+    styleRow(sheet, index, lastCol, style);
+  });
+  for (const { row, col, formato } of decimalCells) numberFormatCell(sheet, row, col, formato);
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Respaldo por viaje".slice(0, 31));
+  XLSX.writeFile(workbook, `liquidacion-por-viaje-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.xlsx`);
+}
+
+export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
+  const grupos = agruparPorPlacaConViajes(liquidacion);
+  const fin = parseFecha(liquidacion.fechaFin);
+  const banco = liquidacion.transportista?.banco;
+  const numeroCuenta = liquidacion.transportista?.numeroCuenta;
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const centerX = pageWidth / 2;
+
+  grupos.forEach((grupo, index) => {
+    if (index > 0) doc.addPage();
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Empresa Minera", 30, 26);
+    doc.text("MARTE S.R.L.", 30, 40);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`NIT: ${MARTE_NIT}`, 30, 50);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.rect(pageWidth - 90, 20, 60, 22);
+    doc.text(liquidacion.numero ? `N° ${liquidacion.numero}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
+
+    doc.setFontSize(13);
+    doc.setTextColor(...AZUL_CONOCIMIENTO);
+    doc.text("RESPALDO POR VIAJE", centerX, 30, { align: "center" });
+    const tituloWidth = doc.getTextWidth("RESPALDO POR VIAJE");
+    doc.setDrawColor(...AZUL_CONOCIMIENTO);
+    doc.setLineWidth(0.8);
+    doc.line(centerX - tituloWidth / 2, 33, centerX + tituloWidth / 2, 33);
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("Transporte de carga Chami de mina Lipeña a Chilcobija", centerX, 46, { align: "center" });
+    doc.text(`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, centerX, 60, { align: "center" });
+    doc.text(
+      `FECHA: ${fin.getUTCDate()}    MES: ${MESES_MAYUSCULA[fin.getUTCMonth()]}    AÑO: ${fin.getUTCFullYear()}`,
+      centerX,
+      73,
+      { align: "center" }
+    );
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(`PLACA: ${grupo.placa}`, 30, 92);
+
+    const rows: RowInput[] = grupo.viajesDetalle.map((v, i) => [
+      i + 1, v.numeroViaje, formatFecha(v.fecha), v.correlativo, v.choferNombre, grupo.placa, v.tonelajeNeto.toFixed(3), ""
+    ]);
+    rows.push(["", "", "", "", "", "Total", grupo.pesoTotalCrudo.toFixed(3), formatBs(grupo.pesoTotal)]);
+
+    drawPlainTable(doc, {
+      startY: 100,
+      head: [["Pre.", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PLACA", "PESO", "PESO REDONDEADO"]],
+      body: rows,
+      styles: pdfTableStyles,
+      headStyles: pdfHeadStyles,
+      columnStyles: {
+        0: { cellWidth: 35, halign: "right" },
+        1: { cellWidth: 55, halign: "right" },
+        2: { cellWidth: 60 },
+        3: { cellWidth: 75 },
+        5: { cellWidth: 60 },
+        6: { cellWidth: 80, halign: "right" },
+        7: { cellWidth: 90, halign: "right" }
+      },
+      margin: { left: 30, right: 30 }
+    });
+
+    // Caja de totales con bordes reales (igual que las otras planillas), en
+    // vez de texto suelto — contratista/banco/cuenta a la izquierda, total
+    // a pagar de este vehículo a la derecha.
+    const finalY = (doc as any).lastAutoTable.finalY + 14;
+    const datosContratista = [
+      `CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`,
+      banco ? `BANCO: ${banco.toUpperCase()}` : "",
+      numeroCuenta ? `NUMERO DE CUENTA: ${numeroCuenta}` : ""
+    ].filter(Boolean);
+
+    drawPlainTable(doc, {
+      startY: finalY,
+      body: datosContratista.map((linea) => [linea]),
+      styles: { ...pdfTableStyles, fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 320 } },
+      margin: { left: 30 },
+      tableWidth: 320
+    });
+
+    drawPlainTable(doc, {
+      startY: finalY,
+      body: [["TOTAL", formatBs(grupo.subtotal)]],
+      styles: { ...pdfTableStyles, fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 110, halign: "right" } },
+      margin: { left: pageWidth - 30 - 210 },
+      tableWidth: 210
+    });
+  });
+
+  openBrowserPrintDialog(doc, `liquidacion-por-viaje-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.pdf`);
 }
 
 // ============================================================================

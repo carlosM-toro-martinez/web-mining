@@ -4,8 +4,6 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   agregarItemConceptoPayloadSchema,
   anularLiquidacionPayloadSchema,
-  comprobanteEgresoLiquidacionPayloadSchema,
-  comprobanteEgresoLiquidacionResponseSchema,
   createLiquidacionPayloadSchema,
   liquidacionItemResponseSchema,
   liquidacionListResponseSchema,
@@ -13,7 +11,6 @@ import {
   previewLiquidacionResponseSchema,
   type AgregarItemConceptoPayload,
   type AnularLiquidacionPayload,
-  type ComprobanteEgresoLiquidacionPayload,
   type CreateLiquidacionPayload,
   type PreviewLiquidacionQuery
 } from "@/features/liquidacion/model/liquidacion.schema";
@@ -79,13 +76,4 @@ export async function anularLiquidacion(id: string, payload: AnularLiquidacionPa
 
 export async function eliminarBorradorLiquidacion(id: string) {
   return deleteRequest({ url: apiEndpoints.liquidaciones.byId(id), schema: z.object({ success: z.boolean() }) });
-}
-
-export async function getComprobanteEgresoLiquidacion(id: string, payload: ComprobanteEgresoLiquidacionPayload) {
-  const body = comprobanteEgresoLiquidacionPayloadSchema.parse(payload);
-  return postRequest({
-    url: apiEndpoints.liquidaciones.comprobanteEgreso(id),
-    body,
-    schema: comprobanteEgresoLiquidacionResponseSchema
-  });
 }
