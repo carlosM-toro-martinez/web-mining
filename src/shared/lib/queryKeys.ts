@@ -167,7 +167,8 @@ export const queryKeys = {
     ingenios: () => [...queryKeys.parametrosLogistica.all, "ingenios"] as const,
     conceptosLiquidacion: () => [...queryKeys.parametrosLogistica.all, "conceptos-liquidacion"] as const,
     alicuotasRegalia: () => [...queryKeys.parametrosLogistica.all, "alicuotas-regalia"] as const,
-    tarifasLiquidacion: () => [...queryKeys.parametrosLogistica.all, "tarifas-liquidacion"] as const
+    tarifasLiquidacion: () => [...queryKeys.parametrosLogistica.all, "tarifas-liquidacion"] as const,
+    preciosCombustible: () => [...queryKeys.parametrosLogistica.all, "precios-combustible"] as const
   },
   transportistas: {
     all: ["transportistas"] as const

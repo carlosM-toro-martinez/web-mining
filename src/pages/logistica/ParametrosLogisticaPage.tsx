@@ -4,6 +4,7 @@ import {
   Check,
   Coins,
   Factory,
+  Fuel,
   ListChecks,
   MapPin,
   Mountain,
@@ -30,8 +31,11 @@ import {
   useDeleteIngenioMutation,
   useDeleteMunicipioOrigenMutation,
   useDeleteTipoMineralMutation,
+  useCreatePrecioCombustibleMutation,
+  useDeleteTarifaLiquidacionMutation,
   useIngeniosQuery,
   useMunicipiosOrigenQuery,
+  usePreciosCombustibleQuery,
   useTarifasLiquidacionQuery,
   useTiposMineralQuery,
   useUpdateConceptoLiquidacionMutation,
@@ -95,6 +99,7 @@ export function ParametrosLogisticaPage() {
   const conceptosQuery = useConceptosLiquidacionQuery();
   const alicuotasQuery = useAlicuotasRegaliaQuery();
   const tarifasQuery = useTarifasLiquidacionQuery();
+  const preciosCombustibleQuery = usePreciosCombustibleQuery();
 
   const createMunicipioMutation = useCreateMunicipioOrigenMutation();
   const updateMunicipioMutation = useUpdateMunicipioOrigenMutation();
@@ -114,6 +119,8 @@ export function ParametrosLogisticaPage() {
 
   const createAlicuotaMutation = useCreateAlicuotaRegaliaMutation();
   const createTarifaMutation = useCreateTarifaLiquidacionMutation();
+  const deleteTarifaMutation = useDeleteTarifaLiquidacionMutation();
+  const createPrecioCombustibleMutation = useCreatePrecioCombustibleMutation();
   const transportistasQuery = useTransportistasQuery();
 
   const municipios = municipiosQuery.data?.data ?? [];
@@ -122,6 +129,7 @@ export function ParametrosLogisticaPage() {
   const conceptos = conceptosQuery.data?.data ?? [];
   const alicuotas = alicuotasQuery.data?.data ?? [];
   const tarifas = tarifasQuery.data?.data ?? [];
+  const preciosCombustible = preciosCombustibleQuery.data?.data ?? [];
   const transportistas = transportistasQuery.data?.data ?? [];
 
   // --- Municipio ---
@@ -149,10 +157,19 @@ export function ParametrosLogisticaPage() {
   // --- Concepto de liquidación ---
   const [conceptoNombre, setConceptoNombre] = useState("");
   const [conceptoTipo, setConceptoTipo] = useState<"ABONO" | "DEDUCCION">("ABONO");
+  // Solo tiene sentido en DEDUCCION: marca el concepto cuyo monto se calcula
+  // solo (litros asignados × precio del combustible vigente) en vez de
+  // escribirse a mano al agregarlo a una liquidación.
+  const [conceptoEsCombustible, setConceptoEsCombustible] = useState(false);
   const [conceptoSearch, setConceptoSearch] = useState("");
   const [editingConceptoId, setEditingConceptoId] = useState<number | null>(null);
   const [editConceptoNombre, setEditConceptoNombre] = useState("");
   const [editConceptoTipo, setEditConceptoTipo] = useState<"ABONO" | "DEDUCCION">("ABONO");
+  const [editConceptoEsCombustible, setEditConceptoEsCombustible] = useState(false);
+
+  // --- Precio del combustible ---
+  const [precioPorLitro, setPrecioPorLitro] = useState("");
+  const [precioVigenteDesde, setPrecioVigenteDesde] = useState("");
 
   // --- Alícuota de regalía ---
   const [alicuotaMunicipioId, setAlicuotaMunicipioId] = useState("");
@@ -200,6 +217,11 @@ export function ParametrosLogisticaPage() {
       );
     return { EMPRESA: encontrar("EMPRESA"), TRABAJADOR_PARTICULAR: encontrar("TRABAJADOR_PARTICULAR") };
   }, [tarifas]);
+
+  const precioCombustibleVigente = useMemo(
+    () => preciosCombustible.find((p) => !p.vigenteHasta) ?? null,
+    [preciosCombustible]
+  );
 
   const municipioMap = useMemo(() => new Map(municipios.map((m) => [m.id, m])), [municipios]);
   const tipoMineralMap = useMemo(() => new Map(tiposMineral.map((t) => [t.id, t])), [tiposMineral]);
@@ -356,11 +378,12 @@ export function ParametrosLogisticaPage() {
   function handleCreateConcepto(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     createConceptoMutation.mutate(
-      { nombre: conceptoNombre, tipo: conceptoTipo },
+      { nombre: conceptoNombre, tipo: conceptoTipo, esCombustible: conceptoTipo === "DEDUCCION" && conceptoEsCombustible },
       {
         onSuccess: () => {
           showSuccess("Concepto de liquidación creado correctamente.");
           setConceptoNombre("");
+          setConceptoEsCombustible(false);
         },
         onError: (error) => showError(normalizeError(error, "No se pudo crear el concepto de liquidación."))
       }
@@ -371,11 +394,19 @@ export function ParametrosLogisticaPage() {
     setEditingConceptoId(item.id);
     setEditConceptoNombre(item.nombre);
     setEditConceptoTipo(item.tipo);
+    setEditConceptoEsCombustible(item.esCombustible);
   }
 
   function handleSaveConcepto(id: number) {
     updateConceptoMutation.mutate(
-      { id, payload: { nombre: editConceptoNombre, tipo: editConceptoTipo } },
+      {
+        id,
+        payload: {
+          nombre: editConceptoNombre,
+          tipo: editConceptoTipo,
+          esCombustible: editConceptoTipo === "DEDUCCION" && editConceptoEsCombustible
+        }
+      },
       {
         onSuccess: () => {
           showSuccess("Concepto actualizado.");
@@ -445,6 +476,33 @@ export function ParametrosLogisticaPage() {
           setTarifaVigenteDesde("");
         },
         onError: (error) => showError(normalizeError(error, "No se pudo registrar la tarifa de liquidación."))
+      }
+    );
+  }
+
+  function handleDeleteTarifa(id: number) {
+    const confirmed = window.confirm(
+      "¿Eliminar esta tarifa? Las liquidaciones ya hechas con este precio no se ven afectadas (el precio queda guardado ahí aparte) — esto solo deja de ofrecerla para liquidaciones futuras."
+    );
+    if (!confirmed) return;
+
+    deleteTarifaMutation.mutate(id, {
+      onSuccess: () => showSuccess("Tarifa eliminada."),
+      onError: (error) => showError(normalizeError(error, "No se pudo eliminar la tarifa."))
+    });
+  }
+
+  function handleCreatePrecioCombustible(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    createPrecioCombustibleMutation.mutate(
+      { precioPorLitro: Number(precioPorLitro), vigenteDesde: precioVigenteDesde },
+      {
+        onSuccess: () => {
+          showSuccess("Precio del combustible registrado. El anterior (si existía) quedó cerrado automáticamente.");
+          setPrecioPorLitro("");
+          setPrecioVigenteDesde("");
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo registrar el precio del combustible."))
       }
     );
   }
@@ -837,6 +895,20 @@ export function ParametrosLogisticaPage() {
               <option value="ABONO">Abono</option>
               <option value="DEDUCCION">Deducción</option>
             </select>
+            {conceptoTipo === "DEDUCCION" ? (
+              <label className="flex items-start gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
+                <input
+                  type="checkbox"
+                  checked={conceptoEsCombustible}
+                  onChange={(event) => setConceptoEsCombustible(event.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Calcular el monto automáticamente desde el combustible asignado (litros × precio del
+                  combustible vigente en cada viaje)
+                </span>
+              </label>
+            ) : null}
             <button
               type="submit"
               disabled={createConceptoMutation.isPending}
@@ -879,6 +951,16 @@ export function ParametrosLogisticaPage() {
                       <option value="ABONO">Abono</option>
                       <option value="DEDUCCION">Deducción</option>
                     </select>
+                    {editConceptoTipo === "DEDUCCION" ? (
+                      <label className="flex items-center gap-1.5 text-xs text-[var(--color-on-surface-variant)]">
+                        <input
+                          type="checkbox"
+                          checked={editConceptoEsCombustible}
+                          onChange={(e) => setEditConceptoEsCombustible(e.target.checked)}
+                        />
+                        Monto automático por combustible
+                      </label>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => handleSaveConcepto(item.id)}
@@ -911,6 +993,14 @@ export function ParametrosLogisticaPage() {
                         {item.tipo === "ABONO" ? "Abono" : "Deducción"}
                       </span>
                       <p>{item.nombre}</p>
+                      {item.esCombustible ? (
+                        <span
+                          className="flex items-center gap-1 rounded-full bg-[var(--color-primary)]/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)]"
+                          title="El monto se calcula solo desde el combustible asignado"
+                        >
+                          <Fuel size={10} /> Auto
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                       <button
@@ -936,6 +1026,77 @@ export function ParametrosLogisticaPage() {
               )}
             </div>
           </div>
+        </div>
+      </article>
+
+      {/* Precio del combustible */}
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h3 className="mb-1 flex items-center gap-2 text-lg font-bold">
+          <Fuel size={16} className="text-[var(--color-primary)]" />
+          Precio del combustible (Bs/litro)
+        </h3>
+        <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
+          Se usa para calcular automáticamente el concepto de deducción marcado "Auto" (arriba): litros
+          realmente asignados en cada viaje × este precio vigente en esa fecha. Cambia de semana a semana
+          o de mes a mes — registrar uno nuevo cierra (reemplaza) la vigencia anterior, nunca se edita.
+        </p>
+
+        <div className="mb-4 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3 text-sm">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+            Precio vigente
+          </p>
+          {precioCombustibleVigente ? (
+            <p className="font-bold">
+              Bs {precioCombustibleVigente.precioPorLitro} / litro{" "}
+              <span className="font-normal text-[var(--color-on-surface-variant)]">
+                desde {formatFecha(precioCombustibleVigente.vigenteDesde)}
+              </span>
+            </p>
+          ) : (
+            <p className="font-semibold text-[var(--color-warning)]">Sin definir todavía</p>
+          )}
+        </div>
+
+        <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleCreatePrecioCombustible}>
+          <input
+            required
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={precioPorLitro}
+            onChange={(event) => setPrecioPorLitro(event.target.value)}
+            className={inputClassName}
+            placeholder="Precio por litro (Bs)"
+          />
+          <input
+            required
+            type="date"
+            value={precioVigenteDesde}
+            onChange={(event) => setPrecioVigenteDesde(event.target.value)}
+            className={inputClassName}
+          />
+          <button
+            type="submit"
+            disabled={createPrecioCombustibleMutation.isPending}
+            className="col-span-full w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+          >
+            {createPrecioCombustibleMutation.isPending ? "Guardando..." : "Registrar precio vigente"}
+          </button>
+        </form>
+
+        <div className="mt-4 space-y-2 text-sm">
+          {preciosCombustible.slice(0, MAX_ROWS).map((item) => (
+            <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+              <p className="font-semibold">Bs {item.precioPorLitro} / litro</p>
+              <p className="text-xs text-[var(--color-on-surface-variant)]">
+                desde {formatFecha(item.vigenteDesde)}
+                {item.vigenteHasta ? ` hasta ${formatFecha(item.vigenteHasta)}` : " (vigente)"}
+              </p>
+            </div>
+          ))}
+          {preciosCombustible.length === 0 ? (
+            <p className="text-xs text-[var(--color-on-surface-variant)]">Aún no hay precios registrados.</p>
+          ) : null}
         </div>
       </article>
 
@@ -1170,19 +1331,33 @@ export function ParametrosLogisticaPage() {
 
           <div className="mt-4 space-y-2 text-sm">
             {tarifas.slice(0, MAX_ROWS).map((item) => (
-              <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
-                <p className="font-semibold">
-                  {item.transportista
-                    ? `${item.transportista.nombreORazonSocial} (${TIPO_ENTIDAD_LABEL[item.tipoEntidad]})`
-                    : TIPO_ENTIDAD_LABEL[item.tipoEntidad]}{" "}
-                  ·{" "}
-                  {item.tipoMineral?.nombre ?? "Todos los tipos"}
-                  {item.incluyeCombustible ? ` · ${TIPO_COMBUSTIBLE_LABEL[item.incluyeCombustible]}` : ""}
-                </p>
-                <p className="text-xs text-[var(--color-on-surface-variant)]">
-                  Bs {item.precioPorTonelada} / ton · desde {formatFecha(item.vigenteDesde)}
-                  {item.vigenteHasta ? ` hasta ${formatFecha(item.vigenteHasta)}` : " (vigente)"}
-                </p>
+              <div
+                key={item.id}
+                className="group flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-2"
+              >
+                <div>
+                  <p className="font-semibold">
+                    {item.transportista
+                      ? `${item.transportista.nombreORazonSocial} (${TIPO_ENTIDAD_LABEL[item.tipoEntidad]})`
+                      : TIPO_ENTIDAD_LABEL[item.tipoEntidad]}{" "}
+                    ·{" "}
+                    {item.tipoMineral?.nombre ?? "Todos los tipos"}
+                    {item.incluyeCombustible ? ` · ${TIPO_COMBUSTIBLE_LABEL[item.incluyeCombustible]}` : ""}
+                  </p>
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">
+                    Bs {item.precioPorTonelada} / ton · desde {formatFecha(item.vigenteDesde)}
+                    {item.vigenteHasta ? ` hasta ${formatFecha(item.vigenteHasta)}` : " (vigente)"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTarifa(item.id)}
+                  disabled={deleteTarifaMutation.isPending}
+                  className="shrink-0 rounded p-1 text-[var(--color-error)] opacity-0 transition hover:bg-[var(--color-error)]/10 group-hover:opacity-100"
+                  title="Eliminar"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             ))}
             {tarifas.length === 0 ? (

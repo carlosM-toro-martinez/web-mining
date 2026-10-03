@@ -10,8 +10,11 @@ import {
   createAlicuotaRegaliaPayloadSchema,
   createCatalogoSimplePayloadSchema,
   createConceptoLiquidacionPayloadSchema,
+  createPrecioCombustiblePayloadSchema,
   createTarifaLiquidacionPayloadSchema,
   parametroDeleteResponseSchema,
+  precioCombustibleListResponseSchema,
+  precioCombustibleResponseSchema,
   tarifaLiquidacionListResponseSchema,
   tarifaLiquidacionResponseSchema,
   updateCatalogoSimplePayloadSchema,
@@ -19,6 +22,7 @@ import {
   type CreateAlicuotaRegaliaPayload,
   type CreateCatalogoSimplePayload,
   type CreateConceptoLiquidacionPayload,
+  type CreatePrecioCombustiblePayload,
   type CreateTarifaLiquidacionPayload,
   type UpdateCatalogoSimplePayload,
   type UpdateConceptoLiquidacionPayload
@@ -173,5 +177,27 @@ export async function createTarifaLiquidacion(payload: CreateTarifaLiquidacionPa
     url: apiEndpoints.parametrosLogistica.tarifasLiquidacion,
     body,
     schema: tarifaLiquidacionResponseSchema
+  });
+}
+export async function deleteTarifaLiquidacion(id: number) {
+  return deleteRequest({
+    url: apiEndpoints.parametrosLogistica.tarifaLiquidacionById(id),
+    schema: parametroDeleteResponseSchema
+  });
+}
+
+// --- Precio del combustible (solo lectura + creación; nunca se edita) ---
+export async function getPreciosCombustible() {
+  return getRequest({
+    url: apiEndpoints.parametrosLogistica.preciosCombustible,
+    schema: precioCombustibleListResponseSchema
+  });
+}
+export async function createPrecioCombustible(payload: CreatePrecioCombustiblePayload) {
+  const body = createPrecioCombustiblePayloadSchema.parse(payload);
+  return postRequest({
+    url: apiEndpoints.parametrosLogistica.preciosCombustible,
+    body,
+    schema: precioCombustibleResponseSchema
   });
 }

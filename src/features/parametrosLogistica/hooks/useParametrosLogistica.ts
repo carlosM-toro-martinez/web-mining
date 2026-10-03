@@ -4,16 +4,19 @@ import {
   createConceptoLiquidacion,
   createIngenio,
   createMunicipioOrigen,
+  createPrecioCombustible,
   createTarifaLiquidacion,
   createTipoMineral,
   deleteConceptoLiquidacion,
   deleteIngenio,
   deleteMunicipioOrigen,
+  deleteTarifaLiquidacion,
   deleteTipoMineral,
   getAlicuotasRegalia,
   getConceptosLiquidacion,
   getIngenios,
   getMunicipiosOrigen,
+  getPreciosCombustible,
   getTarifasLiquidacion,
   getTiposMineral,
   updateConceptoLiquidacion,
@@ -25,6 +28,7 @@ import type {
   CreateAlicuotaRegaliaPayload,
   CreateCatalogoSimplePayload,
   CreateConceptoLiquidacionPayload,
+  CreatePrecioCombustiblePayload,
   CreateTarifaLiquidacionPayload,
   UpdateCatalogoSimplePayload,
   UpdateConceptoLiquidacionPayload
@@ -205,6 +209,32 @@ export function useCreateTarifaLiquidacionMutation() {
     mutationFn: (payload: CreateTarifaLiquidacionPayload) => createTarifaLiquidacion(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosLogistica.tarifasLiquidacion() });
+    }
+  });
+}
+export function useDeleteTarifaLiquidacionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteTarifaLiquidacion(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosLogistica.tarifasLiquidacion() });
+    }
+  });
+}
+
+// --- Precio del combustible ---
+export function usePreciosCombustibleQuery() {
+  return useQuery({
+    queryKey: queryKeys.parametrosLogistica.preciosCombustible(),
+    queryFn: getPreciosCombustible
+  });
+}
+export function useCreatePrecioCombustibleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreatePrecioCombustiblePayload) => createPrecioCombustible(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosLogistica.preciosCombustible() });
     }
   });
 }

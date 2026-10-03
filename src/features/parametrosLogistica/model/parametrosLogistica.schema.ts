@@ -25,13 +25,18 @@ export const conceptoLiquidacionSchema = z.object({
   id: z.number().int().positive(),
   nombre: z.string().min(1),
   tipo: tipoConceptoLiquidacionSchema,
-  activo: z.boolean()
+  activo: z.boolean(),
+  // Marca el concepto (DEDUCCION) cuyo monto se calcula solo a partir del
+  // combustible asignado a los lotes de la liquidación — ver
+  // PrecioCombustible y combustibleSugerido en LiquidacionesPage.
+  esCombustible: z.boolean()
 });
 
 export const createConceptoLiquidacionPayloadSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio."),
   tipo: tipoConceptoLiquidacionSchema,
-  activo: z.boolean().optional()
+  activo: z.boolean().optional(),
+  esCombustible: z.boolean().optional()
 });
 
 export const updateConceptoLiquidacionPayloadSchema = createConceptoLiquidacionPayloadSchema.partial();
@@ -87,6 +92,18 @@ export const createTarifaLiquidacionPayloadSchema = z.object({
   vigenteDesde: z.string().min(1, "La fecha de vigencia es obligatoria.")
 });
 
+export const precioCombustibleSchema = z.object({
+  id: z.number().int().positive(),
+  precioPorLitro: z.union([z.string(), z.number()]),
+  vigenteDesde: z.string(),
+  vigenteHasta: z.string().nullable()
+});
+
+export const createPrecioCombustiblePayloadSchema = z.object({
+  precioPorLitro: z.number().positive("El precio debe ser mayor a cero."),
+  vigenteDesde: z.string().min(1, "La fecha de vigencia es obligatoria.")
+});
+
 export const catalogoSimpleListResponseSchema = z.object({
   success: z.boolean(),
   data: z.array(catalogoSimpleSchema)
@@ -119,6 +136,14 @@ export const tarifaLiquidacionResponseSchema = z.object({
   success: z.boolean(),
   data: tarifaLiquidacionSchema
 });
+export const precioCombustibleListResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(precioCombustibleSchema)
+});
+export const precioCombustibleResponseSchema = z.object({
+  success: z.boolean(),
+  data: precioCombustibleSchema
+});
 export const parametroDeleteResponseSchema = z.object({
   success: z.boolean()
 });
@@ -133,6 +158,8 @@ export type AlicuotaRegalia = z.infer<typeof alicuotaRegaliaSchema>;
 export type CreateAlicuotaRegaliaPayload = z.infer<typeof createAlicuotaRegaliaPayloadSchema>;
 export type TarifaLiquidacion = z.infer<typeof tarifaLiquidacionSchema>;
 export type CreateTarifaLiquidacionPayload = z.infer<typeof createTarifaLiquidacionPayloadSchema>;
+export type PrecioCombustible = z.infer<typeof precioCombustibleSchema>;
+export type CreatePrecioCombustiblePayload = z.infer<typeof createPrecioCombustiblePayloadSchema>;
 export type TipoEntidadTransportista = z.infer<typeof tipoEntidadTransportistaSchema>;
 export type TipoCombustibleViaje = z.infer<typeof tipoCombustibleViajeSchema>;
 export type TipoConceptoLiquidacion = z.infer<typeof tipoConceptoLiquidacionSchema>;

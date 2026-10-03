@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Ban,
   CheckCircle2,
@@ -223,6 +223,25 @@ export function LiquidacionesPage() {
     return { bruto, abonos, deducciones, neto: bruto + abonos - deducciones };
   }, [liquidacion, filasPorPlaca]);
 
+  const conceptoSeleccionado = useMemo(
+    () => conceptos.find((c) => String(c.id) === conceptoId) ?? null,
+    [conceptos, conceptoId]
+  );
+  const combustibleBloqueado =
+    conceptoSeleccionado?.esCombustible && liquidacion?.combustibleSugerido?.bloqueadoPorTarifaConCombustible;
+
+  // Al elegir el concepto marcado "Auto" (combustible), se precarga el
+  // monto con lo que ya calculó el backend (litros asignados × precio del
+  // combustible vigente en cada viaje) — sigue siendo editable por si hace
+  // falta ajustarlo.
+  useEffect(() => {
+    if (!conceptoSeleccionado?.esCombustible) return;
+    const sugerido = liquidacion?.combustibleSugerido?.montoSugerido;
+    if (sugerido !== null && sugerido !== undefined) {
+      setMonto(String(sugerido));
+    }
+  }, [conceptoSeleccionado, liquidacion?.combustibleSugerido]);
+
   function resetBusqueda() {
     setTransportistaId("");
     setFechaInicio("");
@@ -278,6 +297,12 @@ export function LiquidacionesPage() {
   function handleAgregarItem(id: string) {
     if (!conceptoId || !monto) {
       showError("Elige un concepto e ingresa el monto.");
+      return;
+    }
+    if (combustibleBloqueado) {
+      showError(
+        "Este transportista ya tiene una tarifa \"con combustible\" registrada en Parámetros — su precio/ton ya refleja ese costo, así que no se puede agregar esta deducción (duplicaría el descuento)."
+      );
       return;
     }
     agregarItemMutation.mutate(
@@ -869,23 +894,43 @@ export function LiquidacionesPage() {
                 </div>
 
                 {liquidacion.estado === "BORRADOR" ? (
-                  <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-[var(--color-border-soft)] p-3">
-                    <select value={conceptoId} onChange={(e) => setConceptoId(e.target.value)} className={`${inputClassName} w-56`}>
-                      <option value="">Concepto...</option>
-                      {conceptos.map((c) => (
-                        <option key={c.id} value={c.id}>{c.nombre} ({c.tipo === "ABONO" ? "Abono" : "Deducción"})</option>
-                      ))}
-                    </select>
-                    <input type="number" min="0.01" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} className={`${inputClassName} w-32`} placeholder="Monto" />
-                    <input value={descripcionConcepto} onChange={(e) => setDescripcionConcepto(e.target.value)} className={`${inputClassName} w-56`} placeholder="Descripción (opcional)" />
-                    <button
-                      type="button"
-                      onClick={() => handleAgregarItem(liquidacion.id)}
-                      disabled={agregarItemMutation.isPending}
-                      className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-                    >
-                      Agregar
-                    </button>
+                  <div className="mt-3 rounded-lg border border-[var(--color-border-soft)] p-3">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <select value={conceptoId} onChange={(e) => setConceptoId(e.target.value)} className={`${inputClassName} w-56`}>
+                        <option value="">Concepto...</option>
+                        {conceptos.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre} ({c.tipo === "ABONO" ? "Abono" : "Deducción"}){c.esCombustible ? " · Auto" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <input type="number" min="0.01" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} className={`${inputClassName} w-32`} placeholder="Monto" />
+                      <input value={descripcionConcepto} onChange={(e) => setDescripcionConcepto(e.target.value)} className={`${inputClassName} w-56`} placeholder="Descripción (opcional)" />
+                      <button
+                        type="button"
+                        onClick={() => handleAgregarItem(liquidacion.id)}
+                        disabled={agregarItemMutation.isPending || Boolean(combustibleBloqueado)}
+                        className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    {conceptoSeleccionado?.esCombustible ? (
+                      combustibleBloqueado ? (
+                        <p className="mt-2 text-xs text-[var(--color-error)]">
+                          Este transportista ya tiene una tarifa "con combustible" registrada en Parámetros — su
+                          precio/ton ya refleja ese costo, así que no corresponde agregar esta deducción.
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">
+                          Litros asignados en esta liquidación: {formatMoneda(liquidacion.combustibleSugerido?.litrosTotal ?? 0)}.{" "}
+                          {liquidacion.combustibleSugerido?.montoSugerido !== null &&
+                          liquidacion.combustibleSugerido?.montoSugerido !== undefined
+                            ? `Monto sugerido: Bs ${formatMoneda(liquidacion.combustibleSugerido.montoSugerido)} (editable).`
+                            : "Falta registrar el precio del combustible vigente para alguna de las fechas de estos viajes — hazlo en Parámetros de Logística antes de agregar este concepto."}
+                        </p>
+                      )
+                    ) : null}
                   </div>
                 ) : null}
               </div>

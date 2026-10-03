@@ -29,7 +29,19 @@ const loteRef = z.object({
 const conceptoRef = z.object({
   id: z.number().int().positive(),
   nombre: z.string().min(1),
-  tipo: tipoConceptoLiquidacionSchema
+  tipo: tipoConceptoLiquidacionSchema,
+  esCombustible: z.boolean().optional()
+});
+
+// Solo viene en el detalle (getById) de una liquidación, calculado en vivo
+// a partir de los lotes ya incluidos — ver calcularCombustibleSugerido() en
+// liquidacion.service.ts (backend). montoSugerido es null si falta
+// registrar el precio del combustible vigente para alguna de las fechas.
+export const combustibleSugeridoSchema = z.object({
+  litrosTotal: z.number(),
+  montoSugerido: z.number().nullable(),
+  fechasSinPrecio: z.array(z.string()),
+  bloqueadoPorTarifaConCombustible: z.boolean()
 });
 
 export const liquidacionDetalleLoteSchema = z.object({
@@ -72,7 +84,8 @@ export const liquidacionSchema = z.object({
   transportista: transportistaRef.optional(),
   detalleLotes: z.array(liquidacionDetalleLoteSchema).optional(),
   itemsConcepto: z.array(liquidacionItemConceptoSchema).optional(),
-  anulacion: anulacionLiquidacionSchema.nullable().optional()
+  anulacion: anulacionLiquidacionSchema.nullable().optional(),
+  combustibleSugerido: combustibleSugeridoSchema.optional()
 });
 
 export const createLiquidacionPayloadSchema = z.object({
@@ -154,3 +167,4 @@ export type PreviewLiquidacionQuery = z.infer<typeof previewLiquidacionQuerySche
 export type PreviewLiquidacion = z.infer<typeof previewLiquidacionSchema>;
 export type PreviewLoteLiquidacion = z.infer<typeof previewLoteLiquidacionSchema>;
 export type GrupoLiquidacion = z.infer<typeof grupoLiquidacionSchema>;
+export type CombustibleSugerido = z.infer<typeof combustibleSugeridoSchema>;
