@@ -113,6 +113,25 @@ export const createLoteDespachoPayloadSchema = z.object({
   observaciones: z.string().trim().optional()
 });
 
+export const updateLoteDespachoPayloadSchema = z.object({
+  municipioOrigenId: z.number().int().positive().optional(),
+  transportistaId: z.number().int().positive().optional(),
+  vehiculoId: z.number().int().positive().optional(),
+  choferId: z.number().int().positive().optional(),
+  tipoMineralId: z.number().int().positive().optional(),
+  destinoIngenioId: z.number().int().positive().optional(),
+  nivel: z.string().trim().nullable().optional(),
+  incluyeCombustible: tipoCombustibleViajeSchema.optional(),
+  combustibleAsignadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.").nullable().optional(),
+  fechaDespachoReal: z.string().trim().optional(),
+  fechaDocumentalFiscal: z.string().trim().optional(),
+  detalleCarga: z.string().trim().min(1).optional(),
+  descripcion: z.string().trim().nullable().optional(),
+  observaciones: z.string().trim().nullable().optional(),
+  tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero.").optional(),
+  tonelajeTara: z.number().nonnegative("El tara no puede ser negativo.").optional()
+});
+
 export const avanzarEstadoLotePayloadSchema = z.object({
   estado: z.enum(["EN_TRANSITO", "EN_BALANZA"])
 });
@@ -137,6 +156,26 @@ export const transbordarLotePayloadSchema = z.object({
   motivo: z.string().trim().min(1, "Debes indicar el motivo del transbordo.")
 });
 
+export const filaImportLoteResultadoSchema = z.object({
+  fila: z.number(),
+  correlativo: z.string().nullable(),
+  accion: z.enum(["creado", "omitido", "error"]),
+  mensaje: z.string()
+});
+
+export const resultadoImportacionLotesSchema = z.object({
+  procesadas: z.number(),
+  creadas: z.number(),
+  omitidas: z.number(),
+  errores: z.number(),
+  resultados: z.array(filaImportLoteResultadoSchema)
+});
+
+export const importarLotesHistoricoResponseSchema = z.object({
+  success: z.boolean(),
+  data: resultadoImportacionLotesSchema
+});
+
 export const loteDespachoListResponseSchema = z.object({
   success: z.boolean(),
   data: z.array(loteDespachoSchema),
@@ -151,8 +190,11 @@ export type EstadoFormulario101 = z.infer<typeof estadoFormulario101Schema>;
 export type TipoCombustibleViaje = z.infer<typeof tipoCombustibleViajeSchema>;
 export type LoteDespacho = z.infer<typeof loteDespachoSchema>;
 export type CreateLoteDespachoPayload = z.infer<typeof createLoteDespachoPayloadSchema>;
+export type UpdateLoteDespachoPayload = z.infer<typeof updateLoteDespachoPayloadSchema>;
 export type AvanzarEstadoLotePayload = z.infer<typeof avanzarEstadoLotePayloadSchema>;
 export type RegistrarPesajePayload = z.infer<typeof registrarPesajePayloadSchema>;
 export type RegistrarCombustibleEntregadoPayload = z.infer<typeof registrarCombustibleEntregadoPayloadSchema>;
+export type FilaImportLoteResultado = z.infer<typeof filaImportLoteResultadoSchema>;
+export type ResultadoImportacionLotes = z.infer<typeof resultadoImportacionLotesSchema>;
 export type AnularLotePayload = z.infer<typeof anularLotePayloadSchema>;
 export type TransbordarLotePayload = z.infer<typeof transbordarLotePayloadSchema>;

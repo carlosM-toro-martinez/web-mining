@@ -1,20 +1,24 @@
 import { getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
+import { httpClient } from "@/shared/api/core/httpClient";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   anularLotePayloadSchema,
   avanzarEstadoLotePayloadSchema,
   createLoteDespachoPayloadSchema,
+  importarLotesHistoricoResponseSchema,
   loteDespachoListResponseSchema,
   loteDespachoResponseSchema,
   registrarCombustibleEntregadoPayloadSchema,
   registrarPesajePayloadSchema,
   transbordarLotePayloadSchema,
+  updateLoteDespachoPayloadSchema,
   type AnularLotePayload,
   type AvanzarEstadoLotePayload,
   type CreateLoteDespachoPayload,
   type RegistrarCombustibleEntregadoPayload,
   type RegistrarPesajePayload,
-  type TransbordarLotePayload
+  type TransbordarLotePayload,
+  type UpdateLoteDespachoPayload
 } from "@/features/loteDespacho/model/loteDespacho.schema";
 
 export interface LotesDespachoQueryParams {
@@ -45,6 +49,11 @@ export async function createLoteDespacho(payload: CreateLoteDespachoPayload) {
   return postRequest({ url: apiEndpoints.lotesDespacho.base, body, schema: loteDespachoResponseSchema });
 }
 
+export async function updateLoteDespacho(id: string, payload: UpdateLoteDespachoPayload) {
+  const body = updateLoteDespachoPayloadSchema.parse(payload);
+  return patchRequest({ url: apiEndpoints.lotesDespacho.byId(id), body, schema: loteDespachoResponseSchema });
+}
+
 export async function avanzarEstadoLote(id: string, payload: AvanzarEstadoLotePayload) {
   const body = avanzarEstadoLotePayloadSchema.parse(payload);
   return patchRequest({ url: apiEndpoints.lotesDespacho.estado(id), body, schema: loteDespachoResponseSchema });
@@ -68,4 +77,13 @@ export async function anularLote(id: string, payload: AnularLotePayload) {
 export async function transbordarLote(id: string, payload: TransbordarLotePayload) {
   const body = transbordarLotePayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.lotesDespacho.transbordo(id), body, schema: loteDespachoResponseSchema });
+}
+
+export async function importarLotesHistoricoExcel(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await httpClient.post(apiEndpoints.lotesDespacho.importarHistorico, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return importarLotesHistoricoResponseSchema.parse(response.data);
 }

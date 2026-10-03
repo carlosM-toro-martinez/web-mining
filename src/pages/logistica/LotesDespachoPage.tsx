@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Ban,
@@ -14,6 +14,7 @@ import {
   Search,
   Send,
   Truck,
+  Upload,
   X
 } from "lucide-react";
 import {
@@ -26,13 +27,20 @@ import {
   useAnularLoteMutation,
   useAvanzarEstadoLoteMutation,
   useCreateLoteDespachoMutation,
+  useImportarLotesHistoricoMutation,
   useLoteDespachoDetailQuery,
   useLotesDespachoQuery,
   useRegistrarCombustibleEntregadoMutation,
   useRegistrarPesajeMutation,
-  useTransbordarLoteMutation
+  useTransbordarLoteMutation,
+  useUpdateLoteDespachoMutation
 } from "@/features/loteDespacho/hooks/useLoteDespacho";
-import type { EstadoLoteDespacho, TipoCombustibleViaje } from "@/features/loteDespacho/model/loteDespacho.schema";
+import type {
+  EstadoLoteDespacho,
+  LoteDespacho,
+  ResultadoImportacionLotes,
+  TipoCombustibleViaje
+} from "@/features/loteDespacho/model/loteDespacho.schema";
 import {
   useAnularFormulario101Mutation,
   useFormularios101Query,
@@ -111,6 +119,334 @@ function isoDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+// Mismo patrón de overlay simple que otras pantallas de Logística (duplicado
+// a propósito, no compartido, para no arriesgar pantallas ya estables).
+function ModalShell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative my-8 w-full max-w-3xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--color-on-surface-variant)] transition hover:bg-[var(--color-surface-container-highest)] hover:text-[var(--color-on-surface)]"
+        >
+          <X size={20} />
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Modal para subir el "Cuadro de Envío de Carga Chami" en Excel y crear de
+// una sola vez todos los lotes YA COMPLETADOS (pesados, con F101 vinculado)
+// que trae — ver loteDespachoImport.parser.ts (backend) para el formato
+// exacto esperado y qué se asume fijo (siempre Carga Chami / Chilcobija).
+function ImportarHistoricoModal({ onClose }: { onClose: () => void }) {
+  const { showError } = useToast();
+  const importarMutation = useImportarLotesHistoricoMutation();
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [resultado, setResultado] = useState<ResultadoImportacionLotes | null>(null);
+
+  function handleImportar() {
+    if (!archivo) {
+      showError("Elige primero el archivo Excel (.xls o .xlsx).");
+      return;
+    }
+    importarMutation.mutate(archivo, {
+      onSuccess: (response) => setResultado(response.data),
+      onError: (error) => showError(normalizeError(error, "No se pudo importar el archivo."))
+    });
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <Upload size={16} className="text-[var(--color-primary)]" />
+        Importar histórico desde Excel
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        Sube el "Cuadro de Envío de Carga Chami" (Mina Lipeña → Chilcobija) tal cual lo arma la
+        empresa. Cada fila se crea ya <strong>Acopiada</strong>, con su pesaje (columna "Peso Kg",
+        se interpreta directo como toneladas) y su Formulario 101 vinculado. El transportista debe
+        existir ya en Logística/Flota con el nombre exacto de la columna "Propietario"; vehículo y
+        chofer se crean solos si no existen todavía.
+      </p>
+
+      {!resultado ? (
+        <div className="space-y-3">
+          <input
+            type="file"
+            accept=".xls,.xlsx"
+            onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+            className={inputClassName}
+          />
+          <button
+            type="button"
+            onClick={handleImportar}
+            disabled={importarMutation.isPending || !archivo}
+            className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+          >
+            {importarMutation.isPending ? "Importando..." : "Importar"}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
+              <p className="text-lg font-extrabold">{resultado.procesadas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Filas leídas</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 p-2 text-center">
+              <p className="text-lg font-extrabold text-[var(--color-success)]">{resultado.creadas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Creadas</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
+              <p className="text-lg font-extrabold">{resultado.omitidas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Ya existían</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-error)]/35 bg-[var(--color-error)]/8 p-2 text-center">
+              <p className="text-lg font-extrabold text-[var(--color-error)]">{resultado.errores}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Con error</p>
+            </div>
+          </div>
+          <div className="max-h-96 overflow-y-auto rounded-lg border border-[var(--color-outline-variant)]">
+            <table className="w-full border-collapse text-left text-xs">
+              <thead className="sticky top-0 bg-[var(--color-surface-container-high)]">
+                <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  <th className="py-1 px-2">Fila</th>
+                  <th className="py-1 px-2">Conocimiento</th>
+                  <th className="py-1 px-2">Resultado</th>
+                  <th className="py-1 px-2">Detalle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {resultado.resultados.map((r) => (
+                  <tr key={r.fila}>
+                    <td className="py-1 px-2">{r.fila}</td>
+                    <td className="py-1 px-2 font-mono">{r.correlativo ?? "-"}</td>
+                    <td className="py-1 px-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          r.accion === "creado"
+                            ? "bg-[var(--color-success)]/18 text-[var(--color-success)]"
+                            : r.accion === "omitido"
+                              ? "bg-[var(--color-on-surface-variant)]/15 text-[var(--color-on-surface-variant)]"
+                              : "bg-[var(--color-error)]/18 text-[var(--color-error)]"
+                        }`}
+                      >
+                        {r.accion}
+                      </span>
+                    </td>
+                    <td className="py-1 px-2">{r.mensaje}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResultado(null);
+                setArchivo(null);
+              }}
+              className={buttonSecondaryClassName}
+            >
+              Importar otro archivo
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+type OpcionSelect = { id: string; label: string; searchText: string };
+
+// Edita los datos de un lote ya creado (municipio, transportista, vehículo,
+// chofer, mineral, ingenio, nivel, combustible, fecha, datos del
+// Conocimiento y — si ya tiene pesaje registrado — bruto/tara) para
+// corregir lo que se cargó mal a mano o por una importación masiva. No
+// permite tocar el correlativo (es el número del documento físico).
+function EditarLoteModal({
+  lote,
+  onClose,
+  municipioOptions,
+  transportistaOptions,
+  vehiculoOptions,
+  choferOptions,
+  tipoMineralOptions,
+  ingenioOptions
+}: {
+  lote: LoteDespacho;
+  onClose: () => void;
+  municipioOptions: OpcionSelect[];
+  transportistaOptions: OpcionSelect[];
+  vehiculoOptions: OpcionSelect[];
+  choferOptions: OpcionSelect[];
+  tipoMineralOptions: OpcionSelect[];
+  ingenioOptions: OpcionSelect[];
+}) {
+  const { showError, showSuccess } = useToast();
+  const updateMutation = useUpdateLoteDespachoMutation();
+
+  const [municipioOrigenId, setMunicipioOrigenId] = useState(String(lote.municipioOrigenId));
+  const [transportistaId, setTransportistaId] = useState(String(lote.transportistaId));
+  const [vehiculoId, setVehiculoId] = useState(String(lote.vehiculoId));
+  const [choferId, setChoferId] = useState(String(lote.choferId));
+  const [tipoMineralId, setTipoMineralId] = useState(String(lote.tipoMineralId));
+  const [destinoIngenioId, setDestinoIngenioId] = useState(String(lote.destinoIngenioId));
+  const [nivel, setNivel] = useState(lote.nivel ?? "");
+  const [incluyeCombustible, setIncluyeCombustible] = useState<TipoCombustibleViaje>(lote.incluyeCombustible);
+  const [combustibleAsignadoLitros, setCombustibleAsignadoLitros] = useState(
+    lote.combustibleAsignadoLitros != null ? String(lote.combustibleAsignadoLitros) : ""
+  );
+  const [fechaDespachoReal, setFechaDespachoReal] = useState(lote.fechaDespachoReal.slice(0, 10));
+  const [detalleCarga, setDetalleCarga] = useState(lote.conocimientoCarga?.detalleCarga ?? "Carga Chami");
+  const [descripcion, setDescripcion] = useState(lote.conocimientoCarga?.descripcion ?? "");
+  const [observaciones, setObservaciones] = useState(lote.conocimientoCarga?.observaciones ?? "");
+  const [tonelajeBruto, setTonelajeBruto] = useState(lote.pesaje ? String(lote.pesaje.tonelajeBruto) : "");
+  const [tonelajeTara, setTonelajeTara] = useState(lote.pesaje ? String(lote.pesaje.tonelajeTara) : "");
+
+  const tonelajeNetoPreview =
+    lote.pesaje && tonelajeBruto && tonelajeTara ? Number(tonelajeBruto) - Number(tonelajeTara) : null;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (incluyeCombustible === "CON_COMBUSTIBLE" && !combustibleAsignadoLitros) {
+      showError("Indica cuántos litros de combustible se le asignan a este viaje.");
+      return;
+    }
+    updateMutation.mutate(
+      {
+        id: lote.id,
+        payload: {
+          municipioOrigenId: Number(municipioOrigenId),
+          transportistaId: Number(transportistaId),
+          vehiculoId: Number(vehiculoId),
+          choferId: Number(choferId),
+          tipoMineralId: Number(tipoMineralId),
+          destinoIngenioId: Number(destinoIngenioId),
+          nivel: nivel.trim() || null,
+          incluyeCombustible,
+          combustibleAsignadoLitros:
+            incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : null,
+          fechaDespachoReal,
+          detalleCarga: detalleCarga.trim() || undefined,
+          descripcion: descripcion.trim() || null,
+          observaciones: observaciones.trim() || null,
+          ...(lote.pesaje
+            ? { tonelajeBruto: Number(tonelajeBruto), tonelajeTara: Number(tonelajeTara) }
+            : {})
+        }
+      },
+      {
+        onSuccess: () => {
+          showSuccess(`Lote ${lote.correlativo} actualizado.`);
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo actualizar el lote."))
+      }
+    );
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <h2 className="mb-4 text-lg font-bold">Editar lote {lote.correlativo}</h2>
+      <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleSubmit}>
+        <AutocompleteSelect value={municipioOrigenId} onChange={setMunicipioOrigenId} options={municipioOptions} placeholder="Municipio de origen..." className={inputClassName} />
+        <AutocompleteSelect value={transportistaId} onChange={setTransportistaId} options={transportistaOptions} placeholder="Transportista..." className={inputClassName} />
+        <AutocompleteSelect value={vehiculoId} onChange={setVehiculoId} options={vehiculoOptions} placeholder="Vehículo..." className={inputClassName} />
+        <AutocompleteSelect value={choferId} onChange={setChoferId} options={choferOptions} placeholder="Chofer..." className={inputClassName} />
+        <AutocompleteSelect value={tipoMineralId} onChange={setTipoMineralId} options={tipoMineralOptions} placeholder="Tipo de mineral..." className={inputClassName} />
+        <AutocompleteSelect value={destinoIngenioId} onChange={setDestinoIngenioId} options={ingenioOptions} placeholder="Ingenio destino..." className={inputClassName} />
+        <input value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName} placeholder="Nivel (opcional)" />
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Fecha de despacho real</label>
+          <input required type="date" value={fechaDespachoReal} onChange={(e) => setFechaDespachoReal(e.target.value)} className={inputClassName} />
+        </div>
+        <select
+          value={incluyeCombustible}
+          onChange={(e) => setIncluyeCombustible(e.target.value as TipoCombustibleViaje)}
+          className={inputClassName}
+        >
+          <option value="SIN_COMBUSTIBLE">Sin combustible de la empresa</option>
+          <option value="CON_COMBUSTIBLE">Con combustible de la empresa</option>
+        </select>
+        {incluyeCombustible === "CON_COMBUSTIBLE" ? (
+          <input
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            value={combustibleAsignadoLitros}
+            onChange={(e) => setCombustibleAsignadoLitros(e.target.value)}
+            className={inputClassName}
+            placeholder="Combustible asignado (litros)"
+          />
+        ) : null}
+        <input value={detalleCarga} onChange={(e) => setDetalleCarga(e.target.value)} className={inputClassName} placeholder='Detalle de carga ("Con: ...")' />
+        <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className={`${inputClassName} sm:col-span-2`} placeholder="Descripción" />
+        <input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} className={`${inputClassName} sm:col-span-2`} placeholder="Observaciones (opcional)" />
+
+        {lote.pesaje ? (
+          <div className="space-y-2 rounded-lg border border-[var(--color-border-soft)] p-3 sm:col-span-2">
+            <p className="flex items-center gap-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+              <Scale size={13} /> Pesaje ya registrado
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                step="0.001"
+                value={tonelajeBruto}
+                onChange={(e) => setTonelajeBruto(e.target.value)}
+                className={`${inputClassName} w-32`}
+                placeholder="Bruto"
+              />
+              <input
+                type="number"
+                step="0.001"
+                value={tonelajeTara}
+                onChange={(e) => setTonelajeTara(e.target.value)}
+                className={`${inputClassName} w-32`}
+                placeholder="Tara"
+              />
+              {tonelajeNetoPreview !== null ? (
+                <span className="text-xs text-[var(--color-on-surface-variant)]">
+                  Neto: <span className="font-semibold text-[var(--color-on-surface)]">{formatLitros(tonelajeNetoPreview)}</span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={updateMutation.isPending}
+          className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60 sm:col-span-2"
+        >
+          {updateMutation.isPending ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </form>
+    </ModalShell>
+  );
+}
+
 export function LotesDespachoPage() {
   const { showError, showSuccess } = useToast();
 
@@ -123,6 +459,7 @@ export function LotesDespachoPage() {
   const [filtroFechaInicio, setFiltroFechaInicio] = useState(isoDate(haceUnaSemana));
   const [filtroFechaFin, setFiltroFechaFin] = useState(isoDate(hoy));
   const [pagina, setPagina] = useState(1);
+  const [mostrarImportarModal, setMostrarImportarModal] = useState(false);
 
   // La búsqueda se manda al servidor (y se pagina sobre el resultado YA
   // filtrado) en vez de filtrar solo la página que ya está cargada en el
@@ -145,6 +482,8 @@ export function LotesDespachoPage() {
     limit: LOTES_POR_PAGINA
   });
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [mostrarEditarLote, setMostrarEditarLote] = useState(false);
+  useEffect(() => setMostrarEditarLote(false), [selectedId]);
   const loteDetalleQuery = useLoteDespachoDetailQuery(selectedId);
 
   const municipiosQuery = useMunicipiosOrigenQuery();
@@ -207,6 +546,13 @@ export function LotesDespachoPage() {
   const vehiculoDisponibleOptions = useMemo(
     () => vehiculosDisponibles.map((v) => ({ id: String(v.id), label: `${v.placa} · ${v.tipo}`, searchText: v.placa })),
     [vehiculosDisponibles]
+  );
+  // Para EDITAR un lote ya existente, a diferencia de crear uno nuevo, el
+  // vehículo casi nunca está "Disponible" (ya está asignado a este mismo
+  // lote) — por eso acá se listan TODOS, no solo los disponibles.
+  const vehiculoOptions = useMemo(
+    () => (vehiculosQuery.data?.data ?? []).map((v) => ({ id: String(v.id), label: `${v.placa} · ${v.tipo}`, searchText: v.placa })),
+    [vehiculosQuery.data]
   );
   const choferOptions = useMemo(
     () => choferes.map((c) => ({ id: String(c.id), label: c.nombre, searchText: c.ci })),
@@ -475,20 +821,33 @@ export function LotesDespachoPage() {
         <div className="mb-4">
           <SubrouteBackButton />
         </div>
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-[var(--color-primary)]/14 p-2.5 text-[var(--color-primary)]">
-            <PackageSearch size={18} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-[var(--color-primary)]/14 p-2.5 text-[var(--color-primary)]">
+              <PackageSearch size={18} />
+            </div>
+            <div>
+              <h1 className="font-headline text-3xl font-extrabold">Lotes de Despacho</h1>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
+                Registra el Conocimiento del despacho, vincula el Formulario 101 que responde el
+                Municipio (su fecha debe coincidir con la del Conocimiento), avanza el estado del lote
+                y registra el pesaje en balanza para dejarlo listo para Liquidación.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-headline text-3xl font-extrabold">Lotes de Despacho</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
-              Registra el Conocimiento del despacho, vincula el Formulario 101 que responde el
-              Municipio (su fecha debe coincidir con la del Conocimiento), avanza el estado del lote
-              y registra el pesaje en balanza para dejarlo listo para Liquidación.
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => setMostrarImportarModal(true)}
+            className={buttonSecondaryClassName}
+          >
+            <Upload size={13} /> Importar histórico (Excel)
+          </button>
         </div>
       </header>
+
+      {mostrarImportarModal ? (
+        <ImportarHistoricoModal onClose={() => setMostrarImportarModal(false)} />
+      ) : null}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
@@ -1033,6 +1392,16 @@ export function LotesDespachoPage() {
                   {lote.estadoLote !== "LIQUIDADO" && lote.estadoLote !== "ANULADO" ? (
                     <button
                       type="button"
+                      onClick={() => setMostrarEditarLote(true)}
+                      className={buttonSecondaryClassName}
+                    >
+                      Editar
+                    </button>
+                  ) : null}
+
+                  {lote.estadoLote !== "LIQUIDADO" && lote.estadoLote !== "ANULADO" ? (
+                    <button
+                      type="button"
                       onClick={() => handleAnular(lote.id)}
                       disabled={anularMutation.isPending}
                       className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/45 px-4 py-2 text-sm font-semibold text-[var(--color-error)] disabled:opacity-50"
@@ -1042,6 +1411,19 @@ export function LotesDespachoPage() {
                   ) : null}
                 </div>
               )}
+
+              {mostrarEditarLote ? (
+                <EditarLoteModal
+                  lote={lote}
+                  onClose={() => setMostrarEditarLote(false)}
+                  municipioOptions={municipioOptions}
+                  transportistaOptions={transportistaOptions}
+                  vehiculoOptions={vehiculoOptions}
+                  choferOptions={choferOptions}
+                  tipoMineralOptions={tipoMineralOptions}
+                  ingenioOptions={ingenioOptions}
+                />
+              ) : null}
 
               {lote.formulario101?.estado === "ANULADO" && lote.formulario101.anulacion && !lote.formulario101.anulacion.peticionEnviada ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/8 px-3 py-2 text-xs">

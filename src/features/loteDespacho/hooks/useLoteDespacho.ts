@@ -5,9 +5,11 @@ import {
   createLoteDespacho,
   getLoteDespachoById,
   getLotesDespacho,
+  importarLotesHistoricoExcel,
   registrarCombustibleEntregadoLote,
   registrarPesajeLote,
   transbordarLote,
+  updateLoteDespacho,
   type LotesDespachoQueryParams
 } from "@/features/loteDespacho/api/loteDespachoApi";
 import type {
@@ -16,7 +18,8 @@ import type {
   CreateLoteDespachoPayload,
   RegistrarCombustibleEntregadoPayload,
   RegistrarPesajePayload,
-  TransbordarLotePayload
+  TransbordarLotePayload,
+  UpdateLoteDespachoPayload
 } from "@/features/loteDespacho/model/loteDespacho.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
@@ -52,6 +55,15 @@ export function useCreateLoteDespachoMutation() {
   });
 }
 
+export function useUpdateLoteDespachoMutation() {
+  const invalidate = useInvalidateLotes();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateLoteDespachoPayload }) =>
+      updateLoteDespacho(id, payload),
+    onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
 export function useAvanzarEstadoLoteMutation() {
   const invalidate = useInvalidateLotes();
   return useMutation({
@@ -76,6 +88,14 @@ export function useRegistrarCombustibleEntregadoMutation() {
     mutationFn: ({ id, payload }: { id: string; payload: RegistrarCombustibleEntregadoPayload }) =>
       registrarCombustibleEntregadoLote(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useImportarLotesHistoricoMutation() {
+  const invalidate = useInvalidateLotes();
+  return useMutation({
+    mutationFn: (file: File) => importarLotesHistoricoExcel(file),
+    onSuccess: () => invalidate()
   });
 }
 
