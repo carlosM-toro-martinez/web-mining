@@ -102,6 +102,14 @@ function formatLitros(value: string | number | null | undefined) {
   return Number(value ?? 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// El pesaje (bruto/tara/neto) se guarda con 3 decimales en la base de datos
+// (PesajeIngenio.tonelajeNeto @db.Decimal(10,3)) — a diferencia de
+// formatLitros (2 decimales, para combustible en litros), esto es
+// específicamente para toneladas.
+function formatTonelaje(value: string | number | null | undefined) {
+  return Number(value ?? 0).toLocaleString("es-BO", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+}
+
 // Texto boilerplate del Conocimiento real ("Carga para Ingenio del sector
 // Lipeña"), precargado y editable — así el usuario no tiene que escribirlo
 // cada vez y el Conocimiento exportado no sale con la descripción vacía.
@@ -428,7 +436,7 @@ function EditarLoteModal({
               />
               {tonelajeNetoPreview !== null ? (
                 <span className="text-xs text-[var(--color-on-surface-variant)]">
-                  Neto: <span className="font-semibold text-[var(--color-on-surface)]">{formatLitros(tonelajeNetoPreview)}</span>
+                  Neto: <span className="font-semibold text-[var(--color-on-surface)]">{formatTonelaje(tonelajeNetoPreview)}</span>
                 </span>
               ) : null}
             </div>
@@ -458,6 +466,7 @@ export function LotesDespachoPage() {
   const [busquedaDebounced, setBusquedaDebounced] = useState("");
   const [filtroFechaInicio, setFiltroFechaInicio] = useState(isoDate(haceUnaSemana));
   const [filtroFechaFin, setFiltroFechaFin] = useState(isoDate(hoy));
+  const [filtroConObservaciones, setFiltroConObservaciones] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [mostrarImportarModal, setMostrarImportarModal] = useState(false);
 
@@ -478,6 +487,7 @@ export function LotesDespachoPage() {
     fechaInicio: filtroFechaInicio || undefined,
     fechaFin: filtroFechaFin || undefined,
     search: busquedaDebounced || undefined,
+    conObservaciones: filtroConObservaciones || undefined,
     page: pagina,
     limit: LOTES_POR_PAGINA
   });
@@ -521,6 +531,11 @@ export function LotesDespachoPage() {
 
   function handleCambiarFechaFin(value: string) {
     setFiltroFechaFin(value);
+    setPagina(1);
+  }
+
+  function handleToggleConObservaciones(value: boolean) {
+    setFiltroConObservaciones(value);
     setPagina(1);
   }
   const lote = loteDetalleQuery.data?.data ?? null;
@@ -1009,6 +1024,14 @@ export function LotesDespachoPage() {
               className={inputClassName}
             />
           </div>
+          <label className="flex items-center gap-2 pb-2.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+            <input
+              type="checkbox"
+              checked={filtroConObservaciones}
+              onChange={(e) => handleToggleConObservaciones(e.target.checked)}
+            />
+            Con observaciones
+          </label>
         </div>
 
         <div className="overflow-x-auto">
@@ -1335,14 +1358,14 @@ export function LotesDespachoPage() {
                     <div className="flex flex-wrap items-end gap-2 rounded-lg border border-[var(--color-border-soft)] p-3">
                       <div>
                         <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Tonelaje bruto</label>
-                        <input type="number" min="0.01" step="0.01" value={tonelajeBruto} onChange={(e) => setTonelajeBruto(e.target.value)} className={`${inputClassName} w-32`} />
+                        <input type="number" min="0.001" step="0.001" value={tonelajeBruto} onChange={(e) => setTonelajeBruto(e.target.value)} className={`${inputClassName} w-32`} />
                       </div>
                       <div>
                         <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Tara</label>
-                        <input type="number" min="0" step="0.01" value={tonelajeTara} onChange={(e) => setTonelajeTara(e.target.value)} className={`${inputClassName} w-32`} />
+                        <input type="number" min="0" step="0.001" value={tonelajeTara} onChange={(e) => setTonelajeTara(e.target.value)} className={`${inputClassName} w-32`} />
                       </div>
                       <div className="px-2 text-sm text-[var(--color-on-surface-variant)]">
-                        Neto: <span className="font-bold text-[var(--color-on-surface)]">{tonelajeNetoPreview !== null ? tonelajeNetoPreview.toFixed(2) : "-"}</span>
+                        Neto: <span className="font-bold text-[var(--color-on-surface)]">{tonelajeNetoPreview !== null ? tonelajeNetoPreview.toFixed(3) : "-"}</span>
                       </div>
                       <input
                         value={pesajeObservaciones}

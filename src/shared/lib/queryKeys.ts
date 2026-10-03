@@ -188,6 +188,7 @@ export const queryKeys = {
       fechaInicio?: string;
       fechaFin?: string;
       search?: string;
+      conObservaciones?: boolean;
       page?: number;
       limit?: number;
     }) => [...queryKeys.lotesDespacho.all, "list", params] as const,
@@ -207,7 +208,7 @@ export const queryKeys = {
   },
   logisticaReportes: {
     all: ["logistica-reportes"] as const,
-    cuadroMensual: (params: { municipioId: number; anio: number; mes: number }) =>
+    cuadroMensual: (params: { municipioId?: number; anio: number; mes: number; nivel?: string }) =>
       [...queryKeys.logisticaReportes.all, "cuadro-mensual", params] as const,
     cierres: (municipioId?: number) => [...queryKeys.logisticaReportes.all, "cierres", municipioId] as const
   },

@@ -988,90 +988,225 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
 // ahora también exportable a Excel/PDF.
 // ============================================================================
 
-export function exportCuadroMensualExcel(cuadro: CuadroMensual, municipioNombre: string, anio: number, mes: number) {
-  const lastCol = 6;
-  const aoa: Array<Array<string | number>> = [
-    ["EMPRESA MINERA MARTE S.R.L.", "", "", "", "", "", ""],
-    [`CUADRO MENSUAL DE DESPACHOS — ${municipioNombre.toUpperCase()} — ${MESES_MAYUSCULA[mes - 1]} ${anio}`, "", "", "", "", "", ""],
-    [],
-    ["N° Lote / Conocimiento", "Transportista", "Placa", "Mineral", "Ingenio", "Neto (Kg)", "Formulario 101"]
-  ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal"> = ["title", "subtitle", "normal", "header"];
+// Mismo layout que el "Cuadro de Envío de Carga Chami" físico que arma la
+// empresa en Excel mes a mes (el mismo documento que importarHistoricoDesdeExcel
+// lee en sentido inverso) — 15 columnas con el peso de cada viaje repartido
+// en una de 4 columnas de nivel (NIVEL 40/Nivel 0/Nivel 80/La Moza), nunca
+// las 4 juntas en la misma fila, y una fila TOTAL TMB al pie con la suma de
+// cada columna numérica.
+const CUADRO_MENSUAL_HEADERS = [
+  "Nº", "FECHA", "CONOCI\nMIENTO", "Form.\n101", "PESO Kg", "MUNICIPIO", "MUNICIP\nIO Nº",
+  "NIVEL 40", "Nivel 0", "Nivel 80", "La Moza", "PROPIETARIO", "CHOFER", "PLACA", "Lote"
+];
 
-  for (const l of cuadro.lotes) {
+function construirFilasCuadroMensual(cuadro: CuadroMensual) {
+  const niveles = ["Nivel 40", "Nivel 0", "Nivel 80", "La Moza"];
+  const sumasPorNivel: Record<string, number> = { "Nivel 40": 0, "Nivel 0": 0, "Nivel 80": 0, "La Moza": 0 };
+  let sumaPeso = 0;
+
+  const filas = cuadro.lotes.map((l, index) => {
+    const peso = Number(l.pesaje?.tonelajeNeto ?? 0);
+    sumaPeso += peso;
+    const celdasNivel = niveles.map((n) => {
+      if (l.nivel === n) {
+        sumasPorNivel[n] += peso;
+        return peso;
+      }
+      return "";
+    });
+    return {
+      numero: index + 1,
+      fecha: formatFecha(l.fechaDespachoReal),
+      conocimiento: l.correlativo,
+      form101: l.formulario101 ? l.formulario101.codigo : "",
+      peso,
+      municipio: l.municipioOrigen?.nombre ?? "",
+      municipioNumero: l.municipioOrigen?.codigo ?? "",
+      celdasNivel,
+      propietario: l.transportista?.nombreORazonSocial ?? "",
+      chofer: l.chofer?.nombre ?? "",
+      placa: l.vehiculo?.placa ?? "",
+      // "Lote" = combustible ASIGNADO (lo que posiblemente le tocaba dar a
+      // ese viaje) — no el real entregado; en blanco si no llevó combustible.
+      lote: l.combustibleAsignadoLitros !== null && l.combustibleAsignadoLitros !== undefined ? Number(l.combustibleAsignadoLitros) : ""
+    };
+  });
+
+  return { filas, sumaPeso, sumasPorNivel };
+}
+
+function tituloCuadroMensual(municipioNombre: string, anio: number, mes: number, nivel?: string) {
+  const partes = [`Mes: ${MESES_MAYUSCULA[mes - 1]} ${anio}`];
+  if (municipioNombre && municipioNombre !== "TODOS LOS MUNICIPIOS") partes.push(`Municipio: ${municipioNombre.toUpperCase()}`);
+  if (nivel) partes.push(`Nivel: ${nivel}`);
+  return partes.join("   ·   ");
+}
+
+export function exportCuadroMensualExcel(
+  cuadro: CuadroMensual,
+  municipioNombre: string,
+  anio: number,
+  mes: number,
+  nivel?: string
+) {
+  const lastCol = CUADRO_MENSUAL_HEADERS.length - 1;
+  const { filas, sumaPeso, sumasPorNivel } = construirFilasCuadroMensual(cuadro);
+
+  const aoa: Array<Array<string | number>> = [
+    ["Empresa Minera", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["MARTE S.R.L.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["CUADRO DE ENVIO DE CARGA CHAMI", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["DE MINA LIPEÑA A CHILCOBIJA", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    [tituloCuadroMensual(municipioNombre, anio, mes, nivel), "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    [],
+    CUADRO_MENSUAL_HEADERS.map((h) => h.replace("\n", " "))
+  ];
+  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank"> = [
+    "subtitle", "title", "title", "subtitle", "subtitle", "blank", "header"
+  ];
+
+  for (const f of filas) {
     aoa.push([
-      l.correlativo,
-      l.transportista?.nombreORazonSocial ?? "",
-      l.vehiculo?.placa ?? "",
-      l.tipoMineral?.nombre ?? "",
-      l.destinoIngenio?.nombre ?? "",
-      num(Number(l.pesaje?.tonelajeNeto ?? 0)),
-      l.formulario101 ? l.formulario101.codigo : "PENDIENTE"
+      f.numero,
+      f.fecha,
+      f.conocimiento,
+      f.form101,
+      num3(f.peso),
+      f.municipio,
+      f.municipioNumero,
+      f.celdasNivel[0] === "" ? "" : num3(f.celdasNivel[0] as number),
+      f.celdasNivel[1] === "" ? "" : num3(f.celdasNivel[1] as number),
+      f.celdasNivel[2] === "" ? "" : num3(f.celdasNivel[2] as number),
+      f.celdasNivel[3] === "" ? "" : num3(f.celdasNivel[3] as number),
+      f.propietario,
+      f.chofer,
+      f.placa,
+      f.lote === "" ? "" : (f.lote as number)
     ]);
     rowKinds.push("normal");
   }
 
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push([`Total lotes: ${cuadro.resumen.totalLotes}`, `Tonelaje neto: ${num(cuadro.resumen.totalTonelajeNeto)}`, `F101 pendientes: ${cuadro.resumen.pendientesF101}`, "", "", "", ""]);
-  rowKinds.push("normal");
+  aoa.push([
+    "", "", "", "",
+    num3(sumaPeso),
+    "", "",
+    num3(sumasPorNivel["Nivel 40"]!),
+    num3(sumasPorNivel["Nivel 0"]!),
+    num3(sumasPorNivel["Nivel 80"]!),
+    num3(sumasPorNivel["La Moza"]!),
+    "", "", "",
+    "TOTAL TMB."
+  ]);
+  rowKinds.push("total");
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 22 }, { wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 16 }];
+  sheet["!cols"] = [
+    { wch: 4 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 9 }, { wch: 12 }, { wch: 9 },
+    { wch: 9 }, { wch: 8 }, { wch: 9 }, { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 9 }, { wch: 7 }
+  ];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: lastCol } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } }
   ];
   rowKinds.forEach((kind, index) => {
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : bodyStyle;
+    if (kind === "blank") return;
+    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : kind === "total" ? totalStyle : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
-  for (let r = 0; r < aoa.length; r += 1) numberFormatCell(sheet, r, 5);
+  for (const col of [4, 7, 8, 9, 10]) {
+    for (let r = 0; r < aoa.length; r += 1) numberFormatCell(sheet, r, col, "#,##0.000");
+  }
+  for (let r = 0; r < aoa.length; r += 1) numberFormatCell(sheet, r, 14, "#,##0");
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Cuadro Mensual".slice(0, 31));
   XLSX.writeFile(workbook, `cuadro-mensual-${anio}-${String(mes).padStart(2, "0")}.xlsx`);
 }
 
-export function exportCuadroMensualPdf(cuadro: CuadroMensual, municipioNombre: string, anio: number, mes: number) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+export function exportCuadroMensualPdf(
+  cuadro: CuadroMensual,
+  municipioNombre: string,
+  anio: number,
+  mes: number,
+  nivel?: string
+) {
+  const { filas, sumaPeso, sumasPorNivel } = construirFilasCuadroMensual(cuadro);
+
+  // Vertical (portrait): el documento real son muchas columnas angostas, no
+  // pocas columnas anchas — igual que el Excel real, entra mejor en una
+  // hoja alta que ancha.
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const centerX = pageWidth / 2;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("EMPRESA MINERA MARTE S.R.L.", centerX, 30, { align: "center" });
+  doc.setFontSize(11);
+  doc.text("Empresa Minera", 20, 22);
+  doc.text("MARTE S.R.L.", 20, 34);
   doc.setFontSize(10);
-  doc.text(`CUADRO MENSUAL DE DESPACHOS — ${municipioNombre.toUpperCase()} — ${MESES_MAYUSCULA[mes - 1]} ${anio}`, centerX, 46, { align: "center" });
+  doc.text("CUADRO DE ENVIO DE CARGA CHAMI", centerX, 22, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("DE MINA LIPEÑA A CHILCOBIJA", centerX, 34, { align: "center" });
+  doc.text(tituloCuadroMensual(municipioNombre, anio, mes, nivel), centerX, 46, { align: "center" });
 
-  const rows: RowInput[] = cuadro.lotes.map((l) => [
-    l.correlativo,
-    l.transportista?.nombreORazonSocial ?? "",
-    l.vehiculo?.placa ?? "",
-    l.tipoMineral?.nombre ?? "",
-    l.destinoIngenio?.nombre ?? "",
-    formatBs(Number(l.pesaje?.tonelajeNeto ?? 0)),
-    l.formulario101 ? l.formulario101.codigo : "PENDIENTE"
+  const rows: RowInput[] = filas.map((f) => [
+    f.numero,
+    f.fecha,
+    f.conocimiento,
+    f.form101,
+    f.peso.toFixed(3),
+    f.municipio,
+    f.municipioNumero,
+    f.celdasNivel[0] === "" ? "" : (f.celdasNivel[0] as number).toFixed(3),
+    f.celdasNivel[1] === "" ? "" : (f.celdasNivel[1] as number).toFixed(3),
+    f.celdasNivel[2] === "" ? "" : (f.celdasNivel[2] as number).toFixed(3),
+    f.celdasNivel[3] === "" ? "" : (f.celdasNivel[3] as number).toFixed(3),
+    f.propietario,
+    f.chofer,
+    f.placa,
+    f.lote === "" ? "" : String(f.lote)
+  ]);
+  rows.push([
+    "", "", "", "",
+    sumaPeso.toFixed(3),
+    "", "",
+    sumasPorNivel["Nivel 40"]!.toFixed(3),
+    sumasPorNivel["Nivel 0"]!.toFixed(3),
+    sumasPorNivel["Nivel 80"]!.toFixed(3),
+    sumasPorNivel["La Moza"]!.toFixed(3),
+    "", "", "",
+    "TOTAL TMB."
   ]);
 
   drawPlainTable(doc, {
-    startY: 64,
-    head: [["N° Lote / Conocimiento", "Transportista", "Placa", "Mineral", "Ingenio", "Neto (Kg)", "Formulario 101"]],
+    startY: 56,
+    head: [CUADRO_MENSUAL_HEADERS],
     body: rows,
-    styles: pdfTableStyles,
-    headStyles: pdfHeadStyles,
-    columnStyles: { 5: { halign: "right" } },
-    margin: { left: 30, right: 30 }
+    styles: { ...pdfTableStyles, fontSize: 6.5, cellPadding: 2 },
+    headStyles: { ...pdfHeadStyles, fontSize: 6.5 },
+    columnStyles: {
+      0: { cellWidth: 16, halign: "right" },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 32, halign: "center" },
+      3: { cellWidth: 34, halign: "center" },
+      4: { cellWidth: 36, halign: "right" },
+      5: { cellWidth: 48 },
+      6: { cellWidth: 32, halign: "center" },
+      7: { cellWidth: 30, halign: "right" },
+      8: { cellWidth: 30, halign: "right" },
+      9: { cellWidth: 30, halign: "right" },
+      10: { cellWidth: 30, halign: "right" },
+      11: { cellWidth: 62 },
+      12: { cellWidth: 62 },
+      13: { cellWidth: 36, halign: "center" },
+      14: { cellWidth: 28, halign: "right" }
+    },
+    margin: { left: 15, right: 15 }
   });
-
-  const y = (doc as any).lastAutoTable.finalY + 20;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text(
-    `Total lotes: ${cuadro.resumen.totalLotes}    Tonelaje neto: ${formatBs(cuadro.resumen.totalTonelajeNeto)}    F101 pendientes: ${cuadro.resumen.pendientesF101}`,
-    30,
-    y
-  );
 
   openBrowserPrintDialog(doc, `cuadro-mensual-${anio}-${String(mes).padStart(2, "0")}.pdf`);
 }

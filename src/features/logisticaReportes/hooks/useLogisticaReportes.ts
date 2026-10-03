@@ -3,13 +3,14 @@ import {
   cerrarMesLogistica,
   getCierresLogistica,
   getCuadroMensual,
+  type CerrarMesParams,
   type CuadroMensualParams
 } from "@/features/logisticaReportes/api/logisticaReportesApi";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
 export function useCuadroMensualQuery(params: CuadroMensualParams | undefined) {
   return useQuery({
-    queryKey: queryKeys.logisticaReportes.cuadroMensual(params ?? { municipioId: 0, anio: 0, mes: 0 }),
+    queryKey: queryKeys.logisticaReportes.cuadroMensual(params ?? { anio: 0, mes: 0 }),
     queryFn: () => getCuadroMensual(params as CuadroMensualParams),
     enabled: Boolean(params)
   });
@@ -25,7 +26,7 @@ export function useCierresLogisticaQuery(municipioId?: number) {
 export function useCerrarMesLogisticaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: CuadroMensualParams) => cerrarMesLogistica(params),
+    mutationFn: (params: CerrarMesParams) => cerrarMesLogistica(params),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.logisticaReportes.all });
     }

@@ -526,6 +526,7 @@ export function SaldosCajaPage() {
             <select value={fondoTipo} onChange={(e) => setFondoTipo(e.target.value as TipoMovimientoFondoCaja)} className={inputClassName}>
               <option value="REMESA_PRESUPUESTO">Remesa presupuesto</option>
               <option value="REMESA_SUELDOS">Remesa para sueldos</option>
+              <option value="REMESA_COMPRAS_GENERAL">Remesa para compras general</option>
               <option value="REMESA_OTROS">Remesa varios</option>
               <option value="REPOSICION">Reposición</option>
             </select>

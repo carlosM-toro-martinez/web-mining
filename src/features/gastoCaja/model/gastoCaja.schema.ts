@@ -32,6 +32,7 @@ export const CATEGORIA_RENDICION_LABEL: Record<z.infer<typeof categoriaRendicion
 export const tipoMovimientoFondoCajaSchema = z.enum([
   "REMESA_PRESUPUESTO",
   "REMESA_SUELDOS",
+  "REMESA_COMPRAS_GENERAL",
   "REMESA_OTROS",
   "REPOSICION"
 ]);
@@ -178,6 +179,29 @@ export const movimientoFondoCajaListResponseSchema = z.object({
 });
 export const movimientoFondoCajaResponseSchema = z.object({ success: z.boolean(), data: movimientoFondoCajaSchema });
 
+// --- Importación masiva desde Excel (reporte mensual "Caja Lipeña") ---
+export const filaImportGastoCajaResultadoSchema = z.object({
+  fila: z.number(),
+  tipo: z.enum(["fondo", "gasto"]),
+  accion: z.enum(["creado", "omitido", "error"]),
+  mensaje: z.string()
+});
+
+export const resultadoImportacionGastosCajaSchema = z.object({
+  procesadas: z.number(),
+  creadas: z.number(),
+  omitidas: z.number(),
+  errores: z.number(),
+  mes: z.number().nullable(),
+  anio: z.number().nullable(),
+  resultados: z.array(filaImportGastoCajaResultadoSchema)
+});
+
+export const importarGastosCajaResponseSchema = z.object({
+  success: z.boolean(),
+  data: resultadoImportacionGastosCajaSchema
+});
+
 export type TipoDocumentoGasto = z.infer<typeof tipoDocumentoGastoSchema>;
 export type CategoriaRetencionGasto = z.infer<typeof categoriaRetencionGastoSchema>;
 export type CategoriaRendicionGasto = z.infer<typeof categoriaRendicionGastoSchema>;
@@ -191,3 +215,5 @@ export type UpdateGastoCajaPayload = z.infer<typeof updateGastoCajaPayloadSchema
 export type AnularGastoCajaPayload = z.infer<typeof anularGastoCajaPayloadSchema>;
 export type MovimientoFondoCaja = z.infer<typeof movimientoFondoCajaSchema>;
 export type CreateMovimientoFondoCajaPayload = z.infer<typeof createMovimientoFondoCajaPayloadSchema>;
+export type FilaImportGastoCajaResultado = z.infer<typeof filaImportGastoCajaResultadoSchema>;
+export type ResultadoImportacionGastosCaja = z.infer<typeof resultadoImportacionGastosCajaSchema>;

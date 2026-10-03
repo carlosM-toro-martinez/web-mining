@@ -173,9 +173,12 @@ function CuadroMensualReport() {
 
   const hoy = useMemo(() => new Date(), []);
   const [municipioId, setMunicipioId] = useState("");
+  const [nivel, setNivel] = useState("");
   const [anio, setAnio] = useState(String(hoy.getFullYear()));
   const [mes, setMes] = useState(String(hoy.getMonth() + 1));
-  const [consultado, setConsultado] = useState<{ municipioId: number; anio: number; mes: number } | undefined>();
+  const [consultado, setConsultado] = useState<
+    { municipioId?: number; anio: number; mes: number; nivel?: string } | undefined
+  >();
 
   const cuadroQuery = useCuadroMensualQuery(consultado);
   const cierresQuery = useCierresLogisticaQuery(consultado?.municipioId);
@@ -185,21 +188,23 @@ function CuadroMensualReport() {
   const cierres = cierresQuery.data?.data ?? [];
 
   function handleConsultar() {
-    if (!municipioId) {
-      showError("Elige un municipio.");
-      return;
-    }
-    setConsultado({ municipioId: Number(municipioId), anio: Number(anio), mes: Number(mes) });
+    setConsultado({
+      municipioId: municipioId ? Number(municipioId) : undefined,
+      anio: Number(anio),
+      mes: Number(mes),
+      nivel: nivel || undefined
+    });
   }
 
   function handleCerrarMes() {
-    if (!consultado) return;
+    if (!consultado?.municipioId) return;
+    const consultadoConMunicipio = { municipioId: consultado.municipioId, anio: consultado.anio, mes: consultado.mes };
     const confirmed = window.confirm(
       `¿Cerrar ${MESES[consultado.mes - 1]} ${consultado.anio} para este municipio? Ya no se podrá volver a cerrar.`
     );
     if (!confirmed) return;
 
-    cerrarMutation.mutate(consultado, {
+    cerrarMutation.mutate(consultadoConMunicipio, {
       onSuccess: () => showSuccess("Mes cerrado correctamente."),
       onError: (error) => showError(normalizeError(error, "No se pudo cerrar el mes."))
     });
@@ -208,9 +213,9 @@ function CuadroMensualReport() {
   return (
     <>
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
           <select value={municipioId} onChange={(e) => setMunicipioId(e.target.value)} className={inputClassName}>
-            <option value="">Municipio...</option>
+            <option value="">Todos los municipios</option>
             {municipios.map((m) => (
               <option key={m.id} value={m.id}>{m.nombre}</option>
             ))}
@@ -220,6 +225,13 @@ function CuadroMensualReport() {
             {MESES.map((label, index) => (
               <option key={label} value={index + 1}>{label}</option>
             ))}
+          </select>
+          <select value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName}>
+            <option value="">Todos los niveles</option>
+            <option value="Nivel 40">Nivel 40</option>
+            <option value="Nivel 0">Nivel 0</option>
+            <option value="Nivel 80">Nivel 80</option>
+            <option value="La Moza">La Moza</option>
           </select>
           <button
             type="button"
@@ -250,7 +262,7 @@ function CuadroMensualReport() {
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success)]/18 px-3 py-1 text-xs font-bold uppercase text-[var(--color-success)]">
                   <Lock size={12} /> Mes cerrado
                 </span>
-              ) : puedeCerrarMes ? (
+              ) : puedeCerrarMes && consultado?.municipioId ? (
                 <button
                   type="button"
                   onClick={handleCerrarMes}
@@ -273,9 +285,12 @@ function CuadroMensualReport() {
                   onClick={() =>
                     exportCuadroMensualExcel(
                       cuadro,
-                      municipios.find((m) => m.id === consultado?.municipioId)?.nombre ?? "",
+                      consultado?.municipioId
+                        ? (municipios.find((m) => m.id === consultado.municipioId)?.nombre ?? "")
+                        : "TODOS LOS MUNICIPIOS",
                       consultado!.anio,
-                      consultado!.mes
+                      consultado!.mes,
+                      consultado?.nivel
                     )
                   }
                   className={buttonSecondaryClassName}
@@ -287,9 +302,12 @@ function CuadroMensualReport() {
                   onClick={() =>
                     exportCuadroMensualPdf(
                       cuadro,
-                      municipios.find((m) => m.id === consultado?.municipioId)?.nombre ?? "",
+                      consultado?.municipioId
+                        ? (municipios.find((m) => m.id === consultado.municipioId)?.nombre ?? "")
+                        : "TODOS LOS MUNICIPIOS",
                       consultado!.anio,
-                      consultado!.mes
+                      consultado!.mes,
+                      consultado?.nivel
                     )
                   }
                   className={buttonSecondaryClassName}

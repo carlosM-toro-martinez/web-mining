@@ -1817,6 +1817,19 @@ export function FlotaPage() {
       return;
     }
 
+    // Cualquier otro intento de ENTRAR a En tránsito/En balanza (ej.
+    // arrastrar desde Disponible directo a En balanza, o desde En
+    // mantenimiento a En tránsito) no tiene un lote real detrás — el
+    // backend ya lo rechaza, pero se corta acá antes para no abrir el modal
+    // genérico y terminar en un error confuso. Salir DE esos dos estados
+    // hacia cualquier otro sigue permitido (son los casos de arriba y abajo).
+    if (nuevoEstado === "EN_TRANSITO" || nuevoEstado === "EN_BALANZA") {
+      showError(
+        `No se puede mover un vehículo a "${nuevoEstado === "EN_TRANSITO" ? "En tránsito" : "En balanza"}" así — ese estado lo asigna un lote de despacho real. Créalo (o avanza su estado) desde Logística/Lotes.`
+      );
+      return;
+    }
+
     // El vehículo tenía un lote activo (en tránsito o en balanza) y se lo
     // manda a falla mecánica o mantenimiento: ese lote se anula en el mismo
     // paso, en vez de quedar "colgado" en tránsito con un vehículo que ya

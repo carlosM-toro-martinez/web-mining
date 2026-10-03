@@ -15,6 +15,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Upload,
   Wallet,
   X
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   useAnularGastoCajaMutation,
   useCreateGastoCajaMutation,
   useGastosCajaQuery,
+  useImportarGastosCajaExcelMutation,
   useUpdateGastoCajaMutation
 } from "@/features/gastoCaja/hooks/useGastoCaja";
 import { useGastoCajaOfflineQueue } from "@/features/gastoCaja/hooks/useGastoCajaOfflineQueue";
@@ -33,6 +35,7 @@ import {
   type GastoCaja,
   type MonedaCaja,
   type OrigenGastoCaja,
+  type ResultadoImportacionGastosCaja,
   type TipoDocumentoGasto
 } from "@/features/gastoCaja/model/gastoCaja.schema";
 import {
@@ -153,8 +156,150 @@ function ModalShell({ children, onClose }: { children: ReactNode; onClose: () =>
   );
 }
 
+// Carga masiva del reporte mensual "Caja Lipeña" (fondos recibidos +
+// detalle de gastos) tal como se arma a mano en Excel — ver
+// gastoCajaImport.parser.ts (backend) para el formato esperado. Los fondos
+// se cargan antes que los gastos (el saldo disponible depende de que las
+// remesas de ese mismo mes ya estén registradas).
+function ImportarGastosModal({ onClose }: { onClose: () => void }) {
+  const { showError } = useToast();
+  const importarMutation = useImportarGastosCajaExcelMutation();
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [resultado, setResultado] = useState<ResultadoImportacionGastosCaja | null>(null);
+
+  function handleImportar() {
+    if (!archivo) {
+      showError("Elige primero el archivo Excel (.xls o .xlsx).");
+      return;
+    }
+    importarMutation.mutate(archivo, {
+      onSuccess: (response) => setResultado(response.data),
+      onError: (error) => showError(normalizeError(error, "No se pudo importar el archivo."))
+    });
+  }
+
+  return (
+    <ModalShell onClose={onClose}>
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <Upload size={16} className="text-[var(--color-primary)]" />
+        Importar Caja Lipeña desde Excel
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        Sube el reporte mensual "Caja Lipeña" tal cual se arma hoy a mano (Fondos Recibidos + Detalle
+        de Gastos por categoría). Carga a la "Caja Bolivianos Lipeña"; cada fila de gasto queda
+        registrada en la categoría de su sub-sección (Materiales y Suministros, Transportes, etc.),
+        y cada remesa se identifica por su código CH-xxx para no duplicarla si subes el mismo archivo
+        dos veces. Puedes completar después el centro de costo/función de gasto de cada uno.
+      </p>
+
+      {!resultado ? (
+        <div className="space-y-3">
+          <input
+            type="file"
+            accept=".xls,.xlsx"
+            onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+            className={inputClassName}
+          />
+          <button
+            type="button"
+            onClick={handleImportar}
+            disabled={importarMutation.isPending || !archivo}
+            className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+          >
+            {importarMutation.isPending ? "Importando..." : "Importar"}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {resultado.mes && resultado.anio ? (
+            <p className="text-xs text-[var(--color-on-surface-variant)]">
+              Período detectado: {resultado.mes}/{resultado.anio}
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--color-warning)]">
+              No se pudo detectar el mes/año del reporte — los gastos se cargaron con la fecha de hoy.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
+              <p className="text-lg font-extrabold">{resultado.procesadas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Filas leídas</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 p-2 text-center">
+              <p className="text-lg font-extrabold text-[var(--color-success)]">{resultado.creadas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Creadas</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
+              <p className="text-lg font-extrabold">{resultado.omitidas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Ya existían</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-error)]/35 bg-[var(--color-error)]/8 p-2 text-center">
+              <p className="text-lg font-extrabold text-[var(--color-error)]">{resultado.errores}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Con error</p>
+            </div>
+          </div>
+          <div className="max-h-96 overflow-y-auto rounded-lg border border-[var(--color-outline-variant)]">
+            <table className="w-full border-collapse text-left text-xs">
+              <thead className="sticky top-0 bg-[var(--color-surface-container-high)]">
+                <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                  <th className="py-1 px-2">Fila</th>
+                  <th className="py-1 px-2">Tipo</th>
+                  <th className="py-1 px-2">Resultado</th>
+                  <th className="py-1 px-2">Detalle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-soft)]">
+                {resultado.resultados.map((r, index) => (
+                  <tr key={`${r.fila}-${index}`}>
+                    <td className="py-1 px-2">{r.fila}</td>
+                    <td className="py-1 px-2 capitalize">{r.tipo}</td>
+                    <td className="py-1 px-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          r.accion === "creado"
+                            ? "bg-[var(--color-success)]/18 text-[var(--color-success)]"
+                            : r.accion === "omitido"
+                              ? "bg-[var(--color-on-surface-variant)]/15 text-[var(--color-on-surface-variant)]"
+                              : "bg-[var(--color-error)]/18 text-[var(--color-error)]"
+                        }`}
+                      >
+                        {r.accion}
+                      </span>
+                    </td>
+                    <td className="py-1 px-2">{r.mensaje}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResultado(null);
+                setArchivo(null);
+              }}
+              className={buttonSecondaryClassName}
+            >
+              Importar otro archivo
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
 export function GastosCajaPage() {
   const { showError, showSuccess } = useToast();
+  const [mostrarImportarModal, setMostrarImportarModal] = useState(false);
 
   const cajasQuery = useCajasChicasQuery();
   const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
@@ -519,22 +664,33 @@ export function GastosCajaPage() {
         <div className="mb-4">
           <SubrouteBackButton />
         </div>
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-[var(--color-primary)]/14 p-2.5 text-[var(--color-primary)]">
-            <Wallet size={18} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-[var(--color-primary)]/14 p-2.5 text-[var(--color-primary)]">
+              <Wallet size={18} />
+            </div>
+            <div>
+              <h1 className="font-headline text-3xl font-extrabold">Registro de Gastos</h1>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
+                Carga cada gasto con su respaldo. El motor tributario calcula el crédito fiscal o las
+                retenciones automáticamente, según las tasas configuradas en Parámetros. Elige si el gasto
+                sale de una caja o directo del banco (ej. una transferencia sin pasar por caja chica); en
+                ambos casos no se deja registrar un gasto por más de lo que hay disponible. ¿Buscas registrar
+                un fondo recibido o una salida de banco hacia la caja? Eso está en "Saldos y Movimientos".
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-headline text-3xl font-extrabold">Registro de Gastos</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
-              Carga cada gasto con su respaldo. El motor tributario calcula el crédito fiscal o las
-              retenciones automáticamente, según las tasas configuradas en Parámetros. Elige si el gasto
-              sale de una caja o directo del banco (ej. una transferencia sin pasar por caja chica); en
-              ambos casos no se deja registrar un gasto por más de lo que hay disponible. ¿Buscas registrar
-              un fondo recibido o una salida de banco hacia la caja? Eso está en "Saldos y Movimientos".
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => setMostrarImportarModal(true)}
+            className={buttonSecondaryClassName}
+          >
+            <Upload size={13} /> Importar Caja Lipeña (Excel)
+          </button>
         </div>
       </header>
+
+      {mostrarImportarModal ? <ImportarGastosModal onClose={() => setMostrarImportarModal(false)} /> : null}
 
       <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.06] p-4">
         <button

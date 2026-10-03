@@ -28,6 +28,7 @@ export interface LotesDespachoQueryParams {
   fechaInicio?: string;
   fechaFin?: string;
   search?: string;
+  conObservaciones?: boolean;
   page?: number;
   limit?: number;
 }

@@ -1,4 +1,5 @@
 import { getRequest, postRequest, putRequest } from "@/shared/api/core/request";
+import { httpClient } from "@/shared/api/core/httpClient";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   anularGastoCajaPayloadSchema,
@@ -6,6 +7,7 @@ import {
   createMovimientoFondoCajaPayloadSchema,
   gastoCajaListResponseSchema,
   gastoCajaResponseSchema,
+  importarGastosCajaResponseSchema,
   movimientoFondoCajaListResponseSchema,
   movimientoFondoCajaResponseSchema,
   updateGastoCajaPayloadSchema,
@@ -47,6 +49,15 @@ export async function updateGastoCaja(id: string, payload: UpdateGastoCajaPayloa
 export async function anularGastoCaja(id: string, payload: AnularGastoCajaPayload) {
   const body = anularGastoCajaPayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.gastoCaja.gastoAnular(id), body, schema: gastoCajaResponseSchema });
+}
+
+export async function importarGastosCajaExcel(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await httpClient.post(apiEndpoints.gastoCaja.importarExcel, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return importarGastosCajaResponseSchema.parse(response.data);
 }
 
 export async function getMovimientosFondoCaja(cajaId?: number) {

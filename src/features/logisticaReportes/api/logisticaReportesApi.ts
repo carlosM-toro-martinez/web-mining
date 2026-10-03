@@ -7,9 +7,12 @@ import {
 } from "@/features/logisticaReportes/model/logisticaReportes.schema";
 
 export interface CuadroMensualParams {
-  municipioId: number;
+  // Sin municipioId, el cuadro consolida TODOS los municipios del mes.
+  municipioId?: number;
   anio: number;
   mes: number;
+  // "Nivel 40" / "Nivel 0" / "Nivel 80" / "La Moza" — sin esto, trae todos.
+  nivel?: string;
 }
 
 export async function getCuadroMensual(params: CuadroMensualParams) {
@@ -28,7 +31,13 @@ export async function getCierresLogistica(municipioId?: number) {
   });
 }
 
-export async function cerrarMesLogistica(params: CuadroMensualParams) {
+export interface CerrarMesParams {
+  municipioId: number;
+  anio: number;
+  mes: number;
+}
+
+export async function cerrarMesLogistica(params: CerrarMesParams) {
   return postRequest({
     url: apiEndpoints.logisticaReportes.cierreMensual,
     body: params,

@@ -5,6 +5,7 @@ import {
   createMovimientoFondoCaja,
   getGastosCaja,
   getMovimientosFondoCaja,
+  importarGastosCajaExcel,
   updateGastoCaja,
   type GastosCajaQueryParams
 } from "@/features/gastoCaja/api/gastoCajaApi";
@@ -57,6 +58,14 @@ export function useAnularGastoCajaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AnularGastoCajaPayload }) => anularGastoCaja(id, payload),
+    onSuccess: () => invalidarSaldos(queryClient)
+  });
+}
+
+export function useImportarGastosCajaExcelMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => importarGastosCajaExcel(file),
     onSuccess: () => invalidarSaldos(queryClient)
   });
 }

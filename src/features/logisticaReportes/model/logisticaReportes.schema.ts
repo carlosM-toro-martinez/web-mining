@@ -10,14 +10,21 @@ const formulario101Ref = z.object({
   estado: z.enum(["DISPONIBLE", "VINCULADO", "ANULADO"])
 });
 
+const choferRef = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
+const municipioOrigenRef = z.object({ id: z.number().int().positive(), codigo: z.string().min(1), nombre: z.string().min(1) });
+
 export const loteCuadroMensualSchema = z.object({
   id: z.string().min(1),
   correlativo: z.string().min(1),
   fechaDespachoReal: z.string(),
   fechaDocumentalFiscal: z.string(),
+  nivel: z.string().nullable().optional(),
+  combustibleAsignadoLitros: z.union([z.string(), z.number()]).nullable().optional(),
   transportista: transportistaRef.optional(),
   vehiculo: vehiculoRef.optional(),
+  chofer: choferRef.optional(),
   tipoMineral: refConNombre.optional(),
+  municipioOrigen: municipioOrigenRef.optional(),
   destinoIngenio: refConNombre.optional(),
   formulario101: formulario101Ref.nullable().optional(),
   pesaje: z
