@@ -3,6 +3,7 @@ import {
   anularRendicionCaja,
   cerrarRendicionCaja,
   createRendicionCaja,
+  eliminarRendicionCaja,
   getPreviewRendicionCaja,
   getRendicionCajaById,
   getRendicionesCaja,
@@ -70,5 +71,13 @@ export function useAnularRendicionCajaMutation() {
     mutationFn: ({ id, payload }: { id: string; payload: AnularRendicionCajaPayload }) =>
       anularRendicionCaja(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useEliminarRendicionCajaMutation() {
+  const invalidate = useInvalidateRendiciones();
+  return useMutation({
+    mutationFn: (id: string) => eliminarRendicionCaja(id),
+    onSuccess: () => invalidate()
   });
 }

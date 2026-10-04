@@ -247,8 +247,9 @@ function descripcionGasto(g: GastoReporte) {
   return `${proveedor}. ${glosa}`;
 }
 
+// El mes del reporte sale de la fecha "desde": la rendición de septiembre
+// arranca el 01/09 aunque su "hasta" caiga en los primeros días de octubre.
 function datosReporteMensual(reporte: ReporteRendicion) {
-  const fin = parseFecha(reporte.periodoHasta);
   const inicio = parseFecha(reporte.periodoDesde);
   const corte = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate() - 1));
   const sector = sectorCaja(reporte.caja.nombre);
@@ -256,9 +257,9 @@ function datosReporteMensual(reporte: ReporteRendicion) {
   return {
     sector,
     titulo: `CAJA ${sector}`,
-    mesAnio: mesDelAnioLabel(reporte.periodoHasta),
-    mesCorto: `${MESES_MAYUSCULA[fin.getUTCMonth()]} ${fin.getUTCFullYear()}`,
-    nombreHoja: `CAJA ${MESES_MAYUSCULA[fin.getUTCMonth()]}`,
+    mesAnio: mesDelAnioLabel(reporte.periodoDesde),
+    mesCorto: `${MESES_MAYUSCULA[inicio.getUTCMonth()]} ${inicio.getUTCFullYear()}`,
+    nombreHoja: `CAJA ${MESES_MAYUSCULA[inicio.getUTCMonth()]}`,
     saldoLabel: `Saldo deudor al ${corte.getUTCDate()} de ${MESES_MAYUSCULA[corte.getUTCMonth()]} del ${corte.getUTCFullYear()}`,
     totalFondos,
     saldo: totalFondos - reporte.totalGastos,

@@ -66,6 +66,14 @@ export async function getEstadoCuentaBancaria(cuentaBancariaId: number, fechaIni
   });
 }
 
+export async function getReporteRendicionPrevia(params: { cajaId: number; periodoDesde: string; periodoHasta: string }) {
+  return getRequest({
+    url: apiEndpoints.reportesCajaChica.reporteRendicionPrevia,
+    config: { params },
+    schema: reporteRendicionResponseSchema
+  });
+}
+
 export async function getReporteRendicion(rendicionId: string) {
   return getRequest({
     url: apiEndpoints.reportesCajaChica.reporteRendicion(rendicionId),

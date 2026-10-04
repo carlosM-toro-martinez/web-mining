@@ -6,12 +6,14 @@ import {
   FileText,
   Plus,
   ReceiptText,
-  Search
+  Search,
+  Trash2
 } from "lucide-react";
 import {
   useAnularRendicionCajaMutation,
   useCerrarRendicionCajaMutation,
   useCreateRendicionCajaMutation,
+  useEliminarRendicionCajaMutation,
   usePreviewRendicionCajaQuery,
   useRendicionCajaDetailQuery,
   useRendicionesCajaQuery
@@ -21,7 +23,8 @@ import { useCajasChicasQuery } from "@/features/parametrosCajaChica/hooks/usePar
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import {
   getComprobanteDiario,
-  getReporteRendicion
+  getReporteRendicion,
+  getReporteRendicionPrevia
 } from "@/features/reportesCajaChica/api/reportesCajaChicaApi";
 import {
   exportComprobanteDiarioExcel,
@@ -85,8 +88,9 @@ export function RendicionesCajaPage() {
   const createMutation = useCreateRendicionCajaMutation();
   const cerrarMutation = useCerrarRendicionCajaMutation();
   const anularMutation = useAnularRendicionCajaMutation();
+  const eliminarMutation = useEliminarRendicionCajaMutation();
   const [exportando, setExportando] = useState<
-    "caja-excel" | "caja-pdf" | "diario-excel" | "diario-pdf" | null
+    "caja-excel" | "caja-pdf" | "diario-excel" | "diario-pdf" | "previa-excel" | "previa-pdf" | null
   >(null);
 
   const rendiciones = rendicionesQuery.data?.data ?? [];
@@ -153,6 +157,36 @@ export function RendicionesCajaPage() {
     } finally {
       setExportando(null);
     }
+  }
+
+  // El mismo reporte mensual (Excel/PDF), pero con lo que incluiría la
+  // rendición si se creara ahora — para revisar montos antes de crearla.
+  async function handleExportPrevia(formato: "excel" | "pdf") {
+    setExportando(formato === "excel" ? "previa-excel" : "previa-pdf");
+    try {
+      const response = await getReporteRendicionPrevia({ cajaId: Number(cajaId), periodoDesde, periodoHasta });
+      if (formato === "excel") exportReporteRendicionExcel(response.data);
+      else exportReporteRendicionPdf(response.data);
+    } catch (error) {
+      showError(normalizeError(error, "No se pudo generar el reporte previo."));
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  function handleEliminar(id: string, numero: string) {
+    const confirmed = window.confirm(
+      `¿Eliminar definitivamente la rendición anulada ${numero}? Ya no aparecerá en la lista. Los gastos no se tocan.`
+    );
+    if (!confirmed) return;
+
+    eliminarMutation.mutate(id, {
+      onSuccess: () => {
+        showSuccess("Rendición eliminada.");
+        if (selectedId === id) setSelectedId(undefined);
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudo eliminar la rendición."))
+    });
   }
 
   async function handleExportComprobante(id: string, formato: "excel" | "pdf") {
@@ -289,10 +323,28 @@ export function RendicionesCajaPage() {
             <Search size={16} className="text-[var(--color-primary)]" />
             Vista previa del período
           </h2>
-          <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
+          <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
             Esto es lo que incluiría la rendición si la creas ahora — todavía no se guarda nada ni
             se gasta un folio. Cambia las fechas de arriba para ver otro rango.
           </p>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleExportPrevia("excel")}
+              disabled={exportando !== null || !preview}
+              className={buttonSecondaryClassName}
+            >
+              <FileSpreadsheet size={13} /> {exportando === "previa-excel" ? "Generando..." : "Reporte previo (Excel)"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportPrevia("pdf")}
+              disabled={exportando !== null || !preview}
+              className={buttonSecondaryClassName}
+            >
+              <FileText size={13} /> {exportando === "previa-pdf" ? "Generando..." : "Reporte previo (PDF)"}
+            </button>
+          </div>
           {previewQuery.isLoading ? (
             <p className="text-sm text-[var(--color-on-surface-variant)]">Calculando...</p>
           ) : preview ? (
@@ -407,13 +459,25 @@ export function RendicionesCajaPage() {
                   </td>
                   <td className="px-3 py-2 text-xs">{formatMoneda(item.saldoNuevo)}</td>
                   <td className="px-3 py-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(item.id)}
-                      className={buttonSecondaryClassName}
-                    >
-                      <Search size={13} /> Ver
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(item.id)}
+                        className={buttonSecondaryClassName}
+                      >
+                        <Search size={13} /> Ver
+                      </button>
+                      {item.estado === "ANULADO" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleEliminar(item.id, item.numero)}
+                          disabled={eliminarMutation.isPending}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-error)]/45 px-3 py-2 text-xs font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-60"
+                        >
+                          <Trash2 size={13} /> Eliminar
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

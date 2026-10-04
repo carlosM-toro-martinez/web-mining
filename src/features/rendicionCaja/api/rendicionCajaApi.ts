@@ -1,4 +1,5 @@
-import { getRequest, postRequest } from "@/shared/api/core/request";
+import { deleteRequest, getRequest, postRequest } from "@/shared/api/core/request";
+import { z } from "zod";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   anularRendicionCajaPayloadSchema,
@@ -53,4 +54,10 @@ export async function cerrarRendicionCaja(id: string) {
 export async function anularRendicionCaja(id: string, payload: AnularRendicionCajaPayload) {
   const body = anularRendicionCajaPayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.rendicionCaja.anular(id), body, schema: rendicionCajaResponseSchema });
+}
+
+const eliminarRendicionResponseSchema = z.object({ success: z.boolean(), data: z.object({ id: z.string() }) });
+
+export async function eliminarRendicionCaja(id: string) {
+  return deleteRequest({ url: apiEndpoints.rendicionCaja.byId(id), schema: eliminarRendicionResponseSchema });
 }

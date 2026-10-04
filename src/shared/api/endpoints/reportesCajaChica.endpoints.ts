@@ -5,6 +5,7 @@ export const reportesCajaChicaEndpoints = {
   desglose: "/api/reportes-caja-chica/desglose",
   estadoCuenta: "/api/reportes-caja-chica/estado-cuenta",
   estadoCuentaBancaria: "/api/reportes-caja-chica/estado-cuenta-bancaria",
+  reporteRendicionPrevia: "/api/reportes-caja-chica/rendicion-previa",
   reporteRendicion: (rendicionId: string) => `/api/reportes-caja-chica/rendicion/${rendicionId}`,
   comprobanteDiario: (rendicionId: string) => `/api/reportes-caja-chica/rendicion/${rendicionId}/comprobante-diario`,
   comprobanteEgresoGasto: (gastoId: string) => `/api/reportes-caja-chica/gasto/${gastoId}/comprobante-egreso`
