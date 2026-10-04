@@ -147,7 +147,9 @@ export const anularGastoCajaPayloadSchema = z.object({
 export const gastoCajaListResponseSchema = z.object({
   success: z.boolean(),
   data: z.array(gastoCajaSchema),
-  meta: z.object({ page: z.number(), limit: z.number(), total: z.number(), totalPages: z.number() }).optional()
+  meta: z
+    .object({ page: z.number(), limit: z.number(), total: z.number(), totalPages: z.number(), totalMonto: z.number().optional() })
+    .optional()
 });
 export const gastoCajaResponseSchema = z.object({ success: z.boolean(), data: gastoCajaSchema });
 

@@ -15,6 +15,8 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
+  SlidersHorizontal,
   Upload,
   Wallet,
   X
@@ -70,6 +72,24 @@ function today() {
 function inicioDeMesActual() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+type OrdenGastos = "fecha_desc" | "fecha_asc" | "monto_desc" | "monto_asc";
+
+const ORDEN_LABEL: Record<OrdenGastos, string> = {
+  fecha_desc: "Más recientes primero",
+  fecha_asc: "Más antiguos primero",
+  monto_desc: "Monto: mayor a menor",
+  monto_asc: "Monto: menor a mayor"
+};
+
+function useValorDiferido<T>(valor: T, ms = 350) {
+  const [diferido, setDiferido] = useState(valor);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDiferido(valor), ms);
+    return () => window.clearTimeout(timer);
+  }, [valor, ms]);
+  return diferido;
 }
 
 const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoGasto, string> = {
@@ -328,25 +348,82 @@ export function GastosCajaPage() {
   const [filtroCaja, setFiltroCaja] = useState("");
   const [filtroFechaInicio, setFiltroFechaInicio] = useState(inicioDeMesActual);
   const [filtroFechaFin, setFiltroFechaFin] = useState(today);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroTipoDocumento, setFiltroTipoDocumento] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [filtroOrigen, setFiltroOrigen] = useState("");
+  const [filtroMontoMin, setFiltroMontoMin] = useState("");
+  const [filtroMontoMax, setFiltroMontoMax] = useState("");
+  const [filtroClasificacion, setFiltroClasificacion] = useState<"" | "true" | "false">("");
+  const [orden, setOrden] = useState<OrdenGastos>("fecha_desc");
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [pagina, setPagina] = useState(1);
+
+  // Lo que se escribe (texto y montos) se aplica recién cuando se deja de
+  // tipear, para no lanzar una consulta por cada tecla.
+  const busquedaAplicada = useValorDiferido(busqueda.trim());
+  const montoMinAplicado = useValorDiferido(filtroMontoMin);
+  const montoMaxAplicado = useValorDiferido(filtroMontoMax);
+  useEffect(() => {
+    setPagina(1);
+  }, [busquedaAplicada, montoMinAplicado, montoMaxAplicado]);
+
   const gastosQuery = useGastosCajaQuery({
     cajaId: filtroCaja ? Number(filtroCaja) : undefined,
     fechaInicio: filtroFechaInicio || undefined,
     fechaFin: filtroFechaFin || undefined,
+    search: busquedaAplicada || undefined,
+    categoriaRendicion: filtroCategoria || undefined,
+    tipoDocumento: filtroTipoDocumento || undefined,
+    estado: filtroEstado || undefined,
+    origen: filtroOrigen || undefined,
+    montoMin: montoMinAplicado !== "" && !Number.isNaN(Number(montoMinAplicado)) ? Number(montoMinAplicado) : undefined,
+    montoMax: montoMaxAplicado !== "" && !Number.isNaN(Number(montoMaxAplicado)) ? Number(montoMaxAplicado) : undefined,
+    informacionIncompleta: filtroClasificacion || undefined,
+    orden,
     page: pagina,
     limit: 20
   });
 
-  function handleCambiarFiltroCaja(value: string) {
-    setFiltroCaja(value);
-    setPagina(1);
+  function conReinicioDePagina<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      setter(value);
+      setPagina(1);
+    };
   }
-  function handleCambiarFiltroFechaInicio(value: string) {
-    setFiltroFechaInicio(value);
-    setPagina(1);
-  }
-  function handleCambiarFiltroFechaFin(value: string) {
-    setFiltroFechaFin(value);
+  const handleCambiarFiltroCaja = conReinicioDePagina(setFiltroCaja);
+  const handleCambiarFiltroFechaInicio = conReinicioDePagina(setFiltroFechaInicio);
+  const handleCambiarFiltroFechaFin = conReinicioDePagina(setFiltroFechaFin);
+  const handleCambiarCategoria = conReinicioDePagina(setFiltroCategoria);
+  const handleCambiarTipoDocumento = conReinicioDePagina(setFiltroTipoDocumento);
+  const handleCambiarEstado = conReinicioDePagina(setFiltroEstado);
+  const handleCambiarOrigen = conReinicioDePagina(setFiltroOrigen);
+  const handleCambiarClasificacion = conReinicioDePagina(setFiltroClasificacion);
+  const handleCambiarOrden = conReinicioDePagina(setOrden);
+
+  const filtrosActivos = [
+    filtroCategoria,
+    filtroTipoDocumento,
+    filtroEstado,
+    filtroOrigen,
+    filtroMontoMin,
+    filtroMontoMax,
+    filtroClasificacion
+  ].filter(Boolean).length;
+
+  function handleLimpiarFiltros() {
+    setBusqueda("");
+    setFiltroCategoria("");
+    setFiltroTipoDocumento("");
+    setFiltroEstado("");
+    setFiltroOrigen("");
+    setFiltroMontoMin("");
+    setFiltroMontoMax("");
+    setFiltroClasificacion("");
+    setOrden("fecha_desc");
+    setFiltroFechaInicio("");
+    setFiltroFechaFin("");
     setPagina(1);
   }
 
@@ -1199,11 +1276,172 @@ export function GastosCajaPage() {
           </div>
         </div>
 
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-on-surface-variant)]"
+              />
+              <input
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por proveedor, glosa, n° de factura/recibo, NIT o monto (ej. andrea 1200)"
+                className={`${inputClassName} pl-9 pr-9`}
+              />
+              {busqueda ? (
+                <button
+                  type="button"
+                  onClick={() => setBusqueda("")}
+                  aria-label="Borrar búsqueda"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => setMostrarFiltros((v) => !v)}
+              className={`${buttonSecondaryClassName} sm:w-auto`}
+              aria-expanded={mostrarFiltros}
+            >
+              <SlidersHorizontal size={14} /> Filtros
+              {filtrosActivos > 0 ? (
+                <span className="rounded-full bg-[var(--color-primary)] px-1.5 text-[10px] font-bold text-[var(--color-on-primary)]">
+                  {filtrosActivos}
+                </span>
+              ) : null}
+            </button>
+            <select
+              value={orden}
+              onChange={(e) => handleCambiarOrden(e.target.value as OrdenGastos)}
+              className={`${inputClassName} sm:w-56`}
+              aria-label="Ordenar"
+            >
+              {(Object.keys(ORDEN_LABEL) as OrdenGastos[]).map((key) => (
+                <option key={key} value={key}>{ORDEN_LABEL[key]}</option>
+              ))}
+            </select>
+          </div>
+
+          {mostrarFiltros ? (
+            <div className="grid gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)]/40 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Categoría
+                <select value={filtroCategoria} onChange={(e) => handleCambiarCategoria(e.target.value)} className={inputClassName}>
+                  <option value="">Todas</option>
+                  {(Object.keys(CATEGORIA_RENDICION_LABEL) as CategoriaRendicionGasto[]).map((key) => (
+                    <option key={key} value={key}>{CATEGORIA_RENDICION_LABEL[key]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Tipo de documento
+                <select value={filtroTipoDocumento} onChange={(e) => handleCambiarTipoDocumento(e.target.value)} className={inputClassName}>
+                  <option value="">Todos</option>
+                  {(Object.keys(TIPO_DOCUMENTO_LABEL) as TipoDocumentoGasto[]).map((key) => (
+                    <option key={key} value={key}>{TIPO_DOCUMENTO_LABEL[key]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Estado
+                <select value={filtroEstado} onChange={(e) => handleCambiarEstado(e.target.value)} className={inputClassName}>
+                  <option value="">Todos</option>
+                  {(Object.keys(ESTADO_LABEL) as EstadoGastoCaja[]).map((key) => (
+                    <option key={key} value={key}>{ESTADO_LABEL[key]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Origen
+                <select value={filtroOrigen} onChange={(e) => handleCambiarOrigen(e.target.value)} className={inputClassName}>
+                  <option value="">Caja y banco</option>
+                  <option value="CAJA">Caja</option>
+                  <option value="BANCO">Banco</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Monto desde (Bs)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={filtroMontoMin}
+                  onChange={(e) => setFiltroMontoMin(e.target.value)}
+                  className={inputClassName}
+                  placeholder="0,00"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Monto hasta (Bs)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={filtroMontoMax}
+                  onChange={(e) => setFiltroMontoMax(e.target.value)}
+                  className={inputClassName}
+                  placeholder="Sin límite"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                Clasificación
+                <select
+                  value={filtroClasificacion}
+                  onChange={(e) => handleCambiarClasificacion(e.target.value as "" | "true" | "false")}
+                  className={inputClassName}
+                >
+                  <option value="">Todas</option>
+                  <option value="true">Con información incompleta</option>
+                  <option value="false">Completas</option>
+                </select>
+              </label>
+              <div className="flex items-end">
+                <button type="button" onClick={handleLimpiarFiltros} className={`${buttonSecondaryClassName} w-full`}>
+                  <X size={14} /> Limpiar todo (incluye fechas)
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {metaGastos ? (
+            <p className="text-xs text-[var(--color-on-surface-variant)]">
+              {metaGastos.total} gasto(s) encontrado(s)
+              {metaGastos.totalMonto !== undefined ? (
+                <>
+                  {" · "}Total:{" "}
+                  <span className="font-mono font-bold text-[var(--color-on-surface)]">Bs {formatMoneda(metaGastos.totalMonto)}</span>
+                  {filtroEstado ? "" : " (sin anulados)"}
+                </>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
+
         {gastosQuery.isLoading ? (
           <p className="px-1 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando gastos...</p>
         ) : null}
         {!gastosQuery.isLoading && gastos.length === 0 ? (
-          <p className="px-1 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron gastos.</p>
+          <div className="px-1 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">
+            <p>No se encontraron gastos.</p>
+            {filtroFechaInicio || filtroFechaFin ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroFechaInicio("");
+                  setFiltroFechaFin("");
+                  setPagina(1);
+                }}
+                className="mt-2 text-xs font-semibold text-[var(--color-primary)] underline"
+              >
+                Buscar en todas las fechas (ahora solo del {filtroFechaInicio ? formatFecha(filtroFechaInicio) : "inicio"} al{" "}
+                {filtroFechaFin ? formatFecha(filtroFechaFin) : "hoy"})
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Lista en tarjetas: mucho más legible en teléfono que una tabla ancha con scroll horizontal. */}
@@ -1222,6 +1460,10 @@ export function GastosCajaPage() {
                 </div>
               </div>
               <p className="text-xs text-[var(--color-on-surface-variant)]">{item.glosa}</p>
+              <p className="mt-1 text-[10px] text-[var(--color-on-surface-variant)]">
+                {CATEGORIA_RENDICION_LABEL[item.categoriaRendicion]}
+                {item.numeroRespaldo ? ` · Respaldo: ${item.numeroRespaldo}` : ""}
+              </p>
               <div className="mt-2 flex items-center justify-between text-xs text-[var(--color-on-surface-variant)]">
                 <span>{formatFecha(item.fecha)} · {item.origen === "BANCO" ? `Banco: ${item.cuentaBancariaCaja?.banco ?? "-"}` : (item.caja?.nombre ?? "-")}</span>
                 <span className="font-mono font-bold text-[var(--color-on-surface)]">{item.moneda} {formatMoneda(item.montoTotal)}</span>
@@ -1283,7 +1525,7 @@ export function GastosCajaPage() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                {["Fecha", "Origen", "Proveedor", "Glosa", "Monto", "Estado", "Acciones"].map((title) => (
+                {["Fecha", "Origen", "Proveedor", "Glosa", "Respaldo", "Monto", "Estado", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{title}</th>
                 ))}
               </tr>
@@ -1298,8 +1540,12 @@ export function GastosCajaPage() {
                       : (item.caja?.nombre ?? "-")}
                   </td>
                   <td className="px-3 py-2 text-xs font-semibold">{item.proveedorNombre}</td>
-                  <td className="px-3 py-2 text-xs">{item.glosa}</td>
-                  <td className="px-3 py-2 text-xs">{item.moneda} {formatMoneda(item.montoTotal)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    <p>{item.glosa}</p>
+                    <p className="text-[10px] text-[var(--color-on-surface-variant)]">{CATEGORIA_RENDICION_LABEL[item.categoriaRendicion]}</p>
+                  </td>
+                  <td className="px-3 py-2 text-xs">{item.numeroRespaldo || "-"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">{item.moneda} {formatMoneda(item.montoTotal)}</td>
                   <td className="px-3 py-2 text-xs">
                     <div className="flex flex-col items-start gap-1">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>

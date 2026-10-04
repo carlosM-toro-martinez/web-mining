@@ -24,6 +24,13 @@ export interface GastosCajaQueryParams {
   estado?: string;
   fechaInicio?: string;
   fechaFin?: string;
+  search?: string;
+  categoriaRendicion?: string;
+  tipoDocumento?: string;
+  montoMin?: number;
+  montoMax?: number;
+  informacionIncompleta?: "true" | "false";
+  orden?: "fecha_desc" | "fecha_asc" | "monto_desc" | "monto_asc";
   page?: number;
   limit?: number;
 }

@@ -74,12 +74,6 @@ function mesDelAnioLabel(periodoHasta: string) {
   return `${MESES_MAYUSCULA[fin.getUTCMonth()]} DEL ${fin.getUTCFullYear()}`;
 }
 
-function fechaCorteAnterior(periodoDesde: string) {
-  const inicio = parseFecha(periodoDesde);
-  const anterior = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate() - 1));
-  return diaMesLargo(anterior);
-}
-
 // El nombre de la caja ya viene como "Caja Bolivianos Lipeña" / "Caja La Paz
 // Dólares" (con "Caja" incluido) — nunca hay que anteponer "CAJA" de nuevo.
 function cajaLabel(nombre: string) {
@@ -222,194 +216,424 @@ const pdfTableStyles = { fontSize: 8, cellPadding: 3, lineColor: [0, 0, 0] as [n
 const pdfHeadStyles = { fillColor: [255, 255, 255] as [number, number, number], textColor: [0, 0, 0] as [number, number, number], fontStyle: "bold" as const, lineWidth: 0.4, lineColor: [0, 0, 0] as [number, number, number] };
 
 // ============================================================================
-// Reporte mensual "CAJA {NOMBRE}" — mismo formato del documento real impreso
-// (Fondos Recibidos Debe/Haber, Detalle de Gastos por categoría con
-// sub-totales, Total Gastos en el Mes, Saldo Deudor o Acreedor).
+// Reporte mensual "CAJA {SECTOR}" — réplica del Excel real que arma el
+// administrador de la caja ("CAJA LIPEÑA SEPTIEMBRE 2026.xlsx"): mismas
+// columnas A–G, mismas celdas combinadas, Calibri, franja azul con el
+// encargado, TOTAL de fondos en dorado, las 10 categorías siempre visibles
+// (aunque estén vacías) con su SUB-TOTAL, y el saldo calculado igual que la
+// fórmula del Excel (total de fondos − total de gastos).
 // ============================================================================
 
+type GastoReporte = ReporteRendicion["grupos"][number]["gastos"][number];
+type Lado = "thin" | "medium";
+
+const COLOR_ENCARGADO = "D9E1F2";
+const COLOR_TOTAL = "FFD966";
+const FORMATO_BS = "#,##0.00;[Red](#,##0.00)";
+
+// "Caja Bolivianos Lipeña" -> "LIPEÑA" (el documento dice "SECTOR: LIPEÑA"
+// y "CAJA LIPEÑA", sin la moneda).
+function sectorCaja(nombre: string) {
+  const sector = nombre.replace(/\b(caja|bolivianos|d[oó]lares)\b/gi, "").replace(/\s+/g, " ").trim();
+  return (sector || nombre).toUpperCase();
+}
+
+// Lo importado del Excel trae proveedor = glosa: se muestra una sola vez.
+function descripcionGasto(g: GastoReporte) {
+  const proveedor = g.proveedorNombre.trim();
+  const glosa = g.glosa.trim();
+  if (!proveedor || glosa.toUpperCase().includes(proveedor.toUpperCase())) return glosa;
+  if (proveedor.toUpperCase().includes(glosa.toUpperCase())) return proveedor;
+  return `${proveedor}. ${glosa}`;
+}
+
+function datosReporteMensual(reporte: ReporteRendicion) {
+  const fin = parseFecha(reporte.periodoHasta);
+  const inicio = parseFecha(reporte.periodoDesde);
+  const corte = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate() - 1));
+  const sector = sectorCaja(reporte.caja.nombre);
+  const totalFondos = reporte.saldoAnterior + reporte.totalFondos;
+  return {
+    sector,
+    titulo: `CAJA ${sector}`,
+    mesAnio: mesDelAnioLabel(reporte.periodoHasta),
+    mesCorto: `${MESES_MAYUSCULA[fin.getUTCMonth()]} ${fin.getUTCFullYear()}`,
+    nombreHoja: `CAJA ${MESES_MAYUSCULA[fin.getUTCMonth()]}`,
+    saldoLabel: `Saldo deudor al ${corte.getUTCDate()} de ${MESES_MAYUSCULA[corte.getUTCMonth()]} del ${corte.getUTCFullYear()}`,
+    totalFondos,
+    saldo: totalFondos - reporte.totalGastos,
+    archivo: `caja-${reporte.caja.codigo}-${reporte.numero.replace(/\//g, "-")}`
+  };
+}
+
+function bordes(l?: Lado, r?: Lado, t?: Lado, b?: Lado) {
+  const out: Record<string, unknown> = {};
+  const lado = (style: Lado) => ({ style, color: { rgb: "000000" } });
+  if (l) out.left = lado(l);
+  if (r) out.right = lado(r);
+  if (t) out.top = lado(t);
+  if (b) out.bottom = lado(b);
+  return out;
+}
+
+function estilo(o: {
+  sz?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  h?: "left" | "center" | "right";
+  wrap?: boolean;
+  fill?: string;
+  borde?: Record<string, unknown>;
+  fmt?: string;
+}) {
+  return {
+    font: { name: "Calibri", sz: o.sz ?? 10, bold: o.bold ?? false, italic: o.italic ?? false, underline: o.underline ?? false },
+    alignment: { ...(o.h ? { horizontal: o.h } : {}), vertical: "center", wrapText: o.wrap ?? false },
+    ...(o.fill ? { fill: { patternType: "solid", fgColor: { rgb: o.fill } } } : {}),
+    ...(o.borde ? { border: o.borde } : {}),
+    ...(o.fmt ? { numFmt: o.fmt } : {})
+  };
+}
+
 export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
-  const lastCol = 4; // A..E
-  const aoa: Array<Array<string | number>> = [
-    [cajaLabel(reporte.caja.nombre), "", "", "", ""],
-    [`MES DE: ${mesDelAnioLabel(reporte.periodoHasta)}`, "", "", "", ""],
-    [reporte.caja.encargadoNombre?.toUpperCase() ?? "", "", "", "", ""],
-    [],
-    ["FONDOS RECIBIDOS", "Ref.", "Detalle", "Bs. DEBE", "Bs. HABER"],
-    [`Saldo deudor al ${fechaCorteAnterior(reporte.periodoDesde)}`, "", "", num(reporte.saldoAnterior), ""]
-  ];
-  const rowKinds: Array<"title" | "subtitle" | "encargado" | "section" | "header" | "normal" | "subtotal" | "total" | "plain">
-    = ["title", "subtitle", "encargado", "normal", "header", "normal"];
+  const d = datosReporteMensual(reporte);
+  type Celda = [string | number, ReturnType<typeof estilo> | null];
+  const filas: Celda[][] = [];
+  const merges: XLSX.Range[] = [];
+  const alturas: Record<number, number> = {};
+  const vacia: Celda = ["", null];
+  const fila = (celdas: Partial<Record<"A" | "B" | "C" | "D" | "E" | "F" | "G", Celda>>, altura?: number) => {
+    const r = filas.length;
+    filas.push((["A", "B", "C", "D", "E", "F", "G"] as const).map((col) => celdas[col] ?? vacia));
+    if (altura) alturas[r] = altura;
+    return r;
+  };
+  const combinar = (r1: number, c1: number, r2: number, c2: number) => merges.push({ s: { r: r1, c: c1 }, e: { r: r2, c: c2 } });
+  const fino = bordes("thin", "thin", "thin", "thin");
 
+  fila({ A: [`SECTOR: ${d.sector}`, estilo({ bold: true })] });
+  const rTitulo = fila({ A: [d.titulo, estilo({ sz: 16, bold: true, h: "center" })] }, 21);
+  combinar(rTitulo, 0, rTitulo, 6);
+  fila(
+    {
+      E: ["MES DE:", estilo({ bold: true })],
+      F: ["", estilo({ bold: true, borde: bordes("medium", undefined, "medium") })],
+      G: [d.mesAnio, estilo({ bold: true, wrap: true, borde: bordes(undefined, "medium", "medium") })]
+    },
+    27.6
+  );
+  const estiloEncargado = estilo({ sz: 12, bold: true, h: "center", fill: COLOR_ENCARGADO, borde: fino });
+  const rEncargado = fila(
+    Object.fromEntries((["A", "B", "C", "D", "E", "F", "G"] as const).map((c) => [c, [c === "A" ? (reporte.caja.encargadoNombre ?? "").toUpperCase() : "", estiloEncargado]])),
+    15
+  );
+  combinar(rEncargado, 0, rEncargado, 6);
+
+  const encabezadoFondos = estilo({ bold: true, h: "left", borde: fino });
+  const rFondos = fila({
+    A: ["FONDOS RECIBIDOS:", encabezadoFondos],
+    B: ["", encabezadoFondos],
+    C: ["", encabezadoFondos],
+    D: ["", encabezadoFondos],
+    E: ["", encabezadoFondos],
+    F: ["Bs.", estilo({ bold: true, h: "center", borde: fino })],
+    G: ["Bs.", estilo({ bold: true, h: "center", borde: fino })]
+  });
+  fila({
+    A: ["", encabezadoFondos],
+    B: ["", encabezadoFondos],
+    C: ["", encabezadoFondos],
+    D: ["", encabezadoFondos],
+    E: ["", encabezadoFondos],
+    F: ["DEBE", estilo({ bold: true, h: "center", borde: fino })],
+    G: ["HABER", estilo({ bold: true, h: "center", borde: fino })]
+  });
+  combinar(rFondos, 0, rFondos + 1, 4);
+
+  const filaFondo = (a: Celda, b: Celda, detalle: Celda, debe: Celda) => {
+    const r = fila({
+      A: a,
+      B: b,
+      C: detalle,
+      D: ["", estilo({ borde: bordes(undefined, undefined, "thin", "thin") })],
+      E: ["", estilo({ borde: bordes(undefined, "thin", "thin", "thin") })],
+      F: debe,
+      G: ["", estilo({ borde: fino })]
+    });
+    combinar(r, 2, r, 4);
+  };
+  filaFondo(
+    [d.saldoLabel, estilo({ borde: fino })],
+    ["", estilo({ borde: fino })],
+    ["", estilo({ borde: bordes("thin", undefined, "thin", "thin") })],
+    [num(reporte.saldoAnterior), estilo({ h: "right", fmt: "#,##0.00", borde: fino })]
+  );
+  filaFondo(
+    ["RECIBIDO EN EFECTIVO:", estilo({ bold: true, underline: true, borde: fino })],
+    ["", estilo({ borde: fino })],
+    ["", estilo({ borde: bordes("thin", undefined, "thin", "thin") })],
+    ["", estilo({ borde: fino })]
+  );
   for (const f of reporte.fondos) {
-    aoa.push([formatFecha(f.fecha), f.referencia ?? "", TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo, num(Number(f.monto)), ""]);
-    rowKinds.push("normal");
+    filaFondo(
+      [formatFecha(f.fecha), estilo({ sz: 9, h: "center", borde: fino })],
+      [f.referencia ?? "", estilo({ sz: 9, h: "center", borde: fino })],
+      [TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo, estilo({ sz: 9, h: "left", borde: bordes("thin", undefined, "thin", "thin") })],
+      [num(Number(f.monto)), estilo({ sz: 9, h: "right", fmt: "#,##0.00", borde: fino })]
+    );
   }
-  aoa.push(["", "", "TOTAL", num(reporte.saldoAnterior + reporte.totalFondos), ""]);
-  rowKinds.push("subtotal");
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push(["DETALLE DE GASTOS", "", "", "FACTURA O RECIBO", "IMPORTE"]);
-  rowKinds.push("header");
+  const estiloTotalFondos = estilo({ bold: true, h: "center", fill: COLOR_TOTAL, borde: bordes("thin", "thin", undefined, "thin") });
+  const rTotalFondos = fila({
+    A: ["", estilo({ bold: true, borde: bordes("medium") })],
+    D: ["TOTAL", estiloTotalFondos],
+    E: ["", estiloTotalFondos],
+    F: [num(d.totalFondos), estilo({ bold: true, h: "right", fmt: "#,##0.00", fill: COLOR_TOTAL, borde: bordes("thin", "thin", undefined, "thin") })],
+    G: ["", estilo({ fill: COLOR_TOTAL, borde: bordes("thin", "thin", undefined, "thin") })]
+  });
+  combinar(rTotalFondos, 3, rTotalFondos, 4);
 
-  for (const grupo of reporte.grupos) {
-    aoa.push([grupo.label, "", "", "", ""]);
-    rowKinds.push("section");
+  const bajoFino = estilo({ bold: true, borde: bordes(undefined, undefined, undefined, "thin") });
+  fila({
+    A: ["DETALLE DE GASTOS", estilo({ bold: true, borde: bordes("medium", undefined, undefined, "thin") })],
+    B: ["", bajoFino],
+    C: ["", bajoFino],
+    D: ["", bajoFino],
+    E: ["", bajoFino],
+    F: ["", estilo({ bold: true, borde: bordes("thin", "thin", undefined, "thin") })],
+    G: ["", estilo({ bold: true, borde: bordes("thin", "medium", undefined, "thin") })]
+  });
+  const centroFino = estilo({ bold: true, h: "center", borde: bordes(undefined, undefined, "thin", "thin") });
+  const rDescripcion = fila({
+    A: ["DESCRIPCION", estilo({ bold: true, h: "center", borde: bordes("medium", undefined, "thin", "thin") })],
+    B: ["", centroFino],
+    C: ["", centroFino],
+    D: ["", centroFino],
+    E: ["", estilo({ bold: true, h: "center", borde: bordes(undefined, "thin", "thin", "thin") })],
+    F: ["FACTURA O RECIBO", estilo({ bold: true, h: "left", borde: fino })],
+    G: ["IMPORTE", estilo({ bold: true, h: "center", borde: bordes("thin", "medium", "thin", "thin") })]
+  });
+  combinar(rDescripcion, 0, rDescripcion, 4);
+
+  const marco = (celdas: Partial<Record<"A" | "B" | "C" | "D" | "E" | "F" | "G", Celda>> = {}) =>
+    fila({
+      A: ["", estilo({ borde: bordes("medium") })],
+      G: ["", estilo({ borde: bordes(undefined, "medium") })],
+      ...celdas
+    });
+
+  reporte.grupos.forEach((grupo, indice) => {
+    marco({
+      A: [grupo.label, estilo({ bold: true, underline: true, borde: bordes("medium") })],
+      F: ["", estilo({ borde: bordes("thin", "thin") })],
+      G: ["", estilo({ borde: bordes("thin", "medium") })]
+    });
     for (const g of grupo.gastos) {
-      aoa.push([`${g.proveedorNombre}. ${g.glosa}`, "", "", g.numeroRespaldo ?? "", num(Number(g.montoTotal))]);
-      rowKinds.push("normal");
+      const lineaFina = estilo({ sz: 9, bold: true, h: "left", borde: bordes(undefined, undefined, "thin", "thin") });
+      const r = fila({
+        A: [descripcionGasto(g), estilo({ sz: 9, bold: true, h: "left", borde: bordes("medium", undefined, "thin", "thin") })],
+        B: ["", lineaFina],
+        C: ["", lineaFina],
+        D: ["", lineaFina],
+        E: ["", estilo({ sz: 9, bold: true, borde: bordes(undefined, "thin", "thin", "thin") })],
+        F: [g.numeroRespaldo ?? "", estilo({ sz: 9, bold: true, h: "left", borde: fino })],
+        G: [num(Number(g.montoTotal)), estilo({ sz: 9, bold: true, h: "right", fmt: FORMATO_BS, borde: bordes("thin", "medium", "thin", "thin") })]
+      });
+      combinar(r, 0, r, 4);
     }
-    aoa.push(["SUB TOTAL", "", "", "", num(grupo.subtotal)]);
-    rowKinds.push("subtotal");
-  }
-
-  aoa.push([`TOTAL GASTOS EN EL MES: ${formatBs(reporte.totalGastos)}`, "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push([`SALDO DEUDOR O ACREEDOR: ${formatBs(reporte.saldoNuevo)}`, "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push([`Mina ${reporte.caja.nombre}, ${diaMesLargo(new Date(), false)}`, "", "", "", ""]);
-  rowKinds.push("normal");
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push([reporte.caja.encargadoNombre ?? "________________________", "", "", "________________________", ""]);
-  rowKinds.push("normal");
-  aoa.push(["ADMINISTRADOR", "", "", "SUPERINTENDENTE GENERAL", ""]);
-  rowKinds.push("normal");
-
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 16 }];
-  sheet["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
-    { s: { r: 2, c: 0 }, e: { r: 2, c: lastCol } },
-    { s: { r: 5, c: 0 }, e: { r: 5, c: 2 } }
-  ];
-
-  rowKinds.forEach((kind, index) => {
-    const style =
-      kind === "title"
-        ? titleStyle
-        : kind === "subtitle"
-          ? { font: { bold: true, sz: 11 }, alignment: { horizontal: "center" } }
-          : kind === "encargado"
-            ? { font: { bold: true, sz: 10 }, alignment: { horizontal: "center" } }
-            : kind === "section"
-              ? sectionStyle
-              : kind === "header"
-                ? headerStyle
-                : kind === "subtotal"
-                  ? subtotalStyle
-                  : kind === "total"
-                    ? totalStyle
-                    : kind === "plain"
-                      ? { font: { bold: true, sz: 10 } }
-                      : bodyStyle;
-    styleRow(sheet, index, lastCol, style);
+    if (grupo.gastos.length === 0) {
+      marco({ F: ["", estilo({ borde: bordes("thin", "thin") })], G: ["", estilo({ borde: bordes("thin", "medium") })] });
+    }
+    const subtotal = estilo({ bold: true, h: "center", borde: bordes(undefined, undefined, "medium", "medium") });
+    const rSub = marco({
+      D: [indice === 0 ? "SUB TOTAL" : "SUB-TOTAL", estilo({ bold: true, h: "center", borde: bordes("medium", undefined, "medium", "medium") })],
+      E: ["", subtotal],
+      F: ["", estilo({ bold: true, h: "center", borde: bordes(undefined, "thin", "medium", "medium") })],
+      G: [num(grupo.subtotal), estilo({ bold: true, h: "right", fmt: FORMATO_BS, borde: bordes("thin", "medium", "medium", "medium") })]
+    });
+    alturas[rSub] = 15;
+    combinar(rSub, 3, rSub, 5);
+    if (indice < reporte.grupos.length - 1) marco();
   });
 
-  for (let r = 0; r < aoa.length; r += 1) {
-    numberFormatCell(sheet, r, 3);
-    numberFormatCell(sheet, r, 4);
-  }
+  fila({
+    A: ["TOTAL GASTOS EN EL MES", estilo({ bold: true, h: "left", borde: bordes("thin") })],
+    F: ["", estilo({ bold: true, borde: bordes("thin", "thin", undefined, "thin") })],
+    G: [num(reporte.totalGastos), estilo({ bold: true, h: "right", fmt: FORMATO_BS, borde: bordes("thin", "thin", undefined, "thin") })]
+  });
+  const lineaSaldo = estilo({ bold: true, borde: bordes(undefined, undefined, "thin", "thin") });
+  fila({
+    A: ["SALDO DEUDOR O ACREEDOR", estilo({ bold: true, h: "left", borde: bordes("thin", undefined, "thin", "thin") })],
+    B: ["", lineaSaldo],
+    C: ["", lineaSaldo],
+    D: ["", lineaSaldo],
+    E: ["", lineaSaldo],
+    F: ["", estilo({ bold: true, borde: bordes(undefined, "thin", "thin", "thin") })],
+    G: [num(d.saldo), estilo({ bold: true, h: "right", fmt: FORMATO_BS, borde: fino })]
+  });
+  fila({}, 9);
+  const rLugar = fila({ C: [`MINA ${d.sector}, ${d.mesCorto}`, estilo({ h: "center" })] });
+  combinar(rLugar, 2, rLugar, 4);
+  for (let i = 0; i < 6; i += 1) fila({}, 12.75);
+  fila({
+    B: [reporte.caja.encargadoNombre ?? "", estilo({ bold: true, italic: true, h: "center" })],
+    E: ["", estilo({ bold: true, italic: true, h: "center" })]
+  });
+  fila({
+    B: ["ADMINISTRADOR", estilo({ bold: true, h: "center" })],
+    E: ["SUPERINTENDENTE GENERAL", estilo({ bold: true, h: "center" })]
+  });
+
+  const sheet = XLSX.utils.aoa_to_sheet(filas.map((f) => f.map(([v]) => v)));
+  filas.forEach((f, r) =>
+    f.forEach(([, s], c) => {
+      if (!s) return;
+      const address = XLSX.utils.encode_cell({ r, c });
+      if (!sheet[address]) sheet[address] = { t: "s", v: "" };
+      sheet[address].s = s;
+    })
+  );
+  sheet["!cols"] = [{ wch: 18.5 }, { wch: 12.83 }, { wch: 8.43 }, { wch: 8.43 }, { wch: 14.67 }, { wch: 15.67 }, { wch: 13.33 }];
+  sheet["!rows"] = filas.map((_, r) => (alturas[r] ? { hpt: alturas[r] } : {}));
+  sheet["!merges"] = merges;
+  sheet["!margins"] = { left: 0.25, right: 0.25, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 };
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, `Caja ${reporte.caja.nombre}`.slice(0, 31));
-  XLSX.writeFile(workbook, `caja-${reporte.caja.codigo}-${reporte.numero.replace(/\//g, "-")}.xlsx`);
+  XLSX.utils.book_append_sheet(workbook, sheet, d.nombreHoja.slice(0, 31));
+  XLSX.writeFile(workbook, `${d.archivo}.xlsx`);
 }
 
 export function exportReporteRendicionPdf(reporte: ReporteRendicion) {
+  const d = datosReporteMensual(reporte);
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const centerX = pageWidth / 2;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margen = 30;
+  const ancho = pageWidth - margen * 2;
+  const negro: [number, number, number] = [0, 0, 0];
+  const azul: [number, number, number] = [217, 225, 242];
+  const dorado: [number, number, number] = [255, 217, 102];
+  const sinBorde = { top: 0, right: 0, bottom: 0, left: 0 };
+  const base = { fontSize: 8, cellPadding: 2.5, lineColor: negro, lineWidth: 0.4, textColor: negro, fillColor: false as const };
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.text(cajaLabel(reporte.caja.nombre), centerX, 36, { align: "center" });
+  doc.setFontSize(9);
+  doc.text(`SECTOR: ${d.sector}`, margen, 28);
+  doc.setFontSize(16);
+  doc.text(d.titulo, pageWidth / 2, 48, { align: "center" });
+  doc.setFontSize(9);
+  doc.text("MES DE:", pageWidth - margen - 150, 66);
+  doc.text(d.mesAnio, pageWidth - margen, 66, { align: "right" });
+
+  doc.setFillColor(...azul);
+  doc.setDrawColor(...negro);
+  doc.setLineWidth(0.4);
+  doc.rect(margen, 74, ancho, 16, "FD");
   doc.setFontSize(11);
-  doc.text(`MES DE: ${mesDelAnioLabel(reporte.periodoHasta)}`, centerX, 52, { align: "center" });
-  if (reporte.caja.encargadoNombre) {
-    doc.setFontSize(10);
-    doc.text(reporte.caja.encargadoNombre.toUpperCase(), centerX, 66, { align: "center" });
-  }
-
-  const fondosRows: RowInput[] = [
-    [`Saldo deudor al ${fechaCorteAnterior(reporte.periodoDesde)}`, "", "", formatBs(reporte.saldoAnterior), ""],
-    ...reporte.fondos.map((f): RowInput => [
-      formatFecha(f.fecha),
-      f.referencia ?? "",
-      TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo,
-      formatBs(Number(f.monto)),
-      ""
-    ]),
-    ["", "", "TOTAL", formatBs(reporte.saldoAnterior + reporte.totalFondos), ""]
-  ];
+  doc.text((reporte.caja.encargadoNombre ?? "").toUpperCase(), pageWidth / 2, 85.5, { align: "center" });
 
   autoTable(doc, {
-    startY: 80,
-    head: [["FONDOS RECIBIDOS", "Ref.", "Detalle", "Bs. DEBE", "Bs. HABER"]],
-    body: fondosRows,
-    styles: pdfTableStyles,
-    headStyles: pdfHeadStyles,
-    columnStyles: { 3: { halign: "right" }, 4: { halign: "right" } },
-    margin: { left: 30, right: 30 },
-    didParseCell: (hook) => {
-      if (hook.section === "body" && hook.row.index === fondosRows.length - 1) {
-        hook.cell.styles.fontStyle = "bold";
-      }
-    }
+    startY: 90,
+    theme: "plain",
+    margin: { left: margen, right: margen },
+    styles: base,
+    headStyles: { ...base, fontStyle: "bold" },
+    columnStyles: { 0: { cellWidth: 95 }, 1: { cellWidth: 70 }, 3: { cellWidth: 85, halign: "right" }, 4: { cellWidth: 85 } },
+    head: [
+      [
+        { content: "FONDOS RECIBIDOS:", colSpan: 3, rowSpan: 2, styles: { halign: "left", valign: "middle" } },
+        { content: "Bs.", styles: { halign: "center" } },
+        { content: "Bs.", styles: { halign: "center" } }
+      ],
+      [
+        { content: "DEBE", styles: { halign: "center" } },
+        { content: "HABER", styles: { halign: "center" } }
+      ]
+    ],
+    body: [
+      [{ content: d.saldoLabel, colSpan: 3 }, formatBs(reporte.saldoAnterior), ""],
+      [{ content: "RECIBIDO EN EFECTIVO:", colSpan: 3, styles: { fontStyle: "bold" } }, "", ""],
+      ...reporte.fondos.map((f): RowInput => [
+        { content: formatFecha(f.fecha), styles: { halign: "center" } },
+        { content: f.referencia ?? "", styles: { halign: "center" } },
+        TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo,
+        formatBs(Number(f.monto)),
+        ""
+      ]),
+      [
+        { content: "", styles: { lineWidth: sinBorde } },
+        { content: "", styles: { lineWidth: sinBorde } },
+        { content: "TOTAL", styles: { fontStyle: "bold", halign: "center", fillColor: dorado } },
+        { content: formatBs(d.totalFondos), styles: { fontStyle: "bold", fillColor: dorado } },
+        { content: "", styles: { fillColor: dorado } }
+      ]
+    ]
   });
 
-  const afterFondosY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100;
+  const despuesFondos = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 160;
 
-  const gastoRows: RowInput[] = [];
-  const gastoRowKinds: Array<"group" | "normal" | "subtotal"> = [];
-  for (const grupo of reporte.grupos) {
-    gastoRows.push([grupo.label, "", ""]);
-    gastoRowKinds.push("group");
+  const cuerpo: RowInput[] = [];
+  const gruesas = new Set<number>();
+  reporte.grupos.forEach((grupo, indice) => {
+    cuerpo.push([{ content: grupo.label, colSpan: 3, styles: { fontStyle: "bold" } }]);
     for (const g of grupo.gastos) {
-      gastoRows.push([`${g.proveedorNombre}. ${g.glosa}`, g.numeroRespaldo ?? "", formatBs(Number(g.montoTotal))]);
-      gastoRowKinds.push("normal");
+      cuerpo.push([descripcionGasto(g), g.numeroRespaldo ?? "", { content: formatBs(Number(g.montoTotal)), styles: { halign: "right" } }]);
     }
-    gastoRows.push(["SUB TOTAL", "", formatBs(grupo.subtotal)]);
-    gastoRowKinds.push("subtotal");
-  }
+    if (grupo.gastos.length === 0) cuerpo.push(["", "", ""]);
+    gruesas.add(cuerpo.length);
+    cuerpo.push([
+      { content: indice === 0 ? "SUB TOTAL" : "SUB-TOTAL", colSpan: 2, styles: { fontStyle: "bold", halign: "right" } },
+      { content: formatBs(grupo.subtotal), styles: { fontStyle: "bold", halign: "right" } }
+    ]);
+  });
+  cuerpo.push([
+    { content: "TOTAL GASTOS EN EL MES", colSpan: 2, styles: { fontStyle: "bold" } },
+    { content: formatBs(reporte.totalGastos), styles: { fontStyle: "bold", halign: "right" } }
+  ]);
+  cuerpo.push([
+    { content: "SALDO DEUDOR O ACREEDOR", colSpan: 2, styles: { fontStyle: "bold" } },
+    { content: formatBs(d.saldo), styles: { fontStyle: "bold", halign: "right" } }
+  ]);
 
   autoTable(doc, {
-    startY: afterFondosY + 16,
-    head: [["DETALLE DE GASTOS", "Factura o Recibo", "Importe"]],
-    body: gastoRows,
-    styles: pdfTableStyles,
-    headStyles: pdfHeadStyles,
-    columnStyles: { 2: { halign: "right" } },
-    margin: { left: 30, right: 30, bottom: 90 },
+    startY: despuesFondos + 10,
+    theme: "plain",
+    margin: { left: margen, right: margen, bottom: 40 },
+    styles: { ...base, fontStyle: "bold" },
+    headStyles: { ...base, fontStyle: "bold" },
+    columnStyles: { 1: { cellWidth: 90 }, 2: { cellWidth: 85 } },
+    head: [
+      [{ content: "DETALLE DE GASTOS", colSpan: 3, styles: { halign: "left" } }],
+      [
+        { content: "DESCRIPCION", styles: { halign: "center" } },
+        { content: "FACTURA O RECIBO", styles: { halign: "left" } },
+        { content: "IMPORTE", styles: { halign: "center" } }
+      ]
+    ],
+    body: cuerpo,
     didParseCell: (hook) => {
-      if (hook.section !== "body") return;
-      const kind = gastoRowKinds[hook.row.index];
-      if (kind === "group" || kind === "subtotal") hook.cell.styles.fontStyle = "bold";
+      if (hook.section === "body" && gruesas.has(hook.row.index)) hook.cell.styles.lineWidth = 1;
     }
   });
 
-  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 100;
-  let y = Math.min(finalY + 18, doc.internal.pageSize.getHeight() - 90);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text(`TOTAL GASTOS EN EL MES: ${formatBs(reporte.totalGastos)}`, 34, y);
-  y += 14;
-  doc.text(`SALDO DEUDOR O ACREEDOR: ${formatBs(reporte.saldoNuevo)}`, 34, y);
-  y += 28;
+  let y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 400) + 20;
+  if (y + 90 > pageHeight - 30) {
+    doc.addPage();
+    y = 60;
+  }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`Mina ${reporte.caja.nombre}, ${diaMesLargo(new Date(), false)}`, 34, y);
+  doc.text(`MINA ${d.sector}, ${d.mesCorto}`, pageWidth / 2, y, { align: "center" });
+  const firmaY = y + 70;
+  const xIzquierda = margen + 115;
+  const xDerecha = pageWidth - margen - 140;
+  doc.setFont("helvetica", "bolditalic");
+  doc.text(reporte.caja.encargadoNombre ?? "", xIzquierda, firmaY, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.text("ADMINISTRADOR", xIzquierda, firmaY + 12, { align: "center" });
+  doc.text("SUPERINTENDENTE GENERAL", xDerecha, firmaY + 12, { align: "center" });
 
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const firmaY = pageHeight - 48;
-  doc.text(reporte.caja.encargadoNombre ?? "________________________", 60, firmaY);
-  doc.text("ADMINISTRADOR", 60, firmaY + 14);
-  doc.text("________________________", pageWidth - 200, firmaY);
-  doc.text("SUPERINTENDENTE GENERAL", pageWidth - 200, firmaY + 14);
-
-  openBrowserPrintDialog(doc, `caja-${reporte.caja.codigo}-${reporte.numero.replace(/\//g, "-")}.pdf`);
+  openBrowserPrintDialog(doc, `${d.archivo}.pdf`);
 }
 
 // ============================================================================
