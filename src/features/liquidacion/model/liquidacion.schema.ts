@@ -71,6 +71,7 @@ export const anulacionLiquidacionSchema = z.object({
 export const liquidacionSchema = z.object({
   id: z.string().min(1),
   numero: z.number().int().positive().nullable().optional(),
+  gestion: z.number().int().positive().nullable().optional(),
   transportistaId: z.number().int().positive(),
   tipoPeriodo: tipoPeriodoLiquidacionSchema,
   fechaInicio: z.string(),

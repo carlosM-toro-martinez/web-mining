@@ -37,7 +37,9 @@ import {
   exportLiquidacionParticularExcel,
   exportLiquidacionParticularPdf,
   exportLiquidacionPorViajeExcel,
-  exportLiquidacionPorViajePdf
+  exportLiquidacionPorViajePdf,
+  calcularTotales,
+  folioLiquidacion
 } from "@/features/logisticaReportes/lib/logisticaExport";
 import { useConceptosLiquidacionQuery } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
@@ -208,20 +210,8 @@ export function LiquidacionesPage() {
 
   const filasPorPlaca = useMemo(() => (liquidacion ? agruparPorPlaca(liquidacion) : []), [liquidacion]);
 
-  const totales = useMemo(() => {
-    if (!liquidacion) return null;
-    // Bruto = suma de los subtotales ya agrupados por vehículo+precio (ver
-    // filasPorPlaca/agruparPorPlaca), nunca la suma directa de los
-    // `subtotal` por-viaje — esos dos métodos pueden dar montos distintos.
-    const bruto = filasPorPlaca.reduce((acc, f) => acc + f.subtotal, 0);
-    const abonos = (liquidacion.itemsConcepto ?? [])
-      .filter((i) => i.concepto?.tipo === "ABONO")
-      .reduce((acc, i) => acc + Number(i.monto), 0);
-    const deducciones = (liquidacion.itemsConcepto ?? [])
-      .filter((i) => i.concepto?.tipo === "DEDUCCION")
-      .reduce((acc, i) => acc + Number(i.monto), 0);
-    return { bruto, abonos, deducciones, neto: bruto + abonos - deducciones };
-  }, [liquidacion, filasPorPlaca]);
+  // Mismo cálculo que los documentos impresos (ver calcularTotales).
+  const totales = useMemo(() => (liquidacion ? calcularTotales(liquidacion) : null), [liquidacion]);
 
   const conceptoSeleccionado = useMemo(
     () => conceptos.find((c) => String(c.id) === conceptoId) ?? null,
@@ -595,7 +585,7 @@ export function LiquidacionesPage() {
                 <tbody className="divide-y divide-[var(--color-border-soft)]">
                   {historialTransportista.map((item) => (
                     <tr key={item.id}>
-                      <td className="py-1 pr-3 font-mono">{item.numero ?? "-"}</td>
+                      <td className="py-1 pr-3 font-mono">{folioLiquidacion(item) ?? "-"}</td>
                       <td className="py-1 pr-3">{formatFecha(item.fechaInicio)}</td>
                       <td className="py-1 pr-3">{formatFecha(item.fechaFin)}</td>
                       <td className="py-1 pr-3 text-right font-semibold">Bs {formatMoneda(item.totalNeto)}</td>
@@ -660,7 +650,7 @@ export function LiquidacionesPage() {
               ) : null}
               {liquidaciones.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
-                  <td className="px-3 py-2 font-mono text-xs">{item.numero ?? "-"}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{folioLiquidacion(item) ?? "-"}</td>
                   <td className="px-3 py-2 text-xs font-semibold">{item.transportista?.nombreORazonSocial ?? "-"}</td>
                   <td className="px-3 py-2 text-xs">{item.tipoPeriodo === "SEMANAL" ? "Semanal" : "Mensual"}</td>
                   <td className="px-3 py-2 text-xs">{formatFecha(item.fechaInicio)}</td>
@@ -706,7 +696,7 @@ export function LiquidacionesPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold">
-                    {liquidacion.numero ? `Nº ${liquidacion.numero} — ` : ""}
+                    {folioLiquidacion(liquidacion) ? `Nº ${folioLiquidacion(liquidacion)} — ` : ""}
                     {liquidacion.transportista?.nombreORazonSocial}
                   </h2>
                   <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">

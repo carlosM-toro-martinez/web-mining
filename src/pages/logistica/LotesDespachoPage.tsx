@@ -110,6 +110,52 @@ function formatTonelaje(value: string | number | null | undefined) {
   return Number(value ?? 0).toLocaleString("es-BO", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
+function netoCalculado(bruto: string, tara: string) {
+  if (bruto === "" || tara === "") return null;
+  return Math.round((Number(bruto) - Number(tara)) * 1000) / 1000;
+}
+
+// Neto del pesaje: se llena solo con bruto − tara (3 decimales), pero se
+// puede corregir a mano si el ticket de balanza dice otra cosa (a veces
+// cambia algún decimal). `valor` null = automático.
+function CampoNeto({
+  bruto,
+  tara,
+  valor,
+  onCambiar
+}: {
+  bruto: string;
+  tara: string;
+  valor: string | null;
+  onCambiar: (valor: string | null) => void;
+}) {
+  const calculado = netoCalculado(bruto, tara);
+  const mostrado = valor ?? (calculado !== null ? calculado.toFixed(3) : "");
+  const corregido = valor !== null && valor !== "" && calculado !== null && Number(valor) !== calculado;
+  return (
+    <div>
+      <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Neto (editable)</label>
+      <input
+        type="number"
+        min="0.001"
+        step="0.001"
+        value={mostrado}
+        onChange={(e) => onCambiar(e.target.value)}
+        title="Se calcula solo (bruto − tara). Corrígelo si el ticket de balanza dice otro valor."
+        className={`${inputClassName} w-32 font-bold ${corregido ? "border-[var(--color-warning)] ring-1 ring-[var(--color-warning)]" : ""}`}
+      />
+      {corregido && calculado !== null ? (
+        <p className="mt-1 text-[11px] text-[var(--color-warning)]">
+          Corregido a mano (calculado: {calculado.toFixed(3)}){" "}
+          <button type="button" onClick={() => onCambiar(null)} className="font-semibold underline">
+            usar calculado
+          </button>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 // Texto boilerplate del Conocimiento real ("Carga para Ingenio del sector
 // Lipeña"), precargado y editable — así el usuario no tiene que escribirlo
 // cada vez y el Conocimiento exportado no sale con la descripción vacía.
@@ -331,8 +377,15 @@ function EditarLoteModal({
   const [tonelajeBruto, setTonelajeBruto] = useState(lote.pesaje ? String(lote.pesaje.tonelajeBruto) : "");
   const [tonelajeTara, setTonelajeTara] = useState(lote.pesaje ? String(lote.pesaje.tonelajeTara) : "");
 
-  const tonelajeNetoPreview =
-    lote.pesaje && tonelajeBruto && tonelajeTara ? Number(tonelajeBruto) - Number(tonelajeTara) : null;
+  // Si el neto guardado no es bruto − tara es porque se corrigió a mano: se
+  // conserva como corrección para no perderlo al guardar otros cambios.
+  const [tonelajeNetoManual, setTonelajeNetoManual] = useState<string | null>(() => {
+    if (!lote.pesaje) return null;
+    const guardado = Number(lote.pesaje.tonelajeNeto);
+    const calculado = netoCalculado(String(lote.pesaje.tonelajeBruto), String(lote.pesaje.tonelajeTara));
+    return calculado !== null && Math.abs(guardado - calculado) > 0.0005 ? guardado.toFixed(3) : null;
+  });
+  const tonelajeNetoFinal = tonelajeNetoManual ?? netoCalculado(tonelajeBruto, tonelajeTara)?.toFixed(3) ?? "";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -359,7 +412,11 @@ function EditarLoteModal({
           descripcion: descripcion.trim() || null,
           observaciones: observaciones.trim() || null,
           ...(lote.pesaje
-            ? { tonelajeBruto: Number(tonelajeBruto), tonelajeTara: Number(tonelajeTara) }
+            ? {
+                tonelajeBruto: Number(tonelajeBruto),
+                tonelajeTara: Number(tonelajeTara),
+                tonelajeNeto: Number(tonelajeNetoFinal)
+              }
             : {})
         }
       },
@@ -434,11 +491,7 @@ function EditarLoteModal({
                 className={`${inputClassName} w-32`}
                 placeholder="Tara"
               />
-              {tonelajeNetoPreview !== null ? (
-                <span className="text-xs text-[var(--color-on-surface-variant)]">
-                  Neto: <span className="font-semibold text-[var(--color-on-surface)]">{formatTonelaje(tonelajeNetoPreview)}</span>
-                </span>
-              ) : null}
+              <CampoNeto bruto={tonelajeBruto} tara={tonelajeTara} valor={tonelajeNetoManual} onCambiar={setTonelajeNetoManual} />
             </div>
           </div>
         ) : null}
@@ -607,6 +660,7 @@ export function LotesDespachoPage() {
   const [tonelajeBruto, setTonelajeBruto] = useState("");
   const [tonelajeTara, setTonelajeTara] = useState("");
   const [pesajeObservaciones, setPesajeObservaciones] = useState("");
+  const [tonelajeNetoManual, setTonelajeNetoManual] = useState<string | null>(null);
 
   // --- Form: combustible entregado ---
   const [combustibleEntregadoLitros, setCombustibleEntregadoLitros] = useState("");
@@ -616,8 +670,6 @@ export function LotesDespachoPage() {
   const [transbordoChoferId, setTransbordoChoferId] = useState("");
   const [transbordoMotivo, setTransbordoMotivo] = useState("");
 
-  const tonelajeNetoPreview =
-    tonelajeBruto && tonelajeTara ? Number(tonelajeBruto) - Number(tonelajeTara) : null;
 
   // El backend exige que la fecha del F101 coincida EXACTO con la del
   // Conocimiento (mismaFechaCalendario en formulario101.service.ts) — se
@@ -759,13 +811,27 @@ export function LotesDespachoPage() {
       showError("Verifica los valores de tonelaje: el bruto debe ser mayor al tara.");
       return;
     }
+    const netoManual = tonelajeNetoManual !== null && tonelajeNetoManual !== "" ? Number(tonelajeNetoManual) : undefined;
+    if (netoManual !== undefined && !(netoManual > 0)) {
+      showError("El neto debe ser mayor a cero.");
+      return;
+    }
     registrarPesajeMutation.mutate(
-      { id, payload: { tonelajeBruto: bruto, tonelajeTara: tara, observaciones: pesajeObservaciones.trim() || undefined } },
+      {
+        id,
+        payload: {
+          tonelajeBruto: bruto,
+          tonelajeTara: tara,
+          tonelajeNeto: netoManual,
+          observaciones: pesajeObservaciones.trim() || undefined
+        }
+      },
       {
         onSuccess: () => {
           showSuccess("Pesaje registrado. El lote pasó a Acopiado.");
           setTonelajeBruto("");
           setTonelajeTara("");
+          setTonelajeNetoManual(null);
           setPesajeObservaciones("");
         },
         onError: (error) => showError(normalizeError(error, "No se pudo registrar el pesaje."))
@@ -1364,9 +1430,7 @@ export function LotesDespachoPage() {
                         <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Tara</label>
                         <input type="number" min="0" step="0.001" value={tonelajeTara} onChange={(e) => setTonelajeTara(e.target.value)} className={`${inputClassName} w-32`} />
                       </div>
-                      <div className="px-2 text-sm text-[var(--color-on-surface-variant)]">
-                        Neto: <span className="font-bold text-[var(--color-on-surface)]">{tonelajeNetoPreview !== null ? tonelajeNetoPreview.toFixed(3) : "-"}</span>
-                      </div>
+                      <CampoNeto bruto={tonelajeBruto} tara={tonelajeTara} valor={tonelajeNetoManual} onCambiar={setTonelajeNetoManual} />
                       <input
                         value={pesajeObservaciones}
                         onChange={(e) => setPesajeObservaciones(e.target.value)}
@@ -1387,8 +1451,8 @@ export function LotesDespachoPage() {
                   {lote.pesaje ? (
                     <div className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-success)]/30 bg-[var(--color-success)]/8 px-3 py-2 text-xs">
                       <span>
-                        Bruto {lote.pesaje.tonelajeBruto} · Tara {lote.pesaje.tonelajeTara} · Neto{" "}
-                        <span className="font-bold">{lote.pesaje.tonelajeNeto}</span>
+                        Bruto {formatTonelaje(lote.pesaje.tonelajeBruto)} · Tara {formatTonelaje(lote.pesaje.tonelajeTara)} · Neto{" "}
+                        <span className="font-bold">{formatTonelaje(lote.pesaje.tonelajeNeto)}</span>
                         {lote.pesaje.observaciones ? ` · ${lote.pesaje.observaciones}` : ""}
                       </span>
                       <div className="flex gap-2">

@@ -294,7 +294,9 @@ export function agruparPorPlaca(liquidacion: Liquidacion): FilaPorPlaca[] {
 // agruparPorPlaca() (ya con el redondeo agrupado correcto), no de sumar
 // directo los `subtotal` por-viaje.
 export function calcularTotales(liquidacion: Liquidacion) {
-  const bruto = agruparPorPlaca(liquidacion).reduce((acc, f) => acc + f.subtotal, 0);
+  // Igual que la planilla Excel (y que totalBrutoDeGrupos en el backend):
+  // suma peso × precio sin redondear cada fila y redondea una sola vez.
+  const bruto = num(agruparPorPlaca(liquidacion).reduce((acc, f) => acc + f.pesoTotal * f.precioAplicado, 0));
   const abonos = (liquidacion.itemsConcepto ?? [])
     .filter((i) => i.concepto?.tipo === "ABONO")
     .reduce((acc, i) => acc + Number(i.monto), 0);
@@ -319,6 +321,15 @@ function periodoLabel(liquidacion: Liquidacion) {
 }
 
 const MARTE_NIT = "151558022";
+
+// Folio impreso "01/27": correlativo de 2 dígitos + los 2 últimos dígitos de
+// la gestión minera (guardada aparte al cerrar). Las liquidaciones viejas,
+// sin gestión, siguen mostrando su número tal cual ("81").
+export function folioLiquidacion(liquidacion: { numero?: number | null; gestion?: number | null }) {
+  if (!liquidacion.numero) return null;
+  if (!liquidacion.gestion) return String(liquidacion.numero);
+  return `${String(liquidacion.numero).padStart(2, "0")}/${String(liquidacion.gestion).slice(-2)}`;
+}
 const FIRMA_SUPERINTENDENTE = "Zenon Canaviri A";
 const FIRMA_SUPERINTENDENTE_CARGO = "Superintendente General";
 const FIRMA_ASISTENTE = "Lic. Maura M. Ucumari Alvarez";
@@ -376,7 +387,7 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   const pesoTotalTmb = filas.reduce((acc, f) => acc + f.pesoTotal, 0);
 
   const aoa: Array<Array<string | number>> = [
-    ["Empresa Minera", "", "", "", "", "", "N°", liquidacion.numero ?? "BORRADOR", ""] as any,
+    ["Empresa Minera", "", "", "", "", "", "N°", folioLiquidacion(liquidacion) ?? "BORRADOR", ""] as any,
     [`MARTE S.R.L. — NIT: ${MARTE_NIT}`, "", "", "", "", "", "", "", ""],
     [],
     ["LIQUIDACION SERVICIO DE TRANSPORTE", "", "", "", "", "", "", "", ""],
@@ -474,7 +485,7 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Liquidacion".slice(0, 31));
-  XLSX.writeFile(workbook, `liquidacion-empresa-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.xlsx`);
+  XLSX.writeFile(workbook, `liquidacion-empresa-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.xlsx`);
 }
 
 export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
@@ -499,7 +510,7 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.rect(pageWidth - 90, 20, 60, 22);
-  doc.text(liquidacion.numero ? `N° ${liquidacion.numero}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
+  doc.text(folioLiquidacion(liquidacion) ? `N° ${folioLiquidacion(liquidacion)}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
 
   doc.setFontSize(13);
   doc.setTextColor(...AZUL_CONOCIMIENTO);
@@ -586,194 +597,332 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
     ["C.c. Presidente Ejecutivo", "C.c. Contabilidad La Paz", "C.c. Archivos Mina", "C.c. Contratista"]
   );
 
-  openBrowserPrintDialog(doc, `liquidacion-empresa-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.pdf`);
+  openBrowserPrintDialog(doc, `liquidacion-empresa-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.pdf`);
 }
 
 // ============================================================================
-// Liquidación — Particular (ej. Roger Orlando Quispe Miranda): ITEM/PLACA/
-// PRECIO TMB/TOTAL, con banco y N° de cuenta, "Son: ..." al pie.
+// Liquidación — Particular (ej. Roger Orlando Quispe Miranda): réplica de la
+// planilla real "LIQUIDACION POR SERVICIO DE TRANSPORTE DE CARGAS
+// MINERALIZADAS": bloque azul con la empresa, folio "Nº 01/27", franja
+// "CORRESPONDIENTE A", tabla ITEM/PLACA/PESO/PRECIO TMB/TOTAL/BANCO (con la
+// cuenta en la primera fila), TOTAL TMB, y abajo TOTAL LIQUIDACION, los
+// descuentos (el de combustible con sus litros) y TOTAL A FACTURAR.
 // ============================================================================
 
-export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
+const AZUL_EMPRESA = "8EA9DB";
+const AZUL_FRANJA = "B4C6E7";
+const AZUL_TITULO = "1F3864";
+const FUENTE_PARTICULAR = "Arial Narrow";
+
+interface LineaTotalParticular {
+  etiqueta: string;
+  cantidad?: number;
+  monto: number;
+}
+
+function datosLiquidacionParticular(liquidacion: Liquidacion) {
   const filas = agruparPorPlaca(liquidacion);
-  const lastCol = 5;
   const fin = parseFecha(liquidacion.fechaFin);
-  const pesoTotalTmb = filas.reduce((acc, f) => acc + f.pesoTotal, 0);
   const totales = calcularTotales(liquidacion);
-  const totalLiquidacion = totales.bruto + totales.abonos;
-  const banco = liquidacion.transportista?.banco;
-  const numeroCuenta = liquidacion.transportista?.numeroCuenta;
-
-  const aoa: Array<Array<string | number>> = [
-    [liquidacion.numero ? `Nº ${liquidacion.numero}` : "BORRADOR", "", "", "", "", ""],
-    ["Empresa Minera", "", "", "", "", ""],
-    [`MARTE S.R.L. — NIT: ${MARTE_NIT}`, "", "", "", "", ""],
-    [],
-    ["LIQUIDACION POR SERVICIO DE TRANSPORTE DE CARGAS", "", "", "", "", ""],
-    ["MINERALIZADAS (MINA LIPEÑA - CHILCOBIJA)", "", "", "", "", ""],
-    [`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, "", "", "", "", ""],
-    [
-      "CORRESPONDIENTE A:",
-      `Fecha: ${fin.getUTCDate()}`,
-      `Mes: ${MESES_MAYUSCULA[fin.getUTCMonth()]}`,
-      `Año: ${fin.getUTCFullYear()}`,
-      banco ? `Banco: ${banco.toUpperCase()}` : "",
-      numeroCuenta ? `Cuenta: ${numeroCuenta}` : ""
-    ],
-    [],
-    ["ITEM", "PLACA", "PESO", "PRECIO TMB", "TOTAL", "OBSERVACIONES"]
+  const items = liquidacion.itemsConcepto ?? [];
+  const litros = liquidacion.combustibleSugerido?.litrosTotal;
+  const lineas: LineaTotalParticular[] = [
+    ...items
+      .filter((i) => i.concepto?.tipo === "ABONO")
+      .map((i) => ({ etiqueta: (i.descripcion || i.concepto?.nombre || "ABONO").toUpperCase(), monto: Number(i.monto) })),
+    ...items
+      .filter((i) => i.concepto?.tipo === "DEDUCCION")
+      .map((i) =>
+        i.concepto?.esCombustible
+          ? { etiqueta: "DESCUENTO POR COMBUSTIBLE", cantidad: litros && litros > 0 ? litros : undefined, monto: Number(i.monto) }
+          : { etiqueta: (i.descripcion || i.concepto?.nombre || "DESCUENTO").toUpperCase(), monto: Number(i.monto) }
+      )
   ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> = [
-    "plain", "subtitle", "subtitle", "blank", "title", "title", "subtitle", "plain", "blank", "header"
-  ];
+  return {
+    filas,
+    fin,
+    totales,
+    lineas,
+    pesoTotalTmb: num(filas.reduce((acc, f) => acc + f.pesoTotal, 0)),
+    folio: folioLiquidacion(liquidacion),
+    contratista: liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "",
+    banco: (liquidacion.transportista?.banco ?? "").toUpperCase(),
+    numeroCuenta: liquidacion.transportista?.numeroCuenta ?? "",
+    archivo: `liquidacion-particular-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}`
+  };
+}
 
-  let item = 1;
-  for (const f of filas) {
-    aoa.push([item, f.placa, num(f.pesoTotal), num(f.precioAplicado), num(f.subtotal), ""]);
-    rowKinds.push("normal");
-    item += 1;
-  }
-  aoa.push(["", "TOTAL TMB", num(pesoTotalTmb), "", "", ""]);
-  rowKinds.push("total");
-  aoa.push([]);
-  rowKinds.push("blank");
-  aoa.push(["TOTAL LIQUIDACION", "", "", "", num(totalLiquidacion), ""]);
-  rowKinds.push("total");
-  aoa.push([`LIQUIDO A PAGAR.... ${montoEnLetras(totales.neto)}`, "", "", "", num(totales.neto), ""]);
-  rowKinds.push("total");
-  aoa.push([`Fecha, ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push([]);
-  rowKinds.push("blank");
-  aoa.push([FIRMA_SUPERINTENDENTE, "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push(["Sup.te Mina Lipeña", "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push([]);
-  rowKinds.push("blank");
-  aoa.push([liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "", "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push(["Contratista", "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push([]);
-  rowKinds.push("blank");
-  aoa.push(["C.c. Presidente Ejecutivo", "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push(["C.c. Jefe de Personal", "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push(["C.c. Archivos Mina", "", "", "", "", ""]);
-  rowKinds.push("plain");
-  aoa.push(["C.c. Contratista", "", "", "", "", ""]);
-  rowKinds.push("plain");
-
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
-  sheet["!merges"] = [
-    { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } },
-    { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } },
-    { s: { r: 6, c: 0 }, e: { r: 6, c: lastCol } }
-  ];
-  rowKinds.forEach((kind, index) => {
-    if (kind === "blank") return;
-    const style =
-      kind === "title" ? titleStyle
-      : kind === "subtitle" ? subtitleStyle
-      : kind === "header" ? headerStyle
-      : kind === "total" ? totalStyle
-      : kind === "plain" ? plainStyle
-      : bodyStyle;
-    styleRow(sheet, index, lastCol, style);
+export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
+  const d = datosLiquidacionParticular(liquidacion);
+  type Celda = [string | number, Record<string, unknown> | null];
+  type Col = "A" | "B" | "C" | "D" | "E" | "F" | "G";
+  const COLS: Col[] = ["A", "B", "C", "D", "E", "F", "G"];
+  const filas: Celda[][] = [];
+  const merges: XLSX.Range[] = [];
+  const alturas: Record<number, number> = {};
+  const fila = (celdas: Partial<Record<Col, Celda>>, altura?: number) => {
+    const r = filas.length;
+    filas.push(COLS.map((c) => celdas[c] ?? ["", null]));
+    if (altura) alturas[r] = altura;
+    return r;
+  };
+  const combinar = (r1: number, c1: number, r2: number, c2: number) => merges.push({ s: { r: r1, c: c1 }, e: { r: r2, c: c2 } });
+  const est = (o: {
+    sz?: number;
+    bold?: boolean;
+    underline?: boolean;
+    color?: string;
+    h?: "left" | "center" | "right";
+    v?: "top" | "center" | "bottom";
+    fill?: string;
+    borde?: boolean;
+    fmt?: string;
+  }) => ({
+    font: { name: FUENTE_PARTICULAR, sz: o.sz ?? 10, bold: o.bold ?? false, underline: o.underline ?? false, ...(o.color ? { color: { rgb: o.color } } : {}) },
+    alignment: { ...(o.h ? { horizontal: o.h } : {}), vertical: o.v ?? "center" },
+    ...(o.fill ? { fill: { patternType: "solid", fgColor: { rgb: o.fill } } } : {}),
+    ...(o.borde ? { border: thinBorder } : {}),
+    ...(o.fmt ? { numFmt: o.fmt } : {})
   });
-  for (const col of [2, 3, 4]) {
-    for (let r = 0; r < aoa.length; r += 1) numberFormatCell(sheet, r, col);
+  const bloque = (o: Parameters<typeof est>[0] = {}) => est({ fill: AZUL_EMPRESA, ...o });
+
+  const r1 = fila(
+    {
+      A: ["Empresa Minera", bloque({ sz: 16, bold: true, v: "center" })],
+      B: ["", bloque()],
+      C: ["", bloque()],
+      G: [d.folio ? `Nº ${d.folio}` : "BORRADOR", est({ sz: 14, bold: true, h: "right" })]
+    },
+    24
+  );
+  combinar(r1, 0, r1, 2);
+  const r2 = fila({ A: ["MARTE", bloque({ sz: 28, bold: true, underline: true, v: "bottom" })], B: ["", bloque()], C: ["", bloque()] }, 24);
+  const r3 = fila({ A: ["", bloque()], B: ["S.R.L.", bloque({ sz: 8, bold: true, underline: true, v: "top" })], C: ["", bloque()] }, 12);
+  combinar(r2, 0, r3, 0);
+  fila({ A: [`NIT: ${MARTE_NIT}`, bloque({ sz: 9, bold: true })], B: ["", bloque()], C: ["", bloque()] }, 18);
+
+  const titulo = est({ sz: 16, bold: true, underline: true, color: AZUL_TITULO, h: "center" });
+  const t1 = fila({ A: ["LIQUIDACION POR SERVICIO DE TRANSPORTE DE CARGAS", titulo] }, 26);
+  combinar(t1, 0, t1, 6);
+  const t2 = fila({ A: ["MINERALIZADAS (MINA LIPEÑA - CHILCOBIJA)", titulo] }, 26);
+  combinar(t2, 0, t2, 6);
+  const tc = fila({ A: [`CONTRATISTA: ${d.contratista}`, est({ sz: 12, bold: true, underline: true, color: AZUL_TITULO })] }, 18);
+  combinar(tc, 0, tc, 4);
+
+  const franja = est({ sz: 9, bold: true, fill: AZUL_FRANJA });
+  fila({
+    A: ["CORRESPONDIENTE A:", franja],
+    B: ["", franja],
+    C: [`Fecha:  ${String(d.fin.getUTCDate()).padStart(2, "0")}`, franja],
+    D: [`Mes: ${MESES_MAYUSCULA[d.fin.getUTCMonth()]}`, franja],
+    E: ["", franja],
+    F: ["", franja],
+    G: [`Año: ${d.fin.getUTCFullYear()}`, est({ sz: 9, bold: true, fill: AZUL_FRANJA, h: "right" })]
+  });
+
+  const encabezado = est({ sz: 10, bold: true, h: "center", fill: AZUL_FRANJA, borde: true });
+  const rEnc = fila({
+    A: ["ITEM", encabezado],
+    B: ["PLACA", encabezado],
+    C: ["PESO", encabezado],
+    D: ["PRECIO TMB", encabezado],
+    E: ["TOTAL", encabezado],
+    F: [d.banco ? `BANCO ${d.banco.replace(/^BANCO\s+/, "")}` : "BANCO", encabezado],
+    G: ["", encabezado]
+  });
+  combinar(rEnc, 5, rEnc, 6);
+
+  d.filas.forEach((f, i) => {
+    const r = fila({
+      A: [i + 1, est({ sz: 10, bold: true, h: "center", borde: true })],
+      B: [f.placa, est({ sz: 10, h: "left", borde: true })],
+      C: [num(f.pesoTotal), est({ sz: 10, bold: true, h: "center", borde: true, fmt: "0.00" })],
+      D: [num(f.precioAplicado), est({ sz: 10, h: "center", borde: true, fmt: "0.00" })],
+      E: [num(f.subtotal), est({ sz: 10, bold: true, h: "center", borde: true, fmt: "0.00" })],
+      F: [i === 0 ? d.numeroCuenta : "", est({ sz: 10, h: "center", borde: true })],
+      G: ["", est({ borde: true })]
+    });
+    combinar(r, 5, r, 6);
+  });
+  const rTmb = fila({
+    A: ["TOTAL TMB", est({ sz: 10, bold: true, h: "center", borde: true })],
+    B: ["", est({ borde: true })],
+    C: [d.pesoTotalTmb, est({ sz: 10, bold: true, h: "center", borde: true, fmt: "0.00" })],
+    D: ["", est({ borde: true })],
+    E: [num(d.totales.bruto), est({ sz: 10, h: "center", borde: true, fmt: "#,##0.00" })],
+    F: ["", est({ borde: true })],
+    G: ["", est({ borde: true })]
+  });
+  combinar(rTmb, 0, rTmb, 1);
+  combinar(rTmb, 5, rTmb, 6);
+
+  const etiqueta = est({ sz: 10 });
+  const montoGrande = est({ sz: 12, bold: true, h: "center", fmt: "#,##0.00" });
+  fila({ B: ["TOTAL LIQUIDACION", etiqueta], E: [num(d.totales.bruto), montoGrande] }, 20);
+  for (const linea of d.lineas) {
+    fila(
+      {
+        B: [linea.etiqueta, etiqueta],
+        D: linea.cantidad !== undefined ? [num(linea.cantidad), est({ sz: 10, h: "right", fmt: "#,##0.00" })] : ["", null],
+        E: [num(linea.monto), montoGrande]
+      },
+      20
+    );
   }
+  fila({ B: ["TOTAL A FACTURAR", etiqueta], E: [num(d.totales.neto), montoGrande] }, 20);
+  fila({}, 20);
+  fila({ A: [`LIQUIDO A PAGAR.... ${montoEnLetras(d.totales.neto)}`, est({ sz: 9, bold: true })] }, 20);
+  fila({ B: [`Fecha, ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, est({ sz: 10 })] }, 20);
+  fila({}, 20);
+  fila({}, 20);
+  fila({}, 20);
+  fila({
+    A: [FIRMA_SUPERINTENDENTE, est({ sz: 10, bold: true })],
+    E: [d.contratista, est({ sz: 10, bold: true })]
+  });
+  fila({ A: ["Sup.te Mina Lipeña", est({ sz: 9 })], E: ["Contratista", est({ sz: 9 })] });
+  fila({});
+  for (const cc of ["C.c. Presidente Ejecutivo", "C.c. Jefe de Personal", "C.c. Archivos Mina", "C.c. Contratista"]) {
+    fila({ A: [cc, est({ sz: 8 })] });
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(filas.map((f) => f.map(([v]) => v)));
+  filas.forEach((f, r) =>
+    f.forEach(([, s], c) => {
+      if (!s) return;
+      const address = XLSX.utils.encode_cell({ r, c });
+      if (!sheet[address]) sheet[address] = { t: "s", v: "" };
+      sheet[address].s = s;
+    })
+  );
+  sheet["!cols"] = [{ wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }];
+  sheet["!rows"] = filas.map((_, r) => (alturas[r] ? { hpt: alturas[r] } : {}));
+  sheet["!merges"] = merges;
+  sheet["!margins"] = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, "Liquidacion".slice(0, 31));
-  XLSX.writeFile(workbook, `liquidacion-particular-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.xlsx`);
+  XLSX.utils.book_append_sheet(workbook, sheet, "Liquidacion");
+  XLSX.writeFile(workbook, `${d.archivo}.xlsx`);
 }
 
 export function exportLiquidacionParticularPdf(liquidacion: Liquidacion) {
-  const filas = agruparPorPlaca(liquidacion);
-  const fin = parseFecha(liquidacion.fechaFin);
-  const pesoTotalTmb = filas.reduce((acc, f) => acc + f.pesoTotal, 0);
-  const totales = calcularTotales(liquidacion);
-  const totalLiquidacion = totales.bruto + totales.abonos;
-  const banco = liquidacion.transportista?.banco;
-  const numeroCuenta = liquidacion.transportista?.numeroCuenta;
-
+  const d = datosLiquidacionParticular(liquidacion);
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const centerX = pageWidth / 2;
+  const margen = 36;
+  const ancho = pageWidth - margen * 2;
+  const col = ancho / 7;
+  const negro: [number, number, number] = [0, 0, 0];
+  const azulEmpresa: [number, number, number] = [142, 169, 219];
+  const azulFranja: [number, number, number] = [180, 198, 231];
+  const azulTitulo: [number, number, number] = [31, 56, 100];
 
+  const textoSubrayado = (texto: string, x: number, y: number, align: "left" | "center") => {
+    doc.text(texto, x, y, { align });
+    const w = doc.getTextWidth(texto);
+    const x0 = align === "center" ? x - w / 2 : x;
+    doc.setLineWidth(0.8);
+    doc.line(x0, y + 2, x0 + w, y + 2);
+  };
+
+  // Bloque azul de la empresa (columnas A–C) y folio arriba a la derecha.
+  doc.setFillColor(...azulEmpresa);
+  doc.rect(margen, 24, col * 3, 82, "F");
+  doc.setTextColor(...negro);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text(liquidacion.numero ? `Nº ${liquidacion.numero}` : "BORRADOR", 30, 24);
-  doc.text("Empresa Minera", 30, 40);
-  doc.text("MARTE S.R.L.", 30, 52);
-  doc.setFont("helvetica", "normal");
+  doc.setFontSize(15);
+  doc.text("Empresa Minera", margen + 4, 42);
+  doc.setFontSize(30);
+  doc.setDrawColor(...negro);
+  textoSubrayado("MARTE", margen + 4, 80, "left");
+  const anchoMarte = doc.getTextWidth("MARTE");
+  doc.setFontSize(7);
+  textoSubrayado("S.R.L.", margen + 8 + anchoMarte, 80, "left");
   doc.setFontSize(8);
-  doc.text(`NIT: ${MARTE_NIT}`, 30, 62);
+  doc.text(`NIT: ${MARTE_NIT}`, margen + 8, 98);
+  doc.setFontSize(13);
+  doc.text(d.folio ? `Nº ${d.folio}` : "BORRADOR", pageWidth - margen - 4, 44, { align: "right" });
 
+  doc.setTextColor(...azulTitulo);
+  doc.setDrawColor(...azulTitulo);
+  doc.setFontSize(15);
+  textoSubrayado("LIQUIDACION POR SERVICIO DE TRANSPORTE DE CARGAS", pageWidth / 2, 130, "center");
+  textoSubrayado("MINERALIZADAS (MINA LIPEÑA - CHILCOBIJA)", pageWidth / 2, 152, "center");
+  doc.setFontSize(11);
+  textoSubrayado(`CONTRATISTA: ${d.contratista}`, margen, 172, "left");
+  doc.setTextColor(...negro);
+  doc.setDrawColor(...negro);
+
+  doc.setFillColor(...azulFranja);
+  doc.rect(margen, 178, ancho, 14, "F");
+  doc.setFontSize(8);
+  doc.text("CORRESPONDIENTE A:", margen + 3, 188);
+  doc.text(`Fecha:  ${String(d.fin.getUTCDate()).padStart(2, "0")}`, margen + col * 2 - 20, 188);
+  doc.text(`Mes: ${MESES_MAYUSCULA[d.fin.getUTCMonth()]}`, margen + col * 3 + 10, 188);
+  doc.text(`Año: ${d.fin.getUTCFullYear()}`, pageWidth - margen - 4, 188, { align: "right" });
+
+  const celda = (content: string, extra: Record<string, unknown> = {}) => ({ content, styles: extra });
+  const body: RowInput[] = d.filas.map((f, i) => [
+    celda(String(i + 1), { halign: "center", fontStyle: "bold" }),
+    celda(f.placa),
+    celda(f.pesoTotal.toFixed(2), { halign: "center", fontStyle: "bold" }),
+    celda(f.precioAplicado.toFixed(2), { halign: "center" }),
+    celda(f.subtotal.toFixed(2), { halign: "center", fontStyle: "bold" }),
+    { content: i === 0 ? d.numeroCuenta : "", colSpan: 2, styles: { halign: "center" } }
+  ]);
+  body.push([
+    { content: "TOTAL TMB", colSpan: 2, styles: { halign: "center", fontStyle: "bold" } },
+    celda(d.pesoTotalTmb.toFixed(2), { halign: "center", fontStyle: "bold" }),
+    "",
+    celda(d.totales.bruto.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), { halign: "center" }),
+    { content: "", colSpan: 2 }
+  ]);
+
+  drawPlainTable(doc, {
+    startY: 192,
+    margin: { left: margen, right: margen },
+    styles: { ...pdfTableStyles, fontSize: 9, cellPadding: 3.5 },
+    headStyles: { ...pdfHeadStyles, fillColor: azulFranja, halign: "center", fontSize: 9 },
+    columnStyles: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((i) => [i, { cellWidth: col }])),
+    head: [["ITEM", "PLACA", "PESO", "PRECIO TMB", "TOTAL", { content: d.banco ? `BANCO ${d.banco.replace(/^BANCO\s+/, "")}` : "BANCO", colSpan: 2 }]],
+    body
+  });
+
+  const enUS = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let y = (doc as any).lastAutoTable.finalY + 20;
+  const lineaTotal = (etiqueta: string, monto: number, cantidad?: number) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(etiqueta, margen + col + 4, y);
+    if (cantidad !== undefined) doc.text(enUS(cantidad), margen + col * 4 - 6, y, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(enUS(monto), margen + col * 4.5, y, { align: "center" });
+    y += 19;
+  };
+  lineaTotal("TOTAL LIQUIDACION", d.totales.bruto);
+  for (const linea of d.lineas) lineaTotal(linea.etiqueta, linea.monto, linea.cantidad);
+  lineaTotal("TOTAL A FACTURAR", d.totales.neto);
+
+  y += 16;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("LIQUIDACION POR SERVICIO DE TRANSPORTE DE CARGAS", centerX, 34, { align: "center", maxWidth: pageWidth - 100 });
-  doc.text("MINERALIZADAS (MINA LIPEÑA - CHILCOBIJA)", centerX, 48, { align: "center", maxWidth: pageWidth - 100 });
-  doc.setFontSize(10);
-  doc.text(`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, centerX, 66, { align: "center" });
+  doc.setFontSize(8);
+  doc.text(`LIQUIDO A PAGAR.... ${montoEnLetras(d.totales.neto)}`, margen, y, { maxWidth: ancho });
+  y += 18;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(
-    `CORRESPONDIENTE A: Fecha ${fin.getUTCDate()}   Mes: ${MESES_MAYUSCULA[fin.getUTCMonth()]}   Año: ${fin.getUTCFullYear()}`,
-    centerX,
-    80,
-    { align: "center" }
-  );
-  if (banco || numeroCuenta) {
-    doc.text(`${banco ? `Banco: ${banco.toUpperCase()}` : ""}${numeroCuenta ? `   Cuenta: ${numeroCuenta}` : ""}`, centerX, 92, {
-      align: "center"
-    });
-  }
-
-  const rows: RowInput[] = filas.map((f, index) => [index + 1, f.placa, formatBs(f.pesoTotal), formatBs(f.precioAplicado), formatBs(f.subtotal), ""]);
-  rows.push(["", "TOTAL TMB", formatBs(pesoTotalTmb), "", "", ""]);
-
-  drawPlainTable(doc, {
-    startY: 104,
-    head: [["ITEM", "PLACA", "PESO", "PRECIO TMB", "TOTAL", "OBSERVACIONES"]],
-    body: rows,
-    styles: pdfTableStyles,
-    headStyles: pdfHeadStyles,
-    columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
-    margin: { left: 40, right: 40 }
-  });
-
-  // Caja de totales con bordes reales (tabla, no texto suelto).
-  drawPlainTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY + 14,
-    body: [["TOTAL LIQUIDACION", formatBs(totalLiquidacion)]],
-    styles: { ...pdfTableStyles, fontStyle: "bold" },
-    columnStyles: { 0: { cellWidth: 140 }, 1: { cellWidth: 90, halign: "right" } },
-    margin: { left: pageWidth - 40 - 230 },
-    tableWidth: 230
-  });
-
-  const y0 = (doc as any).lastAutoTable.finalY + 20;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`LIQUIDO A PAGAR.... ${montoEnLetras(totales.neto)}`, 40, y0, { maxWidth: pageWidth - 80 });
-  doc.text(`Fecha, ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, 40, y0 + 20);
+  doc.text(`Fecha, ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, margen + col + 4, y);
 
   dibujarPiePagina(
     doc,
     [
-      { nombre: liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "", cargo: "Contratista" },
+      { nombre: d.contratista, cargo: "Contratista" },
       { nombre: FIRMA_SUPERINTENDENTE, cargo: "Sup.te Mina Lipeña" }
     ],
     ["C.c. Presidente Ejecutivo", "C.c. Jefe de Personal", "C.c. Archivos Mina", "C.c. Contratista"]
   );
 
-  openBrowserPrintDialog(doc, `liquidacion-particular-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.pdf`);
+  openBrowserPrintDialog(doc, `${d.archivo}.pdf`);
 }
 
 // ============================================================================
@@ -794,7 +943,7 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
   const lastCol = 7;
 
   const aoa: Array<Array<string | number>> = [
-    ["Empresa Minera", "", "", "", "", "", "N°", liquidacion.numero ?? "BORRADOR"],
+    ["Empresa Minera", "", "", "", "", "", "N°", folioLiquidacion(liquidacion) ?? "BORRADOR"],
     [`MARTE S.R.L. — NIT: ${MARTE_NIT}`, "", "", "", "", "", "", ""],
     [],
     ["RESPALDO POR VIAJE", "", "", "", "", "", "", ""],
@@ -875,7 +1024,7 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Respaldo por viaje".slice(0, 31));
-  XLSX.writeFile(workbook, `liquidacion-por-viaje-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.xlsx`);
+  XLSX.writeFile(workbook, `liquidacion-por-viaje-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.xlsx`);
 }
 
 export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
@@ -902,7 +1051,7 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.rect(pageWidth - 90, 20, 60, 22);
-    doc.text(liquidacion.numero ? `N° ${liquidacion.numero}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
+    doc.text(folioLiquidacion(liquidacion) ? `N° ${folioLiquidacion(liquidacion)}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
 
     doc.setFontSize(13);
     doc.setTextColor(...AZUL_CONOCIMIENTO);
@@ -980,7 +1129,7 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
     });
   });
 
-  openBrowserPrintDialog(doc, `liquidacion-por-viaje-${liquidacion.numero ?? liquidacion.id.slice(0, 8)}.pdf`);
+  openBrowserPrintDialog(doc, `liquidacion-por-viaje-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.pdf`);
 }
 
 // ============================================================================

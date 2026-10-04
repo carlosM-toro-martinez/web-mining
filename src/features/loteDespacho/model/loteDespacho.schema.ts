@@ -129,7 +129,8 @@ export const updateLoteDespachoPayloadSchema = z.object({
   descripcion: z.string().trim().nullable().optional(),
   observaciones: z.string().trim().nullable().optional(),
   tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero.").optional(),
-  tonelajeTara: z.number().nonnegative("El tara no puede ser negativo.").optional()
+  tonelajeTara: z.number().nonnegative("El tara no puede ser negativo.").optional(),
+  tonelajeNeto: z.number().positive("El neto debe ser mayor a cero.").optional()
 });
 
 export const avanzarEstadoLotePayloadSchema = z.object({
@@ -139,6 +140,7 @@ export const avanzarEstadoLotePayloadSchema = z.object({
 export const registrarPesajePayloadSchema = z.object({
   tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero."),
   tonelajeTara: z.number().nonnegative("El tara no puede ser negativo."),
+  tonelajeNeto: z.number().positive("El neto debe ser mayor a cero.").optional(),
   observaciones: z.string().trim().optional()
 });
 
