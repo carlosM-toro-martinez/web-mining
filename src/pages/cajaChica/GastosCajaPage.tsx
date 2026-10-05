@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import {
   useAnularGastoCajaMutation,
+  useClasificarGastosCajaMutation,
   useCreateGastoCajaMutation,
   useGastosCajaQuery,
   useImportarGastosCajaExcelMutation,
@@ -155,7 +156,7 @@ function formatFechaHora(value: string) {
 function ModalShell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
       onClick={onClose}
     >
       <div
@@ -430,6 +431,54 @@ export function GastosCajaPage() {
   const createGastoMutation = useCreateGastoCajaMutation();
   const updateGastoMutation = useUpdateGastoCajaMutation();
   const anularGastoMutation = useAnularGastoCajaMutation();
+  const clasificarMutation = useClasificarGastosCajaMutation();
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [mostrarClasificar, setMostrarClasificar] = useState(false);
+  const clasificacionVacia = {
+    cuentaContableCajaId: "",
+    centroCostoCajaId: "",
+    funcionGastoCajaId: "",
+    partidaPresupuestoId: "",
+    categoriaRendicion: ""
+  };
+  const [clasificacion, setClasificacion] = useState(clasificacionVacia);
+
+  function alternarSeleccion(id: string) {
+    setSeleccionados((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  }
+
+  function handleClasificar(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const payload = {
+      ids: Array.from(seleccionados),
+      ...(clasificacion.cuentaContableCajaId ? { cuentaContableCajaId: Number(clasificacion.cuentaContableCajaId) } : {}),
+      ...(clasificacion.centroCostoCajaId ? { centroCostoCajaId: Number(clasificacion.centroCostoCajaId) } : {}),
+      ...(clasificacion.funcionGastoCajaId ? { funcionGastoCajaId: Number(clasificacion.funcionGastoCajaId) } : {}),
+      ...(clasificacion.partidaPresupuestoId ? { partidaPresupuestoId: Number(clasificacion.partidaPresupuestoId) } : {}),
+      ...(clasificacion.categoriaRendicion ? { categoriaRendicion: clasificacion.categoriaRendicion } : {})
+    };
+    if (Object.keys(payload).length === 1) {
+      showError("Elige al menos un dato para asignar (cuenta, centro, función, partida o categoría).");
+      return;
+    }
+    clasificarMutation.mutate(payload, {
+      onSuccess: (response) => {
+        const { actualizados, omitidos } = response.data;
+        showSuccess(
+          `${actualizados} gasto(s) clasificados.${omitidos ? ` ${omitidos} se saltaron por estar rendidos o anulados.` : ""}`
+        );
+        setSeleccionados(new Set());
+        setMostrarClasificar(false);
+        setClasificacion(clasificacionVacia);
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudieron clasificar los gastos."))
+    });
+  }
 
   const cajas = cajasQuery.data?.data ?? [];
   const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
@@ -450,8 +499,14 @@ export function GastosCajaPage() {
     () => funciones.map((f) => ({ id: String(f.id), label: `${f.codigo} · ${f.nombre}`, searchText: f.codigo })),
     [funciones]
   );
+  // Sin las cuentas de caja (10.xxx) ni de bancos (11.xxx): un gasto nunca
+  // se registra contra la caja o el banco (esos van al HABER, solos, en el
+  // Comprobante de Diario); elegirlas por error dejaba el gasto al DEBE del banco.
   const cuentaOptions = useMemo(
-    () => cuentas.map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
+    () =>
+      cuentas
+        .filter((c) => !c.codigo.startsWith("10.") && !c.codigo.startsWith("11."))
+        .map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
     [cuentas]
   );
   const partidaOptions = useMemo(
@@ -502,6 +557,8 @@ export function GastosCajaPage() {
   const [fecha, setFecha] = useState(today);
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumentoGasto>("FACTURA");
   const [categoriaRetencion, setCategoriaRetencion] = useState<CategoriaRetencionGasto>("SERVICIO");
+  const [esCombustible, setEsCombustible] = useState(false);
+  const [esNoDeducible, setEsNoDeducible] = useState(false);
   const [proveedorNombre, setProveedorNombre] = useState("");
   const [proveedorNitCi, setProveedorNitCi] = useState("");
   const [glosa, setGlosa] = useState("");
@@ -531,20 +588,23 @@ export function GastosCajaPage() {
     if (monto <= 0) return null;
 
     if (tipoDocumento === "FACTURA") {
-      return { creditoFiscal: monto * tasaRcIva, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: false };
+      if (esNoDeducible) return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: true };
+      // Combustible: el crédito fiscal sale del 70% del importe (igual que el backend).
+      const base = esCombustible ? Math.round(monto * 0.7 * 100) / 100 : monto;
+      return { creditoFiscal: Math.round(base * tasaRcIva * 100) / 100, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: false };
     }
     if (tipoDocumento === "RECIBO_DIRECTO") {
       return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: true };
     }
     if (tipoDocumento === "RECIBO") {
-      return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: false };
+      return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: 0, retencionIt: 0, noDeducible: esNoDeducible };
     }
     const retencionIt = monto * tasaIt;
     if (categoriaRetencion === "SERVICIO") {
       return { creditoFiscal: 0, retencionRcIva: monto * tasaRcIva, retencionIueCompras: 0, retencionIt, noDeducible: false };
     }
     return { creditoFiscal: 0, retencionRcIva: 0, retencionIueCompras: monto * tasaIueCompras, retencionIt, noDeducible: false };
-  }, [montoTotal, tipoDocumento, categoriaRetencion, tasaRcIva, tasaIueCompras, tasaIt]);
+  }, [montoTotal, tipoDocumento, categoriaRetencion, esCombustible, esNoDeducible, tasaRcIva, tasaIueCompras, tasaIt]);
 
   function resetGastoForm() {
     setProveedorNombre("");
@@ -552,6 +612,8 @@ export function GastosCajaPage() {
     setGlosa("");
     setNumeroRespaldo("");
     setMontoTotal("");
+    setEsCombustible(false);
+    setEsNoDeducible(false);
   }
 
   // Autocompleta el formulario con la clasificación guardada en una partida
@@ -592,6 +654,8 @@ export function GastosCajaPage() {
       fecha,
       tipoDocumento,
       categoriaRetencion: tipoDocumento === "CONTRATO_RETENCION" ? categoriaRetencion : undefined,
+      esCombustible: tipoDocumento === "FACTURA" ? esCombustible : false,
+      esNoDeducible: tipoDocumento === "FACTURA" || tipoDocumento === "RECIBO" ? esNoDeducible : undefined,
       categoriaRendicion,
       proveedorNombre,
       proveedorNitCi: proveedorNitCi.trim() || undefined,
@@ -680,6 +744,8 @@ export function GastosCajaPage() {
     fecha: string;
     tipoDocumento: TipoDocumentoGasto;
     categoriaRetencion: CategoriaRetencionGasto;
+    esCombustible: boolean;
+    esNoDeducible: boolean;
     categoriaRendicion: CategoriaRendicionGasto;
     proveedorNombre: string;
     proveedorNitCi: string;
@@ -701,6 +767,8 @@ export function GastosCajaPage() {
       fecha: item.fecha.slice(0, 10),
       tipoDocumento: item.tipoDocumento,
       categoriaRetencion: item.categoriaRetencion ?? "SERVICIO",
+      esCombustible: Boolean(item.esCombustible),
+      esNoDeducible: item.tipoDocumento === "RECIBO_DIRECTO" ? false : item.esNoDeducible,
       categoriaRendicion: item.categoriaRendicion,
       proveedorNombre: item.proveedorNombre,
       proveedorNitCi: item.proveedorNitCi ?? "",
@@ -727,6 +795,8 @@ export function GastosCajaPage() {
           fecha: editDraft.fecha,
           tipoDocumento: editDraft.tipoDocumento,
           categoriaRetencion: editDraft.tipoDocumento === "CONTRATO_RETENCION" ? editDraft.categoriaRetencion : null,
+          esCombustible: editDraft.tipoDocumento === "FACTURA" ? editDraft.esCombustible : false,
+          esNoDeducible: editDraft.tipoDocumento === "FACTURA" || editDraft.tipoDocumento === "RECIBO" ? editDraft.esNoDeducible : undefined,
           categoriaRendicion: editDraft.categoriaRendicion,
           proveedorNombre: editDraft.proveedorNombre,
           proveedorNitCi: esReciboDirectoEdit ? null : editDraft.proveedorNitCi.trim() || null,
@@ -783,6 +853,45 @@ export function GastosCajaPage() {
       </header>
 
       {mostrarImportarModal ? <ImportarGastosModal onClose={() => setMostrarImportarModal(false)} /> : null}
+      {mostrarClasificar ? (
+        <ModalShell onClose={() => setMostrarClasificar(false)}>
+          <h2 className="mb-1 text-lg font-bold">Clasificar {seleccionados.size} gasto(s)</h2>
+          <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+            Se asigna lo que elijas a todos los gastos seleccionados; lo que dejes vacío no se cambia. No cambia montos
+            ni impuestos. Los gastos ya rendidos o anulados se saltan.
+          </p>
+          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleClasificar}>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Cuenta contable</label>
+              <AutocompleteSelect value={clasificacion.cuentaContableCajaId} onChange={(v) => setClasificacion({ ...clasificacion, cuentaContableCajaId: v })} options={cuentaOptions} placeholder="Ej. 100.001.000 Costo de Producción, 50.002.000 Compensación..." className={inputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Centro de costo</label>
+              <AutocompleteSelect value={clasificacion.centroCostoCajaId} onChange={(v) => setClasificacion({ ...clasificacion, centroCostoCajaId: v })} options={centroOptions} placeholder="Buscar centro de costo..." className={inputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Función de gasto</label>
+              <AutocompleteSelect value={clasificacion.funcionGastoCajaId} onChange={(v) => setClasificacion({ ...clasificacion, funcionGastoCajaId: v })} options={funcionOptions} placeholder="Buscar función de gasto..." className={inputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Partida de presupuesto</label>
+              <AutocompleteSelect value={clasificacion.partidaPresupuestoId} onChange={(v) => setClasificacion({ ...clasificacion, partidaPresupuestoId: v })} options={partidaOptions} placeholder="Buscar partida..." className={inputClassName} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Categoría del reporte</label>
+              <select value={clasificacion.categoriaRendicion} onChange={(e) => setClasificacion({ ...clasificacion, categoriaRendicion: e.target.value })} className={inputClassName}>
+                <option value="">No cambiar</option>
+                {(Object.keys(CATEGORIA_RENDICION_LABEL) as CategoriaRendicionGasto[]).map((key) => (
+                  <option key={key} value={key}>{CATEGORIA_RENDICION_LABEL[key]}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" disabled={clasificarMutation.isPending} className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60 sm:col-span-2">
+              {clasificarMutation.isPending ? "Guardando..." : "Asignar a los seleccionados"}
+            </button>
+          </form>
+        </ModalShell>
+      ) : null}
 
       <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.06] p-4">
         <button
@@ -907,6 +1016,20 @@ export function GastosCajaPage() {
                 <option value="SERVICIO">Servicio (RC-IVA + IT)</option>
                 <option value="COMPRA">Compra / alimentación (IUE + IT)</option>
               </select>
+            ) : null}
+            {tipoDocumento === "FACTURA" || tipoDocumento === "RECIBO" ? (
+              <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs sm:col-span-2">
+                {tipoDocumento === "FACTURA" ? (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={esCombustible} onChange={(e) => setEsCombustible(e.target.checked)} />
+                    Es combustible (crédito fiscal sobre el 70% del importe)
+                  </label>
+                ) : null}
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={esNoDeducible} onChange={(e) => setEsNoDeducible(e.target.checked)} />
+                  No deducible{tipoDocumento === "FACTURA" ? " (sin crédito fiscal, todo a Gastos No Deducibles)" : ""}
+                </label>
+              </div>
             ) : null}
 
             <input
@@ -1077,6 +1200,20 @@ export function GastosCajaPage() {
                 <option value="SERVICIO">Servicio (RC-IVA + IT)</option>
                 <option value="COMPRA">Compra / alimentación (IUE + IT)</option>
               </select>
+            ) : null}
+            {editDraft.tipoDocumento === "FACTURA" || editDraft.tipoDocumento === "RECIBO" ? (
+              <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs sm:col-span-2">
+                {editDraft.tipoDocumento === "FACTURA" ? (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={editDraft.esCombustible} onChange={(e) => setEditDraft({ ...editDraft, esCombustible: e.target.checked })} />
+                    Es combustible (crédito fiscal sobre el 70% del importe)
+                  </label>
+                ) : null}
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={editDraft.esNoDeducible} onChange={(e) => setEditDraft({ ...editDraft, esNoDeducible: e.target.checked })} />
+                  No deducible{editDraft.tipoDocumento === "FACTURA" ? " (sin crédito fiscal, todo a Gastos No Deducibles)" : ""}
+                </label>
+              </div>
             ) : null}
 
             <input
@@ -1421,6 +1558,20 @@ export function GastosCajaPage() {
           ) : null}
         </div>
 
+        {seleccionados.size > 0 ? (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/8 px-3 py-2 text-sm">
+            <span className="font-semibold">{seleccionados.size} gasto(s) seleccionado(s)</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setMostrarClasificar(true)} className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)]">
+                Clasificar seleccionados
+              </button>
+              <button type="button" onClick={() => setSeleccionados(new Set())} className={buttonSecondaryClassName}>
+                Quitar selección
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {gastosQuery.isLoading ? (
           <p className="px-1 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando gastos...</p>
         ) : null}
@@ -1449,7 +1600,12 @@ export function GastosCajaPage() {
           {gastos.map((item) => (
             <div key={item.id} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] p-3 text-sm">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold">{item.proveedorNombre}</p>
+                <label className="flex items-start gap-2">
+                  {item.estado === "REGISTRADO" ? (
+                    <input type="checkbox" className="mt-1" checked={seleccionados.has(item.id)} onChange={() => alternarSeleccion(item.id)} aria-label="Seleccionar gasto" />
+                  ) : null}
+                  <span className="font-semibold">{item.proveedorNombre}</span>
+                </label>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
                   {item.informacionIncompleta ? (
@@ -1525,6 +1681,27 @@ export function GastosCajaPage() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
+                <th className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Seleccionar todos los registrados de esta página"
+                    checked={
+                      gastos.some((g) => g.estado === "REGISTRADO") &&
+                      gastos.filter((g) => g.estado === "REGISTRADO").every((g) => seleccionados.has(g.id))
+                    }
+                    onChange={(e) =>
+                      setSeleccionados((prev) => {
+                        const nuevo = new Set(prev);
+                        for (const g of gastos) {
+                          if (g.estado !== "REGISTRADO") continue;
+                          if (e.target.checked) nuevo.add(g.id);
+                          else nuevo.delete(g.id);
+                        }
+                        return nuevo;
+                      })
+                    }
+                  />
+                </th>
                 {["Fecha", "Origen", "Proveedor", "Glosa", "Respaldo", "Monto", "Estado", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{title}</th>
                 ))}
@@ -1533,6 +1710,11 @@ export function GastosCajaPage() {
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {gastos.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
+                  <td className="px-3 py-2">
+                    {item.estado === "REGISTRADO" ? (
+                      <input type="checkbox" checked={seleccionados.has(item.id)} onChange={() => alternarSeleccion(item.id)} aria-label="Seleccionar gasto" />
+                    ) : null}
+                  </td>
                   <td className="px-3 py-2 text-xs">{formatFecha(item.fecha)}</td>
                   <td className="px-3 py-2 text-xs">
                     {item.origen === "BANCO"

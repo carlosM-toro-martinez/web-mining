@@ -74,6 +74,7 @@ export const gastoCajaSchema = z.object({
   montoRetencionIueCompras: z.union([z.string(), z.number()]),
   montoRetencionIt: z.union([z.string(), z.number()]),
   esNoDeducible: z.boolean(),
+  esCombustible: z.boolean().optional(),
   estado: estadoGastoCajaSchema,
   // Calculado por el backend (nunca guardado): true si falta centro de
   // costo, función de gasto, cuenta contable o partida de presupuesto.
@@ -96,6 +97,8 @@ export const createGastoCajaPayloadSchema = z
     fecha: z.string().min(1, "La fecha es obligatoria."),
     tipoDocumento: tipoDocumentoGastoSchema,
     categoriaRetencion: categoriaRetencionGastoSchema.optional(),
+    esCombustible: z.boolean().optional(),
+    esNoDeducible: z.boolean().optional(),
     categoriaRendicion: categoriaRendicionGastoSchema,
     proveedorNombre: z.string().trim().min(1, "El proveedor es obligatorio."),
     proveedorNitCi: z.string().trim().optional(),
@@ -127,6 +130,8 @@ export const updateGastoCajaPayloadSchema = z.object({
   fecha: z.string().min(1).optional(),
   tipoDocumento: tipoDocumentoGastoSchema.optional(),
   categoriaRetencion: categoriaRetencionGastoSchema.nullable().optional(),
+  esCombustible: z.boolean().optional(),
+  esNoDeducible: z.boolean().optional(),
   categoriaRendicion: categoriaRendicionGastoSchema.optional(),
   proveedorNombre: z.string().trim().min(1, "El proveedor es obligatorio.").optional(),
   proveedorNitCi: z.string().trim().nullable().optional(),

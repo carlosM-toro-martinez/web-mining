@@ -362,7 +362,7 @@ function FlotaColumn({
 function ModalShell({ children, onClose, maxWidthClassName = "max-w-2xl" }: { children: ReactNode; onClose: () => void; maxWidthClassName?: string }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
       onClick={onClose}
     >
       <div
@@ -1163,6 +1163,25 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
               </button>
               <button type="button" onClick={() => exportConocimientoPdf(lote)} className={buttonSecondaryClassName} title="Exportar Conocimiento a PDF">
                 <FileDown size={13} /> PDF
+              </button>
+            </div>
+          </div>
+
+          {/* Siempre visible, tenga o no Formulario 101: el Conocimiento se
+              imprime al despachar, y el F101 del Municipio puede llegar después. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/8 px-3 py-2">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <FileDown size={14} className="text-[var(--color-primary)]" /> Imprimir Conocimiento {lote.correlativo}
+              {lote.formulario101 ? null : (
+                <span className="text-xs font-normal text-[var(--color-on-surface-variant)]">(no necesita el F101)</span>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => exportConocimientoPdf(lote)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-on-primary)]">
+                <FileDown size={13} /> PDF
+              </button>
+              <button type="button" onClick={() => exportConocimientoExcel(lote)} className={buttonSecondaryClassName}>
+                <FileSpreadsheet size={13} /> Excel
               </button>
             </div>
           </div>

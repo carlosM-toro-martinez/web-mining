@@ -99,7 +99,7 @@ export function RendicionesCajaPage() {
   const [cajaId, setCajaId] = useState("");
   const [periodoDesde, setPeriodoDesde] = useState("");
   const [periodoHasta, setPeriodoHasta] = useState("");
-  const [tipoCambio, setTipoCambio] = useState("12.43");
+  const [tipoCambio, setTipoCambio] = useState("6.96");
 
   const previewQuery = usePreviewRendicionCajaQuery({
     cajaId: cajaId ? Number(cajaId) : undefined,
@@ -193,6 +193,15 @@ export function RendicionesCajaPage() {
     setExportando(formato === "excel" ? "diario-excel" : "diario-pdf");
     try {
       const response = await getComprobanteDiario(id);
+      const sinCuenta = response.data.gastosSinCuenta ?? 0;
+      if (
+        sinCuenta > 0 &&
+        !window.confirm(
+          `${sinCuenta} gasto(s) de esta rendición no tienen cuenta contable asignada y saldrán como "SIN CUENTA CONTABLE ASIGNADA". Asígnales su cuenta en Gastos para que el comprobante quede completo. ¿Generar igual?`
+        )
+      ) {
+        return;
+      }
       if (formato === "excel") exportComprobanteDiarioExcel(response.data);
       else exportComprobanteDiarioPdf(response.data);
     } catch (error) {

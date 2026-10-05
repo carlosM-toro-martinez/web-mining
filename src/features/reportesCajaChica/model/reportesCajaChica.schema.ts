@@ -165,7 +165,8 @@ export const reporteRendicionSchema = z.object({
 export const reporteRendicionResponseSchema = z.object({ success: z.boolean(), data: reporteRendicionSchema });
 
 const lineaComprobanteSchema = z.object({
-  codigo: z.string().min(1),
+  // Vacío cuando el gasto todavía no tiene cuenta contable asignada.
+  codigo: z.string(),
   cuentaNombre: z.string().min(1),
   detalle: z.string(),
   debeBs: z.number(),
@@ -185,7 +186,8 @@ export const reporteComprobanteDiarioSchema = z.object({
   periodoHasta: z.string(),
   tipoCambio: z.number(),
   lineas: z.array(lineaComprobanteSchema),
-  totales: z.object({ debeBs: z.number(), haberBs: z.number(), debeUsd: z.number(), haberUsd: z.number() })
+  totales: z.object({ debeBs: z.number(), haberBs: z.number(), debeUsd: z.number(), haberUsd: z.number() }),
+  gastosSinCuenta: z.number().optional()
 });
 export const reporteComprobanteDiarioResponseSchema = z.object({
   success: z.boolean(),

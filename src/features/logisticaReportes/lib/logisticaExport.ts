@@ -926,210 +926,246 @@ export function exportLiquidacionParticularPdf(liquidacion: Liquidacion) {
 }
 
 // ============================================================================
-// Liquidación — Respaldo por viaje (un bloque por volqueta): el documento
-// real que sustenta los totales de la planilla consolidada de arriba —
-// detalle de cada viaje (conocimiento, chofer, fecha, peso) y, en la fila
-// "Total", el peso crudo de 3 decimales sumado Y el redondeado a 2
-// decimales lado a lado, para auditar exactamente cómo se llegó al monto
-// que cobra cada vehículo (mismo método que agruparPorVehiculoYPrecio en
-// liquidacion.service.ts, verificado contra el documento físico real).
+// Liquidación — Respaldo por viaje: sustenta los totales de la planilla.
+// Encabezado una sola vez y un bloque compacto por volqueta (varios por
+// hoja): sus viajes con el peso neto de 3 decimales y, abajo, cómo se llega
+// al monto — suma de los netos (3 decimales), redondeo a 2 y × precio —
+// mismo método que agruparPorVehiculoYPrecio en liquidacion.service.ts.
 // ============================================================================
 
-export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
-  const grupos = agruparPorPlacaConViajes(liquidacion);
+function datosRespaldoPorViaje(liquidacion: Liquidacion) {
   const fin = parseFecha(liquidacion.fechaFin);
-  const banco = liquidacion.transportista?.banco;
-  const numeroCuenta = liquidacion.transportista?.numeroCuenta;
-  const lastCol = 7;
+  return {
+    grupos: agruparPorPlacaConViajes(liquidacion),
+    totales: calcularTotales(liquidacion),
+    contratista: liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "",
+    banco: (liquidacion.transportista?.banco ?? "").toUpperCase(),
+    numeroCuenta: liquidacion.transportista?.numeroCuenta ?? "",
+    fechaTexto: `FECHA: ${fin.getUTCDate()}    MES: ${MESES_MAYUSCULA[fin.getUTCMonth()]}    AÑO: ${fin.getUTCFullYear()}`,
+    folio: folioLiquidacion(liquidacion),
+    archivo: `liquidacion-por-viaje-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}`
+  };
+}
 
-  const aoa: Array<Array<string | number>> = [
-    ["Empresa Minera", "", "", "", "", "", "N°", folioLiquidacion(liquidacion) ?? "BORRADOR"],
-    [`MARTE S.R.L. — NIT: ${MARTE_NIT}`, "", "", "", "", "", "", ""],
-    [],
-    ["RESPALDO POR VIAJE", "", "", "", "", "", "", ""],
-    ["TRANSPORTE DE CARGA CHAMI DE MINA LIPEÑA A CHILCOBIJA", "", "", "", "", "", "", ""],
-    [`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, "", "", "", "", "", "", ""],
-    [
-      `FECHA: ${fin.getUTCDate()}    MES: ${MESES_MAYUSCULA[fin.getUTCMonth()]}    AÑO: ${fin.getUTCFullYear()}`,
-      "", "", "", "", "", "", ""
-    ]
-  ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> = [
-    "subtitle", "subtitle", "blank", "title", "subtitle", "plain", "plain"
-  ];
-  const decimalCells: Array<{ row: number; col: number; formato: string }> = [];
-  const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
-    { s: { r: 4, c: 0 }, e: { r: 4, c: lastCol } },
-    { s: { r: 5, c: 0 }, e: { r: 5, c: lastCol } },
-    { s: { r: 6, c: 0 }, e: { r: 6, c: lastCol } }
-  ];
+const enUS2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  for (const grupo of grupos) {
-    aoa.push([]);
-    rowKinds.push("blank");
-    merges.push({ s: { r: aoa.length, c: 0 }, e: { r: aoa.length, c: lastCol } });
-    aoa.push([`PLACA: ${grupo.placa}`, "", "", "", "", "", "", ""]);
-    rowKinds.push("subtitle");
-    aoa.push(["Pre.", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PLACA", "PESO", "PESO REDONDEADO"]);
-    rowKinds.push("header");
+export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
+  const d = datosRespaldoPorViaje(liquidacion);
+  const lastCol = 5;
+  type Celda = [string | number, Record<string, unknown> | null];
+  const filas: Celda[][] = [];
+  const merges: XLSX.Range[] = [];
+  const vacia: Celda = ["", null];
+  const fila = (celdas: Celda[]) => {
+    filas.push([...celdas, ...Array(lastCol + 1 - celdas.length).fill(vacia)]);
+    return filas.length - 1;
+  };
+  const combinar = (r: number, c1: number, c2: number) => merges.push({ s: { r, c: c1 }, e: { r, c: c2 } });
+  const est = (o: { sz?: number; bold?: boolean; h?: "left" | "center" | "right"; fill?: string; borde?: boolean; fmt?: string; color?: string }) => ({
+    font: { sz: o.sz ?? 8, bold: o.bold ?? false, ...(o.color ? { color: { rgb: o.color } } : {}) },
+    alignment: { ...(o.h ? { horizontal: o.h } : {}), vertical: "center" },
+    ...(o.fill ? { fill: { patternType: "solid", fgColor: { rgb: o.fill } } } : {}),
+    ...(o.borde ? { border: thinBorder } : {}),
+    ...(o.fmt ? { numFmt: o.fmt } : {})
+  });
+  const borde = (o: Parameters<typeof est>[0] = {}) => est({ borde: true, ...o });
 
-    grupo.viajesDetalle.forEach((v, index) => {
-      decimalCells.push({ row: aoa.length, col: 6, formato: "#,##0.000" });
-      aoa.push([index + 1, v.numeroViaje, formatFecha(v.fecha), v.correlativo, v.choferNombre, grupo.placa, num3(v.tonelajeNeto), ""]);
-      rowKinds.push("normal");
-    });
+  fila([["Empresa Minera", est({ sz: 10, bold: true })], vacia, vacia, vacia, vacia, [d.folio ? `N° ${d.folio}` : "BORRADOR", est({ sz: 10, bold: true, h: "right" })]]);
+  fila([[`MARTE S.R.L. — NIT: ${MARTE_NIT}`, est({ sz: 8, bold: true })]]);
+  const rTitulo = fila([["RESPALDO POR VIAJE", est({ sz: 12, bold: true, h: "center", color: "1F4E9A" })]]);
+  combinar(rTitulo, 0, lastCol);
+  const rSub = fila([["Transporte de carga Chami de mina Lipeña a Chilcobija", est({ sz: 8, h: "center" })]]);
+  combinar(rSub, 0, lastCol);
+  const rContr = fila([[`CONTRATISTA: ${d.contratista}`, est({ sz: 8, bold: true, h: "center" })]]);
+  combinar(rContr, 0, lastCol);
+  const rFecha = fila([[d.fechaTexto, est({ sz: 8, h: "center" })]]);
+  combinar(rFecha, 0, lastCol);
 
-    decimalCells.push({ row: aoa.length, col: 6, formato: "#,##0.000" });
-    decimalCells.push({ row: aoa.length, col: 7, formato: "#,##0.00" });
-    aoa.push(["", "", "", "", "", "Total", num3(grupo.pesoTotalCrudo), num(grupo.pesoTotal)]);
-    rowKinds.push("total");
-
-    decimalCells.push({ row: aoa.length, col: 7, formato: "#,##0.00" });
-    // Merges para que CONTRATISTA/BANCO/NUMERO DE CUENTA no se corten en la
-    // celda angosta de "Pre." — cada dato ocupa 2 columnas.
-    const filaResumen = aoa.length;
-    merges.push({ s: { r: filaResumen, c: 0 }, e: { r: filaResumen, c: 1 } });
-    merges.push({ s: { r: filaResumen, c: 2 }, e: { r: filaResumen, c: 3 } });
-    merges.push({ s: { r: filaResumen, c: 4 }, e: { r: filaResumen, c: 5 } });
-    aoa.push([
-      `CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`,
-      "",
-      banco ? `BANCO: ${banco.toUpperCase()}` : "",
-      "",
-      numeroCuenta ? `NUMERO DE CUENTA: ${numeroCuenta}` : "",
-      "",
-      "TOTAL",
-      num(grupo.subtotal)
+  for (const g of d.grupos) {
+    fila([]);
+    const rPlaca = fila([
+      [`PLACA: ${g.placa}   ·   ${g.viajes} viaje(s)   ·   Precio por TMB: ${g.precioAplicado.toFixed(2)}`, borde({ bold: true, fill: "D9E1F2" })],
+      ["", borde({ fill: "D9E1F2" })],
+      ["", borde({ fill: "D9E1F2" })],
+      ["", borde({ fill: "D9E1F2" })],
+      ["", borde({ fill: "D9E1F2" })],
+      ["", borde({ fill: "D9E1F2" })]
     ]);
-    rowKinds.push("total");
+    combinar(rPlaca, 0, lastCol);
+    fila(["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"].map((t): Celda => [t, borde({ bold: true, h: "center" })]));
+    g.viajesDetalle.forEach((v, i) => {
+      fila([
+        [i + 1, borde({ h: "center" })],
+        [v.numeroViaje, borde({ h: "center" })],
+        [formatFecha(v.fecha), borde({ h: "center" })],
+        [v.correlativo, borde({ h: "center" })],
+        [v.choferNombre, borde()],
+        [num3(v.tonelajeNeto), borde({ h: "right", fmt: "0.000" })]
+      ]);
+    });
+    const resumen = (etiqueta: string, valor: number, fmt: string, bold = false) => {
+      const r = fila([
+        [etiqueta, borde({ h: "right", bold })],
+        ["", borde()],
+        ["", borde()],
+        ["", borde()],
+        ["", borde()],
+        [valor, borde({ h: "right", bold, fmt })]
+      ]);
+      combinar(r, 0, 4);
+    };
+    resumen("Suma del peso neto (3 decimales)", num3(g.pesoTotalCrudo), "0.000");
+    resumen("Peso redondeado a 2 decimales (TMB)", num(g.pesoTotal), "0.00");
+    resumen(`Total: ${num(g.pesoTotal).toFixed(2)} TMB × ${g.precioAplicado.toFixed(2)}`, num(g.subtotal), "#,##0.00", true);
   }
 
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 26 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
+  fila([]);
+  const rTotal = fila([
+    ["TOTAL LIQUIDACION (todas las volquetas)", borde({ sz: 9, bold: true, h: "right" })],
+    ["", borde()],
+    ["", borde()],
+    ["", borde()],
+    ["", borde()],
+    [num(d.totales.bruto), borde({ sz: 9, bold: true, h: "right", fmt: "#,##0.00" })]
+  ]);
+  combinar(rTotal, 0, 4);
+  fila([]);
+  fila([[`CONTRATISTA: ${d.contratista}`, est({ bold: true })]]);
+  if (d.banco) fila([[`BANCO: ${d.banco}`, est({})]]);
+  if (d.numeroCuenta) fila([[`NUMERO DE CUENTA: ${d.numeroCuenta}`, est({})]]);
+
+  const sheet = XLSX.utils.aoa_to_sheet(filas.map((f) => f.map(([v]) => v)));
+  filas.forEach((f, r) =>
+    f.forEach(([, s], c) => {
+      if (!s) return;
+      const address = XLSX.utils.encode_cell({ r, c });
+      if (!sheet[address]) sheet[address] = { t: "s", v: "" };
+      sheet[address].s = s;
+    })
+  );
+  sheet["!cols"] = [{ wch: 5 }, { wch: 9 }, { wch: 11 }, { wch: 13 }, { wch: 30 }, { wch: 12 }];
   sheet["!merges"] = merges;
-  rowKinds.forEach((kind, index) => {
-    if (kind === "blank") return;
-    const style =
-      kind === "title" ? titleStyle
-      : kind === "subtitle" ? subtitleStyle
-      : kind === "header" ? headerStyle
-      : kind === "total" ? totalStyle
-      : kind === "plain" ? plainStyle
-      : bodyStyle;
-    styleRow(sheet, index, lastCol, style);
-  });
-  for (const { row, col, formato } of decimalCells) numberFormatCell(sheet, row, col, formato);
+  sheet["!margins"] = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, "Respaldo por viaje".slice(0, 31));
-  XLSX.writeFile(workbook, `liquidacion-por-viaje-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.xlsx`);
+  XLSX.utils.book_append_sheet(workbook, sheet, "Respaldo por viaje");
+  XLSX.writeFile(workbook, `${d.archivo}.xlsx`);
 }
 
 export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
-  const grupos = agruparPorPlacaConViajes(liquidacion);
-  const fin = parseFecha(liquidacion.fechaFin);
-  const banco = liquidacion.transportista?.banco;
-  const numeroCuenta = liquidacion.transportista?.numeroCuenta;
-
-  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const d = datosRespaldoPorViaje(liquidacion);
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margen = 36;
   const centerX = pageWidth / 2;
+  const altoFila = 11.5;
 
-  grupos.forEach((grupo, index) => {
-    if (index > 0) doc.addPage();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Empresa Minera", margen, 30);
+  doc.text("MARTE S.R.L.", margen, 42);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text(`NIT: ${MARTE_NIT}`, margen, 51);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Empresa Minera", 30, 26);
-    doc.text("MARTE S.R.L.", 30, 40);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(`NIT: ${MARTE_NIT}`, 30, 50);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.rect(pageWidth - margen - 58, 22, 58, 18);
+  doc.text(d.folio ? `N° ${d.folio}` : "BORRADOR", pageWidth - margen - 29, 34, { align: "center" });
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.rect(pageWidth - 90, 20, 60, 22);
-    doc.text(folioLiquidacion(liquidacion) ? `N° ${folioLiquidacion(liquidacion)}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
+  doc.setFontSize(12);
+  doc.setTextColor(...AZUL_CONOCIMIENTO);
+  doc.text("RESPALDO POR VIAJE", centerX, 32, { align: "center" });
+  const anchoTitulo = doc.getTextWidth("RESPALDO POR VIAJE");
+  doc.setDrawColor(...AZUL_CONOCIMIENTO);
+  doc.setLineWidth(0.8);
+  doc.line(centerX - anchoTitulo / 2, 35, centerX + anchoTitulo / 2, 35);
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(0, 0, 0);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.text("Transporte de carga Chami de mina Lipeña a Chilcobija", centerX, 45, { align: "center" });
+  doc.text(`CONTRATISTA: ${d.contratista}`, centerX, 55, { align: "center" });
+  doc.text(d.fechaTexto, centerX, 65, { align: "center" });
 
-    doc.setFontSize(13);
-    doc.setTextColor(...AZUL_CONOCIMIENTO);
-    doc.text("RESPALDO POR VIAJE", centerX, 30, { align: "center" });
-    const tituloWidth = doc.getTextWidth("RESPALDO POR VIAJE");
-    doc.setDrawColor(...AZUL_CONOCIMIENTO);
-    doc.setLineWidth(0.8);
-    doc.line(centerX - tituloWidth / 2, 33, centerX + tituloWidth / 2, 33);
-    doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text("Transporte de carga Chami de mina Lipeña a Chilcobija", centerX, 46, { align: "center" });
-    doc.text(`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, centerX, 60, { align: "center" });
-    doc.text(
-      `FECHA: ${fin.getUTCDate()}    MES: ${MESES_MAYUSCULA[fin.getUTCMonth()]}    AÑO: ${fin.getUTCFullYear()}`,
-      centerX,
-      73,
-      { align: "center" }
-    );
+  let y = 76;
+  const estilos = { ...pdfTableStyles, fontSize: 7, cellPadding: 1.8 };
+  const columnas = {
+    0: { cellWidth: 26, halign: "center" as const },
+    1: { cellWidth: 52, halign: "center" as const },
+    2: { cellWidth: 62, halign: "center" as const },
+    3: { cellWidth: 74, halign: "center" as const },
+    5: { cellWidth: 70, halign: "right" as const }
+  };
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text(`PLACA: ${grupo.placa}`, 30, 92);
-
-    const rows: RowInput[] = grupo.viajesDetalle.map((v, i) => [
-      i + 1, v.numeroViaje, formatFecha(v.fecha), v.correlativo, v.choferNombre, grupo.placa, v.tonelajeNeto.toFixed(3), ""
-    ]);
-    rows.push(["", "", "", "", "", "Total", grupo.pesoTotalCrudo.toFixed(3), formatBs(grupo.pesoTotal)]);
-
+  for (const g of d.grupos) {
+    // El bloque entero (título + encabezado + viajes + 3 filas de cálculo)
+    // tiene que entrar en lo que queda de la hoja; si no, pasa completo a
+    // la siguiente — nunca se parte una volqueta entre dos hojas.
+    const altoBloque = (g.viajesDetalle.length + 5) * altoFila + 8;
+    if (y + altoBloque > pageHeight - margen) {
+      doc.addPage();
+      y = margen;
+    }
+    const resumen = (etiqueta: string, valor: string, bold = false): RowInput => [
+      { content: etiqueta, colSpan: 5, styles: { halign: "right", fontStyle: bold ? "bold" : "normal" } },
+      { content: valor, styles: { halign: "right", fontStyle: bold ? "bold" : "normal" } }
+    ];
     drawPlainTable(doc, {
-      startY: 100,
-      head: [["Pre.", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PLACA", "PESO", "PESO REDONDEADO"]],
-      body: rows,
-      styles: pdfTableStyles,
-      headStyles: pdfHeadStyles,
-      columnStyles: {
-        0: { cellWidth: 35, halign: "right" },
-        1: { cellWidth: 55, halign: "right" },
-        2: { cellWidth: 60 },
-        3: { cellWidth: 75 },
-        5: { cellWidth: 60 },
-        6: { cellWidth: 80, halign: "right" },
-        7: { cellWidth: 90, halign: "right" }
-      },
-      margin: { left: 30, right: 30 }
+      startY: y,
+      margin: { left: margen, right: margen },
+      styles: estilos,
+      headStyles: { ...pdfHeadStyles, fontSize: 7, cellPadding: 1.8, halign: "center" },
+      columnStyles: columnas,
+      head: [
+        [
+          {
+            content: `PLACA: ${g.placa}     ·     ${g.viajes} viaje(s)     ·     Precio por TMB: ${g.precioAplicado.toFixed(2)}`,
+            colSpan: 6,
+            styles: { halign: "left", fillColor: [217, 225, 242] }
+          }
+        ],
+        ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"]
+      ],
+      body: [
+        ...g.viajesDetalle.map((v, i): RowInput => [
+          String(i + 1),
+          v.numeroViaje,
+          formatFecha(v.fecha),
+          v.correlativo,
+          v.choferNombre,
+          v.tonelajeNeto.toFixed(3)
+        ]),
+        resumen("Suma del peso neto (3 decimales)", g.pesoTotalCrudo.toFixed(3)),
+        resumen("Peso redondeado a 2 decimales (TMB)", g.pesoTotal.toFixed(2)),
+        resumen(`Total: ${g.pesoTotal.toFixed(2)} TMB × ${g.precioAplicado.toFixed(2)}`, enUS2(g.subtotal), true)
+      ],
+      showHead: "firstPage"
     });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
 
-    // Caja de totales con bordes reales (igual que las otras planillas), en
-    // vez de texto suelto — contratista/banco/cuenta a la izquierda, total
-    // a pagar de este vehículo a la derecha.
-    const finalY = (doc as any).lastAutoTable.finalY + 14;
-    const datosContratista = [
-      `CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`,
-      banco ? `BANCO: ${banco.toUpperCase()}` : "",
-      numeroCuenta ? `NUMERO DE CUENTA: ${numeroCuenta}` : ""
-    ].filter(Boolean);
-
-    drawPlainTable(doc, {
-      startY: finalY,
-      body: datosContratista.map((linea) => [linea]),
-      styles: { ...pdfTableStyles, fontStyle: "bold" },
-      columnStyles: { 0: { cellWidth: 320 } },
-      margin: { left: 30 },
-      tableWidth: 320
-    });
-
-    drawPlainTable(doc, {
-      startY: finalY,
-      body: [["TOTAL", formatBs(grupo.subtotal)]],
-      styles: { ...pdfTableStyles, fontStyle: "bold" },
-      columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 110, halign: "right" } },
-      margin: { left: pageWidth - 30 - 210 },
-      tableWidth: 210
-    });
+  if (y + 70 > pageHeight - margen) {
+    doc.addPage();
+    y = margen;
+  }
+  drawPlainTable(doc, {
+    startY: y + 4,
+    margin: { left: margen, right: margen },
+    styles: { ...pdfTableStyles, fontSize: 8.5, cellPadding: 3, fontStyle: "bold" },
+    columnStyles: { 1: { cellWidth: 100, halign: "right" } },
+    body: [["TOTAL LIQUIDACION (todas las volquetas)", enUS2(d.totales.bruto)]]
   });
+  y = (doc as any).lastAutoTable.finalY + 16;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text(`CONTRATISTA: ${d.contratista}`, margen, y);
+  doc.setFont("helvetica", "normal");
+  if (d.banco) doc.text(`BANCO: ${d.banco}`, margen, y + 11);
+  if (d.numeroCuenta) doc.text(`NUMERO DE CUENTA: ${d.numeroCuenta}`, margen, y + (d.banco ? 22 : 11));
 
-  openBrowserPrintDialog(doc, `liquidacion-por-viaje-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.pdf`);
+  openBrowserPrintDialog(doc, `${d.archivo}.pdf`);
 }
 
 // ============================================================================

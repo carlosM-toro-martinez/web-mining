@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   anularGastoCaja,
+  clasificarGastosCaja,
+  type ClasificarGastosCajaPayload,
   createGastoCaja,
   createMovimientoFondoCaja,
   getGastosCaja,
@@ -59,6 +61,14 @@ export function useAnularGastoCajaMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AnularGastoCajaPayload }) => anularGastoCaja(id, payload),
     onSuccess: () => invalidarSaldos(queryClient)
+  });
+}
+
+export function useClasificarGastosCajaMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ClasificarGastosCajaPayload) => clasificarGastosCaja(payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all })
   });
 }
 

@@ -638,272 +638,318 @@ export function exportReporteRendicionPdf(reporte: ReporteRendicion) {
 }
 
 // ============================================================================
-// Comprobante de Diario — asiento contable de la rendición cerrada, mismo
-// formato del comprobante real (folio "P-N/AAAA", cabecera, columnas
-// CODIGO/DETALLE/BOLIVIANOS DEBE-HABER/DOLARES DEBE-HABER, TOTALES, SON:,
-// firmas). Ver la nota en reportesCajaChica.service.ts (getComprobanteDiario)
-// sobre la regla de asiento usada por gasto.
+// Comprobante de Diario — réplica del comprobante real de la rendición
+// ("COMPROBANTE DE DIARIO / No: P-3/2025"): encabezado repetido en cada
+// hoja con "Hoja: N", tabla CODIGO / DETALLE / BOLIVIANOS / DOLARES, cada
+// asiento en varias filas (cuenta, centro de costo y función debajo, y el
+// detalle "F.26224 ESTAC.PETRO CENTER..."), TOTALES acumulados al pie de
+// cada hoja, el "SON: ..." solo en la última, y el recuadro de firmas. Las
+// reglas del asiento (crédito fiscal, combustible al 70%, retenciones, caja
+// al HABER por categoría) las arma el backend (getComprobanteDiario).
 // ============================================================================
 
-export function exportComprobanteDiarioExcel(comprobante: ReporteComprobanteDiario) {
-  const lastCol = 5; // A..F: CODIGO, DETALLE, Bs.DEBE, Bs.HABER, $us.DEBE, $us.HABER
-  const fin = parseFecha(comprobante.periodoHasta);
-  const aoa: Array<Array<string | number>> = [
-    ["EMPRESA MINERA MARTE S.R.L.", "", "", "Hoja: 1", "", ""],
-    ["La Paz - Bolivia", "", "", "", "", ""],
-    [],
-    ["COMPROBANTE DE DIARIO", "", "", "", "", ""],
-    [`Lugar y Fecha: La Paz, ${diaMesLargo(fin)}`, "", "", `No: ${comprobante.numero}`, "", ""],
-    [`A Favor de: ${cajaLabel(comprobante.caja.nombre)}`, "", "", `T/C.Dolar.- ${comprobante.tipoCambio}`, "", ""],
-    [`Referencia: DIARIO RENDICION CUENTAS ${cajaLabel(comprobante.caja.nombre)}`, "", "", "", "", ""],
-    [],
-    [`${cajaLabel(comprobante.caja.nombre)} ${mesDelAnioLabel(comprobante.periodoHasta)}`, "", "", "", "", ""],
-    ["CODIGO", "DETALLE", "BOLIVIANOS", "", "DOLARES", ""],
-    ["", "", "DEBE", "HABER", "DEBE", "HABER"]
-  ];
-  const rowKinds: Array<"title-block" | "subtitle" | "section" | "header" | "cuenta" | "sub" | "normal" | "total"> = [
-    "title-block",
-    "title-block",
-    "normal",
-    "subtitle",
-    "title-block",
-    "title-block",
-    "title-block",
-    "normal",
-    "section",
-    "header",
-    "header"
-  ];
+type LineaDiario = ReporteComprobanteDiario["lineas"][number];
+interface FilaDiario {
+  codigo: string;
+  texto: string;
+  nivel: "cuenta" | "sub" | "detalle";
+  debeBs?: number;
+  haberBs?: number;
+  debeUsd?: number;
+  haberUsd?: number;
+}
 
+const FILAS_POR_HOJA_DIARIO = 34;
+const enUSDiario = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const montoDiario = (v?: number) => (v ? enUSDiario(v) : "");
+
+// Cada línea del asiento ocupa varias filas impresas; el monto va en la
+// fila de la cuenta, como en el comprobante real.
+function filasDeLinea(linea: LineaDiario): FilaDiario[] {
+  const filas: FilaDiario[] = [
+    {
+      codigo: linea.codigo,
+      texto: linea.cuentaNombre,
+      nivel: "cuenta",
+      debeBs: linea.debeBs,
+      haberBs: linea.haberBs,
+      debeUsd: linea.debeUsd,
+      haberUsd: linea.haberUsd
+    }
+  ];
+  if (linea.centroCodigo) filas.push({ codigo: linea.centroCodigo, texto: linea.centroNombre ?? "", nivel: "sub" });
+  if (linea.funcionCodigo) filas.push({ codigo: linea.funcionCodigo, texto: linea.funcionNombre ?? "", nivel: "sub" });
+  if (linea.detalle) filas.push({ codigo: "", texto: linea.detalle, nivel: "detalle" });
+  return filas;
+}
+
+// Reparte los asientos en hojas sin partir ninguno entre dos hojas, y
+// calcula los TOTALES acumulados hasta el final de cada hoja.
+function paginarDiario(comprobante: ReporteComprobanteDiario) {
+  const hojas: Array<{ filas: FilaDiario[]; acumulado: { debeBs: number; haberBs: number; debeUsd: number; haberUsd: number } }> = [];
+  let actual: FilaDiario[] = [];
+  const acumulado = { debeBs: 0, haberBs: 0, debeUsd: 0, haberUsd: 0 };
+  const cerrarHoja = () => {
+    hojas.push({ filas: actual, acumulado: { ...acumulado } });
+    actual = [];
+  };
   for (const linea of comprobante.lineas) {
-    aoa.push([linea.codigo, linea.cuentaNombre, "", "", "", ""]);
-    rowKinds.push("cuenta");
-    if (linea.centroCodigo) {
-      aoa.push(["", `${linea.centroCodigo} ${linea.centroNombre}`, "", "", "", ""]);
-      rowKinds.push("sub");
-    }
-    if (linea.funcionCodigo) {
-      aoa.push(["", `${linea.funcionCodigo} ${linea.funcionNombre}`, "", "", "", ""]);
-      rowKinds.push("sub");
-    }
-    aoa.push([
-      "",
-      linea.detalle,
-      linea.debeBs || "",
-      linea.haberBs || "",
-      linea.debeUsd || "",
-      linea.haberUsd || ""
-    ]);
-    rowKinds.push("normal");
+    const filas = filasDeLinea(linea);
+    if (actual.length > 0 && actual.length + filas.length > FILAS_POR_HOJA_DIARIO) cerrarHoja();
+    actual.push(...filas);
+    acumulado.debeBs = Math.round((acumulado.debeBs + linea.debeBs) * 100) / 100;
+    acumulado.haberBs = Math.round((acumulado.haberBs + linea.haberBs) * 100) / 100;
+    acumulado.debeUsd = Math.round((acumulado.debeUsd + linea.debeUsd) * 100) / 100;
+    acumulado.haberUsd = Math.round((acumulado.haberUsd + linea.haberUsd) * 100) / 100;
   }
+  cerrarHoja();
+  return hojas;
+}
 
-  const totalesRow = aoa.length;
-  aoa.push([
-    "",
-    "TOTALES",
-    num(comprobante.totales.debeBs),
-    num(comprobante.totales.haberBs),
-    num(comprobante.totales.debeUsd),
-    num(comprobante.totales.haberUsd)
-  ]);
-  rowKinds.push("total");
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push([`SON: ${montoEnLetras(comprobante.totales.debeBs)}`, "", "", "", "", ""]);
-  rowKinds.push("normal");
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push(["", "", "", "NOMBRE:", "", ""]);
-  rowKinds.push("normal");
-  aoa.push(["", "", "", "CI.:", "", ""]);
-  rowKinds.push("normal");
-  aoa.push(["", "", "", "FIRMA:", "", ""]);
-  rowKinds.push("normal");
-  aoa.push([]);
-  rowKinds.push("normal");
-  aoa.push(["PREPARADO POR", "CONTADOR", "", "PRESIDENCIA", "", "INTERESADO"]);
-  rowKinds.push("section");
-
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 14 }, { wch: 34 }, { wch: 13 }, { wch: 13 }, { wch: 12 }, { wch: 12 }];
-  sheet["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
-    { s: { r: 0, c: 3 }, e: { r: 0, c: lastCol } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
-    { s: { r: 4, c: 0 }, e: { r: 4, c: 2 } },
-    { s: { r: 4, c: 3 }, e: { r: 4, c: lastCol } },
-    { s: { r: 5, c: 0 }, e: { r: 5, c: 2 } },
-    { s: { r: 5, c: 3 }, e: { r: 5, c: lastCol } },
-    { s: { r: 6, c: 0 }, e: { r: 6, c: lastCol } },
-    { s: { r: 8, c: 0 }, e: { r: 8, c: lastCol } },
-    { s: { r: 9, c: 0 }, e: { r: 10, c: 0 } },
-    { s: { r: 9, c: 1 }, e: { r: 10, c: 1 } },
-    { s: { r: 9, c: 2 }, e: { r: 9, c: 3 } },
-    { s: { r: 9, c: 4 }, e: { r: 9, c: 5 } },
-    { s: { r: totalesRow + 2, c: 0 }, e: { r: totalesRow + 2, c: lastCol } }
-  ];
-
-  rowKinds.forEach((kind, index) => {
-    const style =
-      kind === "title-block"
-        ? { font: { sz: 10 } }
-        : kind === "subtitle"
-          ? titleStyle
-          : kind === "section"
-            ? sectionStyle
-            : kind === "header"
-              ? headerStyle
-              : kind === "cuenta"
-                ? { font: { bold: true, sz: 9 }, border: thinBorder }
-                : kind === "sub"
-                  ? { font: { sz: 9, italic: true }, alignment: { indent: 2 }, border: thinBorder }
-                  : kind === "total"
-                    ? totalStyle
-                    : bodyStyle;
-    styleRow(sheet, index, lastCol, style);
-  });
-
-  // Alinea a la derecha "Hoja:", "No:" y "T/C" — quedan en la mitad derecha
-  // fusionada de su fila, igual que en el comprobante real.
-  for (const [row, col] of [
-    [0, 3],
-    [4, 3],
-    [5, 3]
-  ]) {
-    const address = XLSX.utils.encode_cell({ r: row, c: col });
-    setStyle(sheet, address, { font: { sz: 10 }, alignment: { horizontal: "right" } });
-  }
-
-  for (let r = 0; r < aoa.length; r += 1) {
-    for (const col of [2, 3, 4, 5]) numberFormatCell(sheet, r, col);
-  }
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, "Comprobante de Diario".slice(0, 31));
-  XLSX.writeFile(workbook, `comprobante-diario-${comprobante.caja.codigo}-${comprobante.numero.replace(/\//g, "-")}.xlsx`);
+function datosComprobanteDiario(comprobante: ReporteComprobanteDiario) {
+  const inicio = parseFecha(comprobante.periodoDesde);
+  const ultimoDia = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth() + 1, 0)).getUTCDate();
+  const sector = sectorCaja(comprobante.caja.nombre);
+  const mes = MESES_MAYUSCULA[inicio.getUTCMonth()];
+  return {
+    titulo: `CAJA ${sector}`,
+    lugarFecha: `La Paz, ${ultimoDia} de ${mes} de ${inicio.getUTCFullYear()}`,
+    recuadro: `CAJA ${sector} ${mes} ${inicio.getUTCFullYear()}`,
+    hojas: paginarDiario(comprobante),
+    son: `${montoEnLetras(comprobante.totales.debeBs)}.`,
+    archivo: `comprobante-diario-${comprobante.caja.codigo}-${comprobante.numero.replace(/\//g, "-")}`
+  };
 }
 
 export function exportComprobanteDiarioPdf(comprobante: ReporteComprobanteDiario) {
+  const d = datosComprobanteDiario(comprobante);
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const centerX = pageWidth / 2;
-  const fin = parseFecha(comprobante.periodoHasta);
+  const izq = 34;
+  const der = pageWidth - 34;
+  // Columnas: CODIGO | DETALLE | Bs DEBE | Bs HABER | $us DEBE | $us HABER
+  const x = [izq, izq + 72, izq + 285, izq + 352, izq + 419, izq + 473, der];
+  const alto = 12.2;
+  const yTabla = 196;
+  const yCuerpo = yTabla + 26;
+  const yTotales = yCuerpo + FILAS_POR_HOJA_DIARIO * alto + 4;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("EMPRESA MINERA MARTE S.R.L.", 34, 32);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("La Paz - Bolivia", 34, 44);
-  doc.text(`Hoja: 1`, pageWidth - 60, 32);
+  const subrayado = (texto: string, px: number, py: number) => {
+    doc.text(texto, px, py);
+    doc.line(px, py + 1.5, px + doc.getTextWidth(texto), py + 1.5);
+  };
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("COMPROBANTE DE DIARIO", centerX, 66, { align: "center" });
+  d.hojas.forEach((hoja, indice) => {
+    if (indice > 0) doc.addPage();
+    const esUltima = indice === d.hojas.length - 1;
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.6);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  let y = 84;
-  doc.text(`Lugar y Fecha: La Paz, ${diaMesLargo(fin)}`, 34, y);
-  doc.text(`No: ${comprobante.numero}`, pageWidth - 34, y, { align: "right" });
-  y += 13;
-  doc.text(`A Favor de: ${cajaLabel(comprobante.caja.nombre)}`, 34, y);
-  doc.text(`T/C.Dolar.- ${comprobante.tipoCambio}`, pageWidth - 34, y, { align: "right" });
-  y += 13;
-  doc.text(`Referencia: DIARIO RENDICION CUENTAS ${cajaLabel(comprobante.caja.nombre)}`, 34, y);
-  y += 16;
-  doc.setFont("helvetica", "bold");
-  doc.text(`${cajaLabel(comprobante.caja.nombre)} ${mesDelAnioLabel(comprobante.periodoHasta)}`, 34, y);
-  y += 10;
+    doc.setFont("courier", "bold");
+    doc.setFontSize(10);
+    doc.text("EMPRESA MINERA MARTE S.R.L.", izq + 4, 36);
+    doc.setFont("courier", "normal");
+    doc.setFontSize(8.5);
+    doc.text("La Paz - Bolivia", izq + 40, 47);
+    doc.setFont("courier", "bold");
+    doc.setFontSize(9);
+    doc.text(`Hoja: ${indice + 1}`, der - 4, 40, { align: "right" });
 
-  const rows: RowInput[] = [];
-  const rowKinds: Array<"cuenta" | "sub" | "normal"> = [];
-  for (const linea of comprobante.lineas) {
-    rows.push([linea.codigo, linea.cuentaNombre, "", "", "", ""]);
-    rowKinds.push("cuenta");
-    if (linea.centroCodigo) {
-      rows.push(["", `${linea.centroCodigo} ${linea.centroNombre}`, "", "", "", ""]);
-      rowKinds.push("sub");
-    }
-    if (linea.funcionCodigo) {
-      rows.push(["", `${linea.funcionCodigo} ${linea.funcionNombre}`, "", "", "", ""]);
-      rowKinds.push("sub");
-    }
-    rows.push([
-      "",
-      linea.detalle,
-      linea.debeBs ? formatBs(linea.debeBs) : "",
-      linea.haberBs ? formatBs(linea.haberBs) : "",
-      linea.debeUsd ? formatBs(linea.debeUsd) : "",
-      linea.haberUsd ? formatBs(linea.haberUsd) : ""
-    ]);
-    rowKinds.push("normal");
-  }
-  rows.push([
-    "",
-    "TOTALES",
-    formatBs(comprobante.totales.debeBs),
-    formatBs(comprobante.totales.haberBs),
-    formatBs(comprobante.totales.debeUsd),
-    formatBs(comprobante.totales.haberUsd)
-  ]);
-  rowKinds.push("normal");
+    doc.setFontSize(12);
+    const titulo = "COMPROBANTE DE DIARIO";
+    const anchoTitulo = doc.getTextWidth(titulo);
+    doc.text(titulo, pageWidth / 2 - anchoTitulo / 2, 72);
+    doc.line(pageWidth / 2 - anchoTitulo / 2, 74, pageWidth / 2 + anchoTitulo / 2, 74);
 
-  autoTable(doc, {
-    startY: y + 6,
-    head: [
-      [
-        { content: "CODIGO", rowSpan: 2 },
-        { content: "DETALLE", rowSpan: 2 },
-        { content: "BOLIVIANOS", colSpan: 2 },
-        { content: "DOLARES", colSpan: 2 }
-      ],
-      [
-        { content: "DEBE" },
-        { content: "HABER" },
-        { content: "DEBE" },
-        { content: "HABER" }
-      ]
-    ] as unknown as RowInput[],
-    body: rows,
-    styles: { ...pdfTableStyles, fontSize: 7.5, cellPadding: 2.5 },
-    headStyles: { ...pdfHeadStyles, halign: "center" },
-    columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
-    margin: { left: 30, right: 30, bottom: 90 },
-    didParseCell: (hook) => {
-      if (hook.section !== "body") return;
-      const kind = rowKinds[hook.row.index];
-      if (kind === "cuenta") hook.cell.styles.fontStyle = "bold";
-      if (kind === "sub") hook.cell.styles.fontStyle = "italic";
-      if (hook.row.index === rows.length - 1) hook.cell.styles.fontStyle = "bold";
-    }
+    doc.setFontSize(8.5);
+    const etiquetas: Array<[string, string]> = [
+      ["Lugar y Fecha:", d.lugarFecha],
+      ["A Favor de:", d.titulo],
+      ["Referencia:", `DIARIO RENDICION CUENTAS ${d.titulo}`]
+    ];
+    etiquetas.forEach(([etiqueta, valor], i) => {
+      const py = 96 + i * 12;
+      doc.setFont("courier", "bold");
+      const anchoEtiqueta = doc.getTextWidth(etiqueta);
+      subrayado(etiqueta, izq + 150 - anchoEtiqueta, py);
+      doc.setFont("courier", "normal");
+      doc.text(valor, izq + 156, py);
+    });
+    doc.setFont("courier", "bold");
+    doc.rect(der - 140, 82, 136, 18);
+    doc.text(`No: ${comprobante.numero}`, der - 134, 94);
+    subrayado("T/C.Dolar.-", der - 140, 118);
+    doc.setFont("courier", "normal");
+    doc.text(String(comprobante.tipoCambio), der - 4, 118, { align: "right" });
+
+    doc.rect(izq, 130, der - izq, 46);
+    doc.setFont("courier", "bold");
+    doc.setFontSize(7.5);
+    doc.text(d.recuadro, izq + 6, 140);
+
+    // Tabla: encabezado de dos niveles + líneas verticales hasta los totales.
+    doc.setFontSize(8);
+    doc.rect(izq, yTabla, der - izq, yTotales + alto + 2 - yTabla);
+    doc.line(izq, yTabla + 13, der, yTabla + 13);
+    doc.line(x[2]!, yTabla + 26, der, yTabla + 26);
+    doc.line(izq, yCuerpo, x[2]!, yCuerpo);
+    for (const xi of [x[1]!, x[2]!, x[4]!]) doc.line(xi, yTabla, xi, yTotales);
+    for (const xi of [x[3]!, x[5]!]) doc.line(xi, yTabla + 13, xi, yTotales);
+    doc.text("CODIGO", izq + 4, yTabla + 22);
+    doc.text("D E T A L L E", x[1]! + 40, yTabla + 22);
+    doc.text("B O L I V I A N O S", (x[2]! + x[4]!) / 2, yTabla + 9, { align: "center" });
+    doc.text("D O L A R E S", (x[4]! + der) / 2, yTabla + 9, { align: "center" });
+    doc.text("DEBE", (x[2]! + x[3]!) / 2, yTabla + 22, { align: "center" });
+    doc.text("HABER", (x[3]! + x[4]!) / 2, yTabla + 22, { align: "center" });
+    doc.text("DEBE", (x[4]! + x[5]!) / 2, yTabla + 22, { align: "center" });
+    doc.text("HABER", (x[5]! + der) / 2, yTabla + 22, { align: "center" });
+
+    doc.setFont("courier", "normal");
+    doc.setFontSize(7.6);
+    hoja.filas.forEach((fila, i) => {
+      const py = yCuerpo + 9 + i * alto;
+      if (fila.codigo) doc.text(fila.codigo, x[1]! - 2, py, { align: "right" });
+      const sangria = fila.nivel === "detalle" ? 12 : 2;
+      const texto = doc.splitTextToSize(fila.texto, x[2]! - x[1]! - sangria - 4)[0] ?? "";
+      doc.text(texto, x[1]! + sangria, py);
+      if (fila.debeBs) doc.text(montoDiario(fila.debeBs), x[3]! - 3, py, { align: "right" });
+      if (fila.haberBs) doc.text(montoDiario(fila.haberBs), x[4]! - 3, py, { align: "right" });
+      if (fila.debeUsd) doc.text(montoDiario(fila.debeUsd), x[5]! - 3, py, { align: "right" });
+      if (fila.haberUsd) doc.text(montoDiario(fila.haberUsd), der - 3, py, { align: "right" });
+    });
+
+    doc.line(izq, yTotales, der, yTotales);
+    doc.setFont("courier", "bold");
+    doc.setFontSize(8.5);
+    doc.text("T O T A L E S", (izq + x[2]!) / 2, yTotales + 10, { align: "center" });
+    doc.text(enUSDiario(hoja.acumulado.debeBs), x[3]! - 3, yTotales + 10, { align: "right" });
+    doc.text(enUSDiario(hoja.acumulado.haberBs), x[4]! - 3, yTotales + 10, { align: "right" });
+    doc.text(enUSDiario(hoja.acumulado.debeUsd), x[5]! - 3, yTotales + 10, { align: "right" });
+    doc.text(enUSDiario(hoja.acumulado.haberUsd), der - 3, yTotales + 10, { align: "right" });
+
+    const ySon = yTotales + alto + 16;
+    doc.setFontSize(8);
+    doc.text(`SON: ${esUltima ? d.son : ""}`, izq, ySon, { maxWidth: der - izq });
+
+    // Recuadro de firmas: PREPARADO POR | CONTADOR | PRESIDENCIA | NOMBRE/CI/FIRMA/INTERESADO
+    const yFirmas = ySon + 8;
+    const altoFirmas = 96;
+    const xF = [izq, izq + 120, izq + 245, izq + 370, der];
+    doc.setLineWidth(0.6);
+    doc.rect(izq, yFirmas, der - izq, altoFirmas);
+    for (const xi of xF.slice(1, -1)) doc.line(xi, yFirmas, xi, yFirmas + altoFirmas);
+    doc.setFont("courier", "bold");
+    doc.setFontSize(8);
+    doc.text("PREPARADO POR:", izq + 4, yFirmas + altoFirmas - 6);
+    doc.text("CONTADOR", (xF[1]! + xF[2]!) / 2, yFirmas + altoFirmas - 6, { align: "center" });
+    doc.text("PRESIDENCIA", (xF[2]! + xF[3]!) / 2, yFirmas + altoFirmas - 6, { align: "center" });
+    doc.text("NOMBRE:", xF[3]! + 4, yFirmas + 10);
+    doc.line(xF[3]!, yFirmas + 16, der, yFirmas + 16);
+    doc.text("CI.:", xF[3]! + 4, yFirmas + 30);
+    doc.line(xF[3]!, yFirmas + 36, der, yFirmas + 36);
+    doc.text("FIRMA:", xF[3]! + 4, yFirmas + 72);
+    doc.line(xF[3]!, yFirmas + 78, der, yFirmas + 78);
+    doc.text("I N T E R E S A D O", (xF[3]! + der) / 2, yFirmas + altoFirmas - 6, { align: "center" });
   });
 
-  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
-  const sonY = Math.min(finalY + 16, doc.internal.pageSize.getHeight() - 90);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`SON: ${montoEnLetras(comprobante.totales.debeBs)}`, 34, sonY);
+  openBrowserPrintDialog(doc, `${d.archivo}.pdf`);
+}
 
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const cajaBoxX = pageWidth - 200;
-  let cajaBoxY = sonY + 20;
-  doc.setFontSize(8);
-  doc.text("NOMBRE: ________________________", cajaBoxX, cajaBoxY);
-  cajaBoxY += 13;
-  doc.text("CI.: ________________________", cajaBoxX, cajaBoxY);
-  cajaBoxY += 13;
-  doc.text("FIRMA: ________________________", cajaBoxX, cajaBoxY);
+export function exportComprobanteDiarioExcel(comprobante: ReporteComprobanteDiario) {
+  const d = datosComprobanteDiario(comprobante);
+  type Celda = [string | number, Record<string, unknown> | null];
+  const filas: Celda[][] = [];
+  const merges: XLSX.Range[] = [];
+  const vacia: Celda = ["", null];
+  const fila = (celdas: Celda[] = []) => {
+    filas.push([...celdas, ...Array(6 - celdas.length).fill(vacia)]);
+    return filas.length - 1;
+  };
+  const combinar = (r: number, c1: number, c2: number) => merges.push({ s: { r, c: c1 }, e: { r, c: c2 } });
+  const est = (o: { sz?: number; bold?: boolean; underline?: boolean; h?: "left" | "center" | "right"; borde?: Record<string, unknown> }) => ({
+    font: { name: "Courier New", sz: o.sz ?? 8, bold: o.bold ?? false, underline: o.underline ?? false },
+    alignment: { ...(o.h ? { horizontal: o.h } : {}), vertical: "center" },
+    ...(o.borde ? { border: o.borde } : {})
+  });
+  const linea = (lados: Array<"left" | "right" | "top" | "bottom">) =>
+    Object.fromEntries(lados.map((l) => [l, { style: "thin", color: { rgb: "000000" } }]));
+  const columnas = (extra: Array<"top" | "bottom"> = []) =>
+    [0, 1, 2, 3, 4, 5].map((c) => linea([...(c === 0 ? ["left" as const] : []), "right", ...extra]));
 
-  const firmaY = pageHeight - 40;
-  doc.setFontSize(8);
-  doc.text("PREPARADO POR", 40, firmaY);
-  doc.text("CONTADOR", 170, firmaY);
-  doc.text("PRESIDENCIA", 290, firmaY);
-  doc.text("INTERESADO", 420, firmaY);
+  d.hojas.forEach((hoja, indice) => {
+    const esUltima = indice === d.hojas.length - 1;
+    fila([["EMPRESA MINERA MARTE S.R.L.", est({ sz: 10, bold: true })], vacia, vacia, vacia, vacia, [`Hoja: ${indice + 1}`, est({ bold: true, h: "right" })]]);
+    fila([["", null], ["La Paz - Bolivia", est({})]]);
+    const rTitulo = fila([["COMPROBANTE DE DIARIO", est({ sz: 12, bold: true, underline: true, h: "center" })]]);
+    combinar(rTitulo, 0, 5);
+    const rLugar = fila([["Lugar y Fecha:", est({ bold: true, underline: true, h: "right" })], [d.lugarFecha, est({})], vacia, vacia, [`No: ${comprobante.numero}`, est({ bold: true, borde: linea(["left", "right", "top", "bottom"]) })]]);
+    combinar(rLugar, 4, 5);
+    fila([["A Favor de:", est({ bold: true, underline: true, h: "right" })], [d.titulo, est({})]]);
+    fila([["Referencia:", est({ bold: true, underline: true, h: "right" })], [`DIARIO RENDICION CUENTAS ${d.titulo}`, est({})], vacia, vacia, ["T/C.Dolar.-", est({ bold: true, underline: true })], [comprobante.tipoCambio, est({ h: "right" })]]);
+    const rRecuadro = fila([[d.recuadro, est({ bold: true, borde: linea(["left", "top", "bottom"]) })], ["", est({ borde: linea(["top", "bottom"]) })], ["", est({ borde: linea(["top", "bottom"]) })], ["", est({ borde: linea(["top", "bottom"]) })], ["", est({ borde: linea(["top", "bottom"]) })], ["", est({ borde: linea(["right", "top", "bottom"]) })]]);
+    combinar(rRecuadro, 0, 5);
+    fila();
 
-  openBrowserPrintDialog(doc, `comprobante-diario-${comprobante.caja.codigo}-${comprobante.numero.replace(/\//g, "-")}.pdf`);
+    const cab = (texto: string, h: "left" | "center" = "center") => est({ bold: true, h, borde: linea(["left", "right", "top", "bottom"]) });
+    const rCab1 = fila([["CODIGO", cab("CODIGO")], ["D E T A L L E", cab("")], ["B O L I V I A N O S", cab("")], ["", cab("")], ["D O L A R E S", cab("")], ["", cab("")]]);
+    combinar(rCab1, 2, 3);
+    combinar(rCab1, 4, 5);
+    fila([["", cab("")], ["", cab("")], ["DEBE", cab("")], ["HABER", cab("")], ["DEBE", cab("")], ["HABER", cab("")]]);
+
+    const bordesCuerpo = columnas();
+    for (let i = 0; i < FILAS_POR_HOJA_DIARIO; i += 1) {
+      const f = hoja.filas[i];
+      const numero = (v: number | undefined, c: number): Celda => [v ? Math.round(v * 100) / 100 : "", { ...est({ h: "right", borde: bordesCuerpo[c] }), numFmt: "#,##0.00" }];
+      fila([
+        [f?.codigo ?? "", est({ h: "right", borde: bordesCuerpo[0] })],
+        [f ? `${f.nivel === "detalle" ? "    " : ""}${f.texto}` : "", est({ borde: bordesCuerpo[1] })],
+        numero(f?.debeBs, 2),
+        numero(f?.haberBs, 3),
+        numero(f?.debeUsd, 4),
+        numero(f?.haberUsd, 5)
+      ]);
+    }
+    const bordesTotales = columnas(["top", "bottom"]);
+    const total = (v: number, c: number): Celda => [v, { ...est({ bold: true, h: "right", borde: bordesTotales[c] }), numFmt: "#,##0.00" }];
+    const rTotales = fila([
+      ["T O T A L E S", est({ bold: true, h: "center", borde: bordesTotales[0] })],
+      ["", est({ borde: bordesTotales[1] })],
+      total(hoja.acumulado.debeBs, 2),
+      total(hoja.acumulado.haberBs, 3),
+      total(hoja.acumulado.debeUsd, 4),
+      total(hoja.acumulado.haberUsd, 5)
+    ]);
+    combinar(rTotales, 0, 1);
+    const rSon = fila([[`SON: ${esUltima ? d.son : ""}`, est({ bold: true })]]);
+    combinar(rSon, 0, 5);
+    const caja = est({ borde: linea(["left", "right", "top"]) });
+    fila([["", caja], ["", caja], ["", caja], ["NOMBRE:", est({ bold: true, borde: linea(["left", "top"]) })], ["", est({ borde: linea(["top"]) })], ["", est({ borde: linea(["right", "top"]) })]]);
+    fila([["", est({ borde: linea(["left", "right"]) })], ["", est({ borde: linea(["left", "right"]) })], ["", est({ borde: linea(["left", "right"]) })], ["CI.:", est({ bold: true, borde: linea(["left", "top"]) })], ["", est({ borde: linea(["top"]) })], ["", est({ borde: linea(["right", "top"]) })]]);
+    fila([["", est({ borde: linea(["left", "right"]) })], ["", est({ borde: linea(["left", "right"]) })], ["", est({ borde: linea(["left", "right"]) })], ["FIRMA:", est({ bold: true, borde: linea(["left", "top"]) })], ["", est({ borde: linea(["top"]) })], ["", est({ borde: linea(["right", "top"]) })]]);
+    const pie = est({ bold: true, h: "center", borde: linea(["left", "right", "bottom"]) });
+    const rPie = fila([["PREPARADO POR:", est({ bold: true, borde: linea(["left", "right", "bottom"]) })], ["CONTADOR", pie], ["PRESIDENCIA", pie], ["I N T E R E S A D O", est({ bold: true, h: "center", borde: linea(["left", "top", "bottom"]) })], ["", est({ borde: linea(["top", "bottom"]) })], ["", est({ borde: linea(["right", "top", "bottom"]) })]]);
+    combinar(rPie, 3, 5);
+    fila();
+    fila();
+  });
+
+  const sheet = XLSX.utils.aoa_to_sheet(filas.map((f) => f.map(([v]) => v)));
+  filas.forEach((f, r) =>
+    f.forEach(([, s], c) => {
+      if (!s) return;
+      const address = XLSX.utils.encode_cell({ r, c });
+      if (!sheet[address]) sheet[address] = { t: "s", v: "" };
+      sheet[address].s = s;
+    })
+  );
+  sheet["!cols"] = [{ wch: 13 }, { wch: 44 }, { wch: 13 }, { wch: 13 }, { wch: 12 }, { wch: 12 }];
+  sheet["!merges"] = merges;
+  sheet["!margins"] = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Comprobante de Diario");
+  XLSX.writeFile(workbook, `${d.archivo}.xlsx`);
 }
 
 // ============================================================================

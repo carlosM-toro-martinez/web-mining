@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getRequest, postRequest, putRequest } from "@/shared/api/core/request";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { apiEndpoints } from "@/shared/api/endpoints";
@@ -56,6 +57,24 @@ export async function updateGastoCaja(id: string, payload: UpdateGastoCajaPayloa
 export async function anularGastoCaja(id: string, payload: AnularGastoCajaPayload) {
   const body = anularGastoCajaPayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.gastoCaja.gastoAnular(id), body, schema: gastoCajaResponseSchema });
+}
+
+export interface ClasificarGastosCajaPayload {
+  ids: string[];
+  cuentaContableCajaId?: number | null;
+  centroCostoCajaId?: number | null;
+  funcionGastoCajaId?: number | null;
+  partidaPresupuestoId?: number | null;
+  categoriaRendicion?: string;
+}
+
+const clasificarGastosCajaResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({ actualizados: z.number(), omitidos: z.number() })
+});
+
+export async function clasificarGastosCaja(payload: ClasificarGastosCajaPayload) {
+  return postRequest({ url: apiEndpoints.gastoCaja.clasificar, body: payload, schema: clasificarGastosCajaResponseSchema });
 }
 
 export async function importarGastosCajaExcel(file: File) {
