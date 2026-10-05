@@ -125,6 +125,7 @@ export const updateLoteDespachoPayloadSchema = z.object({
   combustibleAsignadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.").nullable().optional(),
   fechaDespachoReal: z.string().trim().optional(),
   fechaDocumentalFiscal: z.string().trim().optional(),
+  numeroCorrelativo: z.number().int().positive("El N° debe ser mayor a cero.").optional(),
   detalleCarga: z.string().trim().min(1).optional(),
   descripcion: z.string().trim().nullable().optional(),
   observaciones: z.string().trim().nullable().optional(),

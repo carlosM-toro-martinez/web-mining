@@ -371,6 +371,10 @@ function EditarLoteModal({
     lote.combustibleAsignadoLitros != null ? String(lote.combustibleAsignadoLitros) : ""
   );
   const [fechaDespachoReal, setFechaDespachoReal] = useState(lote.fechaDespachoReal.slice(0, 10));
+  // "27/10" -> 27. El mes sale siempre de la fecha de despacho.
+  const numeroActual = /^(\d+)\//.exec(lote.correlativo)?.[1] ?? "";
+  const [numeroCorrelativo, setNumeroCorrelativo] = useState(numeroActual);
+  const mesCorrelativo = fechaDespachoReal.slice(5, 7);
   const [detalleCarga, setDetalleCarga] = useState(lote.conocimientoCarga?.detalleCarga ?? "Carga Chami");
   const [descripcion, setDescripcion] = useState(lote.conocimientoCarga?.descripcion ?? "");
   const [observaciones, setObservaciones] = useState(lote.conocimientoCarga?.observaciones ?? "");
@@ -408,6 +412,9 @@ function EditarLoteModal({
           combustibleAsignadoLitros:
             incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : null,
           fechaDespachoReal,
+          ...(numeroCorrelativo && numeroCorrelativo !== numeroActual
+            ? { numeroCorrelativo: Number(numeroCorrelativo) }
+            : {}),
           detalleCarga: detalleCarga.trim() || undefined,
           descripcion: descripcion.trim() || null,
           observaciones: observaciones.trim() || null,
@@ -421,8 +428,12 @@ function EditarLoteModal({
         }
       },
       {
-        onSuccess: () => {
-          showSuccess(`Lote ${lote.correlativo} actualizado.`);
+        onSuccess: (response) => {
+          showSuccess(
+            response.data.correlativo !== lote.correlativo
+              ? `Lote ${lote.correlativo} actualizado, ahora es el N° ${response.data.correlativo}.`
+              : `Lote ${lote.correlativo} actualizado.`
+          );
           onClose();
         },
         onError: (error) => showError(normalizeError(error, "No se pudo actualizar el lote."))
@@ -444,6 +455,23 @@ function EditarLoteModal({
         <div>
           <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Fecha de despacho real</label>
           <input required type="date" value={fechaDespachoReal} onChange={(e) => setFechaDespachoReal(e.target.value)} className={inputClassName} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">N° de Conocimiento</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={numeroCorrelativo}
+              onChange={(e) => setNumeroCorrelativo(e.target.value)}
+              className={`${inputClassName} w-28 font-mono`}
+            />
+            <span className="font-mono text-sm">/{mesCorrelativo}</span>
+          </div>
+          <p className="mt-1 text-[11px] text-[var(--color-on-surface-variant)]">
+            No puede repetir el de otro lote del mes ni saltarse la serie. Si cambias la fecha a otro mes y no tocas el N°, toma el siguiente libre de ese mes.
+          </p>
         </div>
         <select
           value={incluyeCombustible}
@@ -1222,42 +1250,12 @@ export function LotesDespachoPage() {
                   <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${ESTADO_LOTE_CLASS[lote.estadoLote]}`}>
                     {ESTADO_LOTE_LABEL[lote.estadoLote]}
                   </span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
-                      lote.formulario101
-                        ? "bg-[var(--color-success)]/18 text-[var(--color-success)]"
-                        : "bg-[var(--color-warning)]/20 text-[var(--color-warning)]"
-                    }`}
-                  >
-                    {lote.formulario101 ? `F101 ${lote.formulario101.codigo}` : "F101 pendiente"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => exportConocimientoExcel(lote)}
-                    className={buttonSecondaryClassName}
-                    title="Exportar Conocimiento a Excel"
-                  >
-                    <FileSpreadsheet size={13} /> Excel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exportConocimientoPdf(lote)}
-                    className={buttonSecondaryClassName}
-                    title="Exportar Conocimiento a PDF"
-                  >
-                    <FileDown size={13} /> PDF
-                  </button>
                 </div>
               </div>
 
-              {/* Siempre visible, tenga o no Formulario 101: el Conocimiento se
-                  imprime al despachar, y el F101 del Municipio puede llegar después. */}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/8 px-3 py-2">
                 <p className="flex items-center gap-2 text-sm font-semibold">
                   <FileDown size={14} className="text-[var(--color-primary)]" /> Imprimir Conocimiento {lote.correlativo}
-                  {lote.formulario101 ? null : (
-                    <span className="text-xs font-normal text-[var(--color-on-surface-variant)]">(no necesita el F101)</span>
-                  )}
                 </p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => exportConocimientoPdf(lote)} className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-on-primary)]">
