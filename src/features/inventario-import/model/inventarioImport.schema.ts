@@ -281,7 +281,8 @@ export const backfillCppResponseSchema = z
         movimientosActualizados: numberLikeSchema.int().nonnegative().optional(),
         saldosActualizados: numberLikeSchema.int().nonnegative().optional(),
         detalle: z.array(z.record(z.string(), z.unknown())).optional().default([]),
-        errores: z.array(z.unknown()).optional().default([])
+        errores: z.array(z.unknown()).optional().default([]),
+        advertencia: z.string().optional()
       })
       .passthrough()
       .optional()

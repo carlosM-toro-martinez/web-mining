@@ -349,6 +349,10 @@ export function AjustesPage() {
       onSuccess: (response) => {
         setCppResponse(response);
         const data = response.data;
+        if (data?.advertencia) {
+          showError(data.advertencia);
+          return;
+        }
         const productos = data?.productosProcessados ?? data?.productosProcesados;
         const resumen = [
           productos !== undefined ? `productos: ${productos}` : null,
