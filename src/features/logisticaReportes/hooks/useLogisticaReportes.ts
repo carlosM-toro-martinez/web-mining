@@ -3,6 +3,7 @@ import {
   cerrarMesLogistica,
   getCierresLogistica,
   getCuadroMensual,
+  getIntegridadCorrelativo,
   type CerrarMesParams,
   type CuadroMensualParams
 } from "@/features/logisticaReportes/api/logisticaReportesApi";
@@ -12,6 +13,14 @@ export function useCuadroMensualQuery(params: CuadroMensualParams | undefined) {
   return useQuery({
     queryKey: queryKeys.logisticaReportes.cuadroMensual(params ?? { anio: 0, mes: 0 }),
     queryFn: () => getCuadroMensual(params as CuadroMensualParams),
+    enabled: Boolean(params)
+  });
+}
+
+export function useIntegridadCorrelativoQuery(params: CuadroMensualParams | undefined) {
+  return useQuery({
+    queryKey: queryKeys.logisticaReportes.integridadCorrelativo(params ?? { anio: 0, mes: 0 }),
+    queryFn: () => getIntegridadCorrelativo(params as CuadroMensualParams),
     enabled: Boolean(params)
   });
 }

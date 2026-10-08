@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { FileBarChart2, FileSpreadsheet, FileText, Lock, Search } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   useCerrarMesLogisticaMutation,
   useCierresLogisticaQuery,
-  useCuadroMensualQuery
+  useCuadroMensualQuery,
+  useIntegridadCorrelativoQuery
 } from "@/features/logisticaReportes/hooks/useLogisticaReportes";
 import {
   exportCuadroMensualExcel,
@@ -95,6 +96,7 @@ function ultimos7Dias() {
 
 type TipoReporte =
   | "cuadro-mensual"
+  | "integridad-correlativo"
   | "detalle-volqueta"
   | "resumen-mineral-ingenio"
   | "estado-f101"
@@ -113,6 +115,11 @@ const REPORT_GROUPS: Array<{
         type: "cuadro-mensual",
         title: "Cuadro Mensual de Despachos",
         description: "Por municipio, para la declaración de F101 y Conocimientos ante el gobierno municipal."
+      },
+      {
+        type: "integridad-correlativo",
+        title: "Integridad de Series",
+        description: "Verifica que los N° de Conocimiento y los F101 no tengan huecos ni estén fuera de orden."
       },
       {
         type: "detalle-volqueta",
@@ -369,6 +376,190 @@ function CuadroMensualReport() {
             ) : null}
           </div>
         </article>
+      ) : null}
+    </>
+  );
+}
+
+// ============================================================================
+// Integridad de series: huecos en conocimientos y F101.
+// ============================================================================
+function IntegridadCorrelativoReport() {
+  const municipiosQuery = useMunicipiosOrigenQuery();
+  const municipios = municipiosQuery.data?.data ?? [];
+  const [municipioId, setMunicipioId] = useState("");
+  const [anio, setAnio] = useState(() => new Date().getFullYear());
+  const [mes, setMes] = useState(() => new Date().getMonth() + 1);
+  const [nivel, setNivel] = useState("");
+  const [consultado, setConsultado] = useState<
+    { municipioId?: number; anio: number; mes: number; nivel?: string } | undefined
+  >();
+
+  const integridadQuery = useIntegridadCorrelativoQuery(consultado);
+  const integridad = integridadQuery.data?.data;
+
+  function handleConsultar() {
+    if (!anio || !mes) return;
+    setConsultado({
+      ...(municipioId ? { municipioId: Number(municipioId) } : {}),
+      anio,
+      mes,
+      ...(nivel ? { nivel } : {})
+    });
+  }
+
+  const hayProblemas =
+    integridad &&
+    (integridad.huecosCorrelativo.length > 0 ||
+      integridad.f101Gaps.length > 0 ||
+      integridad.f101FueraDeOrden);
+
+  return (
+    <>
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+          Filtros
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Municipio</label>
+            <select value={municipioId} onChange={(e) => setMunicipioId(e.target.value)} className={inputClassName}>
+              <option value="">Todos</option>
+              {municipios.map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Año</label>
+            <input type="number" min={2020} max={2099} value={anio} onChange={(e) => setAnio(Number(e.target.value))} className={inputClassName} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Mes</label>
+            <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className={inputClassName}>
+              {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Nivel (opcional)</label>
+            <input type="text" value={nivel} onChange={(e) => setNivel(e.target.value)} placeholder="Nivel 40, Nivel 0…" className={inputClassName} />
+          </div>
+        </div>
+        <button type="button" onClick={handleConsultar} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white">
+          <Search size={14} /> Verificar
+        </button>
+      </article>
+
+      {integridadQuery.isLoading ? (
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-sm text-[var(--color-on-surface-variant)]">
+          Verificando series…
+        </article>
+      ) : integridad ? (
+        <>
+          {/* Resumen de alertas */}
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+              Resumen — {MESES[consultado!.mes - 1]} {consultado!.anio}
+            </h2>
+            {!hayProblemas ? (
+              <p className="rounded-lg bg-[var(--color-success)]/10 px-4 py-3 text-sm font-medium text-[var(--color-success)]">
+                Series completas y en orden. No se detectaron huecos.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {integridad.huecosCorrelativo.length > 0 && (
+                  <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/8 px-4 py-3 text-sm">
+                    <span className="font-semibold text-[var(--color-error)]">
+                      {integridad.huecosCorrelativo.length} hueco(s) en N° de Conocimiento:
+                    </span>{" "}
+                    <span className="font-mono">{integridad.huecosCorrelativo.map((n) => `${n}/${consultado!.mes.toString().padStart(2, "0")}`).join(", ")}</span>
+                  </div>
+                )}
+                {integridad.f101Gaps.length > 0 && (
+                  <div className="rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/8 px-4 py-3 text-sm">
+                    <span className="font-semibold text-[var(--color-warning)]">
+                      {integridad.f101Gaps.length} F101 faltante(s):
+                    </span>{" "}
+                    <span className="font-mono">{integridad.f101Gaps.slice(0, 20).join(", ")}{integridad.f101Gaps.length > 20 ? "…" : ""}</span>
+                  </div>
+                )}
+                {integridad.f101FueraDeOrden && (
+                  <div className="rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/8 px-4 py-3 text-sm">
+                    <span className="font-semibold text-[var(--color-warning)]">F101 fuera de orden:</span>{" "}
+                    los códigos F101 no están en orden ascendente respecto al N° de lote.
+                  </div>
+                )}
+              </div>
+            )}
+          </article>
+
+          {/* Tabla completa */}
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+              Detalle ({integridad.lotes.length} registro(s))
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    <th className="py-1 pr-3">N° / Correlativo</th>
+                    <th className="py-1 pr-3">Estado</th>
+                    <th className="py-1 pr-3">Transportista</th>
+                    <th className="py-1 pr-3">F101</th>
+                    <th className="py-1">Fecha fiscal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {(() => {
+                    const rows: ReactNode[] = [];
+                    let prevNum = 0;
+                    for (const lote of integridad.lotes) {
+                      const num = lote.numero ?? 0;
+                      // Insert gap rows before this lote if there are missing numbers
+                      if (num > 0) {
+                        for (let g = prevNum + 1; g < num; g++) {
+                          rows.push(
+                            <tr key={`gap-${g}`} className="bg-[var(--color-error)]/8">
+                              <td className="py-1.5 pr-3 font-mono font-bold text-[var(--color-error)]">
+                                {g}/{consultado!.mes.toString().padStart(2, "0")} — HUECO
+                              </td>
+                              <td colSpan={4} className="py-1.5 text-[var(--color-error)]">
+                                Este número de conocimiento no tiene lote asignado
+                              </td>
+                            </tr>
+                          );
+                        }
+                        prevNum = num;
+                      }
+                      const esAnulado = lote.estadoLote === "ANULADO";
+                      rows.push(
+                        <tr key={lote.id} className={esAnulado ? "opacity-50" : ""}>
+                          <td className="py-1 pr-3 font-mono">{lote.correlativo}</td>
+                          <td className="py-1 pr-3">{lote.estadoLote}</td>
+                          <td className="py-1 pr-3">{lote.transportista?.nombreORazonSocial ?? "-"}</td>
+                          <td className="py-1 pr-3">
+                            {lote.f101 ? (
+                              <span className="font-mono">{lote.f101.codigo}</span>
+                            ) : esAnulado ? (
+                              <span className="text-[var(--color-on-surface-variant)]">—</span>
+                            ) : (
+                              <span className="text-[var(--color-warning)]">Pendiente</span>
+                            )}
+                          </td>
+                          <td className="py-1">{formatFecha(lote.fechaDocumentalFiscal)}</td>
+                        </tr>
+                      );
+                    }
+                    return rows;
+                  })()}
+                  {integridad.lotes.length === 0 ? (
+                    <tr><td colSpan={5} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin lotes en este período.</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </>
       ) : null}
     </>
   );
@@ -1268,6 +1459,7 @@ export function LogisticaReportesPage() {
       </article>
 
       {tipo === "cuadro-mensual" ? <CuadroMensualReport /> : null}
+      {tipo === "integridad-correlativo" ? <IntegridadCorrelativoReport /> : null}
       {tipo === "detalle-volqueta" ? <DetalleVolquetaReport /> : null}
       {tipo === "resumen-mineral-ingenio" ? <ResumenMineralIngenioReport /> : null}
       {tipo === "estado-f101" ? <EstadoF101Report /> : null}

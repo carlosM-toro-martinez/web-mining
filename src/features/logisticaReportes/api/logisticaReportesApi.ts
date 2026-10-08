@@ -3,7 +3,8 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   cierreMensualResponseSchema,
   cierresListResponseSchema,
-  cuadroMensualResponseSchema
+  cuadroMensualResponseSchema,
+  integridadCorrelativoResponseSchema
 } from "@/features/logisticaReportes/model/logisticaReportes.schema";
 
 export interface CuadroMensualParams {
@@ -28,6 +29,14 @@ export async function getCierresLogistica(municipioId?: number) {
     url: apiEndpoints.logisticaReportes.cierres,
     config: { params: municipioId ? { municipioId } : {} },
     schema: cierresListResponseSchema
+  });
+}
+
+export async function getIntegridadCorrelativo(params: CuadroMensualParams) {
+  return getRequest({
+    url: apiEndpoints.logisticaReportes.integridadCorrelativo,
+    config: { params },
+    schema: integridadCorrelativoResponseSchema
   });
 }
 

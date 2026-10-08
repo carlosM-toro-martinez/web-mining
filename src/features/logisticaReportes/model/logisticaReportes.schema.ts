@@ -62,3 +62,32 @@ export const cierreMensualResponseSchema = z.object({ success: z.boolean(), data
 export type LoteCuadroMensual = z.infer<typeof loteCuadroMensualSchema>;
 export type CuadroMensual = z.infer<typeof cuadroMensualSchema>;
 export type CierreLogisticaMensual = z.infer<typeof cierreLogisticaMensualSchema>;
+
+// ── Integridad de series ──────────────────────────────────────────────────────
+
+export const loteIntegridadSchema = z.object({
+  id: z.string().min(1),
+  correlativo: z.string().min(1),
+  numero: z.number().int().positive().nullable(),
+  estadoLote: z.string(),
+  fechaDocumentalFiscal: z.string(),
+  transportista: z.object({ nombreORazonSocial: z.string() }).nullable(),
+  f101: z.object({ codigo: z.string(), estado: z.string() }).nullable()
+});
+
+export const integridadCorrelativoSchema = z.object({
+  lotes: z.array(loteIntegridadSchema),
+  huecosCorrelativo: z.array(z.number().int()),
+  f101Min: z.number().int().nullable(),
+  f101Max: z.number().int().nullable(),
+  f101Gaps: z.array(z.number().int()),
+  f101FueraDeOrden: z.boolean()
+});
+
+export const integridadCorrelativoResponseSchema = z.object({
+  success: z.boolean(),
+  data: integridadCorrelativoSchema
+});
+
+export type LoteIntegridad = z.infer<typeof loteIntegridadSchema>;
+export type IntegridadCorrelativo = z.infer<typeof integridadCorrelativoSchema>;

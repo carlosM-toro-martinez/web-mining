@@ -210,7 +210,9 @@ export const queryKeys = {
     all: ["logistica-reportes"] as const,
     cuadroMensual: (params: { municipioId?: number; anio: number; mes: number; nivel?: string }) =>
       [...queryKeys.logisticaReportes.all, "cuadro-mensual", params] as const,
-    cierres: (municipioId?: number) => [...queryKeys.logisticaReportes.all, "cierres", municipioId] as const
+    cierres: (municipioId?: number) => [...queryKeys.logisticaReportes.all, "cierres", municipioId] as const,
+    integridadCorrelativo: (params: { municipioId?: number; anio: number; mes: number; nivel?: string }) =>
+      [...queryKeys.logisticaReportes.all, "integridad-correlativo", params] as const
   },
   parametrosCajaChica: {
     all: ["parametros-caja-chica"] as const,
