@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { getTipoPersonalLabel } from "@/modules/employee/hooks/useEmployees";
 import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 
@@ -45,6 +46,10 @@ const weekDays: Array<keyof Pick<Horario, "lunes" | "martes" | "miercoles" | "ju
 export function PersonalSchedulesPage() {
   const { showError, showSuccess } = useToast();
   const queryClient = useQueryClient();
+  const { can } = usePermisos();
+  const puedeCrear = can("personal.horarios", "crear");
+  const puedeEditar = can("personal.horarios", "editar");
+  const puedeEliminar = can("personal.horarios", "eliminar");
   const [editing, setEditing] = useState<Horario | null>(null);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -141,6 +146,7 @@ export function PersonalSchedulesPage() {
         <h1 className="page-title font-headline text-3xl font-extrabold">Horarios</h1>
       </header>
 
+      {(editing ? puedeEditar : puedeCrear) ? (
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <form className="grid grid-cols-1 gap-3 md:grid-cols-3" onSubmit={onSubmit}>
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Nombre" className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
@@ -162,6 +168,7 @@ export function PersonalSchedulesPage() {
           </div>
         </form>
       </article>
+      ) : null}
 
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
         <div className="px-5 py-3 text-xs text-[var(--color-on-surface-variant)]">Registros: {horariosQuery.data?.length ?? 0}</div>
@@ -176,8 +183,11 @@ export function PersonalSchedulesPage() {
                   <td className="px-4 py-2 text-sm">{h.tolerancia} min</td>
                   <td className="px-4 py-2 text-sm">{h._count?.asignaciones ?? 0}</td>
                   <td className="px-4 py-2 text-right">
-                    <button type="button" className="mr-2 rounded border px-2 py-1 text-xs" onClick={() => startEdit(h)}>Editar</button>
-                    <button type="button" className="rounded border border-red-500/45 px-2 py-1 text-xs text-red-600" onClick={() => void deleteMutation.mutateAsync(h.id)}>Eliminar</button>
+                    {puedeEditar ? <button type="button" className="mr-2 rounded border px-2 py-1 text-xs" onClick={() => startEdit(h)}>Editar</button> : null}
+                    {puedeEliminar ? <button type="button" className="rounded border border-red-500/45 px-2 py-1 text-xs text-red-600" onClick={() => {
+                      if (!window.confirm(`¿Eliminar el horario "${h.nombre}" (${h.horaEntrada} - ${h.horaSalida})?\n\nEsta acción no se puede deshacer.`)) return;
+                      void deleteMutation.mutateAsync(h.id);
+                    }}>Eliminar</button> : null}
                   </td>
                 </tr>
               ))}

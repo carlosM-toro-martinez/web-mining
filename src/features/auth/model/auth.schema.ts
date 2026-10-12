@@ -1,22 +1,9 @@
 import { z } from "zod";
 
-export const roleSchema = z.enum([
-  "ADMIN",
-  "ADMINISTRADOR",
-  "ALMACENERO",
-  "ASISTENTE_ADMINISTRATIVO",
-  "CONTADOR",
-  "GEOLOGO",
-  "GEOLOGOADMIN",
-  "LABORATORISTA",
-  "MEDIOAMBIENTE",
-  "RECEPCIONISTA",
-  "SOLICITANTE",
-  "SUPERINTENDENTE",
-  "TOPOGRAFO",
-  "TRABAJADOR",
-  "VISITANTE"
-]);
+// Los roles son dinámicos (tabla Rol en la API, se crean desde
+// Sistema → Roles y permisos), así que aquí solo se valida que venga un
+// código. La lista vigente se obtiene de GET /api/roles/opciones.
+export const roleSchema = z.string().min(1);
 
 export const authUserSchema = z.object({
   id: z.number().int().positive(),

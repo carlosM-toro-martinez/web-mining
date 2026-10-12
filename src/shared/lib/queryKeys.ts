@@ -1,4 +1,11 @@
 export const queryKeys = {
+  roles: {
+    all: ["roles"] as const,
+    misPermisos: (userId: number | null) => [...queryKeys.roles.all, "mis-permisos", userId] as const,
+    opciones: () => [...queryKeys.roles.all, "opciones"] as const,
+    list: () => [...queryKeys.roles.all, "list"] as const,
+    catalogo: () => [...queryKeys.roles.all, "catalogo"] as const
+  },
   systemStatus: {
     all: ["system-status"] as const,
     detail: () => [...queryKeys.systemStatus.all, "detail"] as const

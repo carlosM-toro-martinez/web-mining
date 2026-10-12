@@ -1,52 +1,57 @@
 import { Link } from "react-router-dom";
 import { ClipboardList, UsersRound, Clock3, CalendarDays, UserCog, FileBarChart2 } from "lucide-react";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
+import { BiometricStatusBadge } from "@/modules/employee/components/BiometricStatusBadge";
 
 const cards = [
   {
     title: "Personal",
     description: "Gestión de empleados, edición y estado de sincronización.",
     to: "/personal/empleados",
-    icon: UsersRound
+    icon: UsersRound,
+    recurso: "personal.empleados"
   },
   {
     title: "Reportes",
     description: "Asistencia filtrada por fecha, empleado y tipo con paginación.",
     to: "/personal/reportes",
-    icon: ClipboardList
+    icon: ClipboardList,
+    recurso: "personal.asistencia"
   },
   {
     title: "Horarios",
     description: "Configura turnos, tolerancia y días laborales.",
     to: "/personal/horarios",
-    icon: CalendarDays
+    icon: CalendarDays,
+    recurso: "personal.horarios"
   },
   {
     title: "Asignaciones",
     description: "Asigna horarios a empleados y consulta historial.",
     to: "/personal/asignaciones",
-    icon: UserCog
+    icon: UserCog,
+    recurso: "personal.asignaciones"
   },
   {
     title: "Ausencias",
     description: "Vacaciones, permisos y demás ausencias por empleado.",
     to: "/personal/ausencias",
-    icon: Clock3
+    icon: Clock3,
+    recurso: "personal.ausencias"
   },
   {
     title: "Reporte Asistencia",
     description: "Comparación de marcajes versus horario asignado.",
     to: "/personal/reporte",
-    icon: FileBarChart2
-  },
-  {
-    title: "Pendientes",
-    description: "Comandos pendientes por enviar al biométrico.",
-    to: "/personal/empleados",
-    icon: Clock3
+    icon: FileBarChart2,
+    recurso: "personal.asistencia"
   }
 ] as const;
 
 export function PersonalHomePage() {
+  const { can } = usePermisos();
+  const visibles = cards.filter((card) => can(card.recurso, "ver"));
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -54,10 +59,13 @@ export function PersonalHomePage() {
         <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
           Selecciona el proceso del módulo de personal.
         </p>
+        <div className="mt-4">
+          <BiometricStatusBadge />
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => {
+        {visibles.map((card) => {
           const Icon = card.icon;
           return (
             <article key={card.title} className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">

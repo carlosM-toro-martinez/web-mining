@@ -56,6 +56,8 @@ import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
 import { LogisticaRoute } from "@/app/router/guards/LogisticaRoute";
 import { CajaChicaRoute } from "@/app/router/guards/CajaChicaRoute";
 import { PersonalRoute } from "@/app/router/guards/PersonalRoute";
+import { PermisoRoute } from "@/app/router/guards/PermisoRoute";
+import { RolesPage } from "@/pages/sistema/RolesPage";
 import { EppRoute } from "@/app/router/guards/EppRoute";
 import { AmbientalRoute } from "@/app/router/guards/AmbientalRoute";
 
@@ -74,12 +76,25 @@ export function AppRouter() {
           <Route path="/mapa" element={<MapPage />} />
           <Route element={<PersonalRoute />}>
             <Route path="/personal" element={<PersonalHomePage />} />
-            <Route path="/personal/empleados" element={<EmployeePage />} />
-            <Route path="/personal/reportes" element={<PersonalReportsPage />} />
-            <Route path="/personal/horarios" element={<PersonalSchedulesPage />} />
-            <Route path="/personal/asignaciones" element={<PersonalAssignmentsPage />} />
-            <Route path="/personal/ausencias" element={<PersonalAbsencesPage />} />
-            <Route path="/personal/reporte" element={<PersonalReportPage />} />
+            <Route element={<PermisoRoute recurso="personal.empleados" />}>
+              <Route path="/personal/empleados" element={<EmployeePage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="personal.asistencia" />}>
+              <Route path="/personal/reportes" element={<PersonalReportsPage />} />
+              <Route path="/personal/reporte" element={<PersonalReportPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="personal.horarios" />}>
+              <Route path="/personal/horarios" element={<PersonalSchedulesPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="personal.asignaciones" />}>
+              <Route path="/personal/asignaciones" element={<PersonalAssignmentsPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="personal.ausencias" />}>
+              <Route path="/personal/ausencias" element={<PersonalAbsencesPage />} />
+            </Route>
+          </Route>
+          <Route element={<PermisoRoute recurso="sistema.roles" />}>
+            <Route path="/sistema/roles" element={<RolesPage />} />
           </Route>
           <Route path="/kardex-valorado" element={<KardexValoradoPage />} />
           <Route path="/perfil" element={<ProfilePage />} />

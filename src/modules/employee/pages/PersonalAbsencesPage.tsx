@@ -6,6 +6,7 @@ import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/use
 import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
 interface AbsenceItem {
   id: number;
@@ -33,6 +34,9 @@ export function PersonalAbsencesPage() {
   const { showError, showSuccess } = useToast();
   const queryClient = useQueryClient();
   const employees = useEmployees();
+  const { can } = usePermisos();
+  const puedeCrear = can("personal.ausencias", "crear");
+  const puedeEliminar = can("personal.ausencias", "eliminar");
   const [alcance, setAlcance] = useState<Alcance>("INDIVIDUAL");
   const [empleadoId, setEmpleadoId] = useState("");
   const [tipo, setTipo] = useState("VACACION");
@@ -118,6 +122,7 @@ export function PersonalAbsencesPage() {
         <h1 className="page-title font-headline text-3xl font-extrabold">Ausencias</h1>
       </header>
 
+      {puedeCrear ? (
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <select
@@ -152,6 +157,7 @@ export function PersonalAbsencesPage() {
           </p>
         ) : null}
       </article>
+      ) : null}
 
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
         <div className="px-5 py-3 text-xs text-[var(--color-on-surface-variant)]">Registros totales: {absencesQuery.data?.meta.total ?? 0}</div>
@@ -166,7 +172,11 @@ export function PersonalAbsencesPage() {
                   <td className="px-4 py-2 text-sm font-mono">{item.desde}</td>
                   <td className="px-4 py-2 text-sm font-mono">{item.hasta}</td>
                   <td className="px-4 py-2 text-sm">{item.aprobado ? "Sí" : "No"}</td>
-                  <td className="px-4 py-2 text-right"><button type="button" onClick={() => void deleteMutation.mutateAsync(item.id)} className="rounded border border-red-500/45 px-2 py-1 text-xs text-red-600">Eliminar</button></td>
+                  <td className="px-4 py-2 text-right">{puedeEliminar ? <button type="button" onClick={() => {
+                    const quien = item.employee?.nombre ? ` de "${item.employee.nombre}"` : "";
+                    if (!window.confirm(`¿Eliminar la ausencia ${item.tipo}${quien} (${item.desde.slice(0, 10)} al ${item.hasta.slice(0, 10)})?\n\nEsta acción no se puede deshacer.`)) return;
+                    void deleteMutation.mutateAsync(item.id);
+                  }} className="rounded border border-red-500/45 px-2 py-1 text-xs text-red-600">Eliminar</button> : null}</td>
                 </tr>
               ))}
             </tbody>

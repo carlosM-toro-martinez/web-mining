@@ -7,6 +7,7 @@ import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
 function formatDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -35,6 +36,8 @@ interface AttendanceReportRow {
 export function PersonalReportsPage() {
   const { showError, showSuccess } = useToast();
   const employees = useEmployees();
+  const { can } = usePermisos();
+  const puedeSincronizar = can("personal.biometrico", "sincronizar");
   const queryClient = useQueryClient();
   const defaultRange = useMemo(() => getCurrentMonthRange(), []);
   const [reportDesde, setReportDesde] = useState(defaultRange.desde);
@@ -200,19 +203,21 @@ export function PersonalReportsPage() {
             <h1 className="page-title font-headline text-3xl font-extrabold">Reportes de Personal</h1>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">Asistencia con filtros y paginación.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => syncAttendanceMutation.mutate()}
-            disabled={syncAttendanceMutation.isPending}
-            className="ml-auto inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] disabled:opacity-60"
-          >
-            <RefreshCw size={16} />
-            {syncAttendanceMutation.isPending ? "Sincronizando..." : "Traer marcaciones biométrico"}
-          </button>
+          {puedeSincronizar ? (
+            <button
+              type="button"
+              onClick={() => syncAttendanceMutation.mutate()}
+              disabled={syncAttendanceMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] disabled:opacity-60"
+            >
+              <RefreshCw size={16} />
+              {syncAttendanceMutation.isPending ? "Sincronizando..." : "Traer marcaciones biométrico"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => void handleExportExcel()}
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)]"
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-surface-variant)]"
           >
             Exportar Excel
           </button>

@@ -1,18 +1,16 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
+// Acceso al módulo Personal: cualquier permiso "personal.*" del rol.
+// Cada página/botón verifica además su permiso específico.
 export function PersonalRoute() {
-  const { user } = useAuth();
+  const { canAny, isLoading } = usePermisos();
 
-  const canAccessPersonal =
-    user?.role === "ADMIN" ||
-    user?.role === "ADMINISTRADOR" ||
-    user?.role === "SUPERINTENDENTE";
+  if (isLoading) return null;
 
-  if (!canAccessPersonal) {
+  if (!canAny("personal")) {
     return <Navigate to="/perfil" replace />;
   }
 
   return <Outlet />;
 }
-

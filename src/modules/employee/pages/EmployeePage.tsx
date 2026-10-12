@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, PencilLine, RefreshCw, Trash2, UsersRound } from "lucide-react";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
+import { BiometricStatusBadge } from "@/modules/employee/components/BiometricStatusBadge";
 import { EmployeeForm } from "@/modules/employee/components/EmployeeForm";
 import {
   getTipoPersonalLabel,
@@ -24,6 +26,11 @@ export function EmployeePage() {
   const { showError, showSuccess } = useToast();
   const employees = useEmployees();
   const { refreshAttendance } = employees;
+  const { can } = usePermisos();
+  const puedeCrear = can("personal.empleados", "crear");
+  const puedeEditar = can("personal.empleados", "editar");
+  const puedeEliminar = can("personal.empleados", "eliminar");
+  const puedeSincronizar = can("personal.biometrico", "sincronizar");
   const [editing, setEditing] = useState<EditingEmployee | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -89,7 +96,14 @@ export function EmployeePage() {
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: number, nombre: string) {
+    const confirmed = window.confirm(
+      `¿Eliminar al empleado "${nombre}"?\n\n` +
+        "También se eliminará del biométrico (incluido su rostro/huella registrado), " +
+        "junto con sus horarios asignados y ausencias. Sus marcaciones se conservan sin empleado vinculado.\n\n" +
+        "Esta acción no se puede deshacer. Si solo dejó de trabajar, considera marcarlo como inactivo."
+    );
+    if (!confirmed) return;
     try {
       await employees.remove(id);
       showSuccess("Empleado eliminado.");
@@ -152,11 +166,12 @@ export function EmployeePage() {
             <div>
               <h1 className="page-title font-headline text-3xl font-extrabold">Personal</h1>
               <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">Gestión de empleados.</p>
+              <div className="mt-3"><BiometricStatusBadge /></div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={handleRetrySync} disabled={employees.isRetrying} className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] disabled:opacity-60"><RefreshCw size={16} />{employees.isRetrying ? "Reintentando..." : "Reencolar pendientes"}</button>
-            <button type="button" onClick={() => { setEditing(null); setIsFormOpen(true); }} className="inline-flex rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]">Nuevo empleado</button>
+            {puedeSincronizar ? <button type="button" onClick={handleRetrySync} disabled={employees.isRetrying} className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)]/14 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] disabled:opacity-60"><RefreshCw size={16} />{employees.isRetrying ? "Reintentando..." : "Reencolar pendientes"}</button> : null}
+            {puedeCrear ? <button type="button" onClick={() => { setEditing(null); setIsFormOpen(true); }} className="inline-flex rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)]">Nuevo empleado</button> : null}
           </div>
         </div>
       </header>
@@ -201,8 +216,8 @@ export function EmployeePage() {
                   <td className="px-4 py-3 text-xs">{employee.activo ? "Sí" : "No"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => { setEditing({ id: employee.id!, nombre: employee.nombre, documento: employee.documento, cargo: employee.cargo, tipoPersonal: employee.tipoPersonal, activo: employee.activo }); setIsFormOpen(true); }} className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)]"><PencilLine size={12} />Editar</button>
-                      <button type="button" onClick={() => handleDelete(employee.id!)} className="inline-flex items-center gap-1 rounded-md border border-red-500/45 px-3 py-1.5 text-xs font-semibold text-red-600"><Trash2 size={12} />Eliminar</button>
+                      {puedeEditar ? <button type="button" onClick={() => { setEditing({ id: employee.id!, nombre: employee.nombre, documento: employee.documento, cargo: employee.cargo, tipoPersonal: employee.tipoPersonal, activo: employee.activo }); setIsFormOpen(true); }} className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)]"><PencilLine size={12} />Editar</button> : null}
+                      {puedeEliminar ? <button type="button" onClick={() => void handleDelete(employee.id!, employee.nombre)} className="inline-flex items-center gap-1 rounded-md border border-red-500/45 px-3 py-1.5 text-xs font-semibold text-red-600"><Trash2 size={12} />Eliminar</button> : null}
                     </div>
                   </td>
                 </tr>

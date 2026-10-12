@@ -32,18 +32,6 @@ interface EmployeeApiItem {
   updatedAt?: string;
 }
 
-interface AttendanceItem {
-  id: number | string;
-  fecha: string;
-  tipo: string;
-  deviceUserId?: string;
-  empleado?: {
-    id: number;
-    nombre: string;
-    cargo?: string | null;
-  } | null;
-}
-
 export const tipoPersonalOptions: Array<{ value: EmployeeTipoPersonal; label: string }> = [
   { value: "OBRERO", label: "Obrero" },
   { value: "TECNICO_EMPLEADO", label: "Técnico / empleado" }
@@ -217,56 +205,6 @@ export function useEmployees() {
     }
   });
 
-  const biometricStatusQuery = useQuery({
-    queryKey: [...queryKeys.employees.all, "biometric-status"],
-    queryFn: async () => {
-      const response = await httpClient.get("/api/biometric/status");
-      return (response.data as { data?: { conectado: boolean; sn?: string; lastSeen?: string } }).data;
-    },
-    refetchInterval: 30000
-  });
-
-  const attendanceQuery = useQuery({
-    queryKey: [...queryKeys.employees.all, "attendance"],
-    queryFn: async () => {
-      const response = await httpClient.get("/api/biometric/attendance", {
-        params: { page: 1, limit: 150 }
-      });
-      const payload = response.data as { data?: AttendanceItem[] };
-      return payload.data ?? [];
-    },
-    refetchInterval: 15000
-  });
-
-  const deviceUsersQuery = useQuery({
-    queryKey: [...queryKeys.employees.all, "device-users"],
-    queryFn: async () => {
-      const response = await httpClient.get("/api/biometric/device-users");
-      const payload = response.data as {
-        data?: Array<{ employeeId: number; deviceUserId: string; nombre: string; cargo?: string }>;
-      };
-      return payload.data ?? [];
-    }
-  });
-
-  const pendingCommandsQuery = useQuery({
-    queryKey: [...queryKeys.employees.all, "pending-commands"],
-    queryFn: async () => {
-      const response = await httpClient.get("/api/biometric/pending-commands");
-      const payload = response.data as {
-        data?: Array<{
-          id: number;
-          action: string;
-          status: string;
-          createdAt: string;
-          deviceIp?: string;
-        }>;
-      };
-      return payload.data ?? [];
-    },
-    refetchInterval: 30000
-  });
-
   const refreshAttendance = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: [...queryKeys.employees.all, "attendance"] });
   }, [queryClient]);
@@ -277,11 +215,6 @@ export function useEmployees() {
       isLoading: employeesQuery.isLoading,
       error: employeesQuery.error
     },
-    biometricStatus: biometricStatusQuery.data,
-    attendance: attendanceQuery.data ?? [],
-    isLoadingAttendance: attendanceQuery.isLoading,
-    deviceUsers: deviceUsersQuery.data ?? [],
-    pendingCommands: pendingCommandsQuery.data ?? [],
     create: createMutation.mutateAsync,
     update: updateMutation.mutateAsync,
     remove: deleteMutation.mutateAsync,

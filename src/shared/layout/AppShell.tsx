@@ -32,9 +32,11 @@ import {
   Leaf,
   Moon,
   Scale,
+  ShieldCheck,
   Sun
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { useInventoryOfflinePendingCount } from "@/features/inventory-offline/hooks/useInventoryOffline";
 import { useTheme } from "@/shared/theme/ThemeProvider";
 import minerImage from "@/assets/miner.png";
@@ -49,6 +51,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, canManageUsers, logout } = useAuth();
+  const { can } = usePermisos();
   const { mode, toggleMode } = useTheme();
   const offlinePendingQuery = useInventoryOfflinePendingCount();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -85,8 +88,11 @@ export function AppShell() {
     if (canManageUsers) {
       items.push({ label: "Trabajadores", icon: UserPlus, to: "/trabajadores" });
     }
+    if (can("sistema.roles", "ver")) {
+      items.push({ label: "Roles y permisos", icon: ShieldCheck, to: "/sistema/roles" });
+    }
     return items;
-  }, [canManageUsers, canSeeEppRoute, canSeeAmbientalRoute]);
+  }, [canManageUsers, canSeeEppRoute, canSeeAmbientalRoute, can]);
 
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventorySection) return [];
@@ -114,17 +120,18 @@ export function AppShell() {
     return items;
   }, [canSeeInventorySection, canSeeInventoryRoute, isAdmin, isContador]);
 
+  // Personal usa permisos dinámicos (Sistema → Roles y permisos)
   const personalNavItems = useMemo(() => {
-    if (!(isAdmin || isAdministrador || isSuperintendente)) return [];
-    return [
-      { label: "Personal", icon: IdCard, to: "/personal/empleados" },
-      { label: "Reportes", icon: FileBarChart2, to: "/personal/reportes" },
-      { label: "Horarios", icon: CalendarClock, to: "/personal/horarios" },
-      { label: "Asignaciones", icon: ClipboardList, to: "/personal/asignaciones" },
-      { label: "Ausencias", icon: RefreshCw, to: "/personal/ausencias" },
-      { label: "Reporte", icon: FileBarChart2, to: "/personal/reporte" }
-    ] as NavItem[];
-  }, [isAdmin, isAdministrador, isSuperintendente]);
+    const items: Array<NavItem & { recurso: string }> = [
+      { label: "Personal", icon: IdCard, to: "/personal/empleados", recurso: "personal.empleados" },
+      { label: "Reportes", icon: FileBarChart2, to: "/personal/reportes", recurso: "personal.asistencia" },
+      { label: "Horarios", icon: CalendarClock, to: "/personal/horarios", recurso: "personal.horarios" },
+      { label: "Asignaciones", icon: ClipboardList, to: "/personal/asignaciones", recurso: "personal.asignaciones" },
+      { label: "Ausencias", icon: RefreshCw, to: "/personal/ausencias", recurso: "personal.ausencias" },
+      { label: "Reporte", icon: FileBarChart2, to: "/personal/reporte", recurso: "personal.asistencia" }
+    ];
+    return items.filter((item) => can(item.recurso, "ver")) as NavItem[];
+  }, [can]);
 
   const logisticaNavItems = useMemo(() => {
     if (!canSeeLogisticaRoute) return [];

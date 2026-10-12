@@ -5,6 +5,7 @@ import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/useEmployees";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
 interface HorarioOption {
   id: number;
@@ -24,12 +25,16 @@ export function PersonalAssignmentsPage() {
   const { showError, showSuccess } = useToast();
   const queryClient = useQueryClient();
   const employees = useEmployees();
+  const { can } = usePermisos();
+  const puedeCrear = can("personal.asignaciones", "crear");
+  const puedeEliminar = can("personal.asignaciones", "eliminar");
   const [employeeId, setEmployeeId] = useState("");
   const [horarioId, setHorarioId] = useState("");
   const [desde, setDesde] = useState("");
 
   const horariosQuery = useQuery({
     queryKey: ["personal-horarios-options"],
+    enabled: puedeCrear,
     queryFn: async () => {
       const response = await httpClient.get("/api/personal/horarios");
       const payload = response.data as { data?: HorarioOption[] };
@@ -99,12 +104,16 @@ export function PersonalAssignmentsPage() {
             placeholder="Buscar empleado"
             className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm"
           />
-          <select value={horarioId} onChange={(e) => setHorarioId(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm">
-            <option value="">Seleccionar horario</option>
-            {horariosQuery.data?.map((h) => <option key={h.id} value={h.id}>{h.nombre} ({h.horaEntrada}-{h.horaSalida})</option>)}
-          </select>
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
-          <button type="button" onClick={() => void assignMutation.mutateAsync()} disabled={!employeeId || !horarioId || !desde || assignMutation.isPending} className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">Asignar</button>
+          {puedeCrear ? (
+            <>
+              <select value={horarioId} onChange={(e) => setHorarioId(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm">
+                <option value="">Seleccionar horario</option>
+                {horariosQuery.data?.map((h) => <option key={h.id} value={h.id}>{h.nombre} ({h.horaEntrada}-{h.horaSalida})</option>)}
+              </select>
+              <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
+              <button type="button" onClick={() => void assignMutation.mutateAsync()} disabled={!employeeId || !horarioId || !desde || assignMutation.isPending} className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">Asignar</button>
+            </>
+          ) : null}
         </div>
       </article>
 
@@ -119,7 +128,10 @@ export function PersonalAssignmentsPage() {
                   <td className="px-4 py-2 text-sm">{item.horario.nombre}</td>
                   <td className="px-4 py-2 text-sm font-mono">{item.desde}</td>
                   <td className="px-4 py-2 text-sm font-mono">{item.hasta ?? "-"}</td>
-                  <td className="px-4 py-2 text-right"><button type="button" onClick={() => void removeMutation.mutateAsync(item.id)} className="rounded border border-red-500/45 px-2 py-1 text-xs text-red-600">Eliminar</button></td>
+                  <td className="px-4 py-2 text-right">{puedeEliminar ? <button type="button" onClick={() => {
+                    if (!window.confirm(`¿Eliminar la asignación al horario "${item.horario.nombre}" (desde ${item.desde.slice(0, 10)})?\n\nEsta acción no se puede deshacer.`)) return;
+                    void removeMutation.mutateAsync(item.id);
+                  }} className="rounded border border-red-500/45 px-2 py-1 text-xs text-red-600">Eliminar</button> : null}</td>
                 </tr>
               ))}
             </tbody>

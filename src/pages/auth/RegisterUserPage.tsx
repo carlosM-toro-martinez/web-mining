@@ -1,6 +1,9 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Pencil, Search, ShieldCheck, UserPlus, UserX, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "@/shared/api/core/apiError";
+import { httpClient } from "@/shared/api/core/httpClient";
+import { queryKeys } from "@/shared/lib/queryKeys";
 import type { AuthRole, ManagedUser } from "@/features/auth/model/auth.schema";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -11,20 +14,6 @@ import {
   authLabelClassName,
   authPrimaryButtonClassName
 } from "@/pages/auth/authUi";
-
-const roleOptions: AuthRole[] = [
-  "ADMIN",
-  "ALMACENERO",
-  "RECEPCIONISTA",
-  "SUPERINTENDENTE",
-  "TRABAJADOR",
-  "VISITANTE",
-  "GEOLOGOADMIN",
-  "GEOLOGO",
-  "ADMINISTRADOR",
-  "ASISTENTE_ADMINISTRATIVO",
-  "CONTADOR"
-];
 
 interface EditFormState {
   id: number;
@@ -50,6 +39,20 @@ export function RegisterUserPage() {
   const usersQuery = useUsersListQuery();
   const updateUserMutation = useUpdateUserMutation();
   const { showError, showSuccess } = useToast();
+
+  // Roles dinámicos: la lista sale de la API (Sistema → Roles y permisos)
+  const rolesQuery = useQuery({
+    queryKey: queryKeys.roles.opciones(),
+    queryFn: async () => {
+      const response = await httpClient.get("/api/roles/opciones");
+      return (response.data as { data: Array<{ codigo: string; nombre: string }> }).data;
+    }
+  });
+  const roleOptions: AuthRole[] = useMemo(() => (rolesQuery.data ?? []).map((r) => r.codigo), [rolesQuery.data]);
+  const roleLabel = (codigo: string) => {
+    const rol = rolesQuery.data?.find((r) => r.codigo === codigo);
+    return rol ? `${rol.nombre} (${rol.codigo})` : codigo;
+  };
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -217,7 +220,7 @@ export function RegisterUserPage() {
             >
               {roleOptions.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {roleLabel(item)}
                 </option>
               ))}
             </select>
@@ -275,7 +278,7 @@ export function RegisterUserPage() {
               <option value="todos">Todos los roles</option>
               {roleOptions.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {roleLabel(item)}
                 </option>
               ))}
             </select>
@@ -441,7 +444,7 @@ export function RegisterUserPage() {
                 >
                   {roleOptions.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {roleLabel(item)}
                     </option>
                   ))}
                 </select>
