@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FileBarChart2, FileSpreadsheet, FileText, Lock, Search } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   useCerrarMesLogisticaMutation,
   useCierresLogisticaQuery,
+  useCombustibleReportQuery,
   useCuadroMensualQuery,
   useIntegridadCorrelativoQuery
 } from "@/features/logisticaReportes/hooks/useLogisticaReportes";
@@ -97,6 +98,7 @@ function ultimos7Dias() {
 type TipoReporte =
   | "cuadro-mensual"
   | "integridad-correlativo"
+  | "combustible"
   | "detalle-volqueta"
   | "resumen-mineral-ingenio"
   | "estado-f101"
@@ -120,6 +122,11 @@ const REPORT_GROUPS: Array<{
         type: "integridad-correlativo",
         title: "Integridad de Series",
         description: "Verifica que los N° de Conocimiento y los F101 no tengan huecos ni estén fuera de orden."
+      },
+      {
+        type: "combustible",
+        title: "Combustible por Transportista",
+        description: "Litros asignados y entregados por transportista en un rango de fechas, con total general."
       },
       {
         type: "detalle-volqueta",
@@ -171,8 +178,8 @@ function isTipoReporte(value: string | undefined): value is TipoReporte {
 // del hub de reportes).
 // ============================================================================
 function CuadroMensualReport() {
-  const { user } = useAuth();
-  const puedeCerrarMes = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const { can } = usePermisos();
+  const puedeCerrarMes = can("logistica.reportes", "cerrar_mes");
   const { showError, showSuccess } = useToast();
 
   const municipiosQuery = useMunicipiosOrigenQuery();
@@ -555,6 +562,142 @@ function IntegridadCorrelativoReport() {
                   {integridad.lotes.length === 0 ? (
                     <tr><td colSpan={5} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin lotes en este período.</td></tr>
                   ) : null}
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+// ============================================================================
+// Combustible por transportista.
+// ============================================================================
+function CombustibleReport() {
+  const municipiosQuery = useMunicipiosOrigenQuery();
+  const municipios = municipiosQuery.data?.data ?? [];
+  const [municipioId, setMunicipioId] = useState("");
+  const [fechaInicio, setFechaInicio] = useState(() => ultimos7Dias().fechaInicio);
+  const [fechaFin, setFechaFin] = useState(() => ultimos7Dias().fechaFin);
+  const [consultado, setConsultado] = useState<
+    { fechaInicio: string; fechaFin: string; municipioId?: number } | undefined
+  >();
+
+  const combustibleQuery = useCombustibleReportQuery(consultado);
+  const reporte = combustibleQuery.data?.data;
+
+  function handleConsultar() {
+    if (!fechaInicio || !fechaFin) return;
+    setConsultado({
+      fechaInicio,
+      fechaFin,
+      ...(municipioId ? { municipioId: Number(municipioId) } : {})
+    });
+  }
+
+  return (
+    <>
+      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+          Filtros
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Desde</label>
+            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className={inputClassName} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Hasta</label>
+            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className={inputClassName} />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Municipio (opcional)</label>
+            <select value={municipioId} onChange={(e) => setMunicipioId(e.target.value)} className={inputClassName}>
+              <option value="">Todos</option>
+              {municipios.map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <button type="button" onClick={handleConsultar} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white">
+          <Search size={14} /> Consultar
+        </button>
+      </article>
+
+      {combustibleQuery.isLoading ? (
+        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 text-sm text-[var(--color-on-surface-variant)]">
+          Cargando…
+        </article>
+      ) : reporte ? (
+        <>
+          {/* Resumen general */}
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+              Total general — {consultado?.fechaInicio} al {consultado?.fechaFin}
+            </h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-xs text-[var(--color-on-surface-variant)]">Viajes c/ combustible</p>
+                <p className="mt-1 text-2xl font-bold">{reporte.totalViajes}</p>
+              </div>
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-xs text-[var(--color-on-surface-variant)]">Litros asignados</p>
+                <p className="mt-1 text-2xl font-bold font-mono">{formatNumero(reporte.totalAsignados)}</p>
+              </div>
+              <div className="rounded-lg bg-[var(--color-surface-container-high)] p-3 text-center">
+                <p className="text-xs text-[var(--color-on-surface-variant)]">Litros entregados</p>
+                <p className="mt-1 text-2xl font-bold font-mono">{formatNumero(reporte.totalEntregados)}</p>
+              </div>
+            </div>
+          </article>
+
+          {/* Detalle por transportista */}
+          <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--color-on-surface-variant)]">
+              Por transportista
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+                    <th className="py-1 pr-3">Transportista</th>
+                    <th className="py-1 pr-3 text-right">Viajes</th>
+                    <th className="py-1 pr-3 text-right">L asignados</th>
+                    <th className="py-1 pr-3 text-right">L entregados</th>
+                    <th className="py-1 text-right">Diferencia</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-soft)]">
+                  {reporte.porTransportista.map((t) => {
+                    const diff = t.entregados - t.asignados;
+                    return (
+                      <tr key={t.transportistaId ?? "__sin__"}>
+                        <td className="py-1.5 pr-3 font-medium">{t.nombre}</td>
+                        <td className="py-1.5 pr-3 text-right">{t.viajes}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono">{formatNumero(t.asignados)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono">{formatNumero(t.entregados)}</td>
+                        <td className={`py-1.5 text-right font-mono ${diff < 0 ? "text-[var(--color-error)]" : diff > 0 ? "text-[var(--color-success)]" : ""}`}>
+                          {diff >= 0 ? "+" : ""}{formatNumero(diff)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {reporte.porTransportista.length === 0 ? (
+                    <tr><td colSpan={5} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin viajes con combustible en este período.</td></tr>
+                  ) : (
+                    <tr className="border-t-2 font-semibold">
+                      <td className="py-1.5 pr-3">TOTAL</td>
+                      <td className="py-1.5 pr-3 text-right">{reporte.totalViajes}</td>
+                      <td className="py-1.5 pr-3 text-right font-mono">{formatNumero(reporte.totalAsignados)}</td>
+                      <td className="py-1.5 pr-3 text-right font-mono">{formatNumero(reporte.totalEntregados)}</td>
+                      <td className={`py-1.5 text-right font-mono ${reporte.totalEntregados - reporte.totalAsignados < 0 ? "text-[var(--color-error)]" : ""}`}>
+                        {reporte.totalEntregados - reporte.totalAsignados >= 0 ? "+" : ""}{formatNumero(reporte.totalEntregados - reporte.totalAsignados)}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1460,6 +1603,7 @@ export function LogisticaReportesPage() {
 
       {tipo === "cuadro-mensual" ? <CuadroMensualReport /> : null}
       {tipo === "integridad-correlativo" ? <IntegridadCorrelativoReport /> : null}
+      {tipo === "combustible" ? <CombustibleReport /> : null}
       {tipo === "detalle-volqueta" ? <DetalleVolquetaReport /> : null}
       {tipo === "resumen-mineral-ingenio" ? <ResumenMineralIngenioReport /> : null}
       {tipo === "estado-f101" ? <EstadoF101Report /> : null}

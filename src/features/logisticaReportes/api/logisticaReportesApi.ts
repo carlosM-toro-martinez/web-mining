@@ -3,6 +3,7 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   cierreMensualResponseSchema,
   cierresListResponseSchema,
+  combustibleReportResponseSchema,
   cuadroMensualResponseSchema,
   integridadCorrelativoResponseSchema
 } from "@/features/logisticaReportes/model/logisticaReportes.schema";
@@ -37,6 +38,20 @@ export async function getIntegridadCorrelativo(params: CuadroMensualParams) {
     url: apiEndpoints.logisticaReportes.integridadCorrelativo,
     config: { params },
     schema: integridadCorrelativoResponseSchema
+  });
+}
+
+export interface CombustibleParams {
+  fechaInicio: string;
+  fechaFin: string;
+  municipioId?: number;
+}
+
+export async function getCombustibleReport(params: CombustibleParams) {
+  return getRequest({
+    url: apiEndpoints.logisticaReportes.combustible,
+    config: { params },
+    schema: combustibleReportResponseSchema
   });
 }
 

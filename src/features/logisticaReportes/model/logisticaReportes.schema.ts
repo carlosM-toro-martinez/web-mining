@@ -91,3 +91,28 @@ export const integridadCorrelativoResponseSchema = z.object({
 
 export type LoteIntegridad = z.infer<typeof loteIntegridadSchema>;
 export type IntegridadCorrelativo = z.infer<typeof integridadCorrelativoSchema>;
+
+// ── Combustible ───────────────────────────────────────────────────────────────
+
+export const combustibleTransportistaSchema = z.object({
+  transportistaId: z.number().int().nullable(),
+  nombre: z.string(),
+  viajes: z.number().int(),
+  asignados: z.number(),
+  entregados: z.number()
+});
+
+export const combustibleReportSchema = z.object({
+  porTransportista: z.array(combustibleTransportistaSchema),
+  totalViajes: z.number().int(),
+  totalAsignados: z.number(),
+  totalEntregados: z.number()
+});
+
+export const combustibleReportResponseSchema = z.object({
+  success: z.boolean(),
+  data: combustibleReportSchema
+});
+
+export type CombustibleTransportista = z.infer<typeof combustibleTransportistaSchema>;
+export type CombustibleReport = z.infer<typeof combustibleReportSchema>;
