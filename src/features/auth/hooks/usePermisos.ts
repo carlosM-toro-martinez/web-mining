@@ -14,12 +14,15 @@ interface MisPermisosResponse {
 // Permisos dinámicos del usuario logueado (GET /api/roles/mis-permisos).
 // Se consultan a la API (no se guardan en el token) para que un cambio de
 // rol o de permisos se refleje sin cerrar sesión.
+//
+// ADMIN tiene acceso total SIEMPRE, sin depender de esta consulta: aunque la
+// API no responda o falle, un ADMIN nunca queda fuera de ningún módulo.
 export function usePermisos() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isAdmin } = useAuth();
 
   const query = useQuery({
     queryKey: queryKeys.roles.misPermisos(user?.id ?? null),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !isAdmin,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -33,28 +36,30 @@ export function usePermisos() {
 
   const can = useCallback(
     (recurso: string, accion: string) => {
+      if (isAdmin) return true;
       if (!data) return false;
       if (data.esSuperAdmin) return true;
       return permisos?.includes(`${recurso}:${accion}`) ?? false;
     },
-    [data, permisos]
+    [isAdmin, data, permisos]
   );
 
   // ¿Tiene algún permiso dentro de un módulo? (ej. "personal")
   const canAny = useCallback(
     (prefijo: string) => {
+      if (isAdmin) return true;
       if (!data) return false;
       if (data.esSuperAdmin) return true;
       return permisos?.some((p) => p.startsWith(`${prefijo}.`)) ?? false;
     },
-    [data, permisos]
+    [isAdmin, data, permisos]
   );
 
   return {
     can,
     canAny,
-    esSuperAdmin: data?.esSuperAdmin ?? false,
-    isLoading: query.isLoading,
-    isError: query.isError
+    esSuperAdmin: isAdmin || (data?.esSuperAdmin ?? false),
+    isLoading: isAdmin ? false : query.isLoading,
+    isError: isAdmin ? false : query.isError
   };
 }
