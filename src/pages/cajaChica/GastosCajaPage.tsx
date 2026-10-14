@@ -97,25 +97,23 @@ function useValorDiferido<T>(valor: T, ms = 350) {
 
 const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoGasto, string> = {
   FACTURA: "Factura",
-  CONTRATO_RETENCION: "Pago a persona sin factura",
-  RECIBO: "Recibo de empresa",
+  RECIBO: "Recibo (sin crédito fiscal)",
+  CONTRATO_RETENCION: "Sin factura, con retención",
   RECIBO_DIRECTO: "Sin comprobante"
 };
 
-// Sin jerga de impuestos: quien registra elige qué papel le dieron; el
-// sistema calcula solo lo que corresponde.
 const TIPO_DOCUMENTO_OPCIONES: Array<{ value: TipoDocumentoGasto; label: string }> = [
-  { value: "FACTURA", label: "Factura" },
-  { value: "RECIBO", label: "Recibo de una empresa (con sello o número)" },
-  { value: "CONTRATO_RETENCION", label: "Pago a una persona que no da factura" },
-  { value: "RECIBO_DIRECTO", label: "Sin comprobante (recibo hecho a mano, viático)" }
+  { value: "FACTURA", label: TIPO_DOCUMENTO_LABEL.FACTURA },
+  { value: "RECIBO", label: TIPO_DOCUMENTO_LABEL.RECIBO },
+  { value: "CONTRATO_RETENCION", label: TIPO_DOCUMENTO_LABEL.CONTRATO_RETENCION },
+  { value: "RECIBO_DIRECTO", label: TIPO_DOCUMENTO_LABEL.RECIBO_DIRECTO }
 ];
 
 const TIPO_DOCUMENTO_AYUDA: Record<TipoDocumentoGasto, string> = {
-  FACTURA: "Anota el número de la factura. El sistema calcula solo lo que corresponde de impuestos.",
-  RECIBO: "Anota el número del recibo.",
-  CONTRATO_RETENCION: "El sistema calcula solo cuánto hay que descontarle por impuestos.",
-  RECIBO_DIRECTO: "Úsalo solo cuando no hay ningún papel formal."
+  FACTURA: "Anota el número de la factura.",
+  RECIBO: "Recibo de una empresa o de una persona. Anota su número.",
+  CONTRATO_RETENCION: "Quien cobra no da factura: se le descuenta el impuesto. El sistema calcula cuánto.",
+  RECIBO_DIRECTO: "No hay ningún papel (por ejemplo, un viático)."
 };
 
 const CAMPO_FALTANTE_LABEL: Record<"centroCostoCaja" | "funcionGastoCaja" | "cuentaContableCaja" | "partidaPresupuesto", string> = {
