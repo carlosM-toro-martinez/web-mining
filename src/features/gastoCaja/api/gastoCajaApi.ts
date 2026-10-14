@@ -36,6 +36,16 @@ export interface GastosCajaQueryParams {
   limit?: number;
 }
 
+const proveedoresCajaResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.array(z.object({ nombre: z.string(), nit: z.string().nullable() }))
+});
+export type ProveedorCaja = z.infer<typeof proveedoresCajaResponseSchema>["data"][number];
+
+export async function getProveedoresCaja() {
+  return getRequest({ url: apiEndpoints.gastoCaja.proveedores, schema: proveedoresCajaResponseSchema });
+}
+
 export async function getGastosCaja(params: GastosCajaQueryParams = {}) {
   return getRequest({
     url: apiEndpoints.gastoCaja.gastos,

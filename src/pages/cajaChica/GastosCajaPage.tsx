@@ -27,6 +27,7 @@ import {
   useCreateGastoCajaMutation,
   useGastosCajaQuery,
   useImportarGastosCajaExcelMutation,
+  useProveedoresCajaQuery,
   useUpdateGastoCajaMutation
 } from "@/features/gastoCaja/hooks/useGastoCaja";
 import { useGastoCajaOfflineQueue } from "@/features/gastoCaja/hooks/useGastoCajaOfflineQueue";
@@ -344,6 +345,7 @@ export function GastosCajaPage() {
   const cuentasQuery = useCuentasContablesCajaQuery();
   const retencionesQuery = useConceptosRetencionCajaQuery();
   const partidasQuery = usePartidasPresupuestoCajaQuery();
+  const proveedoresQuery = useProveedoresCajaQuery();
   const { pendientes, encolar, sincronizar, sincronizando } = useGastoCajaOfflineQueue();
 
   const [filtroCaja, setFiltroCaja] = useState("");
@@ -509,15 +511,26 @@ export function GastosCajaPage() {
         .map((c) => ({ id: String(c.id), label: `${c.codigo} · ${c.nombre}`, searchText: c.codigo })),
     [cuentas]
   );
-  const partidaOptions = useMemo(
-    () =>
-      partidas.map((p) => ({
+  const proveedoresCaja = proveedoresQuery.data?.data ?? [];
+  const nitDeProveedor = (nombre: string) => {
+    const buscado = nombre.trim().toUpperCase().replace(/\s+/g, " ");
+    return proveedoresCaja.find((p) => p.nombre.trim().toUpperCase().replace(/\s+/g, " ") === buscado)?.nit ?? null;
+  };
+
+  // Solo las partidas del presupuesto del mes del gasto ("YYYY-MM"); la que
+  // ya tenía elegida se mantiene aunque sea de otro mes.
+  const partidaOptionsDelMes = (meses: string[], seleccionadaId?: string) =>
+    partidas
+      .filter(
+        (p) =>
+          String(p.id) === seleccionadaId ||
+          (p.presupuesto && meses.includes(`${p.presupuesto.anio}-${String(p.presupuesto.mes).padStart(2, "0")}`))
+      )
+      .map((p) => ({
         id: String(p.id),
         label: p.presupuesto?.nombre ? `${p.presupuesto.nombre} · ${p.descripcion}` : p.descripcion,
         searchText: p.descripcion
-      })),
-    [partidas]
-  );
+      }));
 
   // Partidas de cualquier remesa que todavía tienen saldo disponible (más
   // recientes primero), en una sola lista plana — con muchos pendientes
@@ -822,6 +835,13 @@ export function GastosCajaPage() {
 
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
+      <datalist id="proveedores-caja">
+        {proveedoresCaja.map((p) => (
+          <option key={p.nombre} value={p.nombre}>
+            {p.nit ? `NIT ${p.nit}` : ""}
+          </option>
+        ))}
+      </datalist>
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
         <div className="mb-4">
           <SubrouteBackButton />
@@ -875,7 +895,16 @@ export function GastosCajaPage() {
             </div>
             <div>
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Partida de presupuesto</label>
-              <AutocompleteSelect value={clasificacion.partidaPresupuestoId} onChange={(v) => setClasificacion({ ...clasificacion, partidaPresupuestoId: v })} options={partidaOptions} placeholder="Buscar partida..." className={inputClassName} />
+              <AutocompleteSelect
+                value={clasificacion.partidaPresupuestoId}
+                onChange={(v) => setClasificacion({ ...clasificacion, partidaPresupuestoId: v })}
+                options={partidaOptionsDelMes(
+                  [...new Set(gastos.filter((g) => seleccionados.has(g.id)).map((g) => g.fecha.slice(0, 7)))],
+                  clasificacion.partidaPresupuestoId
+                )}
+                placeholder="Buscar partida del mes de los gastos..."
+                className={inputClassName}
+              />
             </div>
             <div>
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Categoría del reporte</label>
@@ -1034,10 +1063,15 @@ export function GastosCajaPage() {
 
             <input
               required
+              list="proveedores-caja"
               value={proveedorNombre}
-              onChange={(e) => setProveedorNombre(e.target.value)}
+              onChange={(e) => {
+                setProveedorNombre(e.target.value);
+                const nit = nitDeProveedor(e.target.value);
+                if (nit && !proveedorNitCi.trim()) setProveedorNitCi(nit);
+              }}
               className={`${inputClassName} ${esReciboDirecto ? "sm:col-span-2" : ""}`}
-              placeholder="Proveedor / beneficiario"
+              placeholder="Proveedor / beneficiario (escribe para buscar)"
             />
             {esReciboDirecto ? null : (
               <input value={proveedorNitCi} onChange={(e) => setProveedorNitCi(e.target.value)} className={inputClassName} placeholder="NIT / CI (opcional)" />
@@ -1119,8 +1153,8 @@ export function GastosCajaPage() {
               <AutocompleteSelect
                 value={partidaPresupuestoId}
                 onChange={setPartidaPresupuestoId}
-                options={partidaOptions}
-                placeholder="Buscar partida de presupuesto..."
+                options={partidaOptionsDelMes([fecha.slice(0, 7)], partidaPresupuestoId)}
+                placeholder="Buscar partida del presupuesto de este mes..."
                 className={inputClassName}
               />
             </div>
@@ -1218,8 +1252,16 @@ export function GastosCajaPage() {
 
             <input
               required
+              list="proveedores-caja"
               value={editDraft.proveedorNombre}
-              onChange={(e) => setEditDraft({ ...editDraft, proveedorNombre: e.target.value })}
+              onChange={(e) => {
+                const nit = nitDeProveedor(e.target.value);
+                setEditDraft({
+                  ...editDraft,
+                  proveedorNombre: e.target.value,
+                  proveedorNitCi: nit && !editDraft.proveedorNitCi.trim() ? nit : editDraft.proveedorNitCi
+                });
+              }}
               className={`${inputClassName} ${editDraft.tipoDocumento === "RECIBO_DIRECTO" ? "sm:col-span-2" : ""}`}
               placeholder="Proveedor / beneficiario"
             />
@@ -1309,7 +1351,7 @@ export function GastosCajaPage() {
               <AutocompleteSelect
                 value={editDraft.partidaPresupuestoId}
                 onChange={(v) => setEditDraft({ ...editDraft, partidaPresupuestoId: v })}
-                options={partidaOptions}
+                options={partidaOptionsDelMes([editDraft.fecha.slice(0, 7)], editDraft.partidaPresupuestoId)}
                 placeholder="Buscar partida de presupuesto..."
                 className={inputClassName}
               />

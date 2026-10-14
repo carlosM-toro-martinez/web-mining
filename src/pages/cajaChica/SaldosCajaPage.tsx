@@ -15,9 +15,12 @@ import {
 } from "@/features/movimientoBancoCaja/model/movimientoBancoCaja.schema";
 import {
   useCreateMovimientoBancoCajaMutation,
-  useMovimientosBancoCajaQuery
+  useMovimientosBancoCajaQuery,
+  useVincularPresupuestoMovimientoBancoMutation
 } from "@/features/movimientoBancoCaja/hooks/useMovimientoBancoCaja";
-import { ApiError } from "@/shared/api/core/apiError";
+import { usePresupuestosCajaQuery } from "@/features/presupuestoCaja/hooks/usePresupuestoCaja";
+import type { PresupuestoCaja } from "@/features/presupuestoCaja/model/presupuestoCaja.schema";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -44,8 +47,14 @@ const buttonSecondaryClassName =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-60";
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
+}
+
+const MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function etiquetaPresupuesto(p: Pick<PresupuestoCaja, "nombre" | "anio" | "mes" | "totalPresupuestado">) {
+  const total = p.totalPresupuestado !== undefined ? ` · presupuestado ${formatMoneda(p.totalPresupuestado)}` : "";
+  return `${p.nombre} (${MESES_CORTO[p.mes - 1]} ${p.anio})${total}`;
 }
 
 function formatMoneda(value: number | string) {
@@ -106,6 +115,23 @@ export function SaldosCajaPage() {
 
   const createFondoMutation = useCreateMovimientoFondoCajaMutation();
   const createBancoMutation = useCreateMovimientoBancoCajaMutation();
+  const vincularMutation = useVincularPresupuestoMovimientoBancoMutation();
+
+  // Remesas (presupuestos) que todavía no tienen un ingreso del banco vinculado.
+  const presupuestosQuery = usePresupuestosCajaQuery({});
+  const presupuestos = presupuestosQuery.data?.data ?? [];
+  const presupuestosLibres = presupuestos.filter((p) => !p.asignadoMovimientoBancoId);
+  const ingresosBanco = movimientosBanco.filter((m) => m.tipo === "INGRESO").slice(0, 10);
+
+  function handleVincular(movimientoId: string, valor: string) {
+    vincularMutation.mutate(
+      { id: movimientoId, presupuestoId: valor ? Number(valor) : null },
+      {
+        onSuccess: () => showSuccess(valor ? "Ingreso vinculado al presupuesto." : "Ingreso desvinculado del presupuesto."),
+        onError: (error) => showError(normalizeError(error, "No se pudo vincular el presupuesto."))
+      }
+    );
+  }
 
   // --- Form: registrar fondo directo a la caja (sin pasar por un banco) ---
   const [fondoCajaId, setFondoCajaId] = useState("");
@@ -132,6 +158,7 @@ export function SaldosCajaPage() {
   const [ingresoMonto, setIngresoMonto] = useState("");
   const [ingresoDepositante, setIngresoDepositante] = useState("");
   const [ingresoDescripcion, setIngresoDescripcion] = useState("");
+  const [ingresoPresupuestoId, setIngresoPresupuestoId] = useState("");
 
   useEffect(() => {
     if (cajas.length === 0) return;
@@ -216,7 +243,8 @@ export function SaldosCajaPage() {
         monto: Number(ingresoMonto),
         moneda: ingresoCuenta.monedaBase,
         depositanteNombre: ingresoDepositante.trim() || undefined,
-        descripcion: ingresoDescripcion
+        descripcion: ingresoDescripcion,
+        presupuestoId: ingresoPresupuestoId ? Number(ingresoPresupuestoId) : undefined
       },
       {
         onSuccess: () => {
@@ -224,6 +252,7 @@ export function SaldosCajaPage() {
           setIngresoMonto("");
           setIngresoDepositante("");
           setIngresoDescripcion("");
+          setIngresoPresupuestoId("");
         },
         onError: (error) => showError(normalizeError(error, "No se pudo registrar el ingreso."))
       }
@@ -641,22 +670,67 @@ export function SaldosCajaPage() {
             <input required type="date" value={ingresoFecha} onChange={(e) => setIngresoFecha(e.target.value)} className={inputClassName} />
             <input value={ingresoDepositante} onChange={(e) => setIngresoDepositante(e.target.value)} className={inputClassName} placeholder="Depositante (opcional)" />
             <input required value={ingresoDescripcion} onChange={(e) => setIngresoDescripcion(e.target.value)} className={inputClassName} placeholder="Descripción (ej. Presupuesto octubre)" />
+            <div>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
+                ¿Para qué presupuesto llegó este dinero? (opcional)
+              </label>
+              <select value={ingresoPresupuestoId} onChange={(e) => setIngresoPresupuestoId(e.target.value)} className={inputClassName}>
+                <option value="">Sin presupuesto (sueldos, otros)</option>
+                {presupuestosLibres.map((p) => (
+                  <option key={p.id} value={p.id}>{etiquetaPresupuesto(p)}</option>
+                ))}
+              </select>
+            </div>
             <button type="submit" disabled={createBancoMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
               {createBancoMutation.isPending ? "Guardando..." : "Registrar ingreso"}
             </button>
           </form>
           <div className="mt-4 space-y-2 text-xs">
-            {movimientosBanco.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
-                <div>
-                  <span className={`mr-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${item.tipo === "INGRESO" ? "bg-[var(--color-success)]/18 text-[var(--color-success)]" : "bg-[var(--color-error)]/18 text-[var(--color-error)]"}`}>
-                    {item.tipo === "INGRESO" ? "Ingreso" : `→ ${item.caja?.nombre ?? ""}`}
-                  </span>
-                  {formatFecha(item.fecha)}
+            <p className="font-semibold text-[var(--color-on-surface-variant)]">
+              Últimos ingresos: indica (o cambia) para qué presupuesto llegó cada uno
+            </p>
+            {ingresosBanco.length === 0 ? (
+              <p className="text-[var(--color-on-surface-variant)]">Todavía no hay ingresos registrados.</p>
+            ) : null}
+            {ingresosBanco.map((item) => {
+              const vinculado = item.presupuestosAsignados ?? null;
+              const presupuestoVinculado = vinculado ? presupuestos.find((p) => p.id === vinculado.id) : undefined;
+              const diferencia =
+                presupuestoVinculado?.totalPresupuestado !== undefined
+                  ? Number(item.monto) - presupuestoVinculado.totalPresupuestado
+                  : null;
+              return (
+                <div key={item.id} className="space-y-1.5 rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate">
+                      {formatFecha(item.fecha)} · {item.descripcion}
+                    </span>
+                    <span className="shrink-0 font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
+                  </div>
+                  <select
+                    value={vinculado ? String(vinculado.id) : ""}
+                    onChange={(e) => handleVincular(item.id, e.target.value)}
+                    disabled={vincularMutation.isPending}
+                    className={`${inputClassName} py-1.5 text-xs`}
+                  >
+                    <option value="">Sin presupuesto</option>
+                    {vinculado ? (
+                      <option value={vinculado.id}>
+                        {etiquetaPresupuesto({ ...vinculado, totalPresupuestado: presupuestoVinculado?.totalPresupuestado })}
+                      </option>
+                    ) : null}
+                    {presupuestosLibres.map((p) => (
+                      <option key={p.id} value={p.id}>{etiquetaPresupuesto(p)}</option>
+                    ))}
+                  </select>
+                  {diferencia !== null && Math.abs(diferencia) > 0.009 ? (
+                    <p className="text-[var(--color-on-surface-variant)]">
+                      {diferencia > 0 ? "Llegó" : "Faltó"} {formatMoneda(Math.abs(diferencia))} respecto a lo presupuestado.
+                    </p>
+                  ) : null}
                 </div>
-                <span className="font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </article>
       </div>

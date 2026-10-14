@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  asignarBancoPresupuestoCaja,
   createPresupuestoCaja,
   deletePresupuestoCaja,
   duplicarPresupuestoCaja,
@@ -10,7 +9,6 @@ import {
   type PresupuestosCajaQueryParams
 } from "@/features/presupuestoCaja/api/presupuestoCajaApi";
 import type {
-  AsignarBancoPresupuestoCajaPayload,
   CreatePresupuestoCajaPayload,
   DuplicarPresupuestoCajaPayload,
   UpdatePresupuestoCajaPayload
@@ -62,21 +60,6 @@ export function useDeletePresupuestoCajaMutation() {
   return useMutation({
     mutationFn: (id: number) => deletePresupuestoCaja(id),
     onSuccess: () => invalidate()
-  });
-}
-
-// Cambia el saldo de la cuenta bancaria (crea un ingreso), por eso también
-// invalida los saldos de cuentas bancarias además de los presupuestos.
-export function useAsignarBancoPresupuestoCajaMutation() {
-  const invalidate = useInvalidatePresupuestos();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: AsignarBancoPresupuestoCajaPayload }) =>
-      asignarBancoPresupuestoCaja(id, payload),
-    onSuccess: async () => {
-      await invalidate();
-      await queryClient.invalidateQueries({ queryKey: queryKeys.movimientoBancoCaja.all });
-    }
   });
 }
 

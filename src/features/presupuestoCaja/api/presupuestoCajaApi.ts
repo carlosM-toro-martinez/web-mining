@@ -1,14 +1,12 @@
 import { deleteRequest, getRequest, postRequest, putRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
-  asignarBancoPresupuestoCajaPayloadSchema,
   createPresupuestoCajaPayloadSchema,
   duplicarPresupuestoCajaPayloadSchema,
   presupuestoCajaDeleteResponseSchema,
   presupuestoCajaListResponseSchema,
   presupuestoCajaResponseSchema,
   updatePresupuestoCajaPayloadSchema,
-  type AsignarBancoPresupuestoCajaPayload,
   type CreatePresupuestoCajaPayload,
   type DuplicarPresupuestoCajaPayload,
   type UpdatePresupuestoCajaPayload
@@ -45,11 +43,6 @@ export async function updatePresupuestoCaja(id: number, payload: UpdatePresupues
 
 export async function deletePresupuestoCaja(id: number) {
   return deleteRequest({ url: apiEndpoints.cajaChica.presupuestoById(id), schema: presupuestoCajaDeleteResponseSchema });
-}
-
-export async function asignarBancoPresupuestoCaja(id: number, payload: AsignarBancoPresupuestoCajaPayload) {
-  const body = asignarBancoPresupuestoCajaPayloadSchema.parse(payload);
-  return postRequest({ url: apiEndpoints.cajaChica.presupuestoAsignarBanco(id), body, schema: presupuestoCajaResponseSchema });
 }
 
 export async function duplicarPresupuestoCaja(id: number, payload: DuplicarPresupuestoCajaPayload) {

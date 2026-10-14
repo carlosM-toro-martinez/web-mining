@@ -49,10 +49,6 @@ export const updatePresupuestoCajaPayloadSchema = z.object({
   activo: z.boolean().optional()
 });
 
-export const asignarBancoPresupuestoCajaPayloadSchema = z.object({
-  cuentaBancariaId: z.number().int().positive("Debes elegir una cuenta bancaria.")
-});
-
 export const duplicarPresupuestoCajaPayloadSchema = z.object({
   anio: z.number().int().min(2000).max(2100),
   mes: z.number().int().min(1).max(12),
@@ -67,5 +63,4 @@ export const presupuestoCajaDeleteResponseSchema = z.object({ success: z.boolean
 export type PresupuestoCaja = z.infer<typeof presupuestoCajaSchema>;
 export type CreatePresupuestoCajaPayload = z.infer<typeof createPresupuestoCajaPayloadSchema>;
 export type UpdatePresupuestoCajaPayload = z.infer<typeof updatePresupuestoCajaPayloadSchema>;
-export type AsignarBancoPresupuestoCajaPayload = z.infer<typeof asignarBancoPresupuestoCajaPayloadSchema>;
 export type DuplicarPresupuestoCajaPayload = z.infer<typeof duplicarPresupuestoCajaPayloadSchema>;

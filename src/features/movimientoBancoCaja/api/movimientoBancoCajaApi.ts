@@ -1,4 +1,4 @@
-import { getRequest, postRequest } from "@/shared/api/core/request";
+import { getRequest, patchRequest, postRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   createMovimientoBancoCajaPayloadSchema,
@@ -19,6 +19,14 @@ export async function getMovimientosBancoCaja(params: MovimientoBancoCajaQueryPa
     url: apiEndpoints.cajaChica.movimientosBanco,
     config: { params },
     schema: movimientoBancoCajaListResponseSchema
+  });
+}
+
+export async function vincularPresupuestoMovimientoBanco(id: string, presupuestoId: number | null) {
+  return patchRequest({
+    url: apiEndpoints.cajaChica.movimientoBancoPresupuesto(id),
+    body: { presupuestoId },
+    schema: movimientoBancoCajaResponseSchema
   });
 }
 

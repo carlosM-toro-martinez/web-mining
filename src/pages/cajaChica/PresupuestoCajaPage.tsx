@@ -5,7 +5,6 @@ import {
   useCajasChicasQuery,
   useCentrosCostoCajaQuery,
   useCreatePartidaPresupuestoCajaMutation,
-  useCuentasBancariasCajaQuery,
   useCuentasContablesCajaQuery,
   useDeletePartidaPresupuestoCajaMutation,
   useFuncionesGastoCajaQuery,
@@ -16,7 +15,6 @@ import type { PartidaPresupuestoCaja } from "@/features/parametrosCajaChica/mode
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import { exportPlanillaControlPagosExcel, exportPlanillaControlPagosPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
 import {
-  useAsignarBancoPresupuestoCajaMutation,
   useCreatePresupuestoCajaMutation,
   useDeletePresupuestoCajaMutation,
   useDuplicarPresupuestoCajaMutation,
@@ -24,7 +22,7 @@ import {
   useUpdatePresupuestoCajaMutation
 } from "@/features/presupuestoCaja/hooks/usePresupuestoCaja";
 import type { PresupuestoCaja } from "@/features/presupuestoCaja/model/presupuestoCaja.schema";
-import { ApiError } from "@/shared/api/core/apiError";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -60,19 +58,17 @@ function formatFecha(value: string) {
 }
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 interface RemesaCardProps {
   presupuesto: PresupuestoCaja;
-  cuentasBancarias: Array<{ id: number; banco: string; nombreCuenta: string; monedaBase: string }>;
   centroOptions: Array<{ id: string; label: string; searchText: string }>;
   funcionOptions: Array<{ id: string; label: string; searchText: string }>;
   cuentaOptions: Array<{ id: string; label: string; searchText: string }>;
 }
 
-function RemesaCard({ presupuesto, cuentasBancarias, centroOptions, funcionOptions, cuentaOptions }: RemesaCardProps) {
+function RemesaCard({ presupuesto, centroOptions, funcionOptions, cuentaOptions }: RemesaCardProps) {
   const { showError, showSuccess } = useToast();
 
   const partidasQuery = usePartidasPresupuestoCajaQuery({ presupuestoId: presupuesto.id });
@@ -84,7 +80,6 @@ function RemesaCard({ presupuesto, cuentasBancarias, centroOptions, funcionOptio
   const [funcionGastoCajaId, setFuncionGastoCajaId] = useState("");
   const [cuentaContableCajaId, setCuentaContableCajaId] = useState("");
   const [categoriaRendicion, setCategoriaRendicion] = useState<CategoriaRendicionGasto | "">("");
-  const [bancoDestinoId, setBancoDestinoId] = useState("");
 
   const [editandoNombre, setEditandoNombre] = useState(false);
   const [nombreEdit, setNombreEdit] = useState(presupuesto.nombre);
@@ -104,7 +99,6 @@ function RemesaCard({ presupuesto, cuentasBancarias, centroOptions, funcionOptio
   const deletePartidaMutation = useDeletePartidaPresupuestoCajaMutation();
   const deleteRemesaMutation = useDeletePresupuestoCajaMutation();
   const updateRemesaMutation = useUpdatePresupuestoCajaMutation();
-  const asignarBancoMutation = useAsignarBancoPresupuestoCajaMutation();
 
   const totalPresupuestado = presupuesto.totalPresupuestado ?? 0;
   const totalGastado = presupuesto.totalGastado ?? 0;
@@ -148,20 +142,6 @@ function RemesaCard({ presupuesto, cuentasBancarias, centroOptions, funcionOptio
       onSuccess: () => showSuccess("Remesa eliminada."),
       onError: (error) => showError(normalizeError(error, "No se pudo eliminar: puede tener gastos imputados."))
     });
-  }
-
-  function handleAsignarBanco() {
-    if (!bancoDestinoId) {
-      showError("Elige a qué cuenta bancaria se asignó esta remesa.");
-      return;
-    }
-    asignarBancoMutation.mutate(
-      { id: presupuesto.id, payload: { cuentaBancariaId: Number(bancoDestinoId) } },
-      {
-        onSuccess: () => showSuccess(`"${presupuesto.nombre}" aprobada y asignada al banco.`),
-        onError: (error) => showError(normalizeError(error, "No se pudo asignar la remesa al banco."))
-      }
-    );
   }
 
   function handleStartEditNombre() {
@@ -289,45 +269,39 @@ function RemesaCard({ presupuesto, cuentasBancarias, centroOptions, funcionOptio
         )}
       </div>
 
-      {yaAsignado ? (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 px-3 py-2 text-xs font-semibold text-[var(--color-success)]">
-          <Check size={14} />
-          Aprobada y asignada al banco
-          {presupuesto.asignadoEn ? ` el ${formatFecha(presupuesto.asignadoEn)}` : ""}
-          {presupuesto.asignadoMovimientoBanco?.cuentaBancaria
-            ? ` a ${presupuesto.asignadoMovimientoBanco.cuentaBancaria.banco} · ${presupuesto.asignadoMovimientoBanco.cuentaBancaria.nombreCuenta}`
-            : ""}
-        </div>
+      {yaAsignado && presupuesto.asignadoMovimientoBanco ? (
+        (() => {
+          const ingreso = Number(presupuesto.asignadoMovimientoBanco.monto);
+          const diferencia = ingreso - totalPresupuestado;
+          return (
+            <div className="mb-4 rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 px-3 py-2 text-xs">
+              <p className="flex flex-wrap items-center gap-1 font-semibold text-[var(--color-success)]">
+                <Check size={14} />
+                Ingresó {formatMoneda(ingreso)} {presupuesto.asignadoMovimientoBanco.moneda} el{" "}
+                {formatFecha(presupuesto.asignadoMovimientoBanco.fecha)}
+                {presupuesto.asignadoMovimientoBanco.cuentaBancaria
+                  ? ` a ${presupuesto.asignadoMovimientoBanco.cuentaBancaria.banco} · ${presupuesto.asignadoMovimientoBanco.cuentaBancaria.nombreCuenta}`
+                  : ""}
+              </p>
+              {Math.abs(diferencia) > 0.009 ? (
+                <p className="mt-0.5 text-[var(--color-on-surface-variant)]">
+                  {diferencia > 0 ? "Llegó" : "Faltó"} {formatMoneda(Math.abs(diferencia))} respecto a lo presupuestado.
+                </p>
+              ) : null}
+              <p className="mt-0.5 text-[var(--color-on-surface-variant)]">
+                Sus partidas quedan fijas. Para cambiar el ingreso vinculado, ve a Saldos.
+              </p>
+            </div>
+          );
+        })()
       ) : (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
           <Landmark size={14} className="shrink-0 text-[var(--color-primary)]" />
-          <select
-            value={bancoDestinoId}
-            onChange={(e) => setBancoDestinoId(e.target.value)}
-            className={`${inputClassName} w-auto flex-1`}
-          >
-            <option value="">Cuenta bancaria destino...</option>
-            {cuentasBancarias.map((c) => (
-              <option key={c.id} value={c.id}>{c.banco} · {c.nombreCuenta}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleAsignarBanco}
-            disabled={asignarBancoMutation.isPending}
-            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-          >
-            {asignarBancoMutation.isPending ? "Asignando..." : "Aprobar y asignar al banco"}
-          </button>
+          Todavía sin ingreso del banco. Cuando llegue el depósito, regístralo (o elígelo) en Saldos y vincúlalo a esta remesa.
         </div>
       )}
 
-      {yaAsignado ? (
-        <p className="mb-3 text-xs text-[var(--color-on-surface-variant)]">
-          Esta remesa ya fue aprobada y asignada al banco: sus partidas quedan fijas y no se pueden agregar,
-          editar ni eliminar.
-        </p>
-      ) : (
+      {yaAsignado ? null : (
         <form className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_auto]" onSubmit={handleCreatePartida}>
           <input
             required
@@ -531,8 +505,6 @@ export function PresupuestoCajaPage() {
 
   const cajasQuery = useCajasChicasQuery();
   const cajas = cajasQuery.data?.data ?? [];
-  const cuentasBancariasQuery = useCuentasBancariasCajaQuery();
-  const cuentasBancarias = cuentasBancariasQuery.data?.data ?? [];
   const centrosQuery = useCentrosCostoCajaQuery();
   const funcionesQuery = useFuncionesGastoCajaQuery();
   const cuentasContablesQuery = useCuentasContablesCajaQuery();
@@ -766,7 +738,6 @@ export function PresupuestoCajaPage() {
             <RemesaCard
               key={p.id}
               presupuesto={p}
-              cuentasBancarias={cuentasBancarias}
               centroOptions={centroOptions}
               funcionOptions={funcionOptions}
               cuentaOptions={cuentaOptions}

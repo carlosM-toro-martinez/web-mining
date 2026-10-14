@@ -7,6 +7,7 @@ import {
   createMovimientoFondoCaja,
   getGastosCaja,
   getMovimientosFondoCaja,
+  getProveedoresCaja,
   importarGastosCajaExcel,
   updateGastoCaja,
   type GastosCajaQueryParams
@@ -18,6 +19,14 @@ import type {
   UpdateGastoCajaPayload
 } from "@/features/gastoCaja/model/gastoCaja.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function useProveedoresCajaQuery() {
+  return useQuery({
+    queryKey: [...queryKeys.gastoCaja.all, "proveedores"],
+    queryFn: getProveedoresCaja,
+    staleTime: 60_000
+  });
+}
 
 export function useGastosCajaQuery(params: GastosCajaQueryParams = {}) {
   return useQuery({

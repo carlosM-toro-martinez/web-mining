@@ -34,7 +34,12 @@ export const movimientoBancoCajaSchema = z.object({
   descripcion: z.string().min(1),
   createdAt: z.string(),
   cuentaBancaria: cuentaBancariaRef.optional(),
-  caja: refConNombre.nullable().optional()
+  caja: refConNombre.nullable().optional(),
+  // Remesa (presupuesto) que cubre este ingreso.
+  presupuestosAsignados: z
+    .object({ id: z.number().int().positive(), nombre: z.string(), anio: z.number().int(), mes: z.number().int() })
+    .nullable()
+    .optional()
 });
 
 export const createMovimientoBancoCajaPayloadSchema = z
@@ -48,7 +53,8 @@ export const createMovimientoBancoCajaPayloadSchema = z
     monto: z.number().positive("El monto debe ser mayor a cero."),
     moneda: monedaCajaSchema,
     depositanteNombre: z.string().trim().optional(),
-    descripcion: z.string().trim().min(1, "La descripción es obligatoria.")
+    descripcion: z.string().trim().min(1, "La descripción es obligatoria."),
+    presupuestoId: z.number().int().positive().optional()
   })
   .refine((data) => data.formaPago !== "CHEQUE" || Boolean(data.numeroCheque), {
     message: "El número de cheque es obligatorio cuando la forma de pago es Cheque.",
