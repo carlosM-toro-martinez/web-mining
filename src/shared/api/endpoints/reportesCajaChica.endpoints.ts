@@ -2,6 +2,7 @@ export const reportesCajaChicaEndpoints = {
   retenciones: "/api/reportes-caja-chica/retenciones",
   impuestos: "/api/reportes-caja-chica/impuestos",
   noDeducibles: "/api/reportes-caja-chica/no-deducibles",
+  posiblesDuplicados: "/api/reportes-caja-chica/posibles-duplicados",
   desglose: "/api/reportes-caja-chica/desglose",
   estadoCuenta: "/api/reportes-caja-chica/estado-cuenta",
   estadoCuentaBancaria: "/api/reportes-caja-chica/estado-cuenta-bancaria",

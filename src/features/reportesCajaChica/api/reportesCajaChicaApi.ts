@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { getRequest } from "@/shared/api/core/request";
 import { apiEndpoints } from "@/shared/api/endpoints";
 import {
@@ -16,6 +17,35 @@ export interface ReporteCajaChicaParams {
   cajaId?: number;
   fechaInicio?: string;
   fechaFin?: string;
+}
+
+const grupoDuplicadoSchema = z.object({
+  nivel: z.enum(["ALTA", "MEDIA"]),
+  motivo: z.string(),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      fecha: z.string(),
+      monto: z.number(),
+      moneda: z.string(),
+      detalle: z.string(),
+      donde: z.string(),
+      referencia: z.string().nullable()
+    })
+  )
+});
+const posiblesDuplicadosResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({ gastos: z.array(grupoDuplicadoSchema), entradas: z.array(grupoDuplicadoSchema) })
+});
+export type GrupoDuplicado = z.infer<typeof grupoDuplicadoSchema>;
+
+export async function getPosiblesDuplicados(params: ReporteCajaChicaParams) {
+  return getRequest({
+    url: apiEndpoints.reportesCajaChica.posiblesDuplicados,
+    config: { params },
+    schema: posiblesDuplicadosResponseSchema
+  });
 }
 
 export async function getReporteRetenciones(params: ReporteCajaChicaParams) {

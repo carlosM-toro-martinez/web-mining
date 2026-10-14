@@ -39,7 +39,7 @@ const cards = [
   },
   {
     title: "Reportes",
-    description: "Retenciones para el SIAT, gastos no deducibles y desglose por centro de costo, función de gasto y cuenta contable.",
+    description: "Retenciones para el SIAT, gastos no deducibles, desglose de costos y posibles gastos o entradas repetidos.",
     to: "/caja-chica/reportes",
     icon: FileBarChart2,
     available: true

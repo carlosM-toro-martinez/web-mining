@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   getEstadoCuentaBancaria,
   getEstadoCuentaCaja,
+  getPosiblesDuplicados,
   getReporteDesglose,
   getReporteImpuestos,
   getReporteNoDeducibles,
@@ -9,6 +10,13 @@ import {
   type ReporteCajaChicaParams
 } from "@/features/reportesCajaChica/api/reportesCajaChicaApi";
 import { queryKeys } from "@/shared/lib/queryKeys";
+
+export function usePosiblesDuplicadosQuery(params: ReporteCajaChicaParams) {
+  return useQuery({
+    queryKey: [...queryKeys.reportesCajaChica.all, "posibles-duplicados", params],
+    queryFn: () => getPosiblesDuplicados(params)
+  });
+}
 
 export function useReporteRetencionesQuery(params: ReporteCajaChicaParams) {
   return useQuery({

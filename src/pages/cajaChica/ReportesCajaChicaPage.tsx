@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Banknote, FileBarChart2, FileSpreadsheet, FileText, Landmark, PieChart, Receipt, Scale, Search, Wallet } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
+  usePosiblesDuplicadosQuery,
   useReporteDesgloseQuery,
   useReporteImpuestosQuery,
   useReporteNoDeduciblesQuery,
   useReporteRetencionesQuery
 } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
+import type { GrupoDuplicado } from "@/features/reportesCajaChica/api/reportesCajaChicaApi";
 import {
   exportReporteRetencionesExcel,
   exportReporteRetencionesPdf,
@@ -50,7 +52,13 @@ function hoy() {
   return `${year}-${month}-${day}`;
 }
 
-type TipoReporte = "resumen-caja-banco" | "impuestos" | "retenciones" | "no-deducibles" | "desglose";
+type TipoReporte =
+  | "resumen-caja-banco"
+  | "impuestos"
+  | "retenciones"
+  | "no-deducibles"
+  | "desglose"
+  | "posibles-duplicados";
 
 const TIPO_DOCUMENTO_LABEL: Record<string, string> = {
   FACTURA: "Factura",
@@ -95,6 +103,16 @@ const REPORT_GROUPS: Array<{
         type: "no-deducibles",
         title: "Gastos No Deducibles",
         description: "Recibos directos sin respaldo suficiente, para control y auditoría interna."
+      }
+    ]
+  },
+  {
+    title: "Control",
+    reports: [
+      {
+        type: "posibles-duplicados",
+        title: "Posibles repetidos",
+        description: "Gastos y entradas de dinero que parecen cargados dos veces (misma factura, o mismo monto y proveedor en pocos días)."
       }
     ]
   }
@@ -603,6 +621,94 @@ function NoDeduciblesReport() {
 }
 
 // ============================================================================
+// Posibles repetidos (gastos y entradas de dinero)
+// ============================================================================
+function GrupoDuplicadoCard({ grupo }: { grupo: GrupoDuplicado }) {
+  const alta = grupo.nivel === "ALTA";
+  return (
+    <div
+      className={`rounded-lg border p-3 ${
+        alta
+          ? "border-[var(--color-error)]/45 bg-[var(--color-error)]/[0.05]"
+          : "border-[var(--color-warning)]/40 bg-[var(--color-surface-container-low)]"
+      }`}
+    >
+      <p className="mb-2 flex items-start gap-2 text-sm font-semibold">
+        <span
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+            alta ? "bg-[var(--color-error)]/18 text-[var(--color-error)]" : "bg-[var(--color-warning)]/20 text-[var(--color-warning)]"
+          }`}
+        >
+          {alta ? "Casi seguro" : "Revisar"}
+        </span>
+        {grupo.motivo}
+      </p>
+      <div className="space-y-1 text-xs">
+        {grupo.items.map((i) => (
+          <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--color-border-soft)] px-2 py-1.5">
+            <span className="min-w-0 flex-1">
+              <span className="font-semibold">{formatFecha(i.fecha)}</span> · {i.detalle}
+              <span className="text-[var(--color-on-surface-variant)]">
+                {" "}· {i.donde}
+                {i.referencia ? ` · ref. ${i.referencia}` : ""}
+              </span>
+            </span>
+            <span className="font-mono font-bold">{i.moneda} {formatMoneda(i.monto)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PosiblesDuplicadosReport() {
+  const filtro = useFiltroPeriodo();
+  const query = usePosiblesDuplicadosQuery(filtro.consultado ? filtro.params : { cajaId: undefined });
+  const data = query.data?.data;
+
+  return (
+    <>
+      <FiltroPeriodo filtro={filtro} />
+      <p className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] px-4 py-3 text-sm text-[var(--color-on-surface-variant)]">
+        Esto <strong>no borra ni cambia nada</strong>: solo marca lo que conviene revisar. Si un gasto está de más,
+        anúlalo en "Gastos". Si son gastos distintos (por ejemplo, el viático de dos personas por el mismo monto), no
+        hay que hacer nada.
+      </p>
+      {!data ? (
+        <p className="text-sm text-[var(--color-on-surface-variant)]">Buscando...</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <article className="rounded-xl border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
+              <Wallet size={14} className="text-[var(--color-primary)]" /> Gastos posiblemente repetidos ({data.gastos.length})
+            </h2>
+            <div className="space-y-3">
+              {data.gastos.length === 0 ? (
+                <p className="text-sm text-[var(--color-success)]">No se encontraron gastos repetidos en este período.</p>
+              ) : (
+                data.gastos.map((g, idx) => <GrupoDuplicadoCard key={`g-${idx}`} grupo={g} />)
+              )}
+            </div>
+          </article>
+          <article className="rounded-xl border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-low)] p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide">
+              <Banknote size={14} className="text-[var(--color-success)]" /> Entradas de dinero posiblemente repetidas ({data.entradas.length})
+            </h2>
+            <div className="space-y-3">
+              {data.entradas.length === 0 ? (
+                <p className="text-sm text-[var(--color-success)]">No se encontraron entradas repetidas en este período.</p>
+              ) : (
+                data.entradas.map((g, idx) => <GrupoDuplicadoCard key={`e-${idx}`} grupo={g} />)
+              )}
+            </div>
+          </article>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================================
 // Desglose por centro de costo, función de gasto, cuenta contable y categoría
 // ============================================================================
 function DesgloseReport() {
@@ -800,6 +906,7 @@ export function ReportesCajaChicaPage() {
       {tipo === "retenciones" ? <RetencionesReport /> : null}
       {tipo === "no-deducibles" ? <NoDeduciblesReport /> : null}
       {tipo === "desglose" ? <DesgloseReport /> : null}
+      {tipo === "posibles-duplicados" ? <PosiblesDuplicadosReport /> : null}
     </section>
   );
 }
