@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   anularLote,
   avanzarEstadoLote,
+  corregirEstadoLote,
   createLoteDespacho,
   getLoteDespachoById,
   getLotesDespacho,
@@ -15,6 +16,7 @@ import {
 import type {
   AnularLotePayload,
   AvanzarEstadoLotePayload,
+  CorregirEstadoLotePayload,
   CreateLoteDespachoPayload,
   RegistrarCombustibleEntregadoPayload,
   RegistrarPesajePayload,
@@ -69,6 +71,15 @@ export function useAvanzarEstadoLoteMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AvanzarEstadoLotePayload }) =>
       avanzarEstadoLote(id, payload),
+    onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useCorregirEstadoLoteMutation() {
+  const invalidate = useInvalidateLotes();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: CorregirEstadoLotePayload }) =>
+      corregirEstadoLote(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
   });
 }

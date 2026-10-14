@@ -30,6 +30,7 @@ import {
   Send,
   Trash2,
   Truck,
+  Undo2,
   UserCog,
   UserPlus,
   X
@@ -45,6 +46,7 @@ import type { EstadoVehiculo, Vehiculo } from "@/features/flota/model/flota.sche
 import {
   useAnularLoteMutation,
   useAvanzarEstadoLoteMutation,
+  useCorregirEstadoLoteMutation,
   useCreateLoteDespachoMutation,
   useLoteDespachoDetailQuery,
   useLotesDespachoQuery,
@@ -687,7 +689,32 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
 function MarcarDisponibleModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: () => void }) {
   const { showError, showSuccess } = useToast();
   const cambiarEstadoMutation = useCambiarEstadoVehiculoMutation();
+  const corregirEstadoMutation = useCorregirEstadoLoteMutation();
   const [observaciones, setObservaciones] = useState("");
+  const ultimoPesadoQuery = useLotesDespachoQuery({ vehiculoId: vehiculo.id, estadoLote: "ACOPIADO", limit: 1 });
+  const ultimoPesado = ultimoPesadoQuery.data?.data[0];
+
+  function handleDeshacerPesaje() {
+    if (!ultimoPesado) return;
+    const motivo = window.prompt(
+      `Se BORRARÁ el pesaje del lote ${ultimoPesado.correlativo} y volverá a "En balanza" para pesarlo de nuevo.\n\n¿Por qué se corrige? (ej. "pesé el camión equivocado")`
+    );
+    if (motivo === null) return;
+    if (motivo.trim().length < 5) {
+      showError("Escribe el motivo de la corrección (mínimo 5 letras).");
+      return;
+    }
+    corregirEstadoMutation.mutate(
+      { id: ultimoPesado.id, payload: { estado: "EN_BALANZA", motivo: motivo.trim() } },
+      {
+        onSuccess: () => {
+          showSuccess(`Pesaje deshecho. ${vehiculo.placa} y el lote ${ultimoPesado.correlativo} volvieron a En balanza.`);
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo deshacer el pesaje."))
+      }
+    );
+  }
 
   function handleConfirmar() {
     cambiarEstadoMutation.mutate(
@@ -727,6 +754,17 @@ function MarcarDisponibleModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
         >
           <CheckCircle2 size={14} /> {cambiarEstadoMutation.isPending ? "Guardando..." : "Marcar como disponible"}
         </button>
+        {ultimoPesado ? (
+          <button
+            type="button"
+            onClick={handleDeshacerPesaje}
+            disabled={corregirEstadoMutation.isPending}
+            className={`${buttonSecondaryClassName} w-full justify-center`}
+            title="Si se registró el pesaje en el lote equivocado"
+          >
+            <Undo2 size={13} /> ¿Se pesó por error? Deshacer pesaje del lote {ultimoPesado.correlativo}
+          </button>
+        ) : null}
       </div>
     </ModalShell>
   );
@@ -932,6 +970,7 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
   const f101DisponiblesQuery = useFormularios101Query({ estado: "DISPONIBLE" });
 
   const avanzarEstadoMutation = useAvanzarEstadoLoteMutation();
+  const corregirEstadoMutation = useCorregirEstadoLoteMutation();
   const registrarPesajeMutation = useRegistrarPesajeMutation();
   const registrarCombustibleEntregadoMutation = useRegistrarCombustibleEntregadoMutation();
   const anularMutation = useAnularLoteMutation();
@@ -1060,6 +1099,28 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
     );
   }
 
+  function handleVolverATransito() {
+    if (!lote) return;
+    const motivo = window.prompt(
+      `El lote ${lote.correlativo} y ${vehiculo.placa} volverán a "En tránsito".\n\n¿Por qué se corrige? (ej. "lo marqué en balanza por error")`
+    );
+    if (motivo === null) return;
+    if (motivo.trim().length < 5) {
+      showError("Escribe el motivo de la corrección (mínimo 5 letras).");
+      return;
+    }
+    corregirEstadoMutation.mutate(
+      { id: lote.id, payload: { estado: "EN_TRANSITO", motivo: motivo.trim() } },
+      {
+        onSuccess: () => {
+          showSuccess(`${vehiculo.placa} volvió a En tránsito.`);
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo corregir el estado del lote."))
+      }
+    );
+  }
+
   function handleRegistrarPesaje() {
     if (!lote) return;
     const bruto = Number(tonelajeBruto);
@@ -1072,7 +1133,7 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
       { id: lote.id, payload: { tonelajeBruto: bruto, tonelajeTara: tara, observaciones: pesajeObservaciones.trim() || undefined } },
       {
         onSuccess: () => {
-          showSuccess("Pesaje registrado. El lote pasó a Acopiado y el vehículo vuelve a estar disponible.");
+          showSuccess("Pesaje registrado. El lote pasó a Acopiado y el vehículo quedó En retorno.");
           setTonelajeBruto("");
           setTonelajeTara("");
           setPesajeObservaciones("");
@@ -1334,6 +1395,18 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
                     </div>
                   </div>
                 </>
+              ) : null}
+
+              {lote.estadoLote === "EN_BALANZA" ? (
+                <button
+                  type="button"
+                  onClick={handleVolverATransito}
+                  disabled={corregirEstadoMutation.isPending}
+                  className={buttonSecondaryClassName}
+                  title="Si se marcó En balanza por error, devuelve el lote y el vehículo a En tránsito"
+                >
+                  <Undo2 size={13} /> Volver a En tránsito
+                </button>
               ) : null}
 
               {lote.estadoLote === "EN_BALANZA" ? (
@@ -1815,6 +1888,23 @@ export function FlotaPage() {
       setBalanzaModalVehiculo(vehiculo);
       return;
     }
+    // Retrocesos por error: se abre el modal del lote, que tiene el botón
+    // de corrección (pide motivo), en vez de mover solo la tarjeta.
+    if (vehiculo.estadoActual === "EN_BALANZA" && nuevoEstado === "EN_TRANSITO") {
+      setGestionModalVehiculo(vehiculo);
+      return;
+    }
+    if (vehiculo.estadoActual === "EN_RETORNO" && nuevoEstado === "EN_BALANZA") {
+      setRetornoModalVehiculo(vehiculo);
+      return;
+    }
+    const teniaLoteEnCurso = vehiculo.estadoActual === "EN_TRANSITO" || vehiculo.estadoActual === "EN_BALANZA";
+    if (teniaLoteEnCurso && (nuevoEstado === "DISPONIBLE" || nuevoEstado === "EN_RETORNO")) {
+      showError(
+        `${vehiculo.placa} tiene un lote en curso. Toca la tarjeta para registrar el pesaje, volver a En tránsito o anular el lote.`
+      );
+      return;
+    }
 
     // Cualquier otro intento de ENTRAR a En tránsito/En balanza (ej.
     // arrastrar desde Disponible directo a En balanza, o desde En
@@ -1900,10 +1990,11 @@ export function FlotaPage() {
               la boleta de pesaje — al pesar, pasa a "En retorno" (todavía viene de vuelta), no directo
               a Disponible. Si un vehículo con un lote activo se manda a Con falla mecánica o
               Mantenimiento, ese lote se anula (o usa Transbordo, haciendo clic en la tarjeta, si otro
-              vehículo va a completar el traslado). Cualquier otro movimiento solo pide un motivo. Haz
-              clic (sin arrastrar) en una tarjeta "En tránsito"/"En balanza" para gestionar su lote
-              (Formulario 101, transbordo, pesaje, anulación), o en "En retorno" para confirmar que ya
-              volvió y marcarlo disponible.
+              vehículo va a completar el traslado). ¿Te equivocaste? Arrastra de En balanza a En
+              tránsito, o de En retorno a En balanza (deshace el pesaje): pide un motivo y no anula
+              nada. Haz clic (sin arrastrar) en una tarjeta "En tránsito"/"En balanza" para gestionar
+              su lote (Formulario 101, transbordo, pesaje, anulación), o en "En retorno" para
+              confirmar que ya volvió y marcarlo disponible.
             </p>
           </div>
         </div>

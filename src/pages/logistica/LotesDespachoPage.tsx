@@ -14,6 +14,7 @@ import {
   Search,
   Send,
   Truck,
+  Undo2,
   Upload,
   X
 } from "lucide-react";
@@ -26,6 +27,7 @@ import {
 import {
   useAnularLoteMutation,
   useAvanzarEstadoLoteMutation,
+  useCorregirEstadoLoteMutation,
   useCreateLoteDespachoMutation,
   useImportarLotesHistoricoMutation,
   useLoteDespachoDetailQuery,
@@ -587,6 +589,7 @@ export function LotesDespachoPage() {
 
   const createMutation = useCreateLoteDespachoMutation();
   const avanzarEstadoMutation = useAvanzarEstadoLoteMutation();
+  const corregirEstadoMutation = useCorregirEstadoLoteMutation();
   const registrarPesajeMutation = useRegistrarPesajeMutation();
   const registrarCombustibleEntregadoMutation = useRegistrarCombustibleEntregadoMutation();
   const anularMutation = useAnularLoteMutation();
@@ -828,6 +831,27 @@ export function LotesDespachoPage() {
       {
         onSuccess: () => showSuccess("Estado del lote actualizado."),
         onError: (error) => showError(normalizeError(error, "No se pudo actualizar el estado del lote."))
+      }
+    );
+  }
+
+  function handleCorregirEstado(id: string, estado: "EN_TRANSITO" | "EN_BALANZA") {
+    const aviso =
+      estado === "EN_BALANZA"
+        ? "Se BORRARÁ el pesaje registrado y el lote volverá a \"En balanza\" para pesarlo de nuevo."
+        : "El lote volverá a \"En tránsito\".";
+    const motivo = window.prompt(`${aviso}\n\n¿Por qué se corrige? (ej. \"marqué el camión equivocado\")`);
+    if (motivo === null) return;
+    if (motivo.trim().length < 5) {
+      showError("Escribe el motivo de la corrección (mínimo 5 letras).");
+      return;
+    }
+    corregirEstadoMutation.mutate(
+      { id, payload: { estado, motivo: motivo.trim() } },
+      {
+        onSuccess: () =>
+          showSuccess(estado === "EN_BALANZA" ? "Pesaje deshecho. El lote volvió a En balanza." : "El lote volvió a En tránsito."),
+        onError: (error) => showError(normalizeError(error, "No se pudo corregir el estado del lote."))
       }
     );
   }
@@ -1445,6 +1469,30 @@ export function LotesDespachoPage() {
                         </div>
                       </div>
                     </>
+                  ) : null}
+
+                  {lote.estadoLote === "EN_BALANZA" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCorregirEstado(lote.id, "EN_TRANSITO")}
+                      disabled={corregirEstadoMutation.isPending}
+                      className={buttonSecondaryClassName}
+                      title="Si se marcó En balanza por error, devuelve el lote a En tránsito"
+                    >
+                      <Undo2 size={13} /> Volver a En tránsito
+                    </button>
+                  ) : null}
+
+                  {lote.estadoLote === "ACOPIADO" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCorregirEstado(lote.id, "EN_BALANZA")}
+                      disabled={corregirEstadoMutation.isPending}
+                      className={buttonSecondaryClassName}
+                      title="Si se pesó el lote equivocado, borra el pesaje y lo devuelve a En balanza"
+                    >
+                      <Undo2 size={13} /> Deshacer pesaje
+                    </button>
                   ) : null}
 
                   {lote.estadoLote === "EN_BALANZA" ? (

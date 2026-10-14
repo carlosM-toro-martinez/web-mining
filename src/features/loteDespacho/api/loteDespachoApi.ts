@@ -4,6 +4,7 @@ import { apiEndpoints } from "@/shared/api/endpoints";
 import {
   anularLotePayloadSchema,
   avanzarEstadoLotePayloadSchema,
+  corregirEstadoLotePayloadSchema,
   createLoteDespachoPayloadSchema,
   importarLotesHistoricoResponseSchema,
   loteDespachoListResponseSchema,
@@ -14,6 +15,7 @@ import {
   updateLoteDespachoPayloadSchema,
   type AnularLotePayload,
   type AvanzarEstadoLotePayload,
+  type CorregirEstadoLotePayload,
   type CreateLoteDespachoPayload,
   type RegistrarCombustibleEntregadoPayload,
   type RegistrarPesajePayload,
@@ -58,6 +60,11 @@ export async function updateLoteDespacho(id: string, payload: UpdateLoteDespacho
 export async function avanzarEstadoLote(id: string, payload: AvanzarEstadoLotePayload) {
   const body = avanzarEstadoLotePayloadSchema.parse(payload);
   return patchRequest({ url: apiEndpoints.lotesDespacho.estado(id), body, schema: loteDespachoResponseSchema });
+}
+
+export async function corregirEstadoLote(id: string, payload: CorregirEstadoLotePayload) {
+  const body = corregirEstadoLotePayloadSchema.parse(payload);
+  return patchRequest({ url: apiEndpoints.lotesDespacho.corregirEstado(id), body, schema: loteDespachoResponseSchema });
 }
 
 export async function registrarPesajeLote(id: string, payload: RegistrarPesajePayload) {

@@ -138,6 +138,11 @@ export const avanzarEstadoLotePayloadSchema = z.object({
   estado: z.enum(["EN_TRANSITO", "EN_BALANZA"])
 });
 
+export const corregirEstadoLotePayloadSchema = z.object({
+  estado: z.enum(["EN_TRANSITO", "EN_BALANZA"]),
+  motivo: z.string().trim().min(5, "Explica el motivo de la corrección (mínimo 5 letras).")
+});
+
 export const registrarPesajePayloadSchema = z.object({
   tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero."),
   tonelajeTara: z.number().nonnegative("El tara no puede ser negativo."),
@@ -195,6 +200,7 @@ export type LoteDespacho = z.infer<typeof loteDespachoSchema>;
 export type CreateLoteDespachoPayload = z.infer<typeof createLoteDespachoPayloadSchema>;
 export type UpdateLoteDespachoPayload = z.infer<typeof updateLoteDespachoPayloadSchema>;
 export type AvanzarEstadoLotePayload = z.infer<typeof avanzarEstadoLotePayloadSchema>;
+export type CorregirEstadoLotePayload = z.infer<typeof corregirEstadoLotePayloadSchema>;
 export type RegistrarPesajePayload = z.infer<typeof registrarPesajePayloadSchema>;
 export type RegistrarCombustibleEntregadoPayload = z.infer<typeof registrarCombustibleEntregadoPayloadSchema>;
 export type FilaImportLoteResultado = z.infer<typeof filaImportLoteResultadoSchema>;
