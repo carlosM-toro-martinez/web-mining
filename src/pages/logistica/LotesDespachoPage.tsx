@@ -16,6 +16,7 @@ import {
   Truck,
   Undo2,
   Upload,
+  Wrench,
   X
 } from "lucide-react";
 import {
@@ -32,11 +33,14 @@ import {
   useImportarLotesHistoricoMutation,
   useLoteDespachoDetailQuery,
   useLotesDespachoQuery,
+  useNormalizarNivelesMutation,
   useRegistrarCombustibleEntregadoMutation,
   useRegistrarPesajeMutation,
+  useRevisionNivelesQuery,
   useTransbordarLoteMutation,
   useUpdateLoteDespachoMutation
 } from "@/features/loteDespacho/hooks/useLoteDespacho";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import {
   NIVELES_LOTE,
   normalizarNivel,
@@ -213,6 +217,92 @@ function ModalShell({ children, onClose }: { children: ReactNode; onClose: () =>
   );
 }
 
+// Solo ADMIN: muestra qué niveles están mal escritos y los corrige de una vez.
+function CorregirNivelesModal({ onClose }: { onClose: () => void }) {
+  const { showError, showSuccess } = useToast();
+  const revisionQuery = useRevisionNivelesQuery(true);
+  const normalizarMutation = useNormalizarNivelesMutation();
+  const revision = revisionQuery.data?.data;
+
+  function handleAplicar() {
+    normalizarMutation.mutate(undefined, {
+      onSuccess: (response) => {
+        showSuccess(`${response.data.corregidos} lote(s) corregido(s).`);
+        void revisionQuery.refetch();
+      },
+      onError: (error) => showError(normalizeError(error, "No se pudieron corregir los niveles."))
+    });
+  }
+
+  const lista = (titulo: string, detalle: string, filas: string[]) =>
+    filas.length > 0 ? (
+      <div className="rounded-lg border border-[var(--color-outline-variant)] p-3">
+        <p className="text-sm font-semibold">{titulo} ({filas.length})</p>
+        <p className="mb-2 text-xs text-[var(--color-on-surface-variant)]">{detalle}</p>
+        <ul className="max-h-40 space-y-0.5 overflow-y-auto font-mono text-xs">
+          {filas.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+
+  return (
+    <ModalShell onClose={onClose}>
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <Wrench size={16} className="text-[var(--color-primary)]" />
+        Corregir niveles
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        Los niveles válidos son {NIVELES_LOTE.join(", ")}. Aquí se corrigen de una vez los que quedaron mal
+        escritos (por ejemplo "MOSA" o "0") en lotes viejos o importados.
+      </p>
+      {revisionQuery.isLoading || !revision ? (
+        <p className="text-sm text-[var(--color-on-surface-variant)]">Revisando {revision?.totalLotes ?? ""} lotes...</p>
+      ) : (
+        <div className="space-y-3">
+          {revision.porCorregir.length === 0 ? (
+            <p className="rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 p-3 text-sm font-semibold text-[var(--color-success)]">
+              <CheckCircle2 size={14} className="mr-1 inline" /> Todos los niveles están bien escritos ({revision.totalLotes} lotes revisados).
+            </p>
+          ) : (
+            <>
+              {lista(
+                "Se corregirán",
+                "Mismo nivel, mal escrito: se cambia al nombre correcto.",
+                revision.porCorregir.map((p) => `${p.correlativo}  "${p.nivelActual}" → ${p.nivelNuevo}`)
+              )}
+              <button
+                type="button"
+                onClick={handleAplicar}
+                disabled={normalizarMutation.isPending}
+                className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+              >
+                {normalizarMutation.isPending ? "Corrigiendo..." : `Corregir ${revision.porCorregir.length} lote(s)`}
+              </button>
+            </>
+          )}
+          {lista(
+            "No se reconocen",
+            "No se puede saber qué nivel es: ábrelos y elige el nivel con \"Editar\".",
+            revision.noReconocidos.map((p) => `${p.correlativo}  "${p.nivelActual}"`)
+          )}
+          {lista(
+            "Sin nivel",
+            "Usa el filtro Nivel › \"Sin nivel\" y completa cada uno con \"Editar\".",
+            revision.sinNivel.map((p) => p.correlativo)
+          )}
+          {lista(
+            "Revisar el municipio",
+            "La Moza siempre ha sido de San Pablo; estos no calzan. No se cambian solos.",
+            revision.revisarMunicipio.map((p) => `${p.correlativo}  ${p.municipio} / ${p.nivel}`)
+          )}
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
 // Modal para subir el "Cuadro de Envío de Carga Chami" en Excel y crear de
 // una sola vez todos los lotes YA COMPLETADOS (pesados, con F101 vinculado)
 // que trae — ver loteDespachoImport.parser.ts (backend) para el formato
@@ -245,7 +335,8 @@ function ImportarHistoricoModal({ onClose }: { onClose: () => void }) {
         empresa. Cada fila se crea ya <strong>Acopiada</strong>, con su pesaje (columna "Peso Kg",
         se interpreta directo como toneladas) y su Formulario 101 vinculado. El transportista debe
         existir ya en Logística/Flota con el nombre exacto de la columna "Propietario"; vehículo y
-        chofer se crean solos si no existen todavía.
+        chofer se crean solos si no existen todavía. Los conocimientos que ya existen no se tocan,
+        salvo para <strong>agregarles el combustible</strong> si no lo tenían.
       </p>
 
       {!resultado ? (
@@ -267,7 +358,7 @@ function ImportarHistoricoModal({ onClose }: { onClose: () => void }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
             <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
               <p className="text-lg font-extrabold">{resultado.procesadas}</p>
               <p className="text-[11px] text-[var(--color-on-surface-variant)]">Filas leídas</p>
@@ -275,6 +366,10 @@ function ImportarHistoricoModal({ onClose }: { onClose: () => void }) {
             <div className="rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 p-2 text-center">
               <p className="text-lg font-extrabold text-[var(--color-success)]">{resultado.creadas}</p>
               <p className="text-[11px] text-[var(--color-on-surface-variant)]">Creadas</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-primary)]/35 bg-[var(--color-primary)]/8 p-2 text-center">
+              <p className="text-lg font-extrabold text-[var(--color-primary)]">{resultado.actualizadas}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)]">Combustible completado</p>
             </div>
             <div className="rounded-lg border border-[var(--color-outline-variant)] p-2 text-center">
               <p className="text-lg font-extrabold">{resultado.omitidas}</p>
@@ -305,7 +400,9 @@ function ImportarHistoricoModal({ onClose }: { onClose: () => void }) {
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                           r.accion === "creado"
                             ? "bg-[var(--color-success)]/18 text-[var(--color-success)]"
-                            : r.accion === "omitido"
+                            : r.accion === "actualizado"
+                              ? "bg-[var(--color-primary)]/18 text-[var(--color-primary)]"
+                              : r.accion === "omitido"
                               ? "bg-[var(--color-on-surface-variant)]/15 text-[var(--color-on-surface-variant)]"
                               : "bg-[var(--color-error)]/18 text-[var(--color-error)]"
                         }`}
@@ -570,6 +667,8 @@ export function LotesDespachoPage() {
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const [pagina, setPagina] = useState(1);
   const [mostrarImportarModal, setMostrarImportarModal] = useState(false);
+  const [mostrarNivelesModal, setMostrarNivelesModal] = useState(false);
+  const { isAdmin } = useAuth();
 
   // La búsqueda se manda al servidor (y se pagina sobre el resultado YA
   // filtrado) en vez de filtrar solo la página que ya está cargada en el
@@ -1002,19 +1101,27 @@ export function LotesDespachoPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setMostrarImportarModal(true)}
-            className={buttonSecondaryClassName}
-          >
-            <Upload size={13} /> Importar histórico (Excel)
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin ? (
+              <button type="button" onClick={() => setMostrarNivelesModal(true)} className={buttonSecondaryClassName}>
+                <Wrench size={13} /> Corregir niveles
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setMostrarImportarModal(true)}
+              className={buttonSecondaryClassName}
+            >
+              <Upload size={13} /> Importar histórico (Excel)
+            </button>
+          </div>
         </div>
       </header>
 
       {mostrarImportarModal ? (
         <ImportarHistoricoModal onClose={() => setMostrarImportarModal(false)} />
       ) : null}
+      {mostrarNivelesModal ? <CorregirNivelesModal onClose={() => setMostrarNivelesModal(false)} /> : null}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">

@@ -6,7 +6,9 @@ import {
   createLoteDespacho,
   getLoteDespachoById,
   getLotesDespacho,
+  getRevisionNiveles,
   importarLotesHistoricoExcel,
+  normalizarNiveles,
   registrarCombustibleEntregadoLote,
   registrarPesajeLote,
   transbordarLote,
@@ -99,6 +101,22 @@ export function useRegistrarCombustibleEntregadoMutation() {
     mutationFn: ({ id, payload }: { id: string; payload: RegistrarCombustibleEntregadoPayload }) =>
       registrarCombustibleEntregadoLote(id, payload),
     onSuccess: (_data, variables) => invalidate(variables.id)
+  });
+}
+
+export function useRevisionNivelesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: [...queryKeys.lotesDespacho.all, "revision-niveles"],
+    queryFn: getRevisionNiveles,
+    enabled
+  });
+}
+
+export function useNormalizarNivelesMutation() {
+  const invalidate = useInvalidateLotes();
+  return useMutation({
+    mutationFn: normalizarNiveles,
+    onSuccess: () => invalidate()
   });
 }
 

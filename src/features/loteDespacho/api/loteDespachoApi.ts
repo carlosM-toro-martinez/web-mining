@@ -9,6 +9,8 @@ import {
   importarLotesHistoricoResponseSchema,
   loteDespachoListResponseSchema,
   loteDespachoResponseSchema,
+  normalizarNivelesResponseSchema,
+  revisionNivelesResponseSchema,
   registrarCombustibleEntregadoPayloadSchema,
   registrarPesajePayloadSchema,
   transbordarLotePayloadSchema,
@@ -90,6 +92,14 @@ export async function anularLote(id: string, payload: AnularLotePayload) {
 export async function transbordarLote(id: string, payload: TransbordarLotePayload) {
   const body = transbordarLotePayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.lotesDespacho.transbordo(id), body, schema: loteDespachoResponseSchema });
+}
+
+export async function getRevisionNiveles() {
+  return getRequest({ url: apiEndpoints.lotesDespacho.nivelesRevision, schema: revisionNivelesResponseSchema });
+}
+
+export async function normalizarNiveles() {
+  return postRequest({ url: apiEndpoints.lotesDespacho.nivelesNormalizar, body: {}, schema: normalizarNivelesResponseSchema });
 }
 
 export async function importarLotesHistoricoExcel(file: File) {

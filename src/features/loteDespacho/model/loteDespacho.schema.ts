@@ -181,13 +181,14 @@ export const transbordarLotePayloadSchema = z.object({
 export const filaImportLoteResultadoSchema = z.object({
   fila: z.number(),
   correlativo: z.string().nullable(),
-  accion: z.enum(["creado", "omitido", "error"]),
+  accion: z.enum(["creado", "actualizado", "omitido", "error"]),
   mensaje: z.string()
 });
 
 export const resultadoImportacionLotesSchema = z.object({
   procesadas: z.number(),
   creadas: z.number(),
+  actualizadas: z.number().default(0),
   omitidas: z.number(),
   errores: z.number(),
   resultados: z.array(filaImportLoteResultadoSchema)
@@ -196,6 +197,24 @@ export const resultadoImportacionLotesSchema = z.object({
 export const importarLotesHistoricoResponseSchema = z.object({
   success: z.boolean(),
   data: resultadoImportacionLotesSchema
+});
+
+const loteNivelRef = { id: z.string(), correlativo: z.string(), anio: z.number() };
+
+export const revisionNivelesResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    totalLotes: z.number(),
+    porCorregir: z.array(z.object({ ...loteNivelRef, nivelActual: z.string(), nivelNuevo: z.string() })),
+    noReconocidos: z.array(z.object({ ...loteNivelRef, nivelActual: z.string() })),
+    sinNivel: z.array(z.object(loteNivelRef)),
+    revisarMunicipio: z.array(z.object({ ...loteNivelRef, municipio: z.string(), nivel: z.string() }))
+  })
+});
+
+export const normalizarNivelesResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({ corregidos: z.number() })
 });
 
 export const loteDespachoListResponseSchema = z.object({
@@ -219,5 +238,6 @@ export type RegistrarPesajePayload = z.infer<typeof registrarPesajePayloadSchema
 export type RegistrarCombustibleEntregadoPayload = z.infer<typeof registrarCombustibleEntregadoPayloadSchema>;
 export type FilaImportLoteResultado = z.infer<typeof filaImportLoteResultadoSchema>;
 export type ResultadoImportacionLotes = z.infer<typeof resultadoImportacionLotesSchema>;
+export type RevisionNiveles = z.infer<typeof revisionNivelesResponseSchema>["data"];
 export type AnularLotePayload = z.infer<typeof anularLotePayloadSchema>;
 export type TransbordarLotePayload = z.infer<typeof transbordarLotePayloadSchema>;
