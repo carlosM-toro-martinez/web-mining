@@ -37,11 +37,14 @@ import {
   useTransbordarLoteMutation,
   useUpdateLoteDespachoMutation
 } from "@/features/loteDespacho/hooks/useLoteDespacho";
-import type {
-  EstadoLoteDespacho,
-  LoteDespacho,
-  ResultadoImportacionLotes,
-  TipoCombustibleViaje
+import {
+  NIVELES_LOTE,
+  normalizarNivel,
+  type EstadoLoteDespacho,
+  type LoteDespacho,
+  type NivelLote,
+  type ResultadoImportacionLotes,
+  type TipoCombustibleViaje
 } from "@/features/loteDespacho/model/loteDespacho.schema";
 import {
   useAnularFormulario101Mutation,
@@ -164,6 +167,15 @@ function CampoNeto({
 const DESCRIPCION_CONOCIMIENTO_DEFAULT = "Carga para Ingenio del sector Lipeña";
 
 const LOTES_POR_PAGINA = 20;
+
+const FILTROS_VACIOS = {
+  combustible: "" as "" | "CON_COMBUSTIBLE" | "SIN_COMBUSTIBLE" | "SIN_ENTREGA",
+  f101: "" as "" | "CON" | "SIN",
+  pesaje: "" as "" | "CON" | "SIN",
+  nivel: "",
+  transportistaId: "",
+  municipioOrigenId: ""
+};
 
 // Año/mes/día LOCAL (Bolivia), nunca toISOString(): esa función convierte a
 // UTC antes de recortar, así que entre las 20:00 y las 23:59 hora boliviana
@@ -367,7 +379,7 @@ function EditarLoteModal({
   const [choferId, setChoferId] = useState(String(lote.choferId));
   const [tipoMineralId, setTipoMineralId] = useState(String(lote.tipoMineralId));
   const [destinoIngenioId, setDestinoIngenioId] = useState(String(lote.destinoIngenioId));
-  const [nivel, setNivel] = useState(lote.nivel ?? "");
+  const [nivel, setNivel] = useState<NivelLote | "">(normalizarNivel(lote.nivel));
   const [incluyeCombustible, setIncluyeCombustible] = useState<TipoCombustibleViaje>(lote.incluyeCombustible);
   const [combustibleAsignadoLitros, setCombustibleAsignadoLitros] = useState(
     lote.combustibleAsignadoLitros != null ? String(lote.combustibleAsignadoLitros) : ""
@@ -409,7 +421,7 @@ function EditarLoteModal({
           choferId: Number(choferId),
           tipoMineralId: Number(tipoMineralId),
           destinoIngenioId: Number(destinoIngenioId),
-          nivel: nivel.trim() || null,
+          nivel: nivel || null,
           incluyeCombustible,
           combustibleAsignadoLitros:
             incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : null,
@@ -453,7 +465,12 @@ function EditarLoteModal({
         <AutocompleteSelect value={choferId} onChange={setChoferId} options={choferOptions} placeholder="Chofer..." className={inputClassName} />
         <AutocompleteSelect value={tipoMineralId} onChange={setTipoMineralId} options={tipoMineralOptions} placeholder="Tipo de mineral..." className={inputClassName} />
         <AutocompleteSelect value={destinoIngenioId} onChange={setDestinoIngenioId} options={ingenioOptions} placeholder="Ingenio destino..." className={inputClassName} />
-        <input value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName} placeholder="Nivel (opcional)" />
+        <select value={nivel} onChange={(e) => setNivel(e.target.value as NivelLote | "")} className={inputClassName}>
+          <option value="">Nivel (sin especificar)</option>
+          {NIVELES_LOTE.map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
         <div>
           <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Fecha de despacho real</label>
           <input required type="date" value={fechaDespachoReal} onChange={(e) => setFechaDespachoReal(e.target.value)} className={inputClassName} />
@@ -550,6 +567,7 @@ export function LotesDespachoPage() {
   const [filtroFechaInicio, setFiltroFechaInicio] = useState(isoDate(haceUnaSemana));
   const [filtroFechaFin, setFiltroFechaFin] = useState(isoDate(hoy));
   const [filtroConObservaciones, setFiltroConObservaciones] = useState(false);
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const [pagina, setPagina] = useState(1);
   const [mostrarImportarModal, setMostrarImportarModal] = useState(false);
 
@@ -571,6 +589,12 @@ export function LotesDespachoPage() {
     fechaFin: filtroFechaFin || undefined,
     search: busquedaDebounced || undefined,
     conObservaciones: filtroConObservaciones || undefined,
+    combustible: filtros.combustible || undefined,
+    f101: filtros.f101 || undefined,
+    pesaje: filtros.pesaje || undefined,
+    nivel: filtros.nivel || undefined,
+    transportistaId: filtros.transportistaId ? Number(filtros.transportistaId) : undefined,
+    municipioOrigenId: filtros.municipioOrigenId ? Number(filtros.municipioOrigenId) : undefined,
     page: pagina,
     limit: LOTES_POR_PAGINA
   });
@@ -622,6 +646,12 @@ export function LotesDespachoPage() {
     setFiltroConObservaciones(value);
     setPagina(1);
   }
+
+  function cambiarFiltro<K extends keyof typeof FILTROS_VACIOS>(clave: K, valor: (typeof FILTROS_VACIOS)[K]) {
+    setFiltros((actual) => ({ ...actual, [clave]: valor }));
+    setPagina(1);
+  }
+  const hayFiltrosExtra = Object.values(filtros).some(Boolean) || filtroConObservaciones || Boolean(filtroEstado);
   const lote = loteDetalleQuery.data?.data ?? null;
   const municipios = municipiosQuery.data?.data ?? [];
   const tiposMineral = tiposMineralQuery.data?.data ?? [];
@@ -673,7 +703,7 @@ export function LotesDespachoPage() {
   const [choferId, setChoferId] = useState("");
   const [tipoMineralId, setTipoMineralId] = useState("");
   const [destinoIngenioId, setDestinoIngenioId] = useState("");
-  const [nivel, setNivel] = useState("");
+  const [nivel, setNivel] = useState<NivelLote | "">("");
   const [incluyeCombustible, setIncluyeCombustible] = useState<TipoCombustibleViaje>("SIN_COMBUSTIBLE");
   const [combustibleAsignadoLitros, setCombustibleAsignadoLitros] = useState("");
   const [fechaDespachoReal, setFechaDespachoReal] = useState("");
@@ -738,6 +768,10 @@ export function LotesDespachoPage() {
       showError("Elige municipio, transportista, vehículo, chofer, tipo de mineral e ingenio de las listas (no solo escribas texto).");
       return;
     }
+    if (!nivel) {
+      showError("Elige el nivel del que sale la carga.");
+      return;
+    }
     if (incluyeCombustible === "CON_COMBUSTIBLE" && !combustibleAsignadoLitros) {
       showError("Indica cuántos litros de combustible se le asignan a este viaje.");
       return;
@@ -750,7 +784,7 @@ export function LotesDespachoPage() {
         choferId: Number(choferId),
         tipoMineralId: Number(tipoMineralId),
         destinoIngenioId: Number(destinoIngenioId),
-        nivel: nivel.trim() || undefined,
+        nivel,
         incluyeCombustible,
         combustibleAsignadoLitros:
           incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : undefined,
@@ -1030,7 +1064,12 @@ export function LotesDespachoPage() {
             placeholder="Ingenio destino..."
             className={inputClassName}
           />
-          <input value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName} placeholder="Nivel (ej. 80, opcional)" />
+          <select required value={nivel} onChange={(e) => setNivel(e.target.value as NivelLote | "")} className={inputClassName}>
+            <option value="">Nivel...</option>
+            {NIVELES_LOTE.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
           <select
             value={incluyeCombustible}
             onChange={(e) => setIncluyeCombustible(e.target.value as TipoCombustibleViaje)}
@@ -1151,12 +1190,81 @@ export function LotesDespachoPage() {
             Con observaciones
           </label>
         </div>
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Combustible</label>
+            <select value={filtros.combustible} onChange={(e) => cambiarFiltro("combustible", e.target.value as typeof filtros.combustible)} className={inputClassName}>
+              <option value="">Todos</option>
+              <option value="CON_COMBUSTIBLE">Con combustible</option>
+              <option value="SIN_COMBUSTIBLE">Sin combustible</option>
+              <option value="SIN_ENTREGA">Con combustible, sin entrega registrada</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Formulario 101</label>
+            <select value={filtros.f101} onChange={(e) => cambiarFiltro("f101", e.target.value as typeof filtros.f101)} className={inputClassName}>
+              <option value="">Todos</option>
+              <option value="CON">Con F101</option>
+              <option value="SIN">Sin F101 (pendiente)</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Pesaje</label>
+            <select value={filtros.pesaje} onChange={(e) => cambiarFiltro("pesaje", e.target.value as typeof filtros.pesaje)} className={inputClassName}>
+              <option value="">Todos</option>
+              <option value="CON">Pesados</option>
+              <option value="SIN">Sin pesar</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Nivel</label>
+            <select value={filtros.nivel} onChange={(e) => cambiarFiltro("nivel", e.target.value)} className={inputClassName}>
+              <option value="">Todos</option>
+              {NIVELES_LOTE.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+              <option value="SIN_NIVEL">Sin nivel</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Transportista</label>
+            <select value={filtros.transportistaId} onChange={(e) => cambiarFiltro("transportistaId", e.target.value)} className={inputClassName}>
+              <option value="">Todos</option>
+              {transportistaOptions.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Municipio</label>
+            <select value={filtros.municipioOrigenId} onChange={(e) => cambiarFiltro("municipioOrigenId", e.target.value)} className={inputClassName}>
+              <option value="">Todos</option>
+              {municipioOptions.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {hayFiltrosExtra ? (
+          <button
+            type="button"
+            onClick={() => {
+              setFiltros(FILTROS_VACIOS);
+              setFiltroConObservaciones(false);
+              setFiltroEstado("");
+              setPagina(1);
+            }}
+            className={`${buttonSecondaryClassName} mb-4`}
+          >
+            <X size={13} /> Quitar filtros
+          </button>
+        ) : null}
 
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                {["N° Lote / Conocimiento", "Transportista", "Vehículo", "Mineral", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
+                {["N° Lote / Conocimiento", "Transportista", "Vehículo", "Nivel", "Combustible", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     {title}
                   </th>
@@ -1165,17 +1273,22 @@ export function LotesDespachoPage() {
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {lotesQuery.isLoading ? (
-                <tr><td colSpan={8} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando lotes...</td></tr>
+                <tr><td colSpan={9} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando lotes...</td></tr>
               ) : null}
               {!lotesQuery.isLoading && lotes.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron lotes.</td></tr>
+                <tr><td colSpan={9} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron lotes.</td></tr>
               ) : null}
               {lotes.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                   <td className="px-3 py-2 font-mono text-xs">{item.correlativo}</td>
                   <td className="px-3 py-2 text-xs">{item.transportista?.nombreORazonSocial ?? "-"}</td>
                   <td className="px-3 py-2 text-xs">{item.vehiculo?.placa ?? "-"}</td>
-                  <td className="px-3 py-2 text-xs">{item.tipoMineral?.nombre ?? "-"}</td>
+                  <td className="px-3 py-2 text-xs">{item.nivel ?? "-"}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {item.incluyeCombustible === "CON_COMBUSTIBLE"
+                      ? `${Number(item.combustibleAsignadoLitros ?? 0).toLocaleString("es-BO")} L`
+                      : "Sin"}
+                  </td>
                   <td className="px-3 py-2 text-xs">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_LOTE_CLASS[item.estadoLote]}`}>
                       {ESTADO_LOTE_LABEL[item.estadoLote]}

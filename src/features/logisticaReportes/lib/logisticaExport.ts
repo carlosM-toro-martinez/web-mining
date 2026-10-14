@@ -3,7 +3,7 @@ import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
 import type { Liquidacion } from "@/features/liquidacion/model/liquidacion.schema";
 import type { CuadroMensual } from "@/features/logisticaReportes/model/logisticaReportes.schema";
-import type { LoteDespacho } from "@/features/loteDespacho/model/loteDespacho.schema";
+import { normalizarNivel, type LoteDespacho } from "@/features/loteDespacho/model/loteDespacho.schema";
 
 const MESES_MAYUSCULA = [
   "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
@@ -1192,8 +1192,9 @@ function construirFilasCuadroMensual(cuadro: CuadroMensual) {
   const filas = cuadro.lotes.map((l, index) => {
     const peso = Number(l.pesaje?.tonelajeNeto ?? 0);
     sumaPeso += peso;
+    const nivelLote = normalizarNivel(l.nivel);
     const celdasNivel = niveles.map((n) => {
-      if (l.nivel === n) {
+      if (nivelLote === n) {
         sumasPorNivel[n] += peso;
         return peso;
       }
@@ -1399,13 +1400,24 @@ export function exportCuadroMensualPdf(
 // ============================================================================
 // Conocimiento de Carga — reproduce el talonario físico real: encabezado
 // "EMPRESA MINERA / MARTE S.R.L." + título "CONOCIMIENTO" + N° recuadrado,
-// "A la Empresa" (el ingenio destino) / "De" (fijo: Mina Lipeña MARTE S.R.L.)
+// "A la Empresa" (EMUSA, sector del ingenio destino) / "De" (fijo: Mina Lipeña MARTE S.R.L.)
 // / "Con" (detalle de carga) / "Chófer", tabla CANTIDAD/UNIDAD/DESCRIPCION,
 // Observaciones, y pie "Lugar y Fecha" + firmas "Recibí conforme"/"Despachador".
 // ============================================================================
 
 const LUGAR_CONOCIMIENTO = "Mina Lipeña";
 const DE_CONOCIMIENTO = "Mina Lipeña MARTE S.R.L.";
+
+// La carga se entrega a EMUSA; el ingenio va después como sector.
+function destinatarioConocimiento(lote: LoteDespacho) {
+  const ingenio = lote.destinoIngenio?.nombre;
+  return ingenio ? `EMUSA Sector Ingenio ${ingenio}` : "EMUSA";
+}
+
+function descripcionConocimiento(lote: LoteDespacho) {
+  const nivel = normalizarNivel(lote.nivel) || lote.nivel;
+  return [lote.conocimientoCarga?.descripcion, nivel].filter(Boolean).join(" — ");
+}
 
 function fechaConocimientoLarga(value: string) {
   const date = parseFecha(value);
@@ -1421,9 +1433,7 @@ const AZUL_HEX = "153385";
 export function exportConocimientoExcel(lote: LoteDespacho) {
   const conocimiento = lote.conocimientoCarga;
   const fecha = conocimiento ? conocimiento.fecha : lote.fechaDespachoReal;
-  const descripcion = [conocimiento?.descripcion, lote.nivel ? `Nivel ${lote.nivel}` : null]
-    .filter(Boolean)
-    .join(" — ");
+  const descripcion = descripcionConocimiento(lote);
 
   const azulFont = { color: { rgb: AZUL_HEX } };
   const azulBorder = {
@@ -1446,7 +1456,7 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
     ["EMPRESA MINERA", "", "", "CONOCIMIENTO", "", "N°", lote.correlativo],
     ["MARTE S.R.L.", "", "", "", "", "", ""],
     [],
-    ["A la Empresa:", lote.destinoIngenio?.nombre ?? "", "", "", "", "", ""],
+    ["A la Empresa:", destinatarioConocimiento(lote), "", "", "", "", ""],
     ["", `De ${DE_CONOCIMIENTO}`, "", "", "", "", ""],
     ["Con:", conocimiento?.detalleCarga ?? "-", "", "Chófer:", lote.chofer?.nombre ?? "-", "", ""],
     ["Remito lo siguiente recibido de:", "", "", "", "", "", ""],
@@ -1494,6 +1504,7 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
   setStyle(sheet, XLSX.utils.encode_cell({ r: 5, c: 3 }), labelAzul);
   styleRow(sheet, 8, 6, headerAzul);
   styleRow(sheet, 9, 6, celdaAzul);
+  setStyle(sheet, XLSX.utils.encode_cell({ r: 9, c: 2 }), { ...celdaAzul, font: { bold: true, sz: 14, ...azulFont } });
   styleRow(sheet, 15, 6, labelAzul);
 
   const workbook = XLSX.utils.book_new();
@@ -1506,9 +1517,7 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
 export function exportConocimientoPdf(lote: LoteDespacho) {
   const conocimiento = lote.conocimientoCarga;
   const fecha = conocimiento ? conocimiento.fecha : lote.fechaDespachoReal;
-  const descripcion = [conocimiento?.descripcion, lote.nivel ? `Nivel ${lote.nivel}` : null]
-    .filter(Boolean)
-    .join(" — ");
+  const descripcion = descripcionConocimiento(lote);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -1554,7 +1563,7 @@ export function exportConocimientoPdf(lote: LoteDespacho) {
   doc.text("A la Empresa:", margin, y);
   dotted(margin + 78, right, y + 3);
   doc.setFont("helvetica", "normal");
-  doc.text(lote.destinoIngenio?.nombre ?? "", margin + 82, y);
+  doc.text(destinatarioConocimiento(lote), margin + 82, y);
 
   y += 22;
   dotted(margin, right, y + 3);
@@ -1600,9 +1609,12 @@ export function exportConocimientoPdf(lote: LoteDespacho) {
   doc.text("UNIDAD", (colCantidad + colUnidad) / 2, tableTop + 17, { align: "center" });
   doc.text("DESCRIPCION", (colUnidad + colDescripcion) / 2, tableTop + 17, { align: "center" });
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(descripcion || "", colUnidad + 8, tableTop + 42, { maxWidth: colDescripcion - colUnidad - 16 });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(descripcion || "", colUnidad + 10, tableTop + 52, {
+    maxWidth: colDescripcion - colUnidad - 20,
+    lineHeightFactor: 1.4
+  });
 
   // --- Observaciones / Lugar y fecha ---
   y = tableBottom + 26;

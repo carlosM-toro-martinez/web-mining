@@ -13,6 +13,20 @@ export const estadoLoteDespachoSchema = z.enum([
 export const estadoFormulario101Schema = z.enum(["DISPONIBLE", "VINCULADO", "ANULADO"]);
 export const tipoCombustibleViajeSchema = z.enum(["CON_COMBUSTIBLE", "SIN_COMBUSTIBLE"]);
 
+export const NIVELES_LOTE = ["La Moza", "Nivel 0", "Nivel 40", "Nivel 80"] as const;
+export const nivelLoteSchema = z.enum(NIVELES_LOTE);
+export type NivelLote = z.infer<typeof nivelLoteSchema>;
+
+// Lotes viejos pueden traer el nivel escrito a mano ("MOSA", "0"): se lleva
+// al valor válido para que el selector lo muestre y "Editar" no lo rechace.
+export function normalizarNivel(nivel: string | null | undefined): NivelLote | "" {
+  const limpio = (nivel ?? "").trim().toUpperCase();
+  if (!limpio) return "";
+  if (["MOSA", "MOZA", "LA MOSA", "LA MOZA"].includes(limpio)) return "La Moza";
+  const numero = limpio.replace(/^NIVEL\s*/, "");
+  return (NIVELES_LOTE.find((n) => n === `Nivel ${numero}`) ?? "") as NivelLote | "";
+}
+
 const refConNombre = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
 const transportistaRef = z.object({ id: z.number().int().positive(), nombreORazonSocial: z.string().min(1) });
 const vehiculoRef = z.object({ id: z.number().int().positive(), placa: z.string().min(1), tipo: z.string().min(1) });
@@ -102,7 +116,7 @@ export const createLoteDespachoPayloadSchema = z.object({
   choferId: z.number().int().positive("Debes elegir un chofer."),
   tipoMineralId: z.number().int().positive("Debes elegir un tipo de mineral."),
   destinoIngenioId: z.number().int().positive("Debes elegir un ingenio destino."),
-  nivel: z.string().trim().optional(),
+  nivel: nivelLoteSchema,
   incluyeCombustible: tipoCombustibleViajeSchema.optional(),
   combustibleAsignadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.").optional(),
   fechaDespachoReal: z.string().min(1, "La fecha de despacho real es obligatoria."),
@@ -120,7 +134,7 @@ export const updateLoteDespachoPayloadSchema = z.object({
   choferId: z.number().int().positive().optional(),
   tipoMineralId: z.number().int().positive().optional(),
   destinoIngenioId: z.number().int().positive().optional(),
-  nivel: z.string().trim().nullable().optional(),
+  nivel: nivelLoteSchema.nullable().optional(),
   incluyeCombustible: tipoCombustibleViajeSchema.optional(),
   combustibleAsignadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.").nullable().optional(),
   fechaDespachoReal: z.string().trim().optional(),

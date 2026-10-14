@@ -31,6 +31,11 @@ export interface LotesDespachoQueryParams {
   fechaFin?: string;
   search?: string;
   conObservaciones?: boolean;
+  municipioOrigenId?: number;
+  combustible?: "CON_COMBUSTIBLE" | "SIN_COMBUSTIBLE" | "SIN_ENTREGA";
+  f101?: "CON" | "SIN";
+  pesaje?: "CON" | "SIN";
+  nivel?: string;
   page?: number;
   limit?: number;
 }

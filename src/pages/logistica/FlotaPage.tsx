@@ -54,7 +54,12 @@ import {
   useRegistrarPesajeMutation,
   useTransbordarLoteMutation
 } from "@/features/loteDespacho/hooks/useLoteDespacho";
-import type { EstadoLoteDespacho, TipoCombustibleViaje } from "@/features/loteDespacho/model/loteDespacho.schema";
+import {
+  NIVELES_LOTE,
+  type EstadoLoteDespacho,
+  type NivelLote,
+  type TipoCombustibleViaje
+} from "@/features/loteDespacho/model/loteDespacho.schema";
 import {
   useAnularFormulario101Mutation,
   useFormularios101Query,
@@ -413,7 +418,7 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
   const [choferId, setChoferId] = useState("");
   const [tipoMineralId, setTipoMineralId] = useState("");
   const [destinoIngenioId, setDestinoIngenioId] = useState("");
-  const [nivel, setNivel] = useState("");
+  const [nivel, setNivel] = useState<NivelLote | "">("");
   const [incluyeCombustible, setIncluyeCombustible] = useState<TipoCombustibleViaje>("SIN_COMBUSTIBLE");
   const [combustibleAsignadoLitros, setCombustibleAsignadoLitros] = useState("");
   const [fechaDespachoReal, setFechaDespachoReal] = useState(() => fechaLocalISO(new Date()));
@@ -438,6 +443,10 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
       showError("Completa municipio, transportista, chofer, tipo de mineral, ingenio y fecha de despacho.");
       return;
     }
+    if (!nivel) {
+      showError("Elige el nivel del que sale la carga.");
+      return;
+    }
     if (incluyeCombustible === "CON_COMBUSTIBLE" && !combustibleAsignadoLitros) {
       showError("Indica cuántos litros de combustible se le asignan a este viaje.");
       return;
@@ -450,7 +459,7 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
         choferId: Number(choferId),
         tipoMineralId: Number(tipoMineralId),
         destinoIngenioId: Number(destinoIngenioId),
-        nivel: nivel.trim() || undefined,
+        nivel,
         incluyeCombustible,
         combustibleAsignadoLitros:
           incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : undefined,
@@ -508,7 +517,12 @@ function CrearLoteModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: ()
         <AutocompleteSelect value={choferId} onChange={setChoferId} options={choferOptions} placeholder="Chofer..." className={inputClassName} />
         <AutocompleteSelect value={tipoMineralId} onChange={setTipoMineralId} options={tipoMineralOptions} placeholder="Tipo de mineral..." className={inputClassName} />
         <AutocompleteSelect value={destinoIngenioId} onChange={setDestinoIngenioId} options={ingenioOptions} placeholder="Ingenio destino..." className={inputClassName} />
-        <input value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName} placeholder="Nivel (ej. 80, opcional)" />
+        <select required value={nivel} onChange={(e) => setNivel(e.target.value as NivelLote | "")} className={inputClassName}>
+          <option value="">Nivel...</option>
+          {NIVELES_LOTE.map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
         <select
           value={incluyeCombustible}
           onChange={(e) => setIncluyeCombustible(e.target.value as TipoCombustibleViaje)}

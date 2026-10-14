@@ -20,6 +20,7 @@ import {
 import { useFormularios101Query } from "@/features/formulario101/hooks/useFormulario101";
 import type { EstadoFormulario101 } from "@/features/formulario101/model/formulario101.schema";
 import { useLotesDespachoQuery } from "@/features/loteDespacho/hooks/useLoteDespacho";
+import { NIVELES_LOTE } from "@/features/loteDespacho/model/loteDespacho.schema";
 import { useLiquidacionesQuery } from "@/features/liquidacion/hooks/useLiquidacion";
 import type { EstadoLiquidacion } from "@/features/liquidacion/model/liquidacion.schema";
 import {
@@ -242,10 +243,9 @@ function CuadroMensualReport() {
           </select>
           <select value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName}>
             <option value="">Todos los niveles</option>
-            <option value="Nivel 40">Nivel 40</option>
-            <option value="Nivel 0">Nivel 0</option>
-            <option value="Nivel 80">Nivel 80</option>
-            <option value="La Moza">La Moza</option>
+            {NIVELES_LOTE.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -449,7 +449,12 @@ function IntegridadCorrelativoReport() {
           </div>
           <div>
             <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Nivel (opcional)</label>
-            <input type="text" value={nivel} onChange={(e) => setNivel(e.target.value)} placeholder="Nivel 40, Nivel 0…" className={inputClassName} />
+            <select value={nivel} onChange={(e) => setNivel(e.target.value)} className={inputClassName}>
+              <option value="">Todos los niveles</option>
+              {NIVELES_LOTE.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
           </div>
         </div>
         <button type="button" onClick={handleConsultar} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white">
