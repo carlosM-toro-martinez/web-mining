@@ -54,7 +54,8 @@ import {
 import { encontrarCajaLipena } from "@/features/parametrosCajaChica/lib/defaultCaja";
 import type { PartidaPresupuestoCaja } from "@/features/parametrosCajaChica/model/parametrosCajaChica.schema";
 import { getComprobanteEgresoGasto } from "@/features/reportesCajaChica/api/reportesCajaChicaApi";
-import { ApiError } from "@/shared/api/core/apiError";
+import { ApiError, mensajeDeError } from "@/shared/api/core/apiError";
+import { useEstadoCuentaCajaQuery } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { exportComprobanteEgresoExcel, exportComprobanteEgresoPdf } from "@/shared/lib/comprobanteEgresoExport";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -96,9 +97,25 @@ function useValorDiferido<T>(valor: T, ms = 350) {
 
 const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoGasto, string> = {
   FACTURA: "Factura",
-  CONTRATO_RETENCION: "Contrato con retención",
-  RECIBO: "Recibo (con respaldo)",
-  RECIBO_DIRECTO: "Recibo directo (sin respaldo)"
+  CONTRATO_RETENCION: "Pago a persona sin factura",
+  RECIBO: "Recibo de empresa",
+  RECIBO_DIRECTO: "Sin comprobante"
+};
+
+// Sin jerga de impuestos: quien registra elige qué papel le dieron; el
+// sistema calcula solo lo que corresponde.
+const TIPO_DOCUMENTO_OPCIONES: Array<{ value: TipoDocumentoGasto; label: string }> = [
+  { value: "FACTURA", label: "Factura" },
+  { value: "RECIBO", label: "Recibo de una empresa (con sello o número)" },
+  { value: "CONTRATO_RETENCION", label: "Pago a una persona que no da factura" },
+  { value: "RECIBO_DIRECTO", label: "Sin comprobante (recibo hecho a mano, viático)" }
+];
+
+const TIPO_DOCUMENTO_AYUDA: Record<TipoDocumentoGasto, string> = {
+  FACTURA: "Anota el número de la factura. El sistema calcula solo lo que corresponde de impuestos.",
+  RECIBO: "Anota el número del recibo.",
+  CONTRATO_RETENCION: "El sistema calcula solo cuánto hay que descontarle por impuestos.",
+  RECIBO_DIRECTO: "Úsalo solo cuando no hay ningún papel formal."
 };
 
 const CAMPO_FALTANTE_LABEL: Record<"centroCostoCaja" | "funcionGastoCaja" | "cuentaContableCaja" | "partidaPresupuesto", string> = {
@@ -130,8 +147,7 @@ const ESTADO_CLASS: Record<EstadoGastoCaja, string> = {
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 function formatMoneda(value: string | number) {
@@ -586,6 +602,24 @@ export function GastosCajaPage() {
   const cuentaBancariaSeleccionada = cuentasBancarias.find((c) => String(c.id) === cuentaBancariaCajaId);
   const esReciboDirecto = tipoDocumento === "RECIBO_DIRECTO";
 
+  // Antes de guardar se muestra de dónde sale el dinero y cuánto queda.
+  const estadoCajaQuery = useEstadoCuentaCajaQuery(origen === "CAJA" && cajaId ? Number(cajaId) : undefined);
+  const montoGasto = Number(montoTotal) || 0;
+  const efectoGasto = (() => {
+    if (montoGasto <= 0) return null;
+    if (origen === "CAJA") {
+      const estado = estadoCajaQuery.data?.data;
+      return estado ? { donde: estado.caja.nombre, moneda: estado.caja.monedaBase, disponible: estado.saldoActual } : null;
+    }
+    return cuentaBancariaSeleccionada
+      ? {
+          donde: `${cuentaBancariaSeleccionada.banco} · ${cuentaBancariaSeleccionada.nombreCuenta}`,
+          moneda: cuentaBancariaSeleccionada.monedaBase,
+          disponible: cuentaBancariaSeleccionada.saldoActual ?? 0
+        }
+      : null;
+  })();
+
   // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona
   // sola en cuanto carga la lista.
   useEffect(() => {
@@ -1030,33 +1064,39 @@ export function GastosCajaPage() {
             )}
             <input required type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputClassName} title="Fecha del gasto (hoy por defecto, editable)" />
 
-            <select
-              value={tipoDocumento}
-              onChange={(e) => setTipoDocumento(e.target.value as TipoDocumentoGasto)}
-              className={`${inputClassName} ${tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}`}
-            >
-              <option value="FACTURA">Factura</option>
-              <option value="CONTRATO_RETENCION">Contrato con retención</option>
-              <option value="RECIBO">Recibo (con respaldo, sin impuestos)</option>
-              <option value="RECIBO_DIRECTO">Recibo directo (sin respaldo)</option>
-            </select>
-            {tipoDocumento === "CONTRATO_RETENCION" ? (
-              <select value={categoriaRetencion} onChange={(e) => setCategoriaRetencion(e.target.value as CategoriaRetencionGasto)} className={inputClassName}>
-                <option value="SERVICIO">Servicio (RC-IVA + IT)</option>
-                <option value="COMPRA">Compra / alimentación (IUE + IT)</option>
+            <div className={tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}>
+              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">¿Qué comprobante te dieron?</label>
+              <select
+                value={tipoDocumento}
+                onChange={(e) => setTipoDocumento(e.target.value as TipoDocumentoGasto)}
+                className={inputClassName}
+              >
+                {TIPO_DOCUMENTO_OPCIONES.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
+              <p className="mt-1 text-[11px] text-[var(--color-on-surface-variant)]">{TIPO_DOCUMENTO_AYUDA[tipoDocumento]}</p>
+            </div>
+            {tipoDocumento === "CONTRATO_RETENCION" ? (
+              <div>
+                <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">¿Qué se le pagó?</label>
+                <select value={categoriaRetencion} onChange={(e) => setCategoriaRetencion(e.target.value as CategoriaRetencionGasto)} className={inputClassName}>
+                  <option value="SERVICIO">Un trabajo o servicio</option>
+                  <option value="COMPRA">Una compra o comida</option>
+                </select>
+              </div>
             ) : null}
             {tipoDocumento === "FACTURA" || tipoDocumento === "RECIBO" ? (
               <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs sm:col-span-2">
                 {tipoDocumento === "FACTURA" ? (
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={esCombustible} onChange={(e) => setEsCombustible(e.target.checked)} />
-                    Es combustible (crédito fiscal sobre el 70% del importe)
+                    Es combustible (gasolina, diésel)
                   </label>
                 ) : null}
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2" title="Marca esto si contabilidad indicó que este gasto no sirve para descontar impuestos">
                   <input type="checkbox" checked={esNoDeducible} onChange={(e) => setEsNoDeducible(e.target.checked)} />
-                  No deducible{tipoDocumento === "FACTURA" ? " (sin crédito fiscal, todo a Gastos No Deducibles)" : ""}
+                  No sirve para descontar impuestos
                 </label>
               </div>
             ) : null}
@@ -1077,7 +1117,7 @@ export function GastosCajaPage() {
               <input value={proveedorNitCi} onChange={(e) => setProveedorNitCi(e.target.value)} className={inputClassName} placeholder="NIT / CI (opcional)" />
             )}
 
-            <input required value={glosa} onChange={(e) => setGlosa(e.target.value)} className={`${inputClassName} sm:col-span-2`} placeholder="Glosa (ej. 500 Lts Gasolina)" />
+            <input required value={glosa} onChange={(e) => setGlosa(e.target.value)} className={`${inputClassName} sm:col-span-2`} placeholder="¿Qué se compró o pagó? (ej. 500 litros de gasolina)" />
             {/* Un recibo directo no tiene número de factura/recibo formal — no tiene sentido pedirlo.
                 Factura y Recibo SÍ tienen respaldo físico por definición, así que aquí es obligatorio;
                 Contrato con retención queda opcional (a veces el contrato en sí no trae un número). */}
@@ -1176,6 +1216,26 @@ export function GastosCajaPage() {
               </select>
             </div>
 
+            {efectoGasto ? (
+              <p
+                className={`sm:col-span-2 rounded-lg px-3 py-2 text-sm ${
+                  efectoGasto.disponible - montoGasto < 0
+                    ? "bg-[var(--color-error)]/10 text-[var(--color-error)]"
+                    : "bg-[var(--color-primary)]/8 text-[var(--color-on-surface)]"
+                }`}
+              >
+                Al guardar se descuentan <strong>{efectoGasto.moneda} {formatMoneda(montoGasto)}</strong> de{" "}
+                <strong>{efectoGasto.donde}</strong>.{" "}
+                {efectoGasto.disponible - montoGasto >= 0 ? (
+                  <>Quedarán <strong>{efectoGasto.moneda} {formatMoneda(efectoGasto.disponible - montoGasto)}</strong>.</>
+                ) : (
+                  <>
+                    No alcanza: hay {efectoGasto.moneda} {formatMoneda(efectoGasto.disponible)} y faltan{" "}
+                    <strong>{formatMoneda(montoGasto - efectoGasto.disponible)}</strong>.
+                  </>
+                )}
+              </p>
+            ) : null}
             <button
               type="submit"
               disabled={createGastoMutation.isPending}
@@ -1220,10 +1280,9 @@ export function GastosCajaPage() {
               onChange={(e) => setEditDraft({ ...editDraft, tipoDocumento: e.target.value as TipoDocumentoGasto })}
               className={`${inputClassName} ${editDraft.tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}`}
             >
-              <option value="FACTURA">Factura</option>
-              <option value="CONTRATO_RETENCION">Contrato con retención</option>
-              <option value="RECIBO">Recibo (con respaldo, sin impuestos)</option>
-              <option value="RECIBO_DIRECTO">Recibo directo (sin respaldo)</option>
+              {TIPO_DOCUMENTO_OPCIONES.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
             </select>
             {editDraft.tipoDocumento === "CONTRATO_RETENCION" ? (
               <select
@@ -1231,8 +1290,8 @@ export function GastosCajaPage() {
                 onChange={(e) => setEditDraft({ ...editDraft, categoriaRetencion: e.target.value as CategoriaRetencionGasto })}
                 className={inputClassName}
               >
-                <option value="SERVICIO">Servicio (RC-IVA + IT)</option>
-                <option value="COMPRA">Compra / alimentación (IUE + IT)</option>
+                <option value="SERVICIO">Un trabajo o servicio</option>
+                <option value="COMPRA">Una compra o comida</option>
               </select>
             ) : null}
             {editDraft.tipoDocumento === "FACTURA" || editDraft.tipoDocumento === "RECIBO" ? (
@@ -1240,12 +1299,12 @@ export function GastosCajaPage() {
                 {editDraft.tipoDocumento === "FACTURA" ? (
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={editDraft.esCombustible} onChange={(e) => setEditDraft({ ...editDraft, esCombustible: e.target.checked })} />
-                    Es combustible (crédito fiscal sobre el 70% del importe)
+                    Es combustible (gasolina, diésel)
                   </label>
                 ) : null}
                 <label className="flex items-center gap-2">
                   <input type="checkbox" checked={editDraft.esNoDeducible} onChange={(e) => setEditDraft({ ...editDraft, esNoDeducible: e.target.checked })} />
-                  No deducible{editDraft.tipoDocumento === "FACTURA" ? " (sin crédito fiscal, todo a Gastos No Deducibles)" : ""}
+                  No sirve para descontar impuestos
                 </label>
               </div>
             ) : null}

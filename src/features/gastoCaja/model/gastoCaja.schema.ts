@@ -34,7 +34,8 @@ export const tipoMovimientoFondoCajaSchema = z.enum([
   "REMESA_SUELDOS",
   "REMESA_COMPRAS_GENERAL",
   "REMESA_OTROS",
-  "REPOSICION"
+  "REPOSICION",
+  "AJUSTE_CUADRE"
 ]);
 
 const refConNombre = z.object({ id: z.number().int().positive(), codigo: z.string().min(1), nombre: z.string().min(1) });

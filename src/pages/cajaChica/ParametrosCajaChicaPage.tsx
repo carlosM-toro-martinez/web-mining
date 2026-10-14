@@ -732,8 +732,11 @@ export function ParametrosCajaChicaPage() {
       </article>
 
       {isAdmin ? (
-        <article className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error)]/6 p-5">
-          <h3 className="mb-1 flex items-center gap-2 text-lg font-bold text-[var(--color-error)]">
+        <details className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error)]/6 p-5">
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--color-error)]">
+            Zona de administrador: acciones que no se pueden deshacer
+          </summary>
+          <h3 className="mb-1 mt-4 flex items-center gap-2 text-lg font-bold text-[var(--color-error)]">
             <AlertTriangle size={16} />
             Reiniciar todos los registros
           </h3>
@@ -760,7 +763,7 @@ export function ParametrosCajaChicaPage() {
               {resetTransaccionalMutation.isPending ? "Reiniciando..." : "Reiniciar todo"}
             </button>
           </div>
-        </article>
+        </details>
       ) : null}
     </section>
   );

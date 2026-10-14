@@ -16,6 +16,8 @@ export const cajaChicaEndpoints = {
   partidaPresupuestoById: (id: number | string) => `/api/partidas-presupuesto-caja/${id}`,
   movimientosBanco: "/api/movimientos-banco-caja",
   movimientoBancoPresupuesto: (id: string) => `/api/movimientos-banco-caja/${id}/presupuesto`,
+  cuadresSaldo: "/api/cuadres-saldo",
+  cuadresSaldoPrevisualizar: "/api/cuadres-saldo/previsualizar",
   presupuestos: "/api/presupuestos-caja",
   presupuestoById: (id: number | string) => `/api/presupuestos-caja/${id}`,
   presupuestoDuplicar: (id: number | string) => `/api/presupuestos-caja/${id}/duplicar`

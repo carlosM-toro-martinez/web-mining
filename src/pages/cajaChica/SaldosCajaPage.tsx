@@ -21,6 +21,8 @@ import {
 import { usePresupuestosCajaQuery } from "@/features/presupuestoCaja/hooks/usePresupuestoCaja";
 import type { PresupuestoCaja } from "@/features/presupuestoCaja/model/presupuestoCaja.schema";
 import { mensajeDeError } from "@/shared/api/core/apiError";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { CuadreSaldoCard } from "@/features/cuadreSaldo/ui/CuadreSaldoCard";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -68,8 +70,21 @@ function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
+const ROLES_CUADRE = ["ADMIN", "ADMINISTRADOR", "CONTADOR", "SUPERINTENDENTE"];
+
+const DETALLE_FONDO: Record<string, string> = {
+  REMESA_PRESUPUESTO: "Remesa presupuesto",
+  REMESA_SUELDOS: "Remesa para sueldos",
+  REMESA_COMPRAS_GENERAL: "Remesa para compras",
+  REMESA_OTROS: "Remesa varios",
+  REPOSICION: "Reposición",
+  AJUSTE_CUADRE: "Ajuste por cuadre de saldo"
+};
+
 export function SaldosCajaPage() {
   const { showError, showSuccess } = useToast();
+  const { user } = useAuth();
+  const puedeCuadrar = ROLES_CUADRE.includes(user?.role ?? "");
 
   const cajasQuery = useCajasChicasQuery();
   const cajas = cajasQuery.data?.data ?? [];
@@ -399,7 +414,7 @@ export function SaldosCajaPage() {
                           <span className={`mr-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${m.tipo === "FONDO" ? "bg-[var(--color-success)]/18 text-[var(--color-success)]" : "bg-[var(--color-error)]/18 text-[var(--color-error)]"}`}>
                             {m.tipo === "FONDO" ? "Fondo" : "Gasto"}
                           </span>
-                          {m.detalle}{m.referencia ? ` · ${m.referencia}` : ""}
+                          {DETALLE_FONDO[m.detalle] ?? m.detalle}{m.referencia ? ` · ${m.referencia}` : ""}
                         </td>
                         <td className="py-1 pr-3 text-right text-[var(--color-success)]">{m.ingreso > 0 ? formatMoneda(m.ingreso) : ""}</td>
                         <td className="py-1 pr-3 text-right text-[var(--color-error)]">{m.egreso > 0 ? formatMoneda(m.egreso) : ""}</td>
@@ -478,6 +493,8 @@ export function SaldosCajaPage() {
           <p className="text-sm text-[var(--color-on-surface-variant)]">Selecciona una cuenta bancaria para ver su saldo.</p>
         )}
       </article>
+
+      {puedeCuadrar ? <CuadreSaldoCard cajas={cajas} cuentasBancarias={cuentasBancarias} /> : null}
 
       {/* Saldo de cuentas bancarias */}
       <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.06] p-5">
@@ -568,6 +585,12 @@ export function SaldosCajaPage() {
             </div>
             <input required type="date" value={fondoFecha} onChange={(e) => setFondoFecha(e.target.value)} className={inputClassName} />
             <input value={fondoReferencia} onChange={(e) => setFondoReferencia(e.target.value)} className={inputClassName} placeholder="Referencia (opcional)" />
+            {estadoCuenta && String(estadoCuenta.caja.id) === fondoCajaId && Number(fondoMonto) > 0 ? (
+              <p className="rounded-lg bg-[var(--color-primary)]/8 px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
+                Hay {estadoCuenta.caja.monedaBase} {formatMoneda(estadoCuenta.saldoActual)} en {estadoCuenta.caja.nombre}. Con esto
+                quedarán {formatMoneda(estadoCuenta.saldoActual + Number(fondoMonto))}.
+              </p>
+            ) : null}
             <button type="submit" disabled={createFondoMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
               {createFondoMutation.isPending ? "Guardando..." : "Registrar fondo"}
             </button>
@@ -600,8 +623,19 @@ export function SaldosCajaPage() {
               ))}
             </select>
             {salidaCuenta ? (
-              <p className="rounded-lg bg-[var(--color-primary)]/8 px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
-                Disponible en esta cuenta: {salidaCuenta.monedaBase} {formatMoneda(salidaCuenta.saldoActual ?? 0)}
+              <p
+                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                  (salidaCuenta.saldoActual ?? 0) - (Number(salidaMonto) || 0) < 0
+                    ? "bg-[var(--color-error)]/10 text-[var(--color-error)]"
+                    : "bg-[var(--color-primary)]/8 text-[var(--color-primary)]"
+                }`}
+              >
+                Hay {salidaCuenta.monedaBase} {formatMoneda(salidaCuenta.saldoActual ?? 0)} en esta cuenta.
+                {Number(salidaMonto) > 0
+                  ? (salidaCuenta.saldoActual ?? 0) - Number(salidaMonto) >= 0
+                    ? ` Después de esta salida quedarán ${formatMoneda((salidaCuenta.saldoActual ?? 0) - Number(salidaMonto))}.`
+                    : " No alcanza para esta salida."
+                  : ""}
               </p>
             ) : null}
             <select required value={salidaCajaId} onChange={(e) => setSalidaCajaId(e.target.value)} className={inputClassName}>
@@ -653,7 +687,10 @@ export function SaldosCajaPage() {
             </select>
             {ingresoCuenta ? (
               <p className="rounded-lg bg-[var(--color-primary)]/8 px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
-                Saldo actual de esta cuenta: {ingresoCuenta.monedaBase} {formatMoneda(ingresoCuenta.saldoActual ?? 0)}
+                Hay {ingresoCuenta.monedaBase} {formatMoneda(ingresoCuenta.saldoActual ?? 0)} en esta cuenta.
+                {Number(ingresoMonto) > 0
+                  ? ` Con este ingreso quedarán ${formatMoneda((ingresoCuenta.saldoActual ?? 0) + Number(ingresoMonto))}.`
+                  : ""}
               </p>
             ) : null}
             <select value={ingresoFormaPago} onChange={(e) => setIngresoFormaPago(e.target.value as FormaPagoBanco)} className={inputClassName}>

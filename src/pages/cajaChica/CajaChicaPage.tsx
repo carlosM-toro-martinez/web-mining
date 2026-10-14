@@ -1,47 +1,49 @@
 import { Link } from "react-router-dom";
 import { ClipboardList, Landmark, PiggyBank, ReceiptText, FileBarChart2, Scale, Wallet } from "lucide-react";
 
+// Ordenadas por lo que más se usa: lo del día a día primero, la
+// configuración al final.
 const cards = [
   {
-    title: "Parámetros",
-    description: "Cajas y cuentas bancarias (con su saldo inicial), centros de costo, funciones de gasto, cuentas contables y tasas de retención. Se configuran una sola vez.",
-    to: "/caja-chica/parametros",
-    icon: Landmark,
-    available: true
-  },
-  {
     title: "Registro de gastos",
-    description: "Carga cada compra o gasto con su respaldo (día a día); el motor tributario calcula retenciones al instante.",
+    description: "Anota cada compra o pago con su comprobante, el mismo día. Es lo que más vas a usar.",
     to: "/caja-chica/gastos",
     icon: Wallet,
     available: true
   },
   {
     title: "Saldos y movimientos",
-    description: "Cuánto hay disponible ahora mismo en cada caja y en cada cuenta bancaria, y dónde registras cualquier movimiento de dinero que no sea un gasto.",
+    description: "Cuánto dinero hay ahora en cada caja y en cada banco. Aquí también anotas el dinero que llega o que pasa del banco a la caja.",
     to: "/caja-chica/saldos",
     icon: Scale,
     available: true
   },
   {
     title: "Presupuesto",
-    description: "Para qué se pidió el dinero de cada mes (partidas) y cuánto queda a favor de cada una.",
+    description: "Para qué se pidió el dinero de cada mes y cuánto queda de cada cosa.",
     to: "/caja-chica/presupuesto",
     icon: ClipboardList,
     available: true
   },
   {
     title: "Rendiciones",
-    description: "Cierre formal periódico (semanal/mensual): agrupa los gastos ya registrados y genera el comprobante oficial para enviar a contabilidad.",
+    description: "Cierre de cada semana o mes: junta los gastos y arma el documento para contabilidad.",
     to: "/caja-chica/rendiciones",
     icon: ReceiptText,
     available: true
   },
   {
     title: "Reportes",
-    description: "Retenciones para el SIAT, gastos no deducibles, desglose de costos y posibles gastos o entradas repetidos.",
+    description: "Resúmenes para contabilidad e impuestos, y aviso de gastos o entradas que parecen repetidos.",
     to: "/caja-chica/reportes",
     icon: FileBarChart2,
+    available: true
+  },
+  {
+    title: "Parámetros",
+    description: "Configuración: cajas, cuentas bancarias y listas de clasificación. Se arma una sola vez.",
+    to: "/caja-chica/parametros",
+    icon: Landmark,
     available: true
   }
 ] as const;
@@ -57,8 +59,7 @@ export function CajaChicaPage() {
           <div>
             <h1 className="page-title font-headline text-3xl font-extrabold">Caja Chica</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-on-surface-variant)]">
-              Rendición de cuentas de campamento: registro de gastos, motor tributario automático y
-              comprobante de diario bimoneda.
+              El dinero del campamento: qué se gastó, cuánto queda y el cierre para contabilidad.
             </p>
           </div>
         </div>

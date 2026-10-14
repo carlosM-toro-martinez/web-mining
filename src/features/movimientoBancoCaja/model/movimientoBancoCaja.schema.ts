@@ -6,10 +6,11 @@ export const FORMA_PAGO_BANCO_LABEL: Record<z.infer<typeof formaPagoBancoSchema>
   CHEQUE: "Cheque",
   TRANSFERENCIA: "Transferencia"
 };
-export const tipoMovimientoBancoSchema = z.enum(["INGRESO", "SALIDA_A_CAJA"]);
+export const tipoMovimientoBancoSchema = z.enum(["INGRESO", "SALIDA_A_CAJA", "AJUSTE_CUADRE"]);
 export const TIPO_MOVIMIENTO_BANCO_LABEL: Record<z.infer<typeof tipoMovimientoBancoSchema>, string> = {
   INGRESO: "Ingreso a la cuenta (presupuesto, sueldos, etc.)",
-  SALIDA_A_CAJA: "Salida hacia una caja"
+  SALIDA_A_CAJA: "Salida hacia una caja",
+  AJUSTE_CUADRE: "Ajuste por cuadre de saldo"
 };
 export const monedaCajaSchema = z.enum(["BOB", "USD"]);
 
