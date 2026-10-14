@@ -4,6 +4,7 @@ import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { usePermisos } from "@/features/auth/hooks/usePermisos";
+import { AsignacionMasivaHorarios } from "@/modules/employee/components/AsignacionMasivaHorarios";
 import { getTipoPersonalLabel } from "@/modules/employee/hooks/useEmployees";
 import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 
@@ -50,6 +51,7 @@ export function PersonalSchedulesPage() {
   const puedeCrear = can("personal.horarios", "crear");
   const puedeEditar = can("personal.horarios", "editar");
   const puedeEliminar = can("personal.horarios", "eliminar");
+  const puedeAsignarEnLote = can("personal.asignaciones", "ver") && can("personal.asignaciones", "crear");
   const [editing, setEditing] = useState<Horario | null>(null);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -195,6 +197,8 @@ export function PersonalSchedulesPage() {
           </table>
         </div>
       </article>
+
+      {puedeAsignarEnLote ? <AsignacionMasivaHorarios horarios={horariosQuery.data ?? []} /> : null}
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
         <h2 className="text-lg font-bold">Trabajadores por horario</h2>

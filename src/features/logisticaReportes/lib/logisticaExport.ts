@@ -3,11 +3,24 @@ import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
 import type { Liquidacion } from "@/features/liquidacion/model/liquidacion.schema";
 import type { CuadroMensual } from "@/features/logisticaReportes/model/logisticaReportes.schema";
-import { normalizarNivel, type LoteDespacho } from "@/features/loteDespacho/model/loteDespacho.schema";
+import {
+  normalizarNivel,
+  type LoteDespacho
+} from "@/features/loteDespacho/model/loteDespacho.schema";
 
 const MESES_MAYUSCULA = [
-  "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE"
 ];
 
 function parseFecha(value: string): Date {
@@ -72,9 +85,42 @@ function formatBs(value: number) {
 
 // --- Números en letras (para el "Son: ..." de las liquidaciones) ---
 const UNIDADES = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
-const DIECIS = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISEIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
-const DECENAS = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
-const CENTENAS = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+const DIECIS = [
+  "DIEZ",
+  "ONCE",
+  "DOCE",
+  "TRECE",
+  "CATORCE",
+  "QUINCE",
+  "DIECISEIS",
+  "DIECISIETE",
+  "DIECIOCHO",
+  "DIECINUEVE"
+];
+const DECENAS = [
+  "",
+  "",
+  "VEINTE",
+  "TREINTA",
+  "CUARENTA",
+  "CINCUENTA",
+  "SESENTA",
+  "SETENTA",
+  "OCHENTA",
+  "NOVENTA"
+];
+const CENTENAS = [
+  "",
+  "CIENTO",
+  "DOSCIENTOS",
+  "TRESCIENTOS",
+  "CUATROCIENTOS",
+  "QUINIENTOS",
+  "SEISCIENTOS",
+  "SETECIENTOS",
+  "OCHOCIENTOS",
+  "NOVECIENTOS"
+];
 
 function menorQueCien(n: number): string {
   if (n < 10) return UNIDADES[n]!;
@@ -123,9 +169,16 @@ const thinBorder = {
   left: { style: "thin", color: { rgb: "000000" } },
   right: { style: "thin", color: { rgb: "000000" } }
 };
-const titleStyle = { font: { bold: true, sz: 13 }, alignment: { horizontal: "center", vertical: "center" } };
+const titleStyle = {
+  font: { bold: true, sz: 13 },
+  alignment: { horizontal: "center", vertical: "center" }
+};
 const subtitleStyle = { font: { bold: true, sz: 10 }, alignment: { horizontal: "center" } };
-const headerStyle = { font: { bold: true, sz: 9 }, alignment: { horizontal: "center", vertical: "center" }, border: thinBorder };
+const headerStyle = {
+  font: { bold: true, sz: 9 },
+  alignment: { horizontal: "center", vertical: "center" },
+  border: thinBorder
+};
 const bodyStyle = { font: { sz: 9 }, border: thinBorder };
 const totalStyle = { font: { bold: true, sz: 10 }, border: thinBorder };
 // Texto suelto (fecha, firmas, "Son: ...", C.c.) fuera de la tabla: mismo
@@ -138,7 +191,12 @@ function setStyle(sheet: XLSX.WorkSheet, address: string, style: Record<string, 
   sheet[address].s = style;
 }
 
-function styleRow(sheet: XLSX.WorkSheet, row: number, lastCol: number, style: Record<string, unknown>) {
+function styleRow(
+  sheet: XLSX.WorkSheet,
+  row: number,
+  lastCol: number,
+  style: Record<string, unknown>
+) {
   for (let c = 0; c <= lastCol; c += 1) {
     setStyle(sheet, XLSX.utils.encode_cell({ r: row, c }), style);
   }
@@ -147,7 +205,11 @@ function styleRow(sheet: XLSX.WorkSheet, row: number, lastCol: number, style: Re
 function numberFormatCell(sheet: XLSX.WorkSheet, row: number, col: number, formato = "#,##0.00") {
   const address = XLSX.utils.encode_cell({ r: row, c: col });
   if (sheet[address] && typeof sheet[address].v === "number") {
-    sheet[address].s = { ...(sheet[address].s ?? {}), numFmt: formato, alignment: { horizontal: "right" } };
+    sheet[address].s = {
+      ...(sheet[address].s ?? {}),
+      numFmt: formato,
+      alignment: { horizontal: "right" }
+    };
   }
 }
 
@@ -195,8 +257,20 @@ function openBrowserPrintDialog(doc: jsPDF, fileName: string) {
   iframe.src = blobUrl;
 }
 
-const pdfTableStyles = { fontSize: 8, cellPadding: 3, lineColor: [0, 0, 0] as [number, number, number], lineWidth: 0.4, textColor: [0, 0, 0] as [number, number, number] };
-const pdfHeadStyles = { fillColor: [255, 255, 255] as [number, number, number], textColor: [0, 0, 0] as [number, number, number], fontStyle: "bold" as const, lineWidth: 0.4, lineColor: [0, 0, 0] as [number, number, number] };
+const pdfTableStyles = {
+  fontSize: 8,
+  cellPadding: 3,
+  lineColor: [0, 0, 0] as [number, number, number],
+  lineWidth: 0.4,
+  textColor: [0, 0, 0] as [number, number, number]
+};
+const pdfHeadStyles = {
+  fillColor: [255, 255, 255] as [number, number, number],
+  textColor: [0, 0, 0] as [number, number, number],
+  fontStyle: "bold" as const,
+  lineWidth: 0.4,
+  lineColor: [0, 0, 0] as [number, number, number]
+};
 
 // autoTable usa el tema "striped" por defecto, que pinta filas alternas de
 // gris aunque se le pase fillColor blanco en `styles` — por eso salía
@@ -257,10 +331,19 @@ function agruparPorPlacaConViajes(liquidacion: Liquidacion): FilaPorPlacaDetalla
     const origen = d.lote?.municipioOrigen?.nombre?.toUpperCase();
     const destino = d.lote?.destinoIngenio?.nombre?.toUpperCase();
     const descripcionServicio =
-      origen && destino ? `CARGA BRUTA DE MINERAL ${origen} - ${destino}` : "CARGA BRUTA DE MINERAL";
-    const fila =
-      mapa.get(clave) ??
-      { placa, descripcionServicio, pesoTotal: 0, pesoTotalCrudo: 0, precioAplicado, viajes: 0, subtotal: 0, viajesDetalle: [] };
+      origen && destino
+        ? `CARGA BRUTA DE MINERAL ${origen} - ${destino}`
+        : "CARGA BRUTA DE MINERAL";
+    const fila = mapa.get(clave) ?? {
+      placa,
+      descripcionServicio,
+      pesoTotal: 0,
+      pesoTotalCrudo: 0,
+      precioAplicado,
+      viajes: 0,
+      subtotal: 0,
+      viajesDetalle: []
+    };
     const tonelajeNeto = Number(d.tonelajeNeto);
     fila.pesoTotalCrudo += tonelajeNeto;
     fila.viajes += 1;
@@ -284,7 +367,9 @@ function agruparPorPlacaConViajes(liquidacion: Liquidacion): FilaPorPlacaDetalla
 }
 
 export function agruparPorPlaca(liquidacion: Liquidacion): FilaPorPlaca[] {
-  return agruparPorPlacaConViajes(liquidacion).map(({ viajesDetalle, pesoTotalCrudo, ...resto }) => resto);
+  return agruparPorPlacaConViajes(liquidacion).map(
+    ({ viajesDetalle, pesoTotalCrudo, ...resto }) => resto
+  );
 }
 
 // Se calcula siempre en vivo a partir del detalle (nunca leyendo
@@ -296,7 +381,9 @@ export function agruparPorPlaca(liquidacion: Liquidacion): FilaPorPlaca[] {
 export function calcularTotales(liquidacion: Liquidacion) {
   // Igual que la planilla Excel (y que totalBrutoDeGrupos en el backend):
   // suma peso × precio sin redondear cada fila y redondea una sola vez.
-  const bruto = num(agruparPorPlaca(liquidacion).reduce((acc, f) => acc + f.pesoTotal * f.precioAplicado, 0));
+  const bruto = num(
+    agruparPorPlaca(liquidacion).reduce((acc, f) => acc + f.pesoTotal * f.precioAplicado, 0)
+  );
   const abonos = (liquidacion.itemsConcepto ?? [])
     .filter((i) => i.concepto?.tipo === "ABONO")
     .reduce((acc, i) => acc + Number(i.monto), 0);
@@ -338,7 +425,11 @@ const FIRMA_ASISTENTE_CARGO = "Asistente Administrativo";
 // Pie de página fijo al fondo de la hoja (no "en cascada" siguiendo el flujo
 // del contenido): todas las firmas quedan en la MISMA línea horizontal,
 // cada una con su propia raya arriba del nombre, repartidas a lo ancho.
-function dibujarPiePagina(doc: jsPDF, firmas: Array<{ nombre: string; cargo: string }>, ccLines: string[]) {
+function dibujarPiePagina(
+  doc: jsPDF,
+  firmas: Array<{ nombre: string; cargo: string }>,
+  ccLines: string[]
+) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const yFirmas = pageHeight - 45;
@@ -381,33 +472,84 @@ function dibujarPiePagina(doc: jsPDF, firmas: Array<{ nombre: string; cargo: str
 export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   const filas = agruparPorPlaca(liquidacion);
   const abonos = (liquidacion.itemsConcepto ?? []).filter((i) => i.concepto?.tipo === "ABONO");
-  const deducciones = (liquidacion.itemsConcepto ?? []).filter((i) => i.concepto?.tipo === "DEDUCCION");
+  const deducciones = (liquidacion.itemsConcepto ?? []).filter(
+    (i) => i.concepto?.tipo === "DEDUCCION"
+  );
   const totales = calcularTotales(liquidacion);
   const lastCol = 8;
   const pesoTotalTmb = filas.reduce((acc, f) => acc + f.pesoTotal, 0);
 
   const aoa: Array<Array<string | number>> = [
-    ["Empresa Minera", "", "", "", "", "", "N°", folioLiquidacion(liquidacion) ?? "BORRADOR", ""] as any,
+    [
+      "Empresa Minera",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "N°",
+      folioLiquidacion(liquidacion) ?? "BORRADOR",
+      ""
+    ] as any,
     [`MARTE S.R.L. — NIT: ${MARTE_NIT}`, "", "", "", "", "", "", "", ""],
     [],
     ["LIQUIDACION SERVICIO DE TRANSPORTE", "", "", "", "", "", "", "", ""],
-    [`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, "", "", "", "", "", "", "", ""],
+    [
+      `CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
     [`CORRESPONDIENTE A: ${periodoLabel(liquidacion)}`, "", "", "", "", "", "", "", ""],
     [],
-    ["ITEM", "PLACA", "DESCRIPCION DEL SERVICIO", "PESO TMB", "BS/TMB", "VIAJES", "BS/DIA", "TOTAL", "OBSERVACIONES"]
+    [
+      "ITEM",
+      "PLACA",
+      "DESCRIPCION DEL SERVICIO",
+      "PESO TMB",
+      "BS/TMB",
+      "VIAJES",
+      "BS/DIA",
+      "TOTAL",
+      "OBSERVACIONES"
+    ]
   ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> = [
-    "subtitle", "subtitle", "blank", "title", "subtitle", "subtitle", "blank", "header"
-  ];
+  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank" | "plain"> =
+    ["subtitle", "subtitle", "blank", "title", "subtitle", "subtitle", "blank", "header"];
 
   let item = 1;
   for (const f of filas) {
-    aoa.push([item, f.placa, f.descripcionServicio, num(f.pesoTotal), num(f.precioAplicado), f.viajes, "", num(f.subtotal), ""]);
+    aoa.push([
+      item,
+      f.placa,
+      f.descripcionServicio,
+      num(f.pesoTotal),
+      num(f.precioAplicado),
+      f.viajes,
+      "",
+      num(f.subtotal),
+      ""
+    ]);
     rowKinds.push("normal");
     item += 1;
   }
   for (const a of abonos) {
-    aoa.push([item, "", a.concepto?.nombre?.toUpperCase() ?? "ABONO", "", "", "", "", num(Number(a.monto)), a.descripcion ?? ""]);
+    aoa.push([
+      item,
+      "",
+      a.concepto?.nombre?.toUpperCase() ?? "ABONO",
+      "",
+      "",
+      "",
+      "",
+      num(Number(a.monto)),
+      a.descripcion ?? ""
+    ]);
     rowKinds.push("normal");
     item += 1;
   }
@@ -420,12 +562,32 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   aoa.push(["TOTAL LIQUIDACION", "", "", "", "", "", "", num(totalLiquidacion), ""]);
   rowKinds.push("total");
   for (const d of deducciones) {
-    aoa.push([`Menos: ${d.concepto?.nombre?.toUpperCase() ?? "DEDUCCION"} (BS)`, "", "", "", "", "", "", num(Number(d.monto)), ""]);
+    aoa.push([
+      `Menos: ${d.concepto?.nombre?.toUpperCase() ?? "DEDUCCION"} (BS)`,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      num(Number(d.monto)),
+      ""
+    ]);
     rowKinds.push("normal");
   }
   aoa.push(["LIQUIDO A PAGAR", "", "", "", "", "", "", num(totales.neto), ""]);
   rowKinds.push("total");
-  aoa.push([`Fecha: ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, "", "", "", "", "", "", "", ""]);
+  aoa.push([
+    `Fecha: ${fechaLiquidacionLarga(liquidacion.fechaFin)}`,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]);
   rowKinds.push("plain");
   aoa.push([]);
   rowKinds.push("blank");
@@ -445,7 +607,17 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   rowKinds.push("plain");
   aoa.push([]);
   rowKinds.push("blank");
-  aoa.push([liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "", "", "", "", "", "", "", "", ""]);
+  aoa.push([
+    liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]);
   rowKinds.push("plain");
   aoa.push(["Contratista", "", "", "", "", "", "", "", ""]);
   rowKinds.push("plain");
@@ -461,7 +633,17 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   rowKinds.push("plain");
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 16 }];
+  sheet["!cols"] = [
+    { wch: 22 },
+    { wch: 10 },
+    { wch: 30 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 8 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 16 }
+  ];
   sheet["!merges"] = [
     { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
     { s: { r: 3, c: 0 }, e: { r: 3, c: lastCol } },
@@ -471,12 +653,17 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
   rowKinds.forEach((kind, index) => {
     if (kind === "blank") return;
     const style =
-      kind === "title" ? titleStyle
-      : kind === "subtitle" ? subtitleStyle
-      : kind === "header" ? headerStyle
-      : kind === "total" ? totalStyle
-      : kind === "plain" ? plainStyle
-      : bodyStyle;
+      kind === "title"
+        ? titleStyle
+        : kind === "subtitle"
+          ? subtitleStyle
+          : kind === "header"
+            ? headerStyle
+            : kind === "total"
+              ? totalStyle
+              : kind === "plain"
+                ? plainStyle
+                : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
   for (const col of [3, 4, 7]) {
@@ -485,13 +672,18 @@ export function exportLiquidacionEmpresaExcel(liquidacion: Liquidacion) {
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Liquidacion".slice(0, 31));
-  XLSX.writeFile(workbook, `liquidacion-empresa-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.xlsx`);
+  XLSX.writeFile(
+    workbook,
+    `liquidacion-empresa-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.xlsx`
+  );
 }
 
 export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   const filas = agruparPorPlaca(liquidacion);
   const abonos = (liquidacion.itemsConcepto ?? []).filter((i) => i.concepto?.tipo === "ABONO");
-  const deducciones = (liquidacion.itemsConcepto ?? []).filter((i) => i.concepto?.tipo === "DEDUCCION");
+  const deducciones = (liquidacion.itemsConcepto ?? []).filter(
+    (i) => i.concepto?.tipo === "DEDUCCION"
+  );
   const totales = calcularTotales(liquidacion);
   const pesoTotalTmb = filas.reduce((acc, f) => acc + f.pesoTotal, 0);
 
@@ -510,7 +702,12 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.rect(pageWidth - 90, 20, 60, 22);
-  doc.text(folioLiquidacion(liquidacion) ? `N° ${folioLiquidacion(liquidacion)}` : "BORRADOR", pageWidth - 60, 34, { align: "center" });
+  doc.text(
+    folioLiquidacion(liquidacion) ? `N° ${folioLiquidacion(liquidacion)}` : "BORRADOR",
+    pageWidth - 60,
+    34,
+    { align: "center" }
+  );
 
   doc.setFontSize(13);
   doc.setTextColor(...AZUL_CONOCIMIENTO);
@@ -522,17 +719,42 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   doc.setTextColor(0, 0, 0);
   doc.setDrawColor(0, 0, 0);
   doc.setFontSize(10);
-  doc.text(`CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`, centerX, 46, { align: "center" });
+  doc.text(
+    `CONTRATISTA: ${liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? ""}`,
+    centerX,
+    46,
+    { align: "center" }
+  );
   doc.text(`CORRESPONDIENTE A: ${periodoLabel(liquidacion)}`, centerX, 60, { align: "center" });
 
   const rows: RowInput[] = [];
   let item = 1;
   for (const f of filas) {
-    rows.push([item, f.placa, f.descripcionServicio, formatBs(f.pesoTotal), formatBs(f.precioAplicado), String(f.viajes), "", formatBs(f.subtotal), ""]);
+    rows.push([
+      item,
+      f.placa,
+      f.descripcionServicio,
+      formatBs(f.pesoTotal),
+      formatBs(f.precioAplicado),
+      String(f.viajes),
+      "",
+      formatBs(f.subtotal),
+      ""
+    ]);
     item += 1;
   }
   for (const a of abonos) {
-    rows.push([item, "", a.concepto?.nombre?.toUpperCase() ?? "ABONO", "", "", "", "", formatBs(Number(a.monto)), a.descripcion ?? ""]);
+    rows.push([
+      item,
+      "",
+      a.concepto?.nombre?.toUpperCase() ?? "ABONO",
+      "",
+      "",
+      "",
+      "",
+      formatBs(Number(a.monto)),
+      a.descripcion ?? ""
+    ]);
     item += 1;
   }
   rows.push(["", "", "TOTAL TMB", formatBs(pesoTotalTmb), "", "", "", "", ""]);
@@ -543,7 +765,19 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   // la página (595pt - 2×30pt de margen = 535pt).
   drawPlainTable(doc, {
     startY: 74,
-    head: [["ITEM", "PLACA", "DESCRIPCION DEL SERVICIO", "PESO TMB", "BS/TMB", "VIAJES", "BS/DIA", "TOTAL", "OBSERVACIONES"]],
+    head: [
+      [
+        "ITEM",
+        "PLACA",
+        "DESCRIPCION DEL SERVICIO",
+        "PESO TMB",
+        "BS/TMB",
+        "VIAJES",
+        "BS/DIA",
+        "TOTAL",
+        "OBSERVACIONES"
+      ]
+    ],
     body: rows,
     styles: { ...pdfTableStyles, fontSize: 7, cellPadding: 2.5 },
     headStyles: { ...pdfHeadStyles, fontSize: 7 },
@@ -566,7 +800,10 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   const totalLiquidacion = totales.bruto + totales.abonos;
   const totalesRows: RowInput[] = [["TOTAL LIQUIDACION", formatBs(totalLiquidacion)]];
   for (const d of deducciones) {
-    totalesRows.push([`Menos: ${d.concepto?.nombre?.toUpperCase() ?? "DEDUCCION"} (BS)`, formatBs(Number(d.monto))]);
+    totalesRows.push([
+      `Menos: ${d.concepto?.nombre?.toUpperCase() ?? "DEDUCCION"} (BS)`,
+      formatBs(Number(d.monto))
+    ]);
   }
   totalesRows.push(["LIQUIDO A PAGAR", formatBs(totales.neto)]);
 
@@ -582,7 +819,9 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   let y = (doc as any).lastAutoTable.finalY + 20;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`Fecha: ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, pageWidth - 30, y, { align: "right" });
+  doc.text(`Fecha: ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, pageWidth - 30, y, {
+    align: "right"
+  });
 
   y += 24;
   doc.text(`Son: ${montoEnLetras(totales.neto)}`, 30, y, { maxWidth: pageWidth - 60 });
@@ -590,14 +829,25 @@ export function exportLiquidacionEmpresaPdf(liquidacion: Liquidacion) {
   dibujarPiePagina(
     doc,
     [
-      { nombre: liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "", cargo: "Contratista" },
+      {
+        nombre: liquidacion.transportista?.nombreORazonSocial?.toUpperCase() ?? "",
+        cargo: "Contratista"
+      },
       { nombre: FIRMA_ASISTENTE, cargo: FIRMA_ASISTENTE_CARGO },
       { nombre: FIRMA_SUPERINTENDENTE, cargo: FIRMA_SUPERINTENDENTE_CARGO }
     ],
-    ["C.c. Presidente Ejecutivo", "C.c. Contabilidad La Paz", "C.c. Archivos Mina", "C.c. Contratista"]
+    [
+      "C.c. Presidente Ejecutivo",
+      "C.c. Contabilidad La Paz",
+      "C.c. Archivos Mina",
+      "C.c. Contratista"
+    ]
   );
 
-  openBrowserPrintDialog(doc, `liquidacion-empresa-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.pdf`);
+  openBrowserPrintDialog(
+    doc,
+    `liquidacion-empresa-${(folioLiquidacion(liquidacion) ?? liquidacion.id.slice(0, 8)).replace(/\//g, "-")}.pdf`
+  );
 }
 
 // ============================================================================
@@ -629,13 +879,23 @@ function datosLiquidacionParticular(liquidacion: Liquidacion) {
   const lineas: LineaTotalParticular[] = [
     ...items
       .filter((i) => i.concepto?.tipo === "ABONO")
-      .map((i) => ({ etiqueta: (i.descripcion || i.concepto?.nombre || "ABONO").toUpperCase(), monto: Number(i.monto) })),
+      .map((i) => ({
+        etiqueta: (i.descripcion || i.concepto?.nombre || "ABONO").toUpperCase(),
+        monto: Number(i.monto)
+      })),
     ...items
       .filter((i) => i.concepto?.tipo === "DEDUCCION")
       .map((i) =>
         i.concepto?.esCombustible
-          ? { etiqueta: "DESCUENTO POR COMBUSTIBLE", cantidad: litros && litros > 0 ? litros : undefined, monto: Number(i.monto) }
-          : { etiqueta: (i.descripcion || i.concepto?.nombre || "DESCUENTO").toUpperCase(), monto: Number(i.monto) }
+          ? {
+              etiqueta: "DESCUENTO POR COMBUSTIBLE",
+              cantidad: litros && litros > 0 ? litros : undefined,
+              monto: Number(i.monto)
+            }
+          : {
+              etiqueta: (i.descripcion || i.concepto?.nombre || "DESCUENTO").toUpperCase(),
+              monto: Number(i.monto)
+            }
       )
   ];
   return {
@@ -666,7 +926,8 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
     if (altura) alturas[r] = altura;
     return r;
   };
-  const combinar = (r1: number, c1: number, r2: number, c2: number) => merges.push({ s: { r: r1, c: c1 }, e: { r: r2, c: c2 } });
+  const combinar = (r1: number, c1: number, r2: number, c2: number) =>
+    merges.push({ s: { r: r1, c: c1 }, e: { r: r2, c: c2 } });
   const est = (o: {
     sz?: number;
     bold?: boolean;
@@ -678,7 +939,13 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
     borde?: boolean;
     fmt?: string;
   }) => ({
-    font: { name: FUENTE_PARTICULAR, sz: o.sz ?? 10, bold: o.bold ?? false, underline: o.underline ?? false, ...(o.color ? { color: { rgb: o.color } } : {}) },
+    font: {
+      name: FUENTE_PARTICULAR,
+      sz: o.sz ?? 10,
+      bold: o.bold ?? false,
+      underline: o.underline ?? false,
+      ...(o.color ? { color: { rgb: o.color } } : {})
+    },
     alignment: { ...(o.h ? { horizontal: o.h } : {}), vertical: o.v ?? "center" },
     ...(o.fill ? { fill: { patternType: "solid", fgColor: { rgb: o.fill } } } : {}),
     ...(o.borde ? { border: thinBorder } : {}),
@@ -696,17 +963,46 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
     24
   );
   combinar(r1, 0, r1, 2);
-  const r2 = fila({ A: ["MARTE", bloque({ sz: 28, bold: true, underline: true, v: "bottom" })], B: ["", bloque()], C: ["", bloque()] }, 24);
-  const r3 = fila({ A: ["", bloque()], B: ["S.R.L.", bloque({ sz: 8, bold: true, underline: true, v: "top" })], C: ["", bloque()] }, 12);
+  const r2 = fila(
+    {
+      A: ["MARTE", bloque({ sz: 28, bold: true, underline: true, v: "bottom" })],
+      B: ["", bloque()],
+      C: ["", bloque()]
+    },
+    24
+  );
+  const r3 = fila(
+    {
+      A: ["", bloque()],
+      B: ["S.R.L.", bloque({ sz: 8, bold: true, underline: true, v: "top" })],
+      C: ["", bloque()]
+    },
+    12
+  );
   combinar(r2, 0, r3, 0);
-  fila({ A: [`NIT: ${MARTE_NIT}`, bloque({ sz: 9, bold: true })], B: ["", bloque()], C: ["", bloque()] }, 18);
+  fila(
+    {
+      A: [`NIT: ${MARTE_NIT}`, bloque({ sz: 9, bold: true })],
+      B: ["", bloque()],
+      C: ["", bloque()]
+    },
+    18
+  );
 
   const titulo = est({ sz: 16, bold: true, underline: true, color: AZUL_TITULO, h: "center" });
   const t1 = fila({ A: ["LIQUIDACION POR SERVICIO DE TRANSPORTE DE CARGAS", titulo] }, 26);
   combinar(t1, 0, t1, 6);
   const t2 = fila({ A: ["MINERALIZADAS (MINA LIPEÑA - CHILCOBIJA)", titulo] }, 26);
   combinar(t2, 0, t2, 6);
-  const tc = fila({ A: [`CONTRATISTA: ${d.contratista}`, est({ sz: 12, bold: true, underline: true, color: AZUL_TITULO })] }, 18);
+  const tc = fila(
+    {
+      A: [
+        `CONTRATISTA: ${d.contratista}`,
+        est({ sz: 12, bold: true, underline: true, color: AZUL_TITULO })
+      ]
+    },
+    18
+  );
   combinar(tc, 0, tc, 4);
 
   const franja = est({ sz: 9, bold: true, fill: AZUL_FRANJA });
@@ -763,7 +1059,10 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
     fila(
       {
         B: [linea.etiqueta, etiqueta],
-        D: linea.cantidad !== undefined ? [num(linea.cantidad), est({ sz: 10, h: "right", fmt: "#,##0.00" })] : ["", null],
+        D:
+          linea.cantidad !== undefined
+            ? [num(linea.cantidad), est({ sz: 10, h: "right", fmt: "#,##0.00" })]
+            : ["", null],
         E: [num(linea.monto), montoGrande]
       },
       20
@@ -771,7 +1070,10 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
   }
   fila({ B: ["TOTAL A FACTURAR", etiqueta], E: [num(d.totales.neto), montoGrande] }, 20);
   fila({}, 20);
-  fila({ A: [`LIQUIDO A PAGAR.... ${montoEnLetras(d.totales.neto)}`, est({ sz: 9, bold: true })] }, 20);
+  fila(
+    { A: [`LIQUIDO A PAGAR.... ${montoEnLetras(d.totales.neto)}`, est({ sz: 9, bold: true })] },
+    20
+  );
   fila({ B: [`Fecha, ${fechaLiquidacionLarga(liquidacion.fechaFin)}`, est({ sz: 10 })] }, 20);
   fila({}, 20);
   fila({}, 20);
@@ -782,7 +1084,12 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
   });
   fila({ A: ["Sup.te Mina Lipeña", est({ sz: 9 })], E: ["Contratista", est({ sz: 9 })] });
   fila({});
-  for (const cc of ["C.c. Presidente Ejecutivo", "C.c. Jefe de Personal", "C.c. Archivos Mina", "C.c. Contratista"]) {
+  for (const cc of [
+    "C.c. Presidente Ejecutivo",
+    "C.c. Jefe de Personal",
+    "C.c. Archivos Mina",
+    "C.c. Contratista"
+  ]) {
     fila({ A: [cc, est({ sz: 8 })] });
   }
 
@@ -795,7 +1102,15 @@ export function exportLiquidacionParticularExcel(liquidacion: Liquidacion) {
       sheet[address].s = s;
     })
   );
-  sheet["!cols"] = [{ wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 13 }];
+  sheet["!cols"] = [
+    { wch: 13 },
+    { wch: 13 },
+    { wch: 13 },
+    { wch: 13 },
+    { wch: 13 },
+    { wch: 13 },
+    { wch: 13 }
+  ];
   sheet["!rows"] = filas.map((_, r) => (alturas[r] ? { hpt: alturas[r] } : {}));
   sheet["!merges"] = merges;
   sheet["!margins"] = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
@@ -861,7 +1176,10 @@ export function exportLiquidacionParticularPdf(liquidacion: Liquidacion) {
   doc.text(`Mes: ${MESES_MAYUSCULA[d.fin.getUTCMonth()]}`, margen + col * 3 + 10, 188);
   doc.text(`Año: ${d.fin.getUTCFullYear()}`, pageWidth - margen - 4, 188, { align: "right" });
 
-  const celda = (content: string, extra: Record<string, unknown> = {}) => ({ content, styles: extra });
+  const celda = (content: string, extra: Record<string, unknown> = {}) => ({
+    content,
+    styles: extra
+  });
   const body: RowInput[] = d.filas.map((f, i) => [
     celda(String(i + 1), { halign: "center", fontStyle: "bold" }),
     celda(f.placa),
@@ -874,7 +1192,13 @@ export function exportLiquidacionParticularPdf(liquidacion: Liquidacion) {
     { content: "TOTAL TMB", colSpan: 2, styles: { halign: "center", fontStyle: "bold" } },
     celda(d.pesoTotalTmb.toFixed(2), { halign: "center", fontStyle: "bold" }),
     "",
-    celda(d.totales.bruto.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), { halign: "center" }),
+    celda(
+      d.totales.bruto.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }),
+      { halign: "center" }
+    ),
     { content: "", colSpan: 2 }
   ]);
 
@@ -884,17 +1208,28 @@ export function exportLiquidacionParticularPdf(liquidacion: Liquidacion) {
     styles: { ...pdfTableStyles, fontSize: 9, cellPadding: 3.5 },
     headStyles: { ...pdfHeadStyles, fillColor: azulFranja, halign: "center", fontSize: 9 },
     columnStyles: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((i) => [i, { cellWidth: col }])),
-    head: [["ITEM", "PLACA", "PESO", "PRECIO TMB", "TOTAL", { content: d.banco ? `BANCO ${d.banco.replace(/^BANCO\s+/, "")}` : "BANCO", colSpan: 2 }]],
+    head: [
+      [
+        "ITEM",
+        "PLACA",
+        "PESO",
+        "PRECIO TMB",
+        "TOTAL",
+        { content: d.banco ? `BANCO ${d.banco.replace(/^BANCO\s+/, "")}` : "BANCO", colSpan: 2 }
+      ]
+    ],
     body
   });
 
-  const enUS = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const enUS = (v: number) =>
+    v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let y = (doc as any).lastAutoTable.finalY + 20;
   const lineaTotal = (etiqueta: string, monto: number, cantidad?: number) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(etiqueta, margen + col + 4, y);
-    if (cantidad !== undefined) doc.text(enUS(cantidad), margen + col * 4 - 6, y, { align: "right" });
+    if (cantidad !== undefined)
+      doc.text(enUS(cantidad), margen + col * 4 - 6, y, { align: "right" });
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text(enUS(monto), margen + col * 4.5, y, { align: "center" });
@@ -947,7 +1282,8 @@ function datosRespaldoPorViaje(liquidacion: Liquidacion) {
   };
 }
 
-const enUS2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const enUS2 = (v: number) =>
+  v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
   const d = datosRespaldoPorViaje(liquidacion);
@@ -960,8 +1296,17 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
     filas.push([...celdas, ...Array(lastCol + 1 - celdas.length).fill(vacia)]);
     return filas.length - 1;
   };
-  const combinar = (r: number, c1: number, c2: number) => merges.push({ s: { r, c: c1 }, e: { r, c: c2 } });
-  const est = (o: { sz?: number; bold?: boolean; h?: "left" | "center" | "right"; fill?: string; borde?: boolean; fmt?: string; color?: string }) => ({
+  const combinar = (r: number, c1: number, c2: number) =>
+    merges.push({ s: { r, c: c1 }, e: { r, c: c2 } });
+  const est = (o: {
+    sz?: number;
+    bold?: boolean;
+    h?: "left" | "center" | "right";
+    fill?: string;
+    borde?: boolean;
+    fmt?: string;
+    color?: string;
+  }) => ({
     font: { sz: o.sz ?? 8, bold: o.bold ?? false, ...(o.color ? { color: { rgb: o.color } } : {}) },
     alignment: { ...(o.h ? { horizontal: o.h } : {}), vertical: "center" },
     ...(o.fill ? { fill: { patternType: "solid", fgColor: { rgb: o.fill } } } : {}),
@@ -970,11 +1315,22 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
   });
   const borde = (o: Parameters<typeof est>[0] = {}) => est({ borde: true, ...o });
 
-  fila([["Empresa Minera", est({ sz: 10, bold: true })], vacia, vacia, vacia, vacia, [d.folio ? `N° ${d.folio}` : "BORRADOR", est({ sz: 10, bold: true, h: "right" })]]);
+  fila([
+    ["Empresa Minera", est({ sz: 10, bold: true })],
+    vacia,
+    vacia,
+    vacia,
+    vacia,
+    [d.folio ? `N° ${d.folio}` : "BORRADOR", est({ sz: 10, bold: true, h: "right" })]
+  ]);
   fila([[`MARTE S.R.L. — NIT: ${MARTE_NIT}`, est({ sz: 8, bold: true })]]);
-  const rTitulo = fila([["RESPALDO POR VIAJE", est({ sz: 12, bold: true, h: "center", color: "1F4E9A" })]]);
+  const rTitulo = fila([
+    ["RESPALDO POR VIAJE", est({ sz: 12, bold: true, h: "center", color: "1F4E9A" })]
+  ]);
   combinar(rTitulo, 0, lastCol);
-  const rSub = fila([["Transporte de carga Chami de mina Lipeña a Chilcobija", est({ sz: 8, h: "center" })]]);
+  const rSub = fila([
+    ["Transporte de carga Chami de mina Lipeña a Chilcobija", est({ sz: 8, h: "center" })]
+  ]);
   combinar(rSub, 0, lastCol);
   const rContr = fila([[`CONTRATISTA: ${d.contratista}`, est({ sz: 8, bold: true, h: "center" })]]);
   combinar(rContr, 0, lastCol);
@@ -984,7 +1340,10 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
   for (const g of d.grupos) {
     fila([]);
     const rPlaca = fila([
-      [`PLACA: ${g.placa}   ·   ${g.viajes} viaje(s)   ·   Precio por TMB: ${g.precioAplicado.toFixed(2)}`, borde({ bold: true, fill: "D9E1F2" })],
+      [
+        `PLACA: ${g.placa}   ·   ${g.viajes} viaje(s)   ·   Precio por TMB: ${g.precioAplicado.toFixed(2)}`,
+        borde({ bold: true, fill: "D9E1F2" })
+      ],
       ["", borde({ fill: "D9E1F2" })],
       ["", borde({ fill: "D9E1F2" })],
       ["", borde({ fill: "D9E1F2" })],
@@ -992,7 +1351,11 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
       ["", borde({ fill: "D9E1F2" })]
     ]);
     combinar(rPlaca, 0, lastCol);
-    fila(["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"].map((t): Celda => [t, borde({ bold: true, h: "center" })]));
+    fila(
+      ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"].map(
+        (t): Celda => [t, borde({ bold: true, h: "center" })]
+      )
+    );
     g.viajesDetalle.forEach((v, i) => {
       fila([
         [i + 1, borde({ h: "center" })],
@@ -1016,7 +1379,12 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
     };
     resumen("Suma del peso neto (3 decimales)", num3(g.pesoTotalCrudo), "0.000");
     resumen("Peso redondeado a 2 decimales (TMB)", num(g.pesoTotal), "0.00");
-    resumen(`Total: ${num(g.pesoTotal).toFixed(2)} TMB × ${g.precioAplicado.toFixed(2)}`, num(g.subtotal), "#,##0.00", true);
+    resumen(
+      `Total: ${num(g.pesoTotal).toFixed(2)} TMB × ${g.precioAplicado.toFixed(2)}`,
+      num(g.subtotal),
+      "#,##0.00",
+      true
+    );
   }
 
   fila([]);
@@ -1072,7 +1440,9 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.rect(pageWidth - margen - 58, 22, 58, 18);
-  doc.text(d.folio ? `N° ${d.folio}` : "BORRADOR", pageWidth - margen - 29, 34, { align: "center" });
+  doc.text(d.folio ? `N° ${d.folio}` : "BORRADOR", pageWidth - margen - 29, 34, {
+    align: "center"
+  });
 
   doc.setFontSize(12);
   doc.setTextColor(...AZUL_CONOCIMIENTO);
@@ -1085,7 +1455,9 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
   doc.setDrawColor(0, 0, 0);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
-  doc.text("Transporte de carga Chami de mina Lipeña a Chilcobija", centerX, 45, { align: "center" });
+  doc.text("Transporte de carga Chami de mina Lipeña a Chilcobija", centerX, 45, {
+    align: "center"
+  });
   doc.text(`CONTRATISTA: ${d.contratista}`, centerX, 55, { align: "center" });
   doc.text(d.fechaTexto, centerX, 65, { align: "center" });
 
@@ -1109,7 +1481,11 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
       y = margen;
     }
     const resumen = (etiqueta: string, valor: string, bold = false): RowInput => [
-      { content: etiqueta, colSpan: 5, styles: { halign: "right", fontStyle: bold ? "bold" : "normal" } },
+      {
+        content: etiqueta,
+        colSpan: 5,
+        styles: { halign: "right", fontStyle: bold ? "bold" : "normal" }
+      },
       { content: valor, styles: { halign: "right", fontStyle: bold ? "bold" : "normal" } }
     ];
     drawPlainTable(doc, {
@@ -1129,17 +1505,23 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
         ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"]
       ],
       body: [
-        ...g.viajesDetalle.map((v, i): RowInput => [
-          String(i + 1),
-          v.numeroViaje,
-          formatFecha(v.fecha),
-          v.correlativo,
-          v.choferNombre,
-          v.tonelajeNeto.toFixed(3)
-        ]),
+        ...g.viajesDetalle.map(
+          (v, i): RowInput => [
+            String(i + 1),
+            v.numeroViaje,
+            formatFecha(v.fecha),
+            v.correlativo,
+            v.choferNombre,
+            v.tonelajeNeto.toFixed(3)
+          ]
+        ),
         resumen("Suma del peso neto (3 decimales)", g.pesoTotalCrudo.toFixed(3)),
         resumen("Peso redondeado a 2 decimales (TMB)", g.pesoTotal.toFixed(2)),
-        resumen(`Total: ${g.pesoTotal.toFixed(2)} TMB × ${g.precioAplicado.toFixed(2)}`, enUS2(g.subtotal), true)
+        resumen(
+          `Total: ${g.pesoTotal.toFixed(2)} TMB × ${g.precioAplicado.toFixed(2)}`,
+          enUS2(g.subtotal),
+          true
+        )
       ],
       showHead: "firstPage"
     });
@@ -1163,7 +1545,8 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
   doc.text(`CONTRATISTA: ${d.contratista}`, margen, y);
   doc.setFont("helvetica", "normal");
   if (d.banco) doc.text(`BANCO: ${d.banco}`, margen, y + 11);
-  if (d.numeroCuenta) doc.text(`NUMERO DE CUENTA: ${d.numeroCuenta}`, margen, y + (d.banco ? 22 : 11));
+  if (d.numeroCuenta)
+    doc.text(`NUMERO DE CUENTA: ${d.numeroCuenta}`, margen, y + (d.banco ? 22 : 11));
 
   openBrowserPrintDialog(doc, `${d.archivo}.pdf`);
 }
@@ -1180,13 +1563,31 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
 // las 4 juntas en la misma fila, y una fila TOTAL TMB al pie con la suma de
 // cada columna numérica.
 const CUADRO_MENSUAL_HEADERS = [
-  "Nº", "FECHA", "CONOCI\nMIENTO", "Form.\n101", "PESO Kg", "MUNICIPIO", "MUNICIP\nIO Nº",
-  "NIVEL 40", "Nivel 0", "Nivel 80", "La Moza", "PROPIETARIO", "CHOFER", "PLACA", "Lote"
+  "Nº",
+  "FECHA",
+  "CONOCI\nMIENTO",
+  "Form.\n101",
+  "PESO Kg",
+  "MUNICIPIO",
+  "MUNICIP\nIO Nº",
+  "NIVEL 40",
+  "Nivel 0",
+  "Nivel 80",
+  "La Moza",
+  "PROPIETARIO",
+  "CHOFER",
+  "PLACA",
+  "Lote"
 ];
 
 function construirFilasCuadroMensual(cuadro: CuadroMensual) {
   const niveles = ["Nivel 40", "Nivel 0", "Nivel 80", "La Moza"];
-  const sumasPorNivel: Record<string, number> = { "Nivel 40": 0, "Nivel 0": 0, "Nivel 80": 0, "La Moza": 0 };
+  const sumasPorNivel: Record<string, number> = {
+    "Nivel 40": 0,
+    "Nivel 0": 0,
+    "Nivel 80": 0,
+    "La Moza": 0
+  };
   let sumaPeso = 0;
 
   const filas = cuadro.lotes.map((l, index) => {
@@ -1214,7 +1615,10 @@ function construirFilasCuadroMensual(cuadro: CuadroMensual) {
       placa: l.vehiculo?.placa ?? "",
       // "Lote" = combustible ASIGNADO (lo que posiblemente le tocaba dar a
       // ese viaje) — no el real entregado; en blanco si no llevó combustible.
-      lote: l.combustibleAsignadoLitros !== null && l.combustibleAsignadoLitros !== undefined ? Number(l.combustibleAsignadoLitros) : ""
+      lote:
+        l.combustibleAsignadoLitros !== null && l.combustibleAsignadoLitros !== undefined
+          ? Number(l.combustibleAsignadoLitros)
+          : ""
     };
   });
 
@@ -1223,7 +1627,8 @@ function construirFilasCuadroMensual(cuadro: CuadroMensual) {
 
 function tituloCuadroMensual(municipioNombre: string, anio: number, mes: number, nivel?: string) {
   const partes = [`Mes: ${MESES_MAYUSCULA[mes - 1]} ${anio}`];
-  if (municipioNombre && municipioNombre !== "TODOS LOS MUNICIPIOS") partes.push(`Municipio: ${municipioNombre.toUpperCase()}`);
+  if (municipioNombre && municipioNombre !== "TODOS LOS MUNICIPIOS")
+    partes.push(`Municipio: ${municipioNombre.toUpperCase()}`);
   if (nivel) partes.push(`Nivel: ${nivel}`);
   return partes.join("   ·   ");
 }
@@ -1243,12 +1648,34 @@ export function exportCuadroMensualExcel(
     ["MARTE S.R.L.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
     ["CUADRO DE ENVIO DE CARGA CHAMI", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
     ["DE MINA LIPEÑA A CHILCOBIJA", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-    [tituloCuadroMensual(municipioNombre, anio, mes, nivel), "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    [
+      tituloCuadroMensual(municipioNombre, anio, mes, nivel),
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
     [],
     CUADRO_MENSUAL_HEADERS.map((h) => h.replace("\n", " "))
   ];
   const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total" | "blank"> = [
-    "subtitle", "title", "title", "subtitle", "subtitle", "blank", "header"
+    "subtitle",
+    "title",
+    "title",
+    "subtitle",
+    "subtitle",
+    "blank",
+    "header"
   ];
 
   for (const f of filas) {
@@ -1273,22 +1700,41 @@ export function exportCuadroMensualExcel(
   }
 
   aoa.push([
-    "", "", "", "",
+    "",
+    "",
+    "",
+    "",
     num3(sumaPeso),
-    "", "",
+    "",
+    "",
     num3(sumasPorNivel["Nivel 40"]!),
     num3(sumasPorNivel["Nivel 0"]!),
     num3(sumasPorNivel["Nivel 80"]!),
     num3(sumasPorNivel["La Moza"]!),
-    "", "", "",
+    "",
+    "",
+    "",
     "TOTAL TMB."
   ]);
   rowKinds.push("total");
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
   sheet["!cols"] = [
-    { wch: 4 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 9 }, { wch: 12 }, { wch: 9 },
-    { wch: 9 }, { wch: 8 }, { wch: 9 }, { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 9 }, { wch: 7 }
+    { wch: 4 },
+    { wch: 10 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 9 },
+    { wch: 12 },
+    { wch: 9 },
+    { wch: 9 },
+    { wch: 8 },
+    { wch: 9 },
+    { wch: 8 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 9 },
+    { wch: 7 }
   ];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
@@ -1299,7 +1745,16 @@ export function exportCuadroMensualExcel(
   ];
   rowKinds.forEach((kind, index) => {
     if (kind === "blank") return;
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : kind === "total" ? totalStyle : bodyStyle;
+    const style =
+      kind === "title"
+        ? titleStyle
+        : kind === "subtitle"
+          ? subtitleStyle
+          : kind === "header"
+            ? headerStyle
+            : kind === "total"
+              ? totalStyle
+              : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
   for (const col of [4, 7, 8, 9, 10]) {
@@ -1337,7 +1792,9 @@ export function exportCuadroMensualPdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text("DE MINA LIPEÑA A CHILCOBIJA", centerX, 34, { align: "center" });
-  doc.text(tituloCuadroMensual(municipioNombre, anio, mes, nivel), centerX, 46, { align: "center" });
+  doc.text(tituloCuadroMensual(municipioNombre, anio, mes, nivel), centerX, 46, {
+    align: "center"
+  });
 
   const rows: RowInput[] = filas.map((f) => [
     f.numero,
@@ -1357,14 +1814,20 @@ export function exportCuadroMensualPdf(
     f.lote === "" ? "" : String(f.lote)
   ]);
   rows.push([
-    "", "", "", "",
+    "",
+    "",
+    "",
+    "",
     sumaPeso.toFixed(3),
-    "", "",
+    "",
+    "",
     sumasPorNivel["Nivel 40"]!.toFixed(3),
     sumasPorNivel["Nivel 0"]!.toFixed(3),
     sumasPorNivel["Nivel 80"]!.toFixed(3),
     sumasPorNivel["La Moza"]!.toFixed(3),
-    "", "", "",
+    "",
+    "",
+    "",
     "TOTAL TMB."
   ]);
 
@@ -1411,7 +1874,7 @@ const DE_CONOCIMIENTO = "Mina Lipeña MARTE S.R.L.";
 // La carga se entrega a EMUSA; el ingenio va después como sector.
 function destinatarioConocimiento(lote: LoteDespacho) {
   const ingenio = lote.destinoIngenio?.nombre;
-  return ingenio ? `EMUSA Sector Ingenio ${ingenio}` : "EMUSA";
+  return ingenio ? `EMUSA Sector ${ingenio}` : "EMUSA";
 }
 
 function descripcionConocimiento(lote: LoteDespacho) {
@@ -1450,7 +1913,11 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
     alignment: { horizontal: "center" as const },
     border: azulBorder
   };
-  const celdaAzul = { font: { sz: 10, ...azulFont }, border: azulBorder, alignment: { vertical: "top" as const, wrapText: true } };
+  const celdaAzul = {
+    font: { sz: 10, ...azulFont },
+    border: azulBorder,
+    alignment: { vertical: "top" as const, wrapText: true }
+  };
 
   const aoa: Array<Array<string | number>> = [
     ["EMPRESA MINERA", "", "", "CONOCIMIENTO", "", "N°", lote.correlativo],
@@ -1466,17 +1933,35 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
     [],
     ["Observaciones:", conocimiento?.observaciones ?? "", "", "", "", "", ""],
     [],
-    ["Lugar y Fecha:", `${LUGAR_CONOCIMIENTO}, ${fechaConocimientoLarga(fecha)}`, "", "", "", "", ""],
+    [
+      "Lugar y Fecha:",
+      `${LUGAR_CONOCIMIENTO}, ${fechaConocimientoLarga(fecha)}`,
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
     [],
     ["Recibí conforme", "", "", "Despachador", "", "", ""]
   ];
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 16 }, { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 6 }, { wch: 12 }];
+  sheet["!cols"] = [
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 22 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 6 },
+    { wch: 12 }
+  ];
   // Una sola fila de datos, alta (no dos): la línea "de en medio" en la foto
   // real es el doblez físico de la hoja del talonario, no una división del
   // formulario.
-  sheet["!rows"] = Array.from({ length: aoa.length }, (_, index) => (index === 9 ? { hpt: 120 } : {}));
+  sheet["!rows"] = Array.from({ length: aoa.length }, (_, index) =>
+    index === 9 ? { hpt: 120 } : {}
+  );
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
@@ -1495,7 +1980,11 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
   styleRow(sheet, 0, 6, tituloAzul);
   setStyle(sheet, XLSX.utils.encode_cell({ r: 0, c: 3 }), tituloAzul);
   setStyle(sheet, XLSX.utils.encode_cell({ r: 0, c: 5 }), labelAzul);
-  setStyle(sheet, XLSX.utils.encode_cell({ r: 0, c: 6 }), { font: { bold: true, sz: 12, ...azulFont }, border: azulBorder, alignment: { horizontal: "center" as const } });
+  setStyle(sheet, XLSX.utils.encode_cell({ r: 0, c: 6 }), {
+    font: { bold: true, sz: 12, ...azulFont },
+    border: azulBorder,
+    alignment: { horizontal: "center" as const }
+  });
   styleRow(sheet, 1, 6, tituloAzul);
   for (const r of [3, 4, 5, 6, 11, 13]) {
     setStyle(sheet, XLSX.utils.encode_cell({ r, c: 0 }), labelAzul);
@@ -1504,7 +1993,10 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
   setStyle(sheet, XLSX.utils.encode_cell({ r: 5, c: 3 }), labelAzul);
   styleRow(sheet, 8, 6, headerAzul);
   styleRow(sheet, 9, 6, celdaAzul);
-  setStyle(sheet, XLSX.utils.encode_cell({ r: 9, c: 2 }), { ...celdaAzul, font: { bold: true, sz: 14, ...azulFont } });
+  setStyle(sheet, XLSX.utils.encode_cell({ r: 9, c: 2 }), {
+    ...celdaAzul,
+    font: { bold: true, sz: 14, ...azulFont }
+  });
   styleRow(sheet, 15, 6, labelAzul);
 
   const workbook = XLSX.utils.book_new();
@@ -1671,7 +2163,17 @@ export function exportBoletaPesajeExcel(lote: LoteDespacho) {
     [EMISA_SECTOR, "", "", "", "", "", "", ""],
     ["BOLETA DE PESAJE BALANZA CHILCOBIJA", "", "", "", "", "", "", ""],
     [],
-    ["FECHA", "HRS.", "BRUTO LB.", "BRUTO Kg.", "TARA LB.", "TARA Kg.", "NETO LB.", "NETO Kg.", "OBSERV."] as any,
+    [
+      "FECHA",
+      "HRS.",
+      "BRUTO LB.",
+      "BRUTO Kg.",
+      "TARA LB.",
+      "TARA Kg.",
+      "NETO LB.",
+      "NETO Kg.",
+      "OBSERV."
+    ] as any,
     [
       formatFecha(pesaje.fechaPesaje),
       formatHora(pesaje.fechaPesaje),
@@ -1685,20 +2187,49 @@ export function exportBoletaPesajeExcel(lote: LoteDespacho) {
     ] as any,
     [],
     ["DETALLE DE CARGA", "", "", "", "", "", "", ""],
-    [`Procedencia: ${lote.municipioOrigen?.nombre ?? "-"}`, "", "", "", `Tipo de mineral: ${lote.tipoMineral?.nombre ?? "-"}`, "", "", ""],
+    [
+      `Procedencia: ${lote.municipioOrigen?.nombre ?? "-"}`,
+      "",
+      "",
+      "",
+      `Tipo de mineral: ${lote.tipoMineral?.nombre ?? "-"}`,
+      "",
+      "",
+      ""
+    ],
     [`Conductor: ${lote.chofer?.nombre ?? "-"}`, "", "", "", "", "", "", ""],
     [`Placa: ${lote.vehiculo?.placa ?? "-"}`, "", "", "", "", "", "", ""],
     [],
     ["Responsable de balanza", "", "", "", "Vo.Bo. Supervisor", "", "", ""]
   ];
   const rowKinds: Array<"title" | "subtitle" | "header" | "normal"> = [
-    "subtitle", "subtitle", "title", "normal",
-    "header", "normal", "normal",
-    "subtitle", "normal", "normal", "normal", "normal", "normal"
+    "subtitle",
+    "subtitle",
+    "title",
+    "normal",
+    "header",
+    "normal",
+    "normal",
+    "subtitle",
+    "normal",
+    "normal",
+    "normal",
+    "normal",
+    "normal"
   ];
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+  sheet["!cols"] = [
+    { wch: 12 },
+    { wch: 8 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 }
+  ];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
@@ -1708,7 +2239,14 @@ export function exportBoletaPesajeExcel(lote: LoteDespacho) {
     { s: { r: 8, c: 4 }, e: { r: 8, c: 8 } }
   ];
   rowKinds.forEach((kind, index) => {
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : bodyStyle;
+    const style =
+      kind === "title"
+        ? titleStyle
+        : kind === "subtitle"
+          ? subtitleStyle
+          : kind === "header"
+            ? headerStyle
+            : bodyStyle;
     styleRow(sheet, index, 8, style);
   });
 
@@ -1739,7 +2277,19 @@ export function exportBoletaPesajePdf(lote: LoteDespacho) {
 
   drawPlainTable(doc, {
     startY: 64,
-    head: [["FECHA", "HRS.", "BRUTO LB.", "BRUTO Kg.", "TARA LB.", "TARA Kg.", "NETO LB.", "NETO Kg.", "OBSERV."]],
+    head: [
+      [
+        "FECHA",
+        "HRS.",
+        "BRUTO LB.",
+        "BRUTO Kg.",
+        "TARA LB.",
+        "TARA Kg.",
+        "NETO LB.",
+        "NETO Kg.",
+        "OBSERV."
+      ]
+    ],
     body: [
       [
         formatFecha(pesaje.fechaPesaje),
@@ -1756,8 +2306,12 @@ export function exportBoletaPesajePdf(lote: LoteDespacho) {
     styles: pdfTableStyles,
     headStyles: pdfHeadStyles,
     columnStyles: {
-      2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },
-      5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" }
+      2: { halign: "right" },
+      3: { halign: "right" },
+      4: { halign: "right" },
+      5: { halign: "right" },
+      6: { halign: "right" },
+      7: { halign: "right" }
     },
     margin: { left: 20, right: 20 }
   });
@@ -1819,7 +2373,12 @@ function agruparPorVolqueta(lotes: LoteDespacho[]): GrupoVolqueta[] {
   const mapa = new Map<string, GrupoVolqueta>();
   for (const lote of lotes) {
     const placa = lote.vehiculo?.placa ?? "-";
-    const grupo = mapa.get(placa) ?? { placa, chofer: lote.chofer?.nombre ?? "-", filas: [], total: 0 };
+    const grupo = mapa.get(placa) ?? {
+      placa,
+      chofer: lote.chofer?.nombre ?? "-",
+      filas: [],
+      total: 0
+    };
     const peso = Number(lote.pesaje?.tonelajeNeto ?? 0);
     grupo.filas.push({
       placa,
@@ -1838,7 +2397,9 @@ function agruparPorVolqueta(lotes: LoteDespacho[]): GrupoVolqueta[] {
 function tituloTransporteMineral(lotes: LoteDespacho[]) {
   const nombres = new Set(lotes.map((l) => l.tipoMineral?.nombre).filter(Boolean));
   const mineral = nombres.size === 1 ? Array.from(nombres)[0] : "";
-  return `Transporte de carga ${mineral ?? ""} de mina Lipeña a Chilcobija`.replace(/\s+/g, " ").trim();
+  return `Transporte de carga ${mineral ?? ""} de mina Lipeña a Chilcobija`
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function exportDetalleVolquetaExcel(
@@ -1854,7 +2415,10 @@ export function exportDetalleVolquetaExcel(
     [titulo, "", "", "", "", "", ""],
     [`Del ${formatFecha(fechaInicio)} al ${formatFecha(fechaFin)}`, "", "", "", "", "", ""]
   ];
-  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total"> = ["title", "subtitle"];
+  const rowKinds: Array<"title" | "subtitle" | "header" | "normal" | "total"> = [
+    "title",
+    "subtitle"
+  ];
 
   // Info lateral fija por grupo (Contratista/Banco/Número de cuenta/Total),
   // se intercala fila a fila junto a la tabla principal de viajes.
@@ -1894,16 +2458,39 @@ export function exportDetalleVolquetaExcel(
   }
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [{ wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 10 }];
-  sheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }];
+  sheet["!cols"] = [
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 10 }
+  ];
+  sheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
+  ];
   rowKinds.forEach((kind, index) => {
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : kind === "total" ? totalStyle : bodyStyle;
+    const style =
+      kind === "title"
+        ? titleStyle
+        : kind === "subtitle"
+          ? subtitleStyle
+          : kind === "header"
+            ? headerStyle
+            : kind === "total"
+              ? totalStyle
+              : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Detalle Volquetas".slice(0, 31));
-  XLSX.writeFile(workbook, `detalle-volquetas-${transportista.nombreORazonSocial.replace(/\s+/g, "-")}.xlsx`);
+  XLSX.writeFile(
+    workbook,
+    `detalle-volquetas-${transportista.nombreORazonSocial.replace(/\s+/g, "-")}.xlsx`
+  );
 }
 
 export function exportDetalleVolquetaPdf(
@@ -1925,7 +2512,9 @@ export function exportDetalleVolquetaPdf(
   doc.text(titulo, centerX, 30, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Del ${formatFecha(fechaInicio)} al ${formatFecha(fechaFin)}`, centerX, 46, { align: "center" });
+  doc.text(`Del ${formatFecha(fechaInicio)} al ${formatFecha(fechaFin)}`, centerX, 46, {
+    align: "center"
+  });
 
   let y = 62;
   for (const grupo of grupos) {
@@ -1939,7 +2528,12 @@ export function exportDetalleVolquetaPdf(
     doc.text(`Chofer: ${grupo.chofer}`, margin, y);
     doc.text(`Placa: ${grupo.placa}`, margin + 260, y);
 
-    const rows: RowInput[] = grupo.filas.map((f) => [f.nroViaje, f.fecha, f.conocimiento, formatBs(f.peso)]);
+    const rows: RowInput[] = grupo.filas.map((f) => [
+      f.nroViaje,
+      f.fecha,
+      f.conocimiento,
+      formatBs(f.peso)
+    ]);
     rows.push(["", "", "TOTAL", formatBs(grupo.total)]);
 
     drawPlainTable(doc, {
@@ -1972,7 +2566,10 @@ export function exportDetalleVolquetaPdf(
     y = Math.max(finalYTablaPrincipal, finalYCajaLateral) + 24;
   }
 
-  openBrowserPrintDialog(doc, `detalle-volquetas-${transportista.nombreORazonSocial.replace(/\s+/g, "-")}.pdf`);
+  openBrowserPrintDialog(
+    doc,
+    `detalle-volquetas-${transportista.nombreORazonSocial.replace(/\s+/g, "-")}.pdf`
+  );
 }
 
 // ============================================================================
@@ -2003,7 +2600,12 @@ export function exportTablaReporteExcel(config: TablaReporteConfig) {
     [],
     config.columnas
   ];
-  const rowKinds: Array<"title" | "subtitle" | "normal" | "header"> = ["title", "subtitle", "normal", "header"];
+  const rowKinds: Array<"title" | "subtitle" | "normal" | "header"> = [
+    "title",
+    "subtitle",
+    "normal",
+    "header"
+  ];
 
   for (const fila of config.filas) {
     aoa.push(fila);
@@ -2015,14 +2617,24 @@ export function exportTablaReporteExcel(config: TablaReporteConfig) {
   }
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = config.anchoColumnas?.map((wch) => ({ wch })) ?? config.columnas.map(() => ({ wch: 18 }));
+  sheet["!cols"] =
+    config.anchoColumnas?.map((wch) => ({ wch })) ?? config.columnas.map(() => ({ wch: 18 }));
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }
   ];
   rowKinds.forEach((kind, index) => {
     const isTotales = config.filaTotales && index === aoa.length - 1;
-    const style = kind === "title" ? titleStyle : kind === "subtitle" ? subtitleStyle : kind === "header" ? headerStyle : isTotales ? totalStyle : bodyStyle;
+    const style =
+      kind === "title"
+        ? titleStyle
+        : kind === "subtitle"
+          ? subtitleStyle
+          : kind === "header"
+            ? headerStyle
+            : isTotales
+              ? totalStyle
+              : bodyStyle;
     styleRow(sheet, index, lastCol, style);
   });
   for (const col of config.colsNumericas ?? []) {

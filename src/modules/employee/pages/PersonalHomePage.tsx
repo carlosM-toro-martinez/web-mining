@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ClipboardList, UsersRound, Clock3, CalendarDays, UserCog, FileBarChart2 } from "lucide-react";
+import { Fingerprint, UsersRound, Clock3, CalendarDays, UserCog, FileBarChart2 } from "lucide-react";
 import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { BiometricStatusBadge } from "@/modules/employee/components/BiometricStatusBadge";
 
@@ -12,10 +12,10 @@ const cards = [
     recurso: "personal.empleados"
   },
   {
-    title: "Reportes",
-    description: "Asistencia filtrada por fecha, empleado y tipo con paginación.",
-    to: "/personal/reportes",
-    icon: ClipboardList,
+    title: "Biométrico",
+    description: "Marcaciones del dispositivo biométrico filtradas por fecha, empleado y tipo.",
+    to: "/personal/biometrico",
+    icon: Fingerprint,
     recurso: "personal.asistencia"
   },
   {
@@ -40,8 +40,8 @@ const cards = [
     recurso: "personal.ausencias"
   },
   {
-    title: "Reporte Asistencia",
-    description: "Comparación de marcajes versus horario asignado.",
+    title: "Reporte de asistencia",
+    description: "Detalle de asistencia, minutos atrasados, faltas y resumen por trabajador.",
     to: "/personal/reporte",
     icon: FileBarChart2,
     recurso: "personal.asistencia"

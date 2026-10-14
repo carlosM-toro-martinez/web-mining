@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileBarChart2,
+  Fingerprint,
   UploadCloud,
   LayoutDashboard,
   Layers3,
@@ -65,11 +66,9 @@ export function AppShell() {
   const isRecepcionista = user?.role === "RECEPCIONISTA";
   const isSuperintendente = user?.role === "SUPERINTENDENTE";
   const isAdministrador = user?.role === "ADMINISTRADOR";
-  const isAsistenteAdministrativo = user?.role === "ASISTENTE_ADMINISTRATIVO";
   const isContador = user?.role === "CONTADOR";
   const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
   const canSeeInventorySection = canSeeInventoryRoute || isContador;
-  const canSeeLogisticaRoute = isAdmin || isSuperintendente || isAsistenteAdministrativo;
   const canSeeCajaChicaRoute = isAdmin || isAdministrador || isContador || isSuperintendente;
   // EPP y Ambiental restringidos solo a ADMIN por ahora, a pedido explícito,
   // hasta que se creen roles específicos (ej. Seguridad, Medioambiente) que
@@ -124,25 +123,26 @@ export function AppShell() {
   const personalNavItems = useMemo(() => {
     const items: Array<NavItem & { recurso: string }> = [
       { label: "Personal", icon: IdCard, to: "/personal/empleados", recurso: "personal.empleados" },
-      { label: "Reportes", icon: FileBarChart2, to: "/personal/reportes", recurso: "personal.asistencia" },
+      { label: "Biométrico", icon: Fingerprint, to: "/personal/biometrico", recurso: "personal.asistencia" },
       { label: "Horarios", icon: CalendarClock, to: "/personal/horarios", recurso: "personal.horarios" },
       { label: "Asignaciones", icon: ClipboardList, to: "/personal/asignaciones", recurso: "personal.asignaciones" },
       { label: "Ausencias", icon: RefreshCw, to: "/personal/ausencias", recurso: "personal.ausencias" },
-      { label: "Reporte", icon: FileBarChart2, to: "/personal/reporte", recurso: "personal.asistencia" }
+      { label: "Reporte de asistencia", icon: FileBarChart2, to: "/personal/reporte", recurso: "personal.asistencia" }
     ];
     return items.filter((item) => can(item.recurso, "ver")) as NavItem[];
   }, [can]);
 
+  // Logística usa permisos dinámicos (Sistema → Roles y permisos)
   const logisticaNavItems = useMemo(() => {
-    if (!canSeeLogisticaRoute) return [];
-    return [
-      { label: "Flota", icon: Truck, to: "/logistica/flota" },
-      { label: "Lotes de despacho", icon: PackageSearch, to: "/logistica/lotes" },
-      { label: "Liquidaciones", icon: ReceiptText, to: "/logistica/liquidaciones" },
-      { label: "Reportes", icon: FileBarChart2, to: "/logistica/reportes" },
-      { label: "Parámetros", icon: Landmark, to: "/logistica/parametros" }
-    ] as NavItem[];
-  }, [canSeeLogisticaRoute]);
+    const items: Array<NavItem & { recurso: string }> = [
+      { label: "Flota", icon: Truck, to: "/logistica/flota", recurso: "logistica.flota" },
+      { label: "Lotes de despacho", icon: PackageSearch, to: "/logistica/lotes", recurso: "logistica.lotes" },
+      { label: "Liquidaciones", icon: ReceiptText, to: "/logistica/liquidaciones", recurso: "logistica.liquidaciones" },
+      { label: "Reportes", icon: FileBarChart2, to: "/logistica/reportes", recurso: "logistica.reportes" },
+      { label: "Parámetros", icon: Landmark, to: "/logistica/parametros", recurso: "logistica.parametros" }
+    ];
+    return items.filter((item) => can(item.recurso, "ver")) as NavItem[];
+  }, [can]);
 
   const cajaChicaNavItems = useMemo(() => {
     if (!canSeeCajaChicaRoute) return [];

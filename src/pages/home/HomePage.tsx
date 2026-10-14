@@ -12,6 +12,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
 interface DashboardItem {
   title: string;
@@ -30,12 +31,13 @@ export function HomePage() {
   const isAlmacenero = user?.role === "ALMACENERO";
   const isRecepcionista = user?.role === "RECEPCIONISTA";
   const isAdministrador = user?.role === "ADMINISTRADOR";
-  const isAsistenteAdministrativo = user?.role === "ASISTENTE_ADMINISTRATIVO";
   const isContador = user?.role === "CONTADOR";
+  // Personal y Logística ya usan permisos dinámicos (Sistema → Roles y permisos)
+  const { canAny } = usePermisos();
 
   const canSeeInventario = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
-  const canSeePersonal = isAdmin || isAdministrador || isSuperintendente;
-  const canSeeLogistica = isAdmin || isSuperintendente || isAsistenteAdministrativo;
+  const canSeePersonal = canAny("personal");
+  const canSeeLogistica = canAny("logistica");
   const canSeeCajaChica = isAdmin || isAdministrador || isContador || isSuperintendente;
   // EPP y Ambiental: solo ADMIN por ahora, a pedido explícito, hasta que se
   // creen roles específicos (ej. Seguridad, Medioambiente) que deban verlos.

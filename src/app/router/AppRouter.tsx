@@ -42,11 +42,11 @@ import { RendicionesCajaPage } from "@/pages/cajaChica/RendicionesCajaPage";
 import { ReportesCajaChicaPage } from "@/pages/cajaChica/ReportesCajaChicaPage";
 import { EmployeePage } from "@/modules/employee/pages/EmployeePage";
 import { PersonalHomePage } from "@/modules/employee/pages/PersonalHomePage";
-import { PersonalReportsPage } from "@/modules/employee/pages/PersonalReportsPage";
+import { PersonalBiometricoPage } from "@/modules/employee/pages/PersonalBiometricoPage";
 import { PersonalSchedulesPage } from "@/modules/employee/pages/PersonalSchedulesPage";
 import { PersonalAssignmentsPage } from "@/modules/employee/pages/PersonalAssignmentsPage";
 import { PersonalAbsencesPage } from "@/modules/employee/pages/PersonalAbsencesPage";
-import { PersonalReportPage } from "@/modules/employee/pages/PersonalReportPage";
+import { PersonalAsistenciaReportesPage } from "@/modules/employee/pages/PersonalAsistenciaReportesPage";
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
@@ -80,9 +80,12 @@ export function AppRouter() {
               <Route path="/personal/empleados" element={<EmployeePage />} />
             </Route>
             <Route element={<PermisoRoute recurso="personal.asistencia" />}>
-              <Route path="/personal/reportes" element={<PersonalReportsPage />} />
-              <Route path="/personal/reporte" element={<PersonalReportPage />} />
+              <Route path="/personal/biometrico" element={<PersonalBiometricoPage />} />
+              <Route path="/personal/reporte" element={<Navigate to="/personal/reporte/detalle-diario" replace />} />
+              <Route path="/personal/reporte/:tipo" element={<PersonalAsistenciaReportesPage />} />
             </Route>
+            {/* URL anterior de las marcaciones del biométrico */}
+            <Route path="/personal/reportes" element={<Navigate to="/personal/biometrico" replace />} />
             <Route element={<PermisoRoute recurso="personal.horarios" />}>
               <Route path="/personal/horarios" element={<PersonalSchedulesPage />} />
             </Route>
@@ -137,15 +140,25 @@ export function AppRouter() {
 
           <Route element={<LogisticaRoute />}>
             <Route path="/logistica" element={<LogisticaPage />} />
-            <Route path="/logistica/parametros" element={<ParametrosLogisticaPage />} />
-            <Route path="/logistica/flota" element={<FlotaPage />} />
-            <Route path="/logistica/lotes" element={<LotesDespachoPage />} />
-            <Route path="/logistica/liquidaciones" element={<LiquidacionesPage />} />
-            <Route
-              path="/logistica/reportes"
-              element={<Navigate to="/logistica/reportes/cuadro-mensual" replace />}
-            />
-            <Route path="/logistica/reportes/:tipo" element={<LogisticaReportesPage />} />
+            <Route element={<PermisoRoute recurso="logistica.parametros" />}>
+              <Route path="/logistica/parametros" element={<ParametrosLogisticaPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="logistica.flota" />}>
+              <Route path="/logistica/flota" element={<FlotaPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="logistica.lotes" />}>
+              <Route path="/logistica/lotes" element={<LotesDespachoPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="logistica.liquidaciones" />}>
+              <Route path="/logistica/liquidaciones" element={<LiquidacionesPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="logistica.reportes" />}>
+              <Route
+                path="/logistica/reportes"
+                element={<Navigate to="/logistica/reportes/cuadro-mensual" replace />}
+              />
+              <Route path="/logistica/reportes/:tipo" element={<LogisticaReportesPage />} />
+            </Route>
           </Route>
 
           <Route element={<CajaChicaRoute />}>

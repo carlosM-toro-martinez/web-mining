@@ -1,15 +1,14 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
+// Acceso al módulo Logística: cualquier permiso "logistica.*" del rol.
+// Cada página/acción verifica además su permiso específico.
 export function LogisticaRoute() {
-  const { user } = useAuth();
+  const { canAny, isLoading } = usePermisos();
 
-  const canAccess =
-    user?.role === "ADMIN" ||
-    user?.role === "SUPERINTENDENTE" ||
-    user?.role === "ASISTENTE_ADMINISTRATIVO";
+  if (isLoading) return null;
 
-  if (!canAccess) {
+  if (!canAny("logistica")) {
     return <Navigate to="/perfil" replace />;
   }
 

@@ -1,21 +1,8 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx-js-style";
-import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
-import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
-import { getTipoPersonalLabel, useEmployees } from "@/modules/employee/hooks/useEmployees";
-import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
-import { httpClient } from "@/shared/api/core/httpClient";
+import { getTipoPersonalLabel } from "@/modules/employee/hooks/useEmployees";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { LibroAsistenciaReport } from "@/modules/employee/components/LibroAsistenciaReport";
-
-interface ReportDay {
-  fecha: string;
-  estado: string;
-  minutosRetraso: number;
-  real?: { entrada?: string; salida?: string } | null;
-  salidaEstimada?: string | null;
-}
+import type { ReportData, ReportDay, ReportEmployee } from "@/modules/employee/lib/asistenciaReport";
 
 function hasAttendanceMark(day: ReportDay) {
   const status = day.estado.trim().toUpperCase();
@@ -54,19 +41,6 @@ const monthNames = [
   "NOVIEMBRE",
   "DICIEMBRE"
 ];
-
-interface ReportEmployee {
-  empleado: {
-    id: number;
-    nombre: string;
-    documento?: string | null;
-    cargo?: string | null;
-    tipoPersonal?: EmployeeTipoPersonal | null;
-  };
-  horarioActual?: { nombre: string; entrada: string; salida: string } | null;
-  dias: ReportDay[];
-  resumen: Record<string, number>;
-}
 
 type RayadorCellValue = string | number;
 
@@ -131,68 +105,11 @@ interface AttendanceSummary {
   totalDays: number;
 }
 
-function formatDateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getCurrentMonthRange() {
-  const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-  return {
-    desde: formatDateInputValue(firstDay),
-    hasta: formatDateInputValue(today)
-  };
-}
-
-export function PersonalReportPage() {
+// Reporte "Detalle de asistencia": una tarjeta por empleado con su detalle diario,
+// el Libro de Asistencia y los exportes Rayador / Planilla. Los filtros y la
+// consulta viven en el hub (PersonalAsistenciaReportesPage).
+export function DetalleAsistenciaReport({ entries, isLoading, isFetching, isError, desde, hasta }: ReportData) {
   const { showError, showSuccess } = useToast();
-  const employees = useEmployees();
-  const defaultRange = useMemo(() => getCurrentMonthRange(), []);
-  const [desde, setDesde] = useState(defaultRange.desde);
-  const [hasta, setHasta] = useState(defaultRange.hasta);
-  const [empleadoId, setEmpleadoId] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({
-    desde: defaultRange.desde,
-    hasta: defaultRange.hasta,
-    empleadoId: ""
-  });
-
-  const reportQuery = useQuery({
-    queryKey: ["personal-reporte", appliedFilters.desde, appliedFilters.hasta, appliedFilters.empleadoId],
-    enabled: Boolean(appliedFilters.desde && appliedFilters.hasta),
-    queryFn: async () => {
-      const response = await httpClient.get("/api/personal/reporte", {
-        params: {
-          desde: appliedFilters.desde,
-          hasta: appliedFilters.hasta,
-          empleadoId: appliedFilters.empleadoId || undefined
-        }
-      });
-      const payload = response.data as { data?: { empleados?: ReportEmployee[] } };
-      return payload.data?.empleados ?? [];
-    }
-  });
-
-  const employeeOptions = useMemo(
-    () =>
-      employees.getAll.data.map((employee) => ({
-        id: String(employee.remoteId ?? employee.id),
-        label: `${employee.nombre} - ${getTipoPersonalLabel(employee.tipoPersonal)}`,
-        searchText: `${employee.documento ?? ""} ${employee.cargo ?? ""} ${employee.deviceUserId ?? ""} ${getTipoPersonalLabel(employee.tipoPersonal)}`
-      })),
-    [employees.getAll.data]
-  );
-
-  function handleLoadReport() {
-    if (!desde || !hasta) {
-      showError("Selecciona fecha desde y hasta para cargar el reporte.");
-      return;
-    }
-    setAppliedFilters({ desde, hasta, empleadoId });
-  }
 
   function buildAttendanceSummary(entry: ReportEmployee, fromDate: Date | null, daysCount: number): AttendanceSummary {
     const marks = Array.from({ length: daysCount }, () => "");
@@ -248,9 +165,8 @@ export function PersonalReportPage() {
 
   async function handleExportPayrollDataExcel() {
     try {
-      const entries = reportQuery.data ?? [];
-      const fromDate = appliedFilters.desde ? new Date(`${appliedFilters.desde}T00:00:00`) : null;
-      const toDate = appliedFilters.hasta ? new Date(`${appliedFilters.hasta}T00:00:00`) : null;
+            const fromDate = desde ? new Date(`${desde}T00:00:00`) : null;
+      const toDate = hasta ? new Date(`${hasta}T00:00:00`) : null;
       const daysInRange =
         fromDate && toDate
           ? Math.max(
@@ -468,7 +384,7 @@ export function PersonalReportPage() {
       ws["!margins"] = { left: 0.25, right: 0.25, top: 0.25, bottom: 0.25, header: 0.1, footer: 0.1 };
 
       XLSX.utils.book_append_sheet(wb, ws, "DATOS");
-      XLSX.writeFile(wb, `datos-planilla-${appliedFilters.desde || "sin-desde"}-${appliedFilters.hasta || "sin-hasta"}.xlsx`);
+      XLSX.writeFile(wb, `datos-planilla-${desde || "sin-desde"}-${hasta || "sin-hasta"}.xlsx`);
       showSuccess(`Planilla generada con ${entries.length} trabajadores.`);
     } catch (error) {
       showError(error instanceof Error ? error.message : "No se pudo exportar la planilla.");
@@ -477,8 +393,7 @@ export function PersonalReportPage() {
 
   async function handleExportExcel() {
     try {
-      const entries = reportQuery.data ?? [];
-      const fromDate = desde ? new Date(`${desde}T00:00:00`) : null;
+            const fromDate = desde ? new Date(`${desde}T00:00:00`) : null;
       const toDate = hasta ? new Date(`${hasta}T00:00:00`) : null;
       const daysInRange =
         fromDate && toDate
@@ -832,58 +747,43 @@ export function PersonalReportPage() {
   }
 
   return (
-    <section className="space-y-6 text-[var(--color-on-surface)]">
-      <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
-        <div className="mb-4"><SubrouteBackButton to="/personal" label="Volver a Personal" /></div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="page-title font-headline text-3xl font-extrabold">Reporte de Asistencia</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void handleExportPayrollDataExcel()} disabled={reportQuery.isLoading || !reportQuery.data?.length} className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] disabled:cursor-not-allowed disabled:opacity-60">
-              Exportar planilla
-            </button>
-            <button type="button" onClick={() => void handleExportExcel()} disabled={reportQuery.isLoading || !reportQuery.data?.length} className="rounded-lg bg-[var(--color-primary)]/14 px-4 py-2 text-sm font-semibold text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60">
-              Exportar Rayador
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
-          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
-          <AutocompleteSelect value={empleadoId} onChange={setEmpleadoId} options={employeeOptions} placeholder="Empleado (opcional)" className="w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2 text-sm" />
-          <button type="button" onClick={handleLoadReport} disabled={reportQuery.isFetching} className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:cursor-not-allowed disabled:opacity-60">
-            {reportQuery.isFetching ? "Cargando..." : "Cargar reporte"}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] px-5 py-4">
+        <p className="text-xs text-[var(--color-on-surface-variant)]">
+          Rango cargado: {desde} a {hasta}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void handleExportPayrollDataExcel()} disabled={isLoading || !entries.length} className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-sm font-semibold text-[var(--color-on-surface-variant)] disabled:cursor-not-allowed disabled:opacity-60">
+            Exportar planilla
+          </button>
+          <button type="button" onClick={() => void handleExportExcel()} disabled={isLoading || !entries.length} className="rounded-lg bg-[var(--color-primary)]/14 px-4 py-2 text-sm font-semibold text-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60">
+            Exportar Rayador
           </button>
         </div>
-        <p className="mt-3 text-xs text-[var(--color-on-surface-variant)]">
-          Rango cargado: {appliedFilters.desde} a {appliedFilters.hasta}
-        </p>
-      </article>
+      </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
       <article className="overflow-hidden rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
         <div className="px-5 py-3 text-xs text-[var(--color-on-surface-variant)]">
-          {reportQuery.isFetching ? "Cargando reporte..." : `Registros: ${reportQuery.data?.length ?? 0}`}
+          {isFetching ? "Cargando reporte..." : `Registros: ${entries.length}`}
         </div>
         <div className="max-h-[75vh] space-y-4 overflow-y-auto p-4">
-          {reportQuery.isLoading ? (
+          {isLoading ? (
             <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
               Cargando datos de asistencia...
             </div>
           ) : null}
-          {reportQuery.isError ? (
+          {isError ? (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-6 text-center text-sm text-red-600">
               No se pudo cargar el reporte.
             </div>
           ) : null}
-          {!reportQuery.isLoading && !reportQuery.isError && (reportQuery.data?.length ?? 0) === 0 ? (
+          {!isLoading && !isError && entries.length === 0 ? (
             <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
               Sin datos para el rango seleccionado.
             </div>
           ) : null}
-          {reportQuery.data?.map((entry) => (
+          {entries.map((entry) => (
             <div key={entry.empleado.id} className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-semibold">{entry.empleado.nombre} ({entry.empleado.cargo ?? "-"} | {getTipoPersonalLabel(entry.empleado.tipoPersonal)})</p>
@@ -919,11 +819,11 @@ export function PersonalReportPage() {
       </article>
 
       <LibroAsistenciaReport
-        entries={reportQuery.data ?? []}
-        desde={appliedFilters.desde}
-        hasta={appliedFilters.hasta}
+        entries={entries}
+        desde={desde}
+        hasta={hasta}
       />
       </div>
-    </section>
+    </div>
   );
 }

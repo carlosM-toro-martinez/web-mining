@@ -33,7 +33,7 @@ interface AttendanceReportRow {
   empleado?: { nombre: string; tipoPersonal?: EmployeeTipoPersonal | null } | null;
 }
 
-export function PersonalReportsPage() {
+export function PersonalBiometricoPage() {
   const { showError, showSuccess } = useToast();
   const employees = useEmployees();
   const { can } = usePermisos();
@@ -200,8 +200,8 @@ export function PersonalReportsPage() {
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-[var(--color-primary)]/16 p-2.5 text-[var(--color-primary)]"><FileBarChart2 size={18} /></div>
           <div>
-            <h1 className="page-title font-headline text-3xl font-extrabold">Reportes de Personal</h1>
-            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">Asistencia con filtros y paginación.</p>
+            <h1 className="page-title font-headline text-3xl font-extrabold">Biométrico</h1>
+            <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">Marcaciones registradas por el dispositivo biométrico, con filtros y paginación.</p>
           </div>
           {puedeSincronizar ? (
             <button

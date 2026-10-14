@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Landmark, Truck, PackageSearch, ReceiptText, FileBarChart2 } from "lucide-react";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 
 const cards = [
   {
@@ -39,7 +40,18 @@ const cards = [
   }
 ] as const;
 
+const RECURSO_POR_RUTA: Record<string, string> = {
+  "/logistica/flota": "logistica.flota",
+  "/logistica/parametros": "logistica.parametros",
+  "/logistica/lotes": "logistica.lotes",
+  "/logistica/liquidaciones": "logistica.liquidaciones",
+  "/logistica/reportes": "logistica.reportes"
+};
+
 export function LogisticaPage() {
+  const { can } = usePermisos();
+  const visibles = cards.filter((card) => can(RECURSO_POR_RUTA[card.to] ?? "", "ver"));
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -59,7 +71,7 @@ export function LogisticaPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => {
+        {visibles.map((card) => {
           const Icon = card.icon;
           return (
             <article
