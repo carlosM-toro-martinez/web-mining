@@ -16,15 +16,21 @@ import { getCurrentMonthRange, type ReportEmployee } from "@/modules/employee/li
 import { DetalleAsistenciaReport } from "@/modules/employee/reports/DetalleAsistenciaReport";
 import { InasistenciasReport } from "@/modules/employee/reports/InasistenciasReport";
 import { MinutosAtrasadosReport } from "@/modules/employee/reports/MinutosAtrasadosReport";
+import { RayadorMitasReport } from "@/modules/employee/reports/RayadorMitasReport";
 import { ResumenAsistenciaReport } from "@/modules/employee/reports/ResumenAsistenciaReport";
 
-type ReportType = "detalle-diario" | "resumen-asistencia" | "inasistencias" | "minutos-atrasados";
+type ReportType = "detalle-diario" | "rayador-de-mitas" | "resumen-asistencia" | "inasistencias" | "minutos-atrasados";
 
 const REPORTS: Array<{ type: ReportType; title: string; description: string }> = [
   {
     type: "detalle-diario",
     title: "Detalle de asistencia",
     description: "Día por día de cada trabajador, Libro de Asistencia y exportes Rayador / Planilla."
+  },
+  {
+    type: "rayador-de-mitas",
+    title: "Rayador de mitas",
+    description: "Libro mensual: una marca por día de cada trabajador (1, R, F, VAC, LIC, D) y totales."
   },
   {
     type: "resumen-asistencia",
@@ -44,7 +50,7 @@ const REPORTS: Array<{ type: ReportType; title: string; description: string }> =
 ];
 
 const REPORT_GROUPS: Array<{ title: string; types: ReportType[] }> = [
-  { title: "Asistencia", types: ["detalle-diario", "resumen-asistencia", "inasistencias"] },
+  { title: "Asistencia", types: ["detalle-diario", "rayador-de-mitas", "resumen-asistencia", "inasistencias"] },
   { title: "Puntualidad", types: ["minutos-atrasados"] }
 ];
 
@@ -236,6 +242,7 @@ export function PersonalAsistenciaReportesPage() {
       </article>
 
       {tipo === "detalle-diario" ? <DetalleAsistenciaReport {...reportData} /> : null}
+      {tipo === "rayador-de-mitas" ? <RayadorMitasReport {...reportData} /> : null}
       {tipo === "resumen-asistencia" ? <ResumenAsistenciaReport {...reportData} /> : null}
       {tipo === "inasistencias" ? <InasistenciasReport {...reportData} /> : null}
       {tipo === "minutos-atrasados" ? <MinutosAtrasadosReport {...reportData} /> : null}
