@@ -64,7 +64,7 @@ import {
 } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
 import { useChoferesQuery, useVehiculosQuery } from "@/features/flota/hooks/useFlota";
-import { ApiError } from "@/shared/api/core/apiError";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -96,8 +96,7 @@ const ESTADO_LOTE_CLASS: Record<EstadoLoteDespacho, string> = {
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 // timeZone: "UTC" es a propósito: estas fechas son calendario (medianoche

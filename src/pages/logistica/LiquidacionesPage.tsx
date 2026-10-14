@@ -43,7 +43,7 @@ import {
 } from "@/features/logisticaReportes/lib/logisticaExport";
 import { useConceptosLiquidacionQuery } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
-import { ApiError } from "@/shared/api/core/apiError";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -66,8 +66,7 @@ const ESTADO_CLASS: Record<EstadoLiquidacion, string> = {
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 function formatMoneda(value: string | number) {

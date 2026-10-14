@@ -29,7 +29,7 @@ import {
 } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import type { TipoEntidadTransportista } from "@/features/transportista/model/transportista.schema";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
-import { ApiError } from "@/shared/api/core/apiError";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -62,8 +62,7 @@ const ESTADO_LIQUIDACION_LABEL: Record<EstadoLiquidacion, string> = {
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 // timeZone: "UTC" es a propósito: estas fechas son calendario (medianoche

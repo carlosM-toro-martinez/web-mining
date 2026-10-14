@@ -85,7 +85,7 @@ import {
   useUpdateTransportistaMutation
 } from "@/features/transportista/hooks/useTransportistas";
 import type { Transportista, TipoEntidadTransportista } from "@/features/transportista/model/transportista.schema";
-import { ApiError } from "@/shared/api/core/apiError";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -102,8 +102,7 @@ const TIPO_ENTIDAD_LABEL: Record<TipoEntidadTransportista, string> = {
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 // timeZone: "UTC" es a propósito: estas fechas son calendario (elegidas en

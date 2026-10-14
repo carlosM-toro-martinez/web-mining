@@ -49,7 +49,7 @@ import type {
   TipoEntidadTransportista
 } from "@/features/parametrosLogistica/model/parametrosLogistica.schema";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
-import { ApiError } from "@/shared/api/core/apiError";
+import { mensajeDeError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -69,8 +69,7 @@ const TIPO_COMBUSTIBLE_LABEL: Record<TipoCombustibleViaje, string> = {
 };
 
 function normalizeError(error: unknown, fallbackMessage: string) {
-  if (error instanceof ApiError) return error.message;
-  return fallbackMessage;
+  return mensajeDeError(error, fallbackMessage);
 }
 
 function includesText(value: string | undefined, search: string) {

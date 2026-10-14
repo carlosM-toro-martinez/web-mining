@@ -1,4 +1,45 @@
 import axios, { AxiosError } from "axios";
+import { ZodError } from "zod";
+
+const CAMPOS: Record<string, string> = {
+  municipioOrigenId: "Municipio de origen",
+  transportistaId: "Transportista",
+  vehiculoId: "Vehículo",
+  vehiculoNuevoId: "Vehículo nuevo",
+  choferId: "Chofer",
+  tipoMineralId: "Tipo de mineral",
+  destinoIngenioId: "Ingenio destino",
+  nivel: "Nivel",
+  combustibleAsignadoLitros: "Litros de combustible",
+  combustibleEntregadoLitros: "Litros entregados",
+  fechaDespachoReal: "Fecha de despacho",
+  tonelajeBruto: "Tonelaje bruto",
+  tonelajeTara: "Tara",
+  tonelajeNeto: "Neto",
+  motivo: "Motivo",
+  codigo: "Código",
+  fecha: "Fecha",
+  placa: "Placa",
+  nombre: "Nombre",
+  ci: "CI"
+};
+
+// Mensaje real para mostrarle al usuario: el del servidor, o el de la
+// validación hecha en el navegador antes de enviar (nunca uno genérico).
+export function mensajeDeError(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof ZodError) {
+    const partes = error.issues.map((issue) => {
+      const clave = [...issue.path].reverse().find((p) => typeof p === "string") as string | undefined;
+      const campo = clave ? (CAMPOS[clave] ?? clave) : "";
+      const porDefecto = /^(Invalid|Too (small|big)|Unrecognized|Expected)/.test(issue.message);
+      const texto = porDefecto ? "falta o tiene un valor inválido" : issue.message;
+      return campo && porDefecto ? `${campo}: ${texto}` : texto;
+    });
+    return [...new Set(partes)].join(". ") || fallback;
+  }
+  return fallback;
+}
 
 export class ApiError extends Error {
   readonly statusCode?: number;
