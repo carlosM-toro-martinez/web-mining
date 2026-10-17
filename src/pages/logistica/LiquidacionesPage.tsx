@@ -80,6 +80,48 @@ function formatFecha(value: string) {
   return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
+type CombustibleGrupo = "CON_COMBUSTIBLE" | "SIN_COMBUSTIBLE" | null;
+
+// Todas las tarjetas son "vehículo + precio" (así se calcula la liquidación).
+// Un vehículo con viajes con y sin combustible de la empresa sale en dos
+// tarjetas porque cobra distinto: esto dice de cuál se trata. Si el grupo
+// mezcla los dos (misma tarifa para ambos) no se pone etiqueta.
+function combustibleDelGrupo(lotes: Array<{ incluyeCombustible?: string | null }>): CombustibleGrupo {
+  const tipos = new Set(lotes.map((l) => l.incluyeCombustible).filter(Boolean));
+  if (tipos.size !== 1) return null;
+  return tipos.has("CON_COMBUSTIBLE") ? "CON_COMBUSTIBLE" : "SIN_COMBUSTIBLE";
+}
+
+// Mismas placas juntas (y, dentro de una placa, el precio más alto primero).
+function ordenarPorPlaca<T extends { placa: string; precio: number }>(filas: T[]): T[] {
+  return [...filas].sort(
+    (a, b) => a.placa.localeCompare(b.placa, "es", { numeric: true }) || b.precio - a.precio
+  );
+}
+
+function hayPlacaRepetida(filas: Array<{ placa: string }>) {
+  return new Set(filas.map((f) => f.placa)).size < filas.length;
+}
+
+const AVISO_PLACA_REPETIDA =
+  "Una placa aparece más de una vez porque tuvo viajes con y sin combustible de la empresa, que se pagan a distinto precio por tonelada. Cada tarjeta es un precio; no hay viajes contados dos veces.";
+
+function EtiquetaCombustible({ tipo }: { tipo: CombustibleGrupo }) {
+  if (!tipo) return null;
+  const con = tipo === "CON_COMBUSTIBLE";
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+        con
+          ? "bg-[var(--color-primary)]/18 text-[var(--color-primary)]"
+          : "bg-[var(--color-surface-container-highest)] text-[var(--color-on-surface-variant)]"
+      }`}
+    >
+      {con ? "Con combustible" : "Sin combustible"}
+    </span>
+  );
+}
+
 // Convierte la respuesta de preview() (sin persistir, antes de crear/cerrar
 // nada) a la misma forma que espera el detalle de una liquidación real —
 // así los mismos exportadores (agruparPorPlaca, exportLiquidacion*) sirven
@@ -180,12 +222,17 @@ export function LiquidacionesPage() {
   // nada acá para no duplicar ese método y arriesgar que diverja.
   const previewPorPlaca = useMemo(() => {
     if (!preview) return [];
-    return preview.grupos.map((g) => ({
-      placa: g.vehiculoPlaca,
-      viajes: g.loteIds.length,
-      pesoTotal: g.tonelajeNetoRedondeado,
-      subtotal: g.subtotal
-    }));
+    const lotePorId = new Map(preview.lotes.map((l) => [l.loteId, l]));
+    return ordenarPorPlaca(
+      preview.grupos.map((g) => ({
+        placa: g.vehiculoPlaca,
+        viajes: g.loteIds.length,
+        pesoTotal: g.tonelajeNetoRedondeado,
+        subtotal: g.subtotal,
+        precio: g.precioAplicado,
+        combustible: combustibleDelGrupo(g.loteIds.map((id) => lotePorId.get(id) ?? {}))
+      }))
+    );
   }, [preview]);
 
   const previewLiquidacionLike = useMemo(() => {
@@ -207,7 +254,21 @@ export function LiquidacionesPage() {
   const [descripcionConcepto, setDescripcionConcepto] = useState("");
   const [mostrarDetallePorLote, setMostrarDetallePorLote] = useState(false);
 
-  const filasPorPlaca = useMemo(() => (liquidacion ? agruparPorPlaca(liquidacion) : []), [liquidacion]);
+  const filasPorPlaca = useMemo(() => {
+    if (!liquidacion) return [];
+    const detalle = liquidacion.detalleLotes ?? [];
+    return ordenarPorPlaca(
+      agruparPorPlaca(liquidacion).map((f) => ({
+        ...f,
+        precio: f.precioAplicado,
+        combustible: combustibleDelGrupo(
+          detalle
+            .filter((d) => d.lote?.vehiculo?.placa === f.placa && Number(d.precioAplicado) === f.precioAplicado)
+            .map((d) => ({ incluyeCombustible: d.lote?.incluyeCombustible }))
+        )
+      }))
+    );
+  }, [liquidacion]);
 
   // Mismo cálculo que los documentos impresos (ver calcularTotales).
   const totales = useMemo(() => (liquidacion ? calcularTotales(liquidacion) : null), [liquidacion]);
@@ -432,20 +493,28 @@ export function LiquidacionesPage() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {previewPorPlaca.map((f) => (
-                <div key={f.placa} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
-                  <div className="mb-2 flex items-center justify-between">
+                <div key={`${f.placa}-${f.precio}`} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="rounded-md bg-[var(--color-primary)]/12 px-2 py-1 font-mono text-sm font-bold text-[var(--color-primary)]">
                       {f.placa}
                     </span>
-                    <span className="rounded-full bg-[var(--color-surface-container-highest)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
-                      {f.viajes} viaje{f.viajes === 1 ? "" : "s"}
-                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      <EtiquetaCombustible tipo={f.combustible} />
+                      <span className="rounded-full bg-[var(--color-surface-container-highest)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                        {f.viajes} viaje{f.viajes === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-[var(--color-on-surface-variant)]">{formatMoneda(f.pesoTotal)} TMB</p>
+                  <p className="text-[11px] text-[var(--color-on-surface-variant)]">
+                    {formatMoneda(f.pesoTotal)} TMB · Bs {formatMoneda(f.precio)}/ton
+                  </p>
                   <p className="mt-1 text-lg font-bold">Bs {formatMoneda(f.subtotal)}</p>
                 </div>
               ))}
             </div>
+            {hayPlacaRepetida(previewPorPlaca) ? (
+              <p className="text-xs text-[var(--color-on-surface-variant)]">{AVISO_PLACA_REPETIDA}</p>
+            ) : null}
 
             <button
               type="button"
@@ -778,16 +847,19 @@ export function LiquidacionesPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {filasPorPlaca.map((f) => (
                     <div
-                      key={f.placa}
+                      key={`${f.placa}-${f.precioAplicado}`}
                       className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-3"
                     >
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="rounded-md bg-[var(--color-primary)]/12 px-2 py-1 font-mono text-sm font-bold text-[var(--color-primary)]">
                           {f.placa}
                         </span>
-                        <span className="rounded-full bg-[var(--color-surface-container-highest)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
-                          {f.viajes} viaje{f.viajes === 1 ? "" : "s"}
-                        </span>
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          <EtiquetaCombustible tipo={f.combustible} />
+                          <span className="rounded-full bg-[var(--color-surface-container-highest)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
+                            {f.viajes} viaje{f.viajes === 1 ? "" : "s"}
+                          </span>
+                        </div>
                       </div>
                       <p className="text-[11px] text-[var(--color-on-surface-variant)]">
                         {formatMoneda(f.pesoTotal)} TMB · Bs {formatMoneda(f.precioAplicado)}/ton
@@ -801,6 +873,9 @@ export function LiquidacionesPage() {
                     </p>
                   ) : null}
                 </div>
+                {hayPlacaRepetida(filasPorPlaca) ? (
+                  <p className="mt-2 text-xs text-[var(--color-on-surface-variant)]">{AVISO_PLACA_REPETIDA}</p>
+                ) : null}
 
                 <button
                   type="button"
