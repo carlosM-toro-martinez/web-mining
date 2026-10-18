@@ -9,6 +9,7 @@ export const parametrosLogisticaEndpoints = {
   conceptoLiquidacionById: (id: number | string) => `/api/conceptos-liquidacion/${id}`,
   alicuotasRegalia: "/api/alicuotas-regalia",
   tarifasLiquidacion: "/api/tarifas-liquidacion",
+  tarifaLiquidacionAplicable: "/api/tarifas-liquidacion/aplicable",
   tarifaLiquidacionById: (id: number | string) => `/api/tarifas-liquidacion/${id}`,
   preciosCombustible: "/api/precios-combustible"
 } as const;

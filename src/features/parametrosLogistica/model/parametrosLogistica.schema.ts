@@ -83,6 +83,20 @@ export const tarifaLiquidacionSchema = z.object({
   transportista: transportistaRefSchema.nullable().optional()
 });
 
+// Resultado de "¿cuánto se pagaría?": la tarifa que usaría la liquidación real.
+export const tarifaAplicableResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    transportista: z.object({
+      id: z.number().int().positive(),
+      nombreORazonSocial: z.string(),
+      tipoEntidad: tipoEntidadTransportistaSchema
+    }),
+    fecha: z.string(),
+    tarifa: tarifaLiquidacionSchema.nullable()
+  })
+});
+
 export const createTarifaLiquidacionPayloadSchema = z.object({
   tipoEntidad: tipoEntidadTransportistaSchema,
   transportistaId: z.number().int().positive().nullable().optional(),
@@ -157,6 +171,7 @@ export type UpdateConceptoLiquidacionPayload = z.infer<typeof updateConceptoLiqu
 export type AlicuotaRegalia = z.infer<typeof alicuotaRegaliaSchema>;
 export type CreateAlicuotaRegaliaPayload = z.infer<typeof createAlicuotaRegaliaPayloadSchema>;
 export type TarifaLiquidacion = z.infer<typeof tarifaLiquidacionSchema>;
+export type TarifaAplicable = z.infer<typeof tarifaAplicableResponseSchema>["data"];
 export type CreateTarifaLiquidacionPayload = z.infer<typeof createTarifaLiquidacionPayloadSchema>;
 export type PrecioCombustible = z.infer<typeof precioCombustibleSchema>;
 export type CreatePrecioCombustiblePayload = z.infer<typeof createPrecioCombustiblePayloadSchema>;

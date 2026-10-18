@@ -16,6 +16,7 @@ import {
   precioCombustibleListResponseSchema,
   precioCombustibleResponseSchema,
   tarifaLiquidacionListResponseSchema,
+  tarifaAplicableResponseSchema,
   tarifaLiquidacionResponseSchema,
   updateCatalogoSimplePayloadSchema,
   updateConceptoLiquidacionPayloadSchema,
@@ -169,6 +170,17 @@ export async function getTarifasLiquidacion() {
   return getRequest({
     url: apiEndpoints.parametrosLogistica.tarifasLiquidacion,
     schema: tarifaLiquidacionListResponseSchema
+  });
+}
+export async function getTarifaAplicable(params: {
+  transportistaId: number;
+  incluyeCombustible: "CON_COMBUSTIBLE" | "SIN_COMBUSTIBLE";
+  fecha?: string;
+}) {
+  return getRequest({
+    url: apiEndpoints.parametrosLogistica.tarifaLiquidacionAplicable,
+    config: { params },
+    schema: tarifaAplicableResponseSchema
   });
 }
 export async function createTarifaLiquidacion(payload: CreateTarifaLiquidacionPayload) {

@@ -150,6 +150,13 @@ export async function deleteRequest<TResponse>({
   client = httpClient
 }: DeleteRequestOptions<TResponse>): Promise<TResponse> {
   const response = await client.delete(url, config);
+  // Un 204 llega sin cuerpo: borró bien, solo que no hay JSON que validar. Sin
+  // esto el borrado sí se hacía pero la pantalla mostraba un error y volvía a
+  // intentarlo (y el segundo intento fallaba con "no encontrado").
+  if (response.status === 204) {
+    const exito = schema.safeParse({ success: true });
+    return (exito.success ? exito.data : response.data) as TResponse;
+  }
   try {
     return schema.parse(response.data);
   } catch (error) {

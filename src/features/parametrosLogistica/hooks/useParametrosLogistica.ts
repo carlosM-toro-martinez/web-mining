@@ -17,6 +17,7 @@ import {
   getIngenios,
   getMunicipiosOrigen,
   getPreciosCombustible,
+  getTarifaAplicable,
   getTarifasLiquidacion,
   getTiposMineral,
   updateConceptoLiquidacion,
@@ -201,6 +202,16 @@ export function useTarifasLiquidacionQuery() {
   return useQuery({
     queryKey: queryKeys.parametrosLogistica.tarifasLiquidacion(),
     queryFn: getTarifasLiquidacion
+  });
+}
+export function useTarifaAplicableQuery(
+  params: { transportistaId: number; incluyeCombustible: "CON_COMBUSTIBLE" | "SIN_COMBUSTIBLE"; fecha?: string } | null
+) {
+  return useQuery({
+    // Depende de las tarifas: al registrar o quitar una, se vuelve a calcular.
+    queryKey: [...queryKeys.parametrosLogistica.tarifasLiquidacion(), "aplicable", params] as const,
+    queryFn: () => getTarifaAplicable(params!),
+    enabled: Boolean(params)
   });
 }
 export function useCreateTarifaLiquidacionMutation() {
