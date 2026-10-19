@@ -1,5 +1,6 @@
 import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  ArrowUpDown,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
@@ -1740,6 +1741,8 @@ export function ReportesPage() {
   const [fechaInicio, setFechaInicio] = useState(urlFechaInicio);
   const [fechaFin, setFechaFin] = useState(urlFechaFin);
   const [dataMode, setDataMode] = useState<DataMode>("paged");
+  const [ordenVista, setOrdenVista] = useState<"producto" | "fecha">("producto");
+  const [ordenSimulado, setOrdenSimulado] = useState(false);
   const [estadoReporte, setEstadoReporte] = useState("");
   const [salidasCuentaId, setSalidasCuentaId] = useState("");
   const [salidasFuncion, setSalidasFuncion] = useState("");
@@ -1815,9 +1818,10 @@ export function ReportesPage() {
           ? fecha || undefined
           : dateMode === "range"
             ? fechaFin || undefined
-            : undefined
+            : undefined,
+      ordenado: ordenSimulado || undefined
     }),
-    [dateMode, fecha, fechaFin, fechaInicio, limit, page, productoId]
+    [dateMode, fecha, fechaFin, fechaInicio, limit, ordenSimulado, page, productoId]
   );
 
   const shouldFetchAllLegacy = isLegacyType;
@@ -2013,13 +2017,30 @@ export function ReportesPage() {
     isApiType && tipo === "compras-resumen"
   );
   const legacyActiveQuery = tipo === "bin-card" ? binCardQuery : binCardValoradoQuery;
-  const legacyItems = useMemo(
-    () =>
-      [...(legacyActiveQuery.data?.items ?? [])]
-        .filter((item) => !isSaldoInicialReferencia(item.referencia))
-        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()),
-    [legacyActiveQuery.data?.items]
-  );
+  const legacyItems = useMemo(() => {
+    // El API entrega las filas en orden cronológico (también dentro de un mismo día): la posición desempata.
+    const filas = (legacyActiveQuery.data?.items ?? [])
+      .map((item, posicion) => ({ item, posicion }))
+      .filter(({ item }) => !isSaldoInicialReferencia(item.referencia));
+    if (ordenVista === "producto") {
+      // Por producto (código) y, dentro de cada producto, en orden cronológico.
+      filas.sort(
+        (a, b) =>
+          (a.item.productoCodigo ?? a.item.productoNombre ?? "").localeCompare(
+            b.item.productoCodigo ?? b.item.productoNombre ?? "",
+            undefined,
+            { numeric: true }
+          ) || a.posicion - b.posicion
+      );
+    } else {
+      filas.sort(
+        (a, b) =>
+          new Date(b.item.fecha).getTime() - new Date(a.item.fecha).getTime() ||
+          b.posicion - a.posicion
+      );
+    }
+    return filas.map(({ item }) => item);
+  }, [legacyActiveQuery.data?.items, ordenVista]);
 
   const pagedLegacyItems = useMemo(() => {
     if (dataMode === "all") return legacyItems;
@@ -2060,6 +2081,10 @@ export function ReportesPage() {
       : dateMode === "range"
         ? `${fechaInicio || "-"} a ${fechaFin || "-"}`
         : "Sin filtro";
+  const legacyDateLabel = ordenSimulado
+    ? `${selectedDateLabel} | Vista ordenada (simulada, no modifica datos)`
+    : selectedDateLabel;
+  const simulacionInfo = legacyActiveQuery.data?.simulacion;
 
   const reportDefinition = useMemo(() => {
     if (!isAdminType) return null;
@@ -2185,6 +2210,8 @@ export function ReportesPage() {
     setFechaInicio(defaultFechaInicio);
     setFechaFin(defaultFechaFin);
     setDataMode("paged");
+    setOrdenSimulado(false);
+    setOrdenVista("producto");
     setEstadoReporte("");
     setSalidasCuentaId("");
     setSalidasFuncion("");
@@ -2203,7 +2230,7 @@ export function ReportesPage() {
         tab: tipo,
         items: dataMode === "all" ? legacyItems : pagedLegacyItems,
         productLabel: selectedProductLabel,
-        dateFilterLabel: selectedDateLabel
+        dateFilterLabel: legacyDateLabel
       });
       return;
     }
@@ -2238,7 +2265,7 @@ export function ReportesPage() {
           tab: tipo,
           items: dataMode === "all" ? legacyItems : pagedLegacyItems,
           productLabel: selectedProductLabel,
-          dateFilterLabel: selectedDateLabel
+          dateFilterLabel: legacyDateLabel
         });
         return;
       }
@@ -2615,7 +2642,33 @@ export function ReportesPage() {
                 : primaryFilterLabel}
             : {selectedProductLabel}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isLegacyType ? (
+              <>
+                <select
+                  value={ordenVista}
+                  onChange={(event) => setOrdenVista(event.target.value as "producto" | "fecha")}
+                  className="rounded-lg border border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] px-2 py-2 text-xs font-semibold text-[var(--color-on-surface)]"
+                  aria-label="Orden de las filas"
+                >
+                  <option value="producto">Orden: por producto</option>
+                  <option value="fecha">Orden: por fecha (recientes primero)</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setOrdenSimulado((actual) => !actual)}
+                  title="Muestra cómo quedaría el stock de cada producto en orden cronológico. No modifica ningún dato guardado."
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    ordenSimulado
+                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
+                      : "border-[var(--color-outline-variant)] bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] hover:border-[var(--color-primary)]"
+                  }`}
+                >
+                  <ArrowUpDown size={14} />
+                  {ordenSimulado ? "Vista ordenada (simulada): activa" : "Ver ordenado (simulado)"}
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               onClick={handleExportExcel}
@@ -2644,6 +2697,28 @@ export function ReportesPage() {
             </button>
           </div>
         </div>
+
+        {isLegacyType && ordenSimulado ? (
+          <div className="mb-4 rounded-lg border border-[var(--color-primary)]/35 bg-[var(--color-primary)]/10 px-4 py-3 text-xs text-[var(--color-on-surface-variant)]">
+            <p className="font-semibold text-[var(--color-on-surface)]">
+              Vista ordenada (simulada): no se guardó ni se cambió nada.
+            </p>
+            <p className="mt-1">
+              Recalcula el stock antes/después de cada producto en orden cronológico, desde el saldo inicial del mes. Lo que
+              ves aquí es lo que se imprime en Excel y PDF.
+              {simulacionInfo
+                ? ` ${simulacionInfo.filasAjustadas} filas muestran un stock distinto al guardado.`
+                : ""}
+            </p>
+            {simulacionInfo && simulacionInfo.productosSinSimular.length > 0 ? (
+              <p className="mt-1 text-[var(--color-warning)]">
+                No se pudieron ordenar (sus movimientos no suman el saldo del mes; se muestran como están):{" "}
+                {simulacionInfo.productosSinSimular.slice(0, 12).join(", ")}
+                {simulacionInfo.productosSinSimular.length > 12 ? "…" : ""}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {currentQuery.isError ? (
           <div className="mb-4 rounded-lg border border-[var(--color-error)]/45 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
@@ -2696,6 +2771,9 @@ export function ReportesPage() {
                     Usuario
                   </th>
                   <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                    Solicitante
+                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Referencia
                   </th>
                 </tr>
@@ -2704,7 +2782,7 @@ export function ReportesPage() {
                 {legacyActiveQuery.isLoading ? (
                   <tr>
                     <td
-                      colSpan={tipo === "bin-card-valorado" ? 12 : 8}
+                      colSpan={tipo === "bin-card-valorado" ? 13 : 9}
                       className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]"
                     >
                       Cargando reporte...
@@ -2715,7 +2793,7 @@ export function ReportesPage() {
                 (dataMode === "all" ? legacyItems : pagedLegacyItems).length === 0 ? (
                   <tr>
                     <td
-                      colSpan={tipo === "bin-card-valorado" ? 12 : 8}
+                      colSpan={tipo === "bin-card-valorado" ? 13 : 9}
                       className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]"
                     >
                       Sin movimientos para los filtros seleccionados.
@@ -2742,7 +2820,12 @@ export function ReportesPage() {
                         {item.tipo}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-xs">{item.productoNombre ?? "-"}</td>
+                    <td className="px-3 py-2 text-xs">
+                      {item.productoCodigo ? (
+                        <span className="mr-1 font-semibold text-[var(--color-on-surface-variant)]">{item.productoCodigo}</span>
+                      ) : null}
+                      {item.productoNombre ?? "-"}
+                    </td>
                     <td className="px-3 py-2 text-right text-xs">{item.cantidad}</td>
                     <td className="px-3 py-2 text-right text-xs">{item.stockAntes}</td>
                     <td className="px-3 py-2 text-right text-xs">{item.stockDespues}</td>
@@ -2763,6 +2846,7 @@ export function ReportesPage() {
                       </>
                     ) : null}
                     <td className="px-3 py-2 text-xs">{item.usuarioNombre ?? "-"}</td>
+                    <td className="px-3 py-2 text-xs">{item.solicitanteNombre ?? "-"}</td>
                     <td className="px-3 py-2 text-xs">
                       {item.referencia ?? "-"} {item.referenciaId ? `(${item.referenciaId})` : ""}
                       {buildRetroactivoLabel(item) ? (

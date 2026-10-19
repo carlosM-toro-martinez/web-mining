@@ -52,10 +52,10 @@ export function useValesQuery(
   });
 }
 
-export function useHistorialSolicitanteQuery(userId: number | null, page = 1, limit = 10) {
+export function useHistorialSolicitanteQuery(userId: number | null, page = 1, limit = 10, productoId?: number) {
   return useQuery({
-    queryKey: userId ? queryKeys.vales.historialSolicitante(userId, page, limit) : queryKeys.vales.all,
-    queryFn: () => getValesBySolicitante(userId as number, page, limit),
+    queryKey: userId ? queryKeys.vales.historialSolicitante(userId, page, limit, productoId) : queryKeys.vales.all,
+    queryFn: () => getValesBySolicitante(userId as number, page, limit, productoId),
     enabled: typeof userId === "number" && userId > 0
   });
 }

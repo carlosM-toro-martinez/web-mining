@@ -54,10 +54,10 @@ export async function getVales(params?: ValesListParams) {
   });
 }
 
-export async function getValesBySolicitante(userId: number, page = 1, limit = 10) {
+export async function getValesBySolicitante(userId: number, page = 1, limit = 10, productoId?: number) {
   return getRequest({
     url: apiEndpoints.vales.historialSolicitante(userId),
-    config: { params: { page, limit } },
+    config: { params: { page, limit, ...(productoId ? { productoId } : {}) } },
     schema: historialSolicitanteResponseSchema
   });
 }

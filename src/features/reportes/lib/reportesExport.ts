@@ -2654,17 +2654,18 @@ function legacyHeaders(tab: LegacyReportTab) {
       "Salida Bs.",
       "Saldo Bs.",
       "Usuario",
+      "Solicitante",
       "Referencia"
     ];
   }
-  return [...base, "Usuario", "Referencia"];
+  return [...base, "Usuario", "Solicitante", "Referencia"];
 }
 
 function legacyRow(item: LegacyReportItem, tab: LegacyReportTab) {
   const base = [
     formatInventoryDate(item.fecha),
     item.tipo,
-    item.productoNombre ?? "-",
+    item.productoCodigo ? `${item.productoCodigo} - ${item.productoNombre ?? "-"}` : (item.productoNombre ?? "-"),
     item.cantidad,
     item.stockAntes,
     item.stockDespues
@@ -2679,10 +2680,11 @@ function legacyRow(item: LegacyReportItem, tab: LegacyReportTab) {
       valued.salidaBs ?? "",
       valued.saldoBs ?? "",
       item.usuarioNombre ?? "-",
+      item.solicitanteNombre ?? "-",
       referencia
     ];
   }
-  return [...base, item.usuarioNombre ?? "-", referencia];
+  return [...base, item.usuarioNombre ?? "-", item.solicitanteNombre ?? "-", referencia];
 }
 
 export function exportLegacyBinCardExcel(context: LegacyExportContext) {
@@ -2709,6 +2711,7 @@ export function exportLegacyBinCardExcel(context: LegacyExportContext) {
   sheet["!cols"] = headers.map((header, index) => {
     if (index === 0) return { wch: 22 };
     if (header === "Producto") return { wch: 36 };
+    if (header === "Solicitante") return { wch: 28 };
     if (header === "Referencia") return { wch: 26 };
     return { wch: 14 };
   });

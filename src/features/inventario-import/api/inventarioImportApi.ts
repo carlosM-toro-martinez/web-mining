@@ -15,8 +15,6 @@ import {
   inicializarPeriodoPayloadSchema,
   recalcularStockPayloadSchema,
   recalcularStockResponseSchema,
-  diagnosticoPreciosResponseSchema,
-  diagnosticoSaldosResponseSchema,
   backfillCppPayloadSchema,
   backfillCppResponseSchema,
   reiniciarStockPayloadSchema,
@@ -33,9 +31,6 @@ import {
   saldoMensualSingleResponseSchema,
   sincronizarStockPayloadSchema,
   stockInicialPayloadSchema,
-  limpiarMesPayloadSchema,
-  limpiarMesPreviewResponseSchema,
-  limpiarMesResultResponseSchema,
   type ReiniciarStockPayload,
   type RecalcularStockPayload,
   type AjustarPreciosSinIvaPayload,
@@ -50,7 +45,6 @@ import {
   type StockInicialPayload,
   type CierreMesPayload,
   type InicializarPeriodoPayload,
-  type LimpiarMesPayload,
   type FixRedondeoPayload,
   diagnosticoRedondeoResponseSchema,
   fixRedondeoPayloadSchema,
@@ -223,24 +217,6 @@ export async function syncStockFromSaldoMensual() {
   });
 }
 
-export async function getDiagnosticoPrecios(params: SaldoMensualQuery) {
-  const parsed = saldoMensualQuerySchema.parse(params);
-  return getRequest({
-    url: apiEndpoints.inventarioImport.diagnosticoPrecios,
-    config: { params: parsed },
-    schema: diagnosticoPreciosResponseSchema
-  });
-}
-
-export async function getDiagnosticoSaldos(params: SaldoMensualQuery) {
-  const parsed = saldoMensualQuerySchema.parse(params);
-  return getRequest({
-    url: apiEndpoints.inventarioImport.diagnosticoSaldos,
-    config: { params: parsed },
-    schema: diagnosticoSaldosResponseSchema
-  });
-}
-
 export async function getDiagnosticoRedondeo(params: SaldoMensualQuery) {
   const parsed = saldoMensualQuerySchema.parse(params);
   return getRequest({
@@ -329,19 +305,3 @@ export async function inicializarPeriodoHistorico(payload: InicializarPeriodoPay
   });
 }
 
-export async function getLimpiarMesPreview(params: LimpiarMesPayload) {
-  const parsed = limpiarMesPayloadSchema.parse(params);
-  return getRequest({
-    url: apiEndpoints.inventarioImport.limpiarMesPreview,
-    config: { params: parsed },
-    schema: limpiarMesPreviewResponseSchema
-  });
-}
-
-export async function ejecutarLimpiarMes(payload: LimpiarMesPayload) {
-  const parsed = limpiarMesPayloadSchema.parse(payload);
-  const response = await httpClient.delete(apiEndpoints.inventarioImport.limpiarMes, {
-    data: parsed
-  });
-  return limpiarMesResultResponseSchema.parse(response.data);
-}

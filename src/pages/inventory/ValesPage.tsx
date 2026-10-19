@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { PackageCheck, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, PackageCheck, Plus, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { useRegisterMutation } from "@/features/auth/hooks/useRegisterMutation";
@@ -114,6 +114,9 @@ export function ValesPage() {
 
   const [historialUserId, setHistorialUserId] = useState("");
   const [historialPage, setHistorialPage] = useState(1);
+  const [historialProductoId, setHistorialProductoId] = useState("");
+  const [historialAbierto, setHistorialAbierto] = useState(true);
+  const [anulacionesAbierto, setAnulacionesAbierto] = useState(false);
   const [solicitanteCreateId, setSolicitanteCreateId] = useState("");
   const [isCreateWorkerModalOpen, setIsCreateWorkerModalOpen] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState("");
@@ -132,7 +135,8 @@ export function ValesPage() {
   const historialSolicitanteQuery = useHistorialSolicitanteQuery(
     historialUserId ? Number(historialUserId) : null,
     historialPage,
-    50
+    10,
+    historialProductoId ? Number(historialProductoId) : undefined
   );
 
   const usuarios = usersQuery.data?.data ?? [];
@@ -527,8 +531,8 @@ export function ValesPage() {
           <div>
             <h1 className="font-headline text-3xl font-extrabold">Flujo de vales físicos</h1>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-              1) Revisión histórica del solicitante. 2) Aprobación física con firma. 3) Registro y
-              entrega inmediata en sistema.
+              1) Revisa el historial del solicitante. 2) Aprueba el vale físico con firma.
+              3) Regístralo en el sistema (se entrega al instante).
             </p>
             <button
               type="button"
@@ -548,18 +552,50 @@ export function ValesPage() {
       </header>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-          <Search size={16} className="text-[var(--color-primary)]" />
-          Revisión histórica por solicitante
-        </h2>
-        <AutocompleteSelect
-          value={historialUserId}
-          onChange={(id) => { setHistorialUserId(id); setHistorialPage(1); }}
-          options={solicitantesOptions}
-          placeholder="Selecciona solicitante"
-          className={inputClassName}
-          maxVisibleOptions={30}
-        />
+        <button
+          type="button"
+          onClick={() => setHistorialAbierto((v) => !v)}
+          aria-expanded={historialAbierto}
+          className="flex w-full items-center justify-between gap-2 text-left"
+        >
+          <span className="flex items-center gap-2 text-lg font-bold">
+            <Search size={16} className="text-[var(--color-primary)]" />
+            Revisión histórica por solicitante
+          </span>
+          {historialAbierto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+        <div className={historialAbierto ? "mt-4" : "hidden"}>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <AutocompleteSelect
+            value={historialUserId}
+            onChange={(id) => { setHistorialUserId(id); setHistorialPage(1); }}
+            options={solicitantesOptions}
+            placeholder="Selecciona solicitante"
+            className={inputClassName}
+            maxVisibleOptions={30}
+          />
+          <div className="flex gap-2">
+            <div className="min-w-0 flex-1">
+              <AutocompleteSelect
+                value={historialProductoId}
+                onChange={(id) => { setHistorialProductoId(id); setHistorialPage(1); }}
+                options={productoOptions}
+                placeholder="Filtrar por producto (opcional)"
+                className={inputClassName}
+                maxVisibleOptions={60}
+              />
+            </div>
+            {historialProductoId ? (
+              <button
+                type="button"
+                onClick={() => { setHistorialProductoId(""); setHistorialPage(1); }}
+                className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)]"
+              >
+                Quitar
+              </button>
+            ) : null}
+          </div>
+        </div>
         {!historialUserId ? (
           <p className="mt-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">
             Selecciona un solicitante para ver sus últimos vales.
@@ -594,7 +630,9 @@ export function ValesPage() {
                   ) : (historialSolicitanteQuery.data?.data ?? []).length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]">
-                        Sin vales para este solicitante.
+                        {historialProductoId
+                          ? "Este solicitante no tiene vales con ese producto."
+                          : "Sin vales para este solicitante."}
                       </td>
                     </tr>
                   ) : (
@@ -671,13 +709,18 @@ export function ValesPage() {
             ) : null}
           </>
         )}
+        </div>
       </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
+        <h2 className="flex items-center gap-2 text-lg font-bold">
           <Plus size={16} className="text-[var(--color-primary)]" />
-          Registro en almacén (crear + entregar inmediato)
+          Registrar vale (se entrega al instante)
         </h2>
+        <p className="mb-4 mt-1 text-xs text-[var(--color-on-surface-variant)]">
+          Registra un vale físico ya firmado: elige al solicitante y los productos; el sistema lo
+          crea y descuenta el stock en el mismo paso.
+        </p>
         <form className="space-y-3" onSubmit={handleCreateAndDeliverVale}>
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
@@ -1067,12 +1110,21 @@ export function ValesPage() {
 
       {user?.role === "ADMIN" ? (
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-4 text-lg font-bold">
-            Auditoría de anulaciones
-            <span className="ml-2 text-sm font-normal text-[var(--color-on-surface-variant)]">
-              (mes actual)
+          <button
+            type="button"
+            onClick={() => setAnulacionesAbierto((v) => !v)}
+            aria-expanded={anulacionesAbierto}
+            className="flex w-full items-center justify-between gap-2 text-left"
+          >
+            <span className="text-lg font-bold">
+              Auditoría de anulaciones
+              <span className="ml-2 text-sm font-normal text-[var(--color-on-surface-variant)]">
+                (mes actual)
+              </span>
             </span>
-          </h2>
+            {anulacionesAbierto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
+          <div className={anulacionesAbierto ? "mt-4" : "hidden"}>
           <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <input
               value={anulacionesSearchProducto}
@@ -1176,6 +1228,7 @@ export function ValesPage() {
               </div>
             </div>
           ) : null}
+          </div>
         </article>
       ) : null}
 

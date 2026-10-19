@@ -56,8 +56,8 @@ export const queryKeys = {
     }) =>
       [...queryKeys.vales.all, "list", params ?? {}] as const,
     detail: (id: string) => [...queryKeys.vales.all, "detail", id] as const,
-    historialSolicitante: (userId: number, page: number, limit: number) =>
-      [...queryKeys.vales.all, "historial-solicitante", userId, page, limit] as const
+    historialSolicitante: (userId: number, page: number, limit: number, productoId?: number) =>
+      [...queryKeys.vales.all, "historial-solicitante", userId, page, limit, ...(productoId ? [productoId] : [])] as const
   },
   compras: {
     all: ["compras"] as const,

@@ -8,8 +8,6 @@ import {
   deleteCierreMes,
   ejecutarBackfillCpp,
   getCierresMes,
-  getDiagnosticoPrecios,
-  getDiagnosticoSaldos,
   getDiagnosticoRedondeo,
   postFixRedondeo,
   getSaldoMensual,
@@ -25,8 +23,6 @@ import {
   sincronizarStock,
   updateSaldoMensualById,
   upsertSaldoMensualItem,
-  getLimpiarMesPreview,
-  ejecutarLimpiarMes,
   syncStockFromSaldoMensual
 } from "@/features/inventario-import/api/inventarioImportApi";
 import type {
@@ -43,7 +39,6 @@ import type {
   SincronizarStockPayload,
   CierreMesPayload,
   StockInicialPayload,
-  LimpiarMesPayload,
   FixRedondeoPayload
 } from "@/features/inventario-import/model/inventarioImport.schema";
 
@@ -162,22 +157,6 @@ export function useSyncStockFromSaldoMensualMutation() {
   });
 }
 
-export function useDiagnosticoPreciosQuery(params: SaldoMensualQuery, enabled: boolean) {
-  return useQuery({
-    queryKey: ["inventario-import", "diagnostico-precios", params],
-    queryFn: () => getDiagnosticoPrecios(params),
-    enabled
-  });
-}
-
-export function useDiagnosticoSaldosQuery(params: SaldoMensualQuery, enabled: boolean) {
-  return useQuery({
-    queryKey: ["inventario-import", "diagnostico-saldos", params],
-    queryFn: () => getDiagnosticoSaldos(params),
-    enabled
-  });
-}
-
 export function useDiagnosticoRedondeoQuery(params: SaldoMensualQuery, enabled: boolean) {
   return useQuery({
     queryKey: ["inventario-import", "diagnostico-redondeo", params],
@@ -228,16 +207,3 @@ export function useInicializarPeriodoHistoricoMutation() {
   });
 }
 
-export function useLimpiarMesPreviewQuery(params: LimpiarMesPayload, enabled: boolean) {
-  return useQuery({
-    queryKey: ["inventario-import", "limpiar-mes-preview", params],
-    queryFn: () => getLimpiarMesPreview(params),
-    enabled
-  });
-}
-
-export function useEjecutarLimpiarMesMutation() {
-  return useMutation({
-    mutationFn: (payload: LimpiarMesPayload) => ejecutarLimpiarMes(payload)
-  });
-}

@@ -4,11 +4,11 @@ import {
   createEntradaManualPayloadSchema,
   createSalidaManualPayloadSchema,
   movimientoResponseSchema,
-  reordenarMovimientosPayloadSchema,
-  reordenarMovimientosResponseSchema,
+  reconstruirCadenaPayloadSchema,
+  reconstruirCadenaResponseSchema,
   type CreateEntradaManualPayload,
   type CreateSalidaManualPayload,
-  type ReordenarMovimientosPayload
+  type ReconstruirCadenaPayload,
 } from "@/features/movimientos/model/movimientos.schema";
 
 export async function createSalidaManual(payload: CreateSalidaManualPayload) {
@@ -29,11 +29,12 @@ export async function createEntradaManual(payload: CreateEntradaManualPayload) {
   });
 }
 
-export async function reordenarMovimientos(payload: ReordenarMovimientosPayload) {
-  const body = reordenarMovimientosPayloadSchema.parse(payload);
+export async function reconstruirCadena(payload: ReconstruirCadenaPayload) {
+  const body = reconstruirCadenaPayloadSchema.parse(payload);
   return postRequest({
-    url: apiEndpoints.movimientos.reordenar,
+    url: apiEndpoints.movimientos.reconstruirCadena,
     body,
-    schema: reordenarMovimientosResponseSchema
+    schema: reconstruirCadenaResponseSchema
   });
 }
+

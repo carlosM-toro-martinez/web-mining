@@ -101,7 +101,7 @@ const cards = [
   },
   {
     title: "Ajustes",
-    description: "Diagnostico de precios y ajustes operativos del modulo inventario.",
+    description: "Sincronizar stock, ordenar el bin card del mes, backfill de CPP y revision de negativos.",
     to: "/inventario/ajustes",
     icon: Settings,
     available: true

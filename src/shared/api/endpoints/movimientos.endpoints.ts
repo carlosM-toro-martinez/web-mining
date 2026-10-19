@@ -1,5 +1,5 @@
 export const movimientosEndpoints = {
   salidas: "/api/movimientos/salidas",
   entradas: "/api/movimientos/entradas",
-  reordenar: "/api/movimientos/reordenar"
+  reconstruirCadena: "/api/movimientos/reconstruir-cadena"
 } as const;

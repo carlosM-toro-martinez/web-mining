@@ -268,7 +268,7 @@ export function ValesHistoricosPage() {
   const [compraSinIva, setCompraSinIva] = useState(false);
   const [compraEsGasEspecial, setCompraEsGasEspecial] = useState(false);
   const [compraDraftItems, setCompraDraftItems] = useState<CompraDraftItem[]>([
-    { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
+    { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: true }
   ]);
   const [nextCompraDraftItemId, setNextCompraDraftItemId] = useState(2);
   const now = new Date();
@@ -527,7 +527,7 @@ export function ValesHistoricosPage() {
   function addCompraDraftItem() {
     setCompraDraftItems((current) => [
       ...current,
-      { id: nextCompraDraftItemId, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
+      { id: nextCompraDraftItemId, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: true }
     ]);
     setNextCompraDraftItemId((current) => current + 1);
   }
@@ -868,7 +868,7 @@ export function ValesHistoricosPage() {
       setNumeroFacturaCompra("");
       setCompraSinIva(false);
       setCompraEsGasEspecial(false);
-      setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }]);
+      setCompraDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: true }]);
       setNextCompraDraftItemId(2);
     } catch (error) {
       // If server reports the compra is already completed (409), the mutation hook

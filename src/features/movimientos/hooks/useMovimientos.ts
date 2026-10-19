@@ -1,9 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createEntradaManual, createSalidaManual, reordenarMovimientos } from "@/features/movimientos/api/movimientosApi";
+import {
+  createEntradaManual,
+  createSalidaManual,
+  reconstruirCadena,
+} from "@/features/movimientos/api/movimientosApi";
 import type {
   CreateEntradaManualPayload,
   CreateSalidaManualPayload,
-  ReordenarMovimientosPayload
+  ReconstruirCadenaPayload,
 } from "@/features/movimientos/model/movimientos.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 
@@ -30,8 +34,13 @@ export function useCreateEntradaManualMutation() {
   });
 }
 
-export function useReordenarMovimientosMutation() {
+export function useReconstruirCadenaMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: ReordenarMovimientosPayload) => reordenarMovimientos(payload)
+    mutationFn: (payload: ReconstruirCadenaPayload) => reconstruirCadena(payload),
+    onSuccess: async (_data, payload) => {
+      if (payload.aplicar) await queryClient.invalidateQueries({ queryKey: queryKeys.reportes.all });
+    }
   });
 }
+

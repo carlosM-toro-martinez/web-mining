@@ -153,7 +153,7 @@ export function ComprasPage() {
   const [numeroFactura, setNumeroFactura] = useState("");
   const [observacion, setObservacion] = useState("");
   const [draftItems, setDraftItems] = useState<CompraDraftItem[]>([
-    { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
+    { id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: true }
   ]);
   const [nextDraftItemId, setNextDraftItemId] = useState(2);
 
@@ -228,7 +228,7 @@ export function ComprasPage() {
   function addDraftItem() {
     setDraftItems((current) => [
       ...current,
-      { id: nextDraftItemId, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }
+      { id: nextDraftItemId, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: true }
     ]);
     setNextDraftItemId((current) => current + 1);
   }
@@ -295,7 +295,7 @@ export function ComprasPage() {
         setObservacion("");
         setTieneIva(true);
         setEsGasEspecial(false);
-        setDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: false }]);
+        setDraftItems([{ id: 1, productoId: "", cantidadPedida: "1", precioUnit: "", precioGlobal: "", usePrecioGlobal: true }]);
         setNextDraftItemId(2);
       },
       onError: (error) => showError(normalizeError(error, "No se pudo crear la compra."))

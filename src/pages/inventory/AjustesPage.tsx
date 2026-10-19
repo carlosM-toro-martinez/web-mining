@@ -1,35 +1,18 @@
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2, Trash2, TriangleAlert } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Loader2, Play, Search, Settings2, TriangleAlert } from "lucide-react";
 import {
   useBackfillCppMutation,
   useSyncStockFromSaldoMensualMutation,
-  useDiagnosticoPreciosQuery,
-  useDiagnosticoSaldosQuery,
   useDiagnosticoRedondeoQuery,
-  useFixRedondeoMutation,
-  useLimpiarMesPreviewQuery,
-  useEjecutarLimpiarMesMutation
+  useFixRedondeoMutation
 } from "@/features/inventario-import/hooks/useInventarioImport";
-import { useReordenarMovimientosMutation } from "@/features/movimientos/hooks/useMovimientos";
-import {
-  useComprasConSaldoInicialReportQuery,
-  useInventarioAlmacenReportQuery
-} from "@/features/reportes/hooks/useReportes";
+import { useReconstruirCadenaMutation } from "@/features/movimientos/hooks/useMovimientos";
+import { useInventarioAlmacenReportQuery } from "@/features/reportes/hooks/useReportes";
 import type {
   BackfillCppResponse,
-  SyncStockFromSaldoMensualResponse,
-  DiagnosticoPreciosItem,
-  DiagnosticoSaldosItem,
-  LimpiarMesVale,
-  LimpiarMesCompra,
-  SaldoMensualQuery
+  SyncStockFromSaldoMensualResponse
 } from "@/features/inventario-import/model/inventarioImport.schema";
-import type {
-  CompraConSaldoInicialGrupo,
-  CompraConSaldoInicialProducto,
-  MonthlyRangeReportQueryParams
-} from "@/features/reportes/model/reportes.schema";
-import type { ReordenarMovimientosResponse } from "@/features/movimientos/model/movimientos.schema";
+import type { ReconstruirCadenaResponse } from "@/features/movimientos/model/movimientos.schema";
 import { ApiError } from "@/shared/api/core/apiError";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -51,130 +34,36 @@ function formatNumber(value: number | undefined, decimals = 2) {
   }).format(value);
 }
 
-function productCode(item: DiagnosticoPreciosItem) {
-  return item.productoCodigo ?? item.codigo ?? "-";
-}
-
-function productName(item: DiagnosticoPreciosItem) {
-  return item.productoNombre ?? item.nombre ?? "-";
-}
-
-function saldoProductCode(item: DiagnosticoSaldosItem) {
-  return item.productoCodigo ?? item.codigo ?? "-";
-}
-
-function saldoProductName(item: DiagnosticoSaldosItem) {
-  return item.productoNombre ?? item.nombre ?? "-";
-}
-
-function comprasGrupoKey(grupo: CompraConSaldoInicialGrupo) {
-  const codigo = (grupo.grupoCodigo ?? "").trim();
-  const nombre = (grupo.grupoNombre ?? "").trim();
-  return `${codigo}|||${nombre}`;
-}
-
-function comprasGrupoLabel(grupo: CompraConSaldoInicialGrupo) {
-  const codigo = (grupo.grupoCodigo ?? "").trim();
-  const nombre = (grupo.grupoNombre ?? "").trim();
-  if (codigo && nombre) return `${codigo} - ${nombre}`;
-  return codigo || nombre || "Sin grupo";
-}
-
-function comprasProductoSearchText(
-  producto: CompraConSaldoInicialProducto,
-  grupo: CompraConSaldoInicialGrupo
-) {
-  return `${producto.codigo ?? ""} ${producto.nombre ?? ""} ${grupo.grupoCodigo ?? ""} ${grupo.grupoNombre ?? ""}`.toLowerCase();
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("es-BO");
-}
-
 export function AjustesPage() {
   const now = new Date();
   const { showError, showSuccess } = useToast();
   const backfillCppMutation = useBackfillCppMutation();
   const syncStockMutation = useSyncStockFromSaldoMensualMutation();
   const [syncStockResult, setSyncStockResult] = useState<SyncStockFromSaldoMensualResponse | null>(null);
-  const reordenarMutation = useReordenarMovimientosMutation();
+  const reconstruirMutation = useReconstruirCadenaMutation();
 
-  const [diagnosticoAnio, setDiagnosticoAnio] = useState(String(now.getFullYear()));
-  const [diagnosticoMes, setDiagnosticoMes] = useState(String(now.getMonth() + 1));
-  const [diagnosticoParams, setDiagnosticoParams] = useState<SaldoMensualQuery | null>(null);
-  const [diagnosticoTab, setDiagnosticoTab] = useState<"sinPrecio" | "sinProm">("sinPrecio");
-  const [saldosAnio, setSaldosAnio] = useState(String(now.getFullYear()));
-  const [saldosMes, setSaldosMes] = useState(String(now.getMonth() + 1));
-  const [saldosParams, setSaldosParams] = useState<SaldoMensualQuery | null>(null);
-  const [comprasAnioInicio, setComprasAnioInicio] = useState(String(now.getFullYear()));
-  const [comprasMesInicio, setComprasMesInicio] = useState(String(now.getMonth() + 1));
-  const [comprasAnioFin, setComprasAnioFin] = useState(String(now.getFullYear()));
-  const [comprasMesFin, setComprasMesFin] = useState(String(now.getMonth() + 1));
-  const [comprasParams, setComprasParams] = useState<MonthlyRangeReportQueryParams | null>(null);
-  const [comprasGrupo, setComprasGrupo] = useState("");
-  const [comprasSearch, setComprasSearch] = useState("");
-  const [reordenarAnio, setReordenarAnio] = useState(String(now.getFullYear()));
-  const [reordenarMes, setReordenarMes] = useState(String(now.getMonth() + 1));
-  const [reordenarProductoId, setReordenarProductoId] = useState("");
-  const [reordenarResponse, setReordenarResponse] = useState<ReordenarMovimientosResponse | null>(
-    null
-  );
+  const [cadenaAnio, setCadenaAnio] = useState(String(now.getFullYear()));
+  const [cadenaMes, setCadenaMes] = useState(String(now.getMonth() + 1));
+  const [cadenaProductoId, setCadenaProductoId] = useState("");
+  const [cadenaResponse, setCadenaResponse] = useState<ReconstruirCadenaResponse | null>(null);
   const [cppAnio, setCppAnio] = useState(String(now.getFullYear()));
   const [cppMes, setCppMes] = useState(String(now.getMonth() + 1));
   const [cppResponse, setCppResponse] = useState<BackfillCppResponse | null>(null);
   const [negativosAnio, setNegativosAnio] = useState(String(now.getFullYear()));
   const [negativosMes, setNegativosMes] = useState(String(now.getMonth() + 1));
   const [negativosParams, setNegativosParams] = useState<{ anioInicio: number; mesInicio: number; anioFin: number; mesFin: number } | null>(null);
-  const [limpiarAnio, setLimpiarAnio] = useState(String(now.getFullYear()));
-  const [limpiarMes, setLimpiarMes] = useState(String(now.getMonth() + 1));
-  const [limpiarParams, setLimpiarParams] = useState<{ anio: number; mes: number } | null>(null);
-  const [limpiarTab, setLimpiarTab] = useState<"vales" | "compras">("vales");
-  const [limpiarConfirmando, setLimpiarConfirmando] = useState(false);
   const [redondeoAnio, setRedondeoAnio] = useState(String(now.getFullYear()));
   const [redondeoMes, setRedondeoMes] = useState(String(now.getMonth() + 1));
   const [redondeoParams, setRedondeoParams] = useState<{ anio: number; mes: number } | null>(null);
   const fixRedondeoMutation = useFixRedondeoMutation();
 
-  const activeDiagnosticoParams = diagnosticoParams ?? {
-    anio: Number(diagnosticoAnio),
-    mes: Number(diagnosticoMes)
-  };
-  const diagnosticoQuery = useDiagnosticoPreciosQuery(
-    activeDiagnosticoParams,
-    Boolean(diagnosticoParams)
-  );
-  const activeSaldosParams = saldosParams ?? {
-    anio: Number(saldosAnio),
-    mes: Number(saldosMes)
-  };
-  const saldosQuery = useDiagnosticoSaldosQuery(activeSaldosParams, Boolean(saldosParams));
   const activeRedondeoParams = redondeoParams ?? { anio: Number(redondeoAnio), mes: Number(redondeoMes) };
   const redondeoQuery = useDiagnosticoRedondeoQuery(activeRedondeoParams, Boolean(redondeoParams));
-  const activeComprasParams = comprasParams ?? {
-    anioInicio: Number(comprasAnioInicio),
-    mesInicio: Number(comprasMesInicio),
-    anioFin: Number(comprasAnioFin),
-    mesFin: Number(comprasMesFin)
-  };
-  const comprasConSaldoQuery = useComprasConSaldoInicialReportQuery(
-    activeComprasParams,
-    Boolean(comprasParams)
-  );
   const activeNegativosParams = negativosParams ?? {
     anioInicio: Number(negativosAnio), mesInicio: Number(negativosMes),
     anioFin: Number(negativosAnio),   mesFin: Number(negativosMes)
   };
   const negativosQuery = useInventarioAlmacenReportQuery(activeNegativosParams, Boolean(negativosParams));
-  const activeLimpiarParams = limpiarParams ?? { anio: Number(limpiarAnio), mes: Number(limpiarMes) };
-  const limpiarPreviewQuery = useLimpiarMesPreviewQuery(activeLimpiarParams, Boolean(limpiarParams));
-  const limpiarMesMutation = useEjecutarLimpiarMesMutation();
-
-  const diagnosticoData = diagnosticoQuery.data?.data;
-  const saldosData = saldosQuery.data?.data;
-  const comprasConSaldoData = comprasConSaldoQuery.data?.data;
 
   const negativosRows = useMemo(() => {
     const meses = negativosQuery.data?.data?.meses ?? [];
@@ -203,47 +92,6 @@ export function AjustesPage() {
       )
     );
   }, [negativosQuery.data]);
-  const saldosRows = saldosData?.discrepancias ?? [];
-  const diagnosticoRows = useMemo(
-    () =>
-      diagnosticoTab === "sinPrecio"
-        ? (diagnosticoData?.sinPrecio ?? [])
-        : (diagnosticoData?.sinProm ?? []),
-    [diagnosticoData?.sinPrecio, diagnosticoData?.sinProm, diagnosticoTab]
-  );
-  const comprasGrupoOptions = useMemo(() => {
-    const groups = new Map<string, { id: string; label: string }>();
-    for (const mes of comprasConSaldoData?.meses ?? []) {
-      for (const grupo of mes.grupos) {
-        const id = comprasGrupoKey(grupo);
-        if (!groups.has(id)) groups.set(id, { id, label: comprasGrupoLabel(grupo) });
-      }
-    }
-    return [...groups.values()].sort((a, b) => {
-      const aCode = Number(a.label.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
-      const bCode = Number(b.label.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
-      return aCode - bCode || a.label.localeCompare(b.label);
-    });
-  }, [comprasConSaldoData?.meses]);
-  const comprasRows = useMemo(() => {
-    const search = comprasSearch.trim().toLowerCase();
-    return (comprasConSaldoData?.meses ?? []).flatMap((mes) =>
-      mes.grupos
-        .filter((grupo) => !comprasGrupo || comprasGrupoKey(grupo) === comprasGrupo)
-        .flatMap((grupo) =>
-          grupo.productos
-            .filter(
-              (producto) => !search || comprasProductoSearchText(producto, grupo).includes(search)
-            )
-            .map((producto) => ({ mes, grupo, producto }))
-        )
-    );
-  }, [comprasConSaldoData?.meses, comprasGrupo, comprasSearch]);
-  const comprasFiltradasTotal = useMemo(
-    () => comprasRows.reduce((sum, row) => sum + row.producto.totalCompradoBs, 0),
-    [comprasRows]
-  );
-
   function parsePeriodo(anioValue: string, mesValue: string) {
     const anio = Number(anioValue);
     const mes = Number(mesValue);
@@ -258,34 +106,6 @@ export function AjustesPage() {
       return null;
     }
     return { anio, mes };
-  }
-
-  function parseRangoMensual() {
-    const inicio = parsePeriodo(comprasAnioInicio, comprasMesInicio);
-    const fin = parsePeriodo(comprasAnioFin, comprasMesFin);
-    if (!inicio || !fin) return null;
-    const inicioKey = inicio.anio * 12 + inicio.mes;
-    const finKey = fin.anio * 12 + fin.mes;
-    if (inicioKey > finKey) return null;
-    return {
-      anioInicio: inicio.anio,
-      mesInicio: inicio.mes,
-      anioFin: fin.anio,
-      mesFin: fin.mes
-    };
-  }
-
-  function handleDiagnosticoSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const periodo = parsePeriodo(diagnosticoAnio, diagnosticoMes);
-    if (!periodo) {
-      showError("Indica un año y mes válidos para consultar el diagnóstico.");
-      return;
-    }
-    setDiagnosticoParams(periodo);
-    if (diagnosticoParams?.anio === periodo.anio && diagnosticoParams.mes === periodo.mes) {
-      void diagnosticoQuery.refetch();
-    }
   }
 
   function handleNegativosSubmit(event: FormEvent<HTMLFormElement>) {
@@ -305,34 +125,41 @@ export function AjustesPage() {
     }
   }
 
-  function handleReordenarSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const periodo = parsePeriodo(reordenarAnio, reordenarMes);
+  function ejecutarReconstruirCadena(aplicar: boolean) {
+    const periodo = parsePeriodo(cadenaAnio, cadenaMes);
     if (!periodo) {
-      showError("Indica un año y mes válidos para reordenar.");
+      showError("Indica un año y mes válidos.");
       return;
     }
-    const payload: { anio: number; mes: number; productoId?: number } = { ...periodo };
-    const pid = Number(reordenarProductoId);
-    if (reordenarProductoId.trim() && Number.isInteger(pid) && pid > 0) {
-      payload.productoId = pid;
+    const payload: { anio: number; mes: number; productoId?: number; aplicar: boolean } = {
+      ...periodo,
+      aplicar
+    };
+    const pid = Number(cadenaProductoId);
+    if (cadenaProductoId.trim() && Number.isInteger(pid) && pid > 0) payload.productoId = pid;
+
+    if (
+      aplicar &&
+      !window.confirm(
+        `Vas a corregir el bin card de ${String(periodo.mes).padStart(2, "0")}/${periodo.anio}. ` +
+          "Solo cambia stock antes/después y saldo Bs de cada fila; no toca precios, CPP ni saldos. ¿Continuar?"
+      )
+    ) {
+      return;
     }
 
-    setReordenarResponse(null);
-    reordenarMutation.mutate(payload, {
+    setCadenaResponse(null);
+    reconstruirMutation.mutate(payload, {
       onSuccess: (response) => {
-        setReordenarResponse(response);
+        setCadenaResponse(response);
         const d = response.data;
-        const resumen = [
-          `productos: ${d.productosReordenados}`,
-          `movimientos: ${d.movimientosActualizados}`,
-          d.errores.length ? `errores: ${d.errores.length}` : null
-        ]
-          .filter(Boolean)
-          .join(" · ");
-        showSuccess(`Reordenamiento completado · ${resumen}`);
+        showSuccess(
+          aplicar
+            ? `Bin card corregido · productos: ${d.productosAplicados} · filas: ${d.filasModificadas}`
+            : `Simulación · productos con cambios: ${d.productosConCambios} · filas: ${d.filasModificadas}`
+        );
       },
-      onError: (error) => showError(normalizeError(error, "No se pudo reordenar los movimientos."))
+      onError: (error) => showError(normalizeError(error, "No se pudo reconstruir la cadena del bin card."))
     });
   }
 
@@ -372,66 +199,6 @@ export function AjustesPage() {
     });
   }
 
-  function handleLimpiarPreviewSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const periodo = parsePeriodo(limpiarAnio, limpiarMes);
-    if (!periodo) {
-      showError("Indica un año y mes válidos.");
-      return;
-    }
-    setLimpiarConfirmando(false);
-    setLimpiarParams(periodo);
-    if (limpiarParams?.anio === periodo.anio && limpiarParams.mes === periodo.mes) {
-      void limpiarPreviewQuery.refetch();
-    }
-  }
-
-  function handleLimpiarMesConfirmar() {
-    if (!limpiarParams) return;
-    limpiarMesMutation.mutate(limpiarParams, {
-      onSuccess: (response) => {
-        const d = response.data;
-        showSuccess(
-          `Limpiar mes completado · vales eliminados: ${d.valesEliminados} · compras eliminadas: ${d.comprasEliminadas}`
-        );
-        setLimpiarParams(null);
-        setLimpiarConfirmando(false);
-      },
-      onError: (error) => showError(normalizeError(error, "No se pudo limpiar el mes."))
-    });
-  }
-
-  function handleSaldosSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const periodo = parsePeriodo(saldosAnio, saldosMes);
-    if (!periodo) {
-      showError("Indica un año y mes válidos para consultar el diagnóstico de saldos.");
-      return;
-    }
-    setSaldosParams(periodo);
-    if (saldosParams?.anio === periodo.anio && saldosParams.mes === periodo.mes) {
-      void saldosQuery.refetch();
-    }
-  }
-
-  function handleComprasConSaldoSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const rango = parseRangoMensual();
-    if (!rango) {
-      showError("Indica un rango mensual válido para consultar compras con saldo inicial.");
-      return;
-    }
-    setComprasParams(rango);
-    if (
-      comprasParams?.anioInicio === rango.anioInicio &&
-      comprasParams.mesInicio === rango.mesInicio &&
-      comprasParams.anioFin === rango.anioFin &&
-      comprasParams.mesFin === rango.mesFin
-    ) {
-      void comprasConSaldoQuery.refetch();
-    }
-  }
-
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -447,8 +214,8 @@ export function AjustesPage() {
               Ajustes de inventario
             </h1>
             <p className="mt-2 text-sm text-[var(--color-on-surface-variant)]">
-              Diagnóstico de productos sin precio y ejecución controlada del ajuste de precios sin
-              IVA.
+              Herramientas de mantenimiento: sincronizar stock, ordenar el bin card, backfill de CPP y
+              controles de negativos y redondeo.
             </p>
           </div>
         </div>
@@ -553,206 +320,7 @@ export function AjustesPage() {
         ) : null}
       </article>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
-        <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold">Diagnóstico de precios</h2>
-              <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-                Productos con saldo final y precio unitario o promedio pendiente.
-              </p>
-            </div>
-            {diagnosticoData?.periodo || diagnosticoParams ? (
-              <span className="rounded-full bg-[var(--color-primary)]/12 px-3 py-1 text-xs font-bold text-[var(--color-primary)]">
-                {diagnosticoData?.periodo ??
-                  `${String(diagnosticoParams?.mes ?? "").padStart(2, "0")}/${diagnosticoParams?.anio}`}
-              </span>
-            ) : null}
-          </div>
-
-          <form
-            className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]"
-            onSubmit={handleDiagnosticoSubmit}
-          >
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Año
-              </label>
-              <input
-                type="number"
-                min={2000}
-                max={2100}
-                value={diagnosticoAnio}
-                onChange={(event) => setDiagnosticoAnio(event.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Mes
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={12}
-                value={diagnosticoMes}
-                onChange={(event) => setDiagnosticoMes(event.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={diagnosticoQuery.isFetching}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {diagnosticoQuery.isFetching ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Search size={16} />
-                )}
-                Consultar
-              </button>
-            </div>
-          </form>
-
-          {diagnosticoQuery.isError ? (
-            <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-              {normalizeError(diagnosticoQuery.error, "No se pudo consultar el diagnóstico.")}
-            </div>
-          ) : null}
-
-          {diagnosticoData ? (
-            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Productos
-                </p>
-                <p className="mt-1 text-2xl font-extrabold">{diagnosticoData.totalProductos}</p>
-              </div>
-              <div className="rounded-lg border border-[var(--color-error)]/25 bg-[var(--color-error)]/8 p-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Sin precio unit.
-                </p>
-                <p className="mt-1 text-2xl font-extrabold text-[var(--color-error)]">
-                  {diagnosticoData.sinPrecioCount}
-                </p>
-              </div>
-              <div className="rounded-lg border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/8 p-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  Sin precio prom.
-                </p>
-                <p className="mt-1 text-2xl font-extrabold text-[var(--color-warning)]">
-                  {diagnosticoData.sinPromCount}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mb-3 flex flex-wrap gap-2">
-            {[
-              {
-                key: "sinPrecio" as const,
-                label: "Sin precio unitario",
-                count: diagnosticoData?.sinPrecioCount
-              },
-              {
-                key: "sinProm" as const,
-                label: "Sin precio promedio",
-                count: diagnosticoData?.sinPromCount
-              }
-            ].map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setDiagnosticoTab(option.key)}
-                className={`rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
-                  diagnosticoTab === option.key
-                    ? "border-[var(--color-primary)] bg-[var(--color-primary)]/14 text-[var(--color-primary)]"
-                    : "border-[var(--color-border-soft)] text-[var(--color-on-surface-variant)] hover:border-[var(--color-primary)]/45"
-                }`}
-              >
-                {option.label}
-                {option.count !== undefined ? ` (${option.count})` : ""}
-              </button>
-            ))}
-          </div>
-
-          <div className="overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
-            <div className="max-h-[560px] overflow-auto">
-              <table className="min-w-full border-collapse text-sm">
-                <thead className="sticky top-0 bg-[var(--color-surface-container-highest)] text-left text-xs uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                  <tr>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2">ID</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2">
-                      Producto
-                    </th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Unidad</th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                      Saldo final
-                    </th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                      Precio unit.
-                    </th>
-                    <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                      Precio prom.
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!diagnosticoParams ? (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                      >
-                        Consulta un período para ver productos sin precio asignado.
-                      </td>
-                    </tr>
-                  ) : diagnosticoQuery.isFetching ? (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                      >
-                        Cargando diagnóstico...
-                      </td>
-                    </tr>
-                  ) : diagnosticoRows.length ? (
-                    diagnosticoRows.map((item, index) => (
-                      <tr
-                        key={`${productCode(item)}-${item.id ?? item.productoId ?? index}`}
-                        className="border-b border-[var(--color-border-soft)] last:border-0"
-                      >
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {item.productoId ?? item.id ?? "-"}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs">{productCode(item)}</td>
-                        <td className="px-3 py-2 font-medium">{productName(item)}</td>
-                        <td className="px-3 py-2">{item.unidad ?? "-"}</td>
-                        <td className="px-3 py-2 text-right">{formatNumber(item.saldoFinal)}</td>
-                        <td className="px-3 py-2 text-right">{formatNumber(item.precioUnit, 4)}</td>
-                        <td className="px-3 py-2 text-right">
-                          {formatNumber(item.precioUnitProm, 4)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-3 py-8 text-center text-sm text-[var(--color-success)]"
-                      >
-                        Sin productos pendientes para el período consultado.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </article>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
 
         <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
           <div className="mb-4 flex items-start gap-3">
@@ -760,15 +328,15 @@ export function AjustesPage() {
               <ArrowUpDown size={16} />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Reordenar movimientos</h2>
+              <h2 className="text-lg font-bold">Ordenar bin card del mes</h2>
               <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-                Corrige stockAntes, stockDespues y saldoBs del bin card cuando hay salidas
-                registradas antes de su compra.
+                Deja la cadena de stock de cada producto en orden cronológico: empieza en el saldo
+                inicial del mes, cada fila continúa en la anterior y termina en el saldo final.
               </p>
             </div>
           </div>
 
-          <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={handleReordenarSubmit}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                 Año
@@ -777,8 +345,8 @@ export function AjustesPage() {
                 type="number"
                 min={2000}
                 max={2100}
-                value={reordenarAnio}
-                onChange={(event) => setReordenarAnio(event.target.value)}
+                value={cadenaAnio}
+                onChange={(event) => setCadenaAnio(event.target.value)}
                 className={inputClassName}
               />
             </div>
@@ -790,8 +358,8 @@ export function AjustesPage() {
                 type="number"
                 min={1}
                 max={12}
-                value={reordenarMes}
-                onChange={(event) => setReordenarMes(event.target.value)}
+                value={cadenaMes}
+                onChange={(event) => setCadenaMes(event.target.value)}
                 className={inputClassName}
               />
             </div>
@@ -804,77 +372,110 @@ export function AjustesPage() {
                 type="number"
                 min={1}
                 placeholder="Todos los productos del período"
-                value={reordenarProductoId}
-                onChange={(event) => setReordenarProductoId(event.target.value)}
+                value={cadenaProductoId}
+                onChange={(event) => setCadenaProductoId(event.target.value)}
                 className={inputClassName}
               />
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
-                type="submit"
-                disabled={reordenarMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                disabled={reconstruirMutation.isPending}
+                onClick={() => ejecutarReconstruirCadena(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-4 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {reordenarMutation.isPending ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <ArrowUpDown size={16} />
-                )}
-                Reordenar movimientos
+                {reconstruirMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                Simular (no cambia nada)
+              </button>
+              <button
+                type="button"
+                disabled={reconstruirMutation.isPending}
+                onClick={() => ejecutarReconstruirCadena(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reconstruirMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <ArrowUpDown size={16} />}
+                Aplicar
               </button>
             </div>
-          </form>
+          </div>
 
           <div className="mt-4 rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/10 p-3 text-sm">
             <div className="flex items-start gap-2">
               <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
               <p className="text-[var(--color-on-surface-variant)]">
-                Solo modifica stockAntes, stockDespues y saldoBs de los movimientos. Ejecuta
-                backfill CPP primero para tener precios correctos.
+                Solo reescribe stock antes, stock después y saldo Bs de cada fila. No cambia fechas,
+                precios, importes, CPP, saldos mensuales ni stock. No funciona en meses cerrados ni
+                con CPP móvil. Los productos cuyos movimientos no suman el saldo del mes se omiten.
               </p>
             </div>
           </div>
 
-          {reordenarMutation.isError ? (
+          {reconstruirMutation.isError ? (
             <div className="mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-              {normalizeError(reordenarMutation.error, "No se pudo reordenar los movimientos.")}
+              {normalizeError(reconstruirMutation.error, "No se pudo reconstruir la cadena del bin card.")}
             </div>
           ) : null}
 
-          {reordenarResponse ? (
+          {cadenaResponse ? (
             <div className="mt-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Productos
-                  </p>
-                  <p className="mt-1 text-2xl font-extrabold">
-                    {reordenarResponse.data.productosReordenados}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Movimientos
-                  </p>
-                  <p className="mt-1 text-2xl font-extrabold">
-                    {reordenarResponse.data.movimientosActualizados}
-                  </p>
-                </div>
+              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+                {cadenaResponse.data.aplicar ? "Resultado aplicado" : "Simulación (no se guardó nada)"} ·{" "}
+                {String(cadenaResponse.data.mes).padStart(2, "0")}/{cadenaResponse.data.anio}
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  ["Analizados", cadenaResponse.data.productosAnalizados],
+                  ["Con cambios", cadenaResponse.data.productosConCambios],
+                  ["Filas", cadenaResponse.data.filasModificadas]
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{label}</p>
+                    <p className="mt-1 text-2xl font-extrabold">{value}</p>
+                  </div>
+                ))}
               </div>
-              {reordenarResponse.data.errores.length > 0 ? (
+              {cadenaResponse.data.productosOmitidos.length > 0 ? (
+                <div className="rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/10 p-3 text-xs">
+                  <p className="mb-1 font-bold">
+                    Omitidos ({cadenaResponse.data.productosOmitidos.length}): sus movimientos no suman el saldo del mes
+                  </p>
+                  {cadenaResponse.data.productosOmitidos.slice(0, 15).map((o) => (
+                    <div key={o.codigo}>
+                      {o.codigo}: movimientos terminan en {o.saldoFinalCadena}, saldo del mes {o.saldoFinalMes}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {cadenaResponse.data.errores.length > 0 ? (
                 <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-xs text-[var(--color-error)]">
-                  {reordenarResponse.data.errores.map((e) => (
+                  {cadenaResponse.data.errores.map((e) => (
                     <div key={e.productoId}>
                       Producto {e.productoId}: {e.error}
                     </div>
                   ))}
                 </div>
               ) : null}
+              {cadenaResponse.data.muestra.length > 0 ? (
+                <details className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3 text-xs">
+                  <summary className="cursor-pointer font-bold">Ejemplos de filas corregidas</summary>
+                  <div className="mt-2 space-y-2">
+                    {cadenaResponse.data.muestra.map((m) => (
+                      <div key={m.codigo}>
+                        <p className="font-semibold">{m.codigo} · {m.filasModificadas} filas</p>
+                        {m.cambios.slice(0, 4).map((c, index) => (
+                          <p key={`${m.codigo}-${index}`} className="text-[var(--color-on-surface-variant)]">
+                            {c.tipo} {c.cantidad}: antes {c.stockAntes.antes}→{c.stockDespues.antes}, ahora{" "}
+                            {c.stockAntes.despues}→{c.stockDespues.despues}
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
             </div>
           ) : (
-            <p className="mt-5 text-sm text-[var(--color-on-surface-variant)]">
-              Sin ejecución todavía.
-            </p>
+            <p className="mt-5 text-sm text-[var(--color-on-surface-variant)]">Sin ejecución todavía.</p>
           )}
         </article>
 
@@ -959,260 +560,6 @@ export function AjustesPage() {
           </div>
         </article>
       </div>
-
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold">Compras con saldo inicial</h2>
-            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-              Productos que tienen saldo inicial mayor a cero y compras dentro del período.
-            </p>
-          </div>
-          {comprasParams ? (
-            <span className="rounded-full bg-[var(--color-primary)]/12 px-3 py-1 text-xs font-bold text-[var(--color-primary)]">
-              {String(comprasParams.mesInicio).padStart(2, "0")}/{comprasParams.anioInicio} -{" "}
-              {String(comprasParams.mesFin).padStart(2, "0")}/{comprasParams.anioFin}
-            </span>
-          ) : null}
-        </div>
-
-        <form
-          className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-5"
-          onSubmit={handleComprasConSaldoSubmit}
-        >
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Año inicio
-            </label>
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={comprasAnioInicio}
-              onChange={(event) => setComprasAnioInicio(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Mes inicio
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={comprasMesInicio}
-              onChange={(event) => setComprasMesInicio(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Año fin
-            </label>
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={comprasAnioFin}
-              onChange={(event) => setComprasAnioFin(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Mes fin
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={comprasMesFin}
-              onChange={(event) => setComprasMesFin(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={comprasConSaldoQuery.isFetching}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {comprasConSaldoQuery.isFetching ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Search size={16} />
-              )}
-              Consultar
-            </button>
-          </div>
-        </form>
-
-        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.4fr]">
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Grupo
-            </label>
-            <select
-              value={comprasGrupo}
-              onChange={(event) => setComprasGrupo(event.target.value)}
-              disabled={!comprasConSaldoData || comprasConSaldoQuery.isFetching}
-              className={inputClassName}
-            >
-              <option value="">Todos los grupos</option>
-              {comprasGrupoOptions.map((grupo) => (
-                <option key={grupo.id} value={grupo.id}>
-                  {grupo.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Buscar producto
-            </label>
-            <input
-              value={comprasSearch}
-              onChange={(event) => setComprasSearch(event.target.value)}
-              placeholder="Código o nombre"
-              disabled={!comprasConSaldoData || comprasConSaldoQuery.isFetching}
-              className={inputClassName}
-            />
-          </div>
-        </div>
-
-        {comprasConSaldoQuery.isError ? (
-          <div className="mb-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-            {normalizeError(
-              comprasConSaldoQuery.error,
-              "No se pudo consultar compras con saldo inicial."
-            )}
-          </div>
-        ) : null}
-
-        {comprasConSaldoData ? (
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Meses
-              </p>
-              <p className="mt-1 text-2xl font-extrabold">{comprasConSaldoData.meses.length}</p>
-            </div>
-            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Productos filtrados
-              </p>
-              <p className="mt-1 text-2xl font-extrabold">{comprasRows.length}</p>
-            </div>
-            <div className="rounded-lg border border-[var(--color-success)]/25 bg-[var(--color-success)]/8 p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Total comprado Bs.
-              </p>
-              <p className="mt-1 text-2xl font-extrabold text-[var(--color-success)]">
-                {formatNumber(comprasFiltradasTotal)}
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
-          <div className="max-h-[620px] overflow-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="sticky top-0 bg-[var(--color-surface-container-highest)] text-left text-xs uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                <tr>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Periodo</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Grupo</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Saldo inicial
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Saldo Bs.
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Comprado Bs.
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Compras</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!comprasParams ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                    >
-                      Consulta un rango para ver productos con saldo inicial y compras.
-                    </td>
-                  </tr>
-                ) : comprasConSaldoQuery.isFetching ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                    >
-                      Cargando compras con saldo inicial...
-                    </td>
-                  </tr>
-                ) : comprasRows.length ? (
-                  comprasRows.map(({ mes, grupo, producto }) => (
-                    <tr
-                      key={`${mes.anio}-${mes.mes}-${comprasGrupoKey(grupo)}-${producto.codigo ?? producto.nombre}`}
-                      className="border-b border-[var(--color-border-soft)] align-top last:border-0"
-                    >
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {String(mes.mes).padStart(2, "0")}/{mes.anio}
-                      </td>
-                      <td className="min-w-[160px] px-3 py-2">{comprasGrupoLabel(grupo)}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{producto.codigo ?? "-"}</td>
-                      <td className="min-w-[220px] px-3 py-2 font-medium">
-                        {producto.nombre ?? "-"}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(producto.saldoInicialQty)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(producto.saldoInicialBs)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-semibold">
-                        {formatNumber(producto.totalCompradoBs)}
-                      </td>
-                      <td className="min-w-[360px] px-3 py-2">
-                        <div className="space-y-1 text-xs text-[var(--color-on-surface-variant)]">
-                          {producto.compras.map((compra, index) => (
-                            <div
-                              key={`${compra.numeroFactura ?? "sf"}-${compra.fecha ?? "sf"}-${index}`}
-                              className="rounded-md bg-[var(--color-surface-container-low)] px-2 py-1"
-                            >
-                              <span className="font-semibold text-[var(--color-on-surface)]">
-                                {compra.numeroFactura ?? "Sin factura"}
-                              </span>{" "}
-                              · {formatDate(compra.fecha)} · {compra.proveedor ?? "Sin proveedor"} ·
-                              Cant. {formatNumber(compra.cantidad)} · P.U.{" "}
-                              {formatNumber(compra.precioUnit, 4)} · Bs.{" "}
-                              {formatNumber(compra.importeBs)}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                    >
-                      Sin productos para los filtros seleccionados.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </article>
 
       <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -1347,442 +694,6 @@ export function AjustesPage() {
             </div>
           </>
         ) : null}
-      </article>
-
-      <article className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold">Diagnóstico de saldos</h2>
-            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-              Compara salida mensual contra movimientos y valida saldoInicial + ingresos - salidas.
-            </p>
-          </div>
-          {saldosData?.periodo || saldosParams ? (
-            <span className="rounded-full bg-[var(--color-primary)]/12 px-3 py-1 text-xs font-bold text-[var(--color-primary)]">
-              {saldosData?.periodo ??
-                `${String(saldosParams?.mes ?? "").padStart(2, "0")}/${saldosParams?.anio}`}
-            </span>
-          ) : null}
-        </div>
-
-        <form
-          className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]"
-          onSubmit={handleSaldosSubmit}
-        >
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Año
-            </label>
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={saldosAnio}
-              onChange={(event) => setSaldosAnio(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Mes
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={saldosMes}
-              onChange={(event) => setSaldosMes(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={saldosQuery.isFetching}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saldosQuery.isFetching ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Search size={16} />
-              )}
-              Consultar
-            </button>
-          </div>
-        </form>
-
-        {saldosQuery.isError ? (
-          <div className="mb-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-            {normalizeError(saldosQuery.error, "No se pudo consultar el diagnóstico de saldos.")}
-          </div>
-        ) : null}
-
-        {saldosData ? (
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Productos
-              </p>
-              <p className="mt-1 text-2xl font-extrabold">{saldosData.totalProductos}</p>
-            </div>
-            <div className="rounded-lg border border-[var(--color-success)]/25 bg-[var(--color-success)]/8 p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Correctos
-              </p>
-              <p className="mt-1 text-2xl font-extrabold text-[var(--color-success)]">
-                {saldosData.productosOk}
-              </p>
-            </div>
-            <div className="rounded-lg border border-[var(--color-error)]/25 bg-[var(--color-error)]/8 p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                Discrepancias
-              </p>
-              <p className="mt-1 text-2xl font-extrabold text-[var(--color-error)]">
-                {saldosData.discrepanciasCount}
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="overflow-hidden rounded-lg border border-[var(--color-border-soft)]">
-          <div className="max-h-[560px] overflow-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="sticky top-0 bg-[var(--color-surface-container-highest)] text-left text-xs uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                <tr>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Código</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">Producto</th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Saldo inicial
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Salida mensual
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Movimientos
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Dif. salida
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Saldo final
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Calculado
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2 text-right">
-                    Dif. saldo
-                  </th>
-                  <th className="border-b border-[var(--color-border-soft)] px-3 py-2">
-                    Problemas
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {!saldosParams ? (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                    >
-                      Consulta un período para revisar discrepancias de saldos.
-                    </td>
-                  </tr>
-                ) : saldosQuery.isFetching ? (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]"
-                    >
-                      Cargando diagnóstico...
-                    </td>
-                  </tr>
-                ) : saldosRows.length ? (
-                  saldosRows.map((item, index) => (
-                    <tr
-                      key={`${saldoProductCode(item)}-${item.id ?? item.productoId ?? index}`}
-                      className="border-b border-[var(--color-border-soft)] last:border-0"
-                    >
-                      <td className="px-3 py-2 font-mono text-xs">{saldoProductCode(item)}</td>
-                      <td className="min-w-[220px] px-3 py-2 font-medium">
-                        {saldoProductName(item)}
-                      </td>
-                      <td className="px-3 py-2 text-right">{formatNumber(item.saldoInicial)}</td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(item.salidaQty?.saldoMensual)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(item.salidaQty?.movimientos)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(item.salidaQty?.diferencia)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(item.saldoFinal?.saldoMensual)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(item.saldoFinal?.calculado)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {formatNumber(item.saldoFinal?.diferencia)}
-                      </td>
-                      <td className="min-w-[260px] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
-                        {item.problemas.length ? item.problemas.join(" | ") : "-"}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="px-3 py-8 text-center text-sm text-[var(--color-success)]"
-                    >
-                      Sin discrepancias para el período consultado.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </article>
-
-      {/* ─── Limpiar mes ─────────────────────────────────────────────────── */}
-      <article className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-surface-container-high)] p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold">Limpiar mes</h2>
-            <p className="mt-1 text-sm text-[var(--color-on-surface-variant)]">
-              Elimina permanentemente todos los vales y compras no-retroactivos de un mes.
-              No afecta movimientos históricos ni SaldoMensual.
-            </p>
-          </div>
-          {limpiarParams ? (
-            <span className="rounded-full bg-[var(--color-error)]/12 px-3 py-1 text-xs font-bold text-[var(--color-error)]">
-              {String(limpiarParams.mes).padStart(2, "0")}/{limpiarParams.anio}
-            </span>
-          ) : null}
-        </div>
-
-        <form
-          className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]"
-          onSubmit={handleLimpiarPreviewSubmit}
-        >
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Año
-            </label>
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={limpiarAnio}
-              onChange={(e) => setLimpiarAnio(e.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-              Mes
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={limpiarMes}
-              onChange={(e) => setLimpiarMes(e.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={limpiarPreviewQuery.isFetching}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {limpiarPreviewQuery.isFetching ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Search size={16} />
-              )}
-              Ver preview
-            </button>
-          </div>
-        </form>
-
-        {limpiarPreviewQuery.isError ? (
-          <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 p-3 text-sm text-[var(--color-error)]">
-            {normalizeError(limpiarPreviewQuery.error, "No se pudo cargar el preview.")}
-          </div>
-        ) : null}
-
-        {limpiarPreviewQuery.data ? (() => {
-          const preview = limpiarPreviewQuery.data.data;
-          const vales = preview.vales as LimpiarMesVale[];
-          const compras = preview.compras as LimpiarMesCompra[];
-          const totalVales = vales.length;
-          const totalCompras = compras.length;
-          const tabVales = limpiarTab === "vales";
-
-          return (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Vales
-                  </p>
-                  <p className="mt-1 text-2xl font-extrabold">{totalVales}</p>
-                </div>
-                <div className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-3">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                    Compras
-                  </p>
-                  <p className="mt-1 text-2xl font-extrabold">{totalCompras}</p>
-                </div>
-              </div>
-
-              {/* tabs */}
-              <div className="flex gap-1 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-1">
-                {(["vales", "compras"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setLimpiarTab(tab)}
-                    className={`flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                      limpiarTab === tab
-                        ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
-                        : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)]"
-                    }`}
-                  >
-                    {tab === "vales" ? `Vales (${totalVales})` : `Compras (${totalCompras})`}
-                  </button>
-                ))}
-              </div>
-
-              <div className="overflow-x-auto rounded-lg border border-[var(--color-border-soft)]">
-                <table className="w-full min-w-[520px] text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)]">
-                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Fecha</th>
-                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                        {tabVales ? "Solicitante" : "Proveedor"}
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Estado</th>
-                      <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Productos</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tabVales
-                      ? vales.length === 0
-                        ? (
-                          <tr>
-                            <td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
-                              Sin vales no-retroactivos en este mes.
-                            </td>
-                          </tr>
-                        )
-                        : vales.map((vale) => (
-                          <tr key={vale.id} className="border-b border-[var(--color-border-soft)] last:border-0">
-                            <td className="px-3 py-2 font-mono text-xs">{formatDate(vale.fecha.toISOString())}</td>
-                            <td className="px-3 py-2">{vale.solicitante}</td>
-                            <td className="px-3 py-2">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                vale.estado === "ANULADO"
-                                  ? "bg-[var(--color-error)]/15 text-[var(--color-error)]"
-                                  : vale.estado === "ENTREGADO"
-                                  ? "bg-[var(--color-success)]/15 text-[var(--color-success)]"
-                                  : "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
-                              }`}>
-                                {vale.estado}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
-                              {vale.items.map((i) => `${i.productoCodigo} ×${i.cantidadEntregada}`).join(", ")}
-                            </td>
-                          </tr>
-                        ))
-                      : compras.length === 0
-                        ? (
-                          <tr>
-                            <td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">
-                              Sin compras no-retroactivas en este mes.
-                            </td>
-                          </tr>
-                        )
-                        : compras.map((compra) => (
-                          <tr key={compra.id} className="border-b border-[var(--color-border-soft)] last:border-0">
-                            <td className="px-3 py-2 font-mono text-xs">{formatDate(compra.fecha.toISOString())}</td>
-                            <td className="px-3 py-2">{compra.proveedor}</td>
-                            <td className="px-3 py-2">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                compra.estado === "ANULADA"
-                                  ? "bg-[var(--color-error)]/15 text-[var(--color-error)]"
-                                  : "bg-[var(--color-success)]/15 text-[var(--color-success)]"
-                              }`}>
-                                {compra.estado}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
-                              {compra.items.map((i) => `${i.productoCodigo} ×${i.cantidadRecibida}`).join(", ")}
-                            </td>
-                          </tr>
-                        ))
-                    }
-                  </tbody>
-                </table>
-              </div>
-
-              {totalVales === 0 && totalCompras === 0 ? null : (
-                <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/8 p-4">
-                  <div className="mb-3 flex items-start gap-2 text-sm text-[var(--color-error)]">
-                    <TriangleAlert size={16} className="mt-0.5 shrink-0" />
-                    <span>
-                      Esta acción es <strong>irreversible</strong>. Se eliminarán {totalVales} vale(s) y {totalCompras} compra(s)
-                      del mes {String(preview.mes).padStart(2, "0")}/{preview.anio} junto con todos sus movimientos.
-                      El stock físico será ajustado automáticamente.
-                    </span>
-                  </div>
-                  {!limpiarConfirmando ? (
-                    <button
-                      type="button"
-                      onClick={() => setLimpiarConfirmando(true)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/40 bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-error)] transition hover:bg-[var(--color-error)]/12"
-                    >
-                      <Trash2 size={15} />
-                      Eliminar todo el mes
-                    </button>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-[var(--color-error)]">
-                        ¿Confirmas la eliminación permanente?
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleLimpiarMesConfirmar}
-                        disabled={limpiarMesMutation.isPending}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {limpiarMesMutation.isPending ? (
-                          <Loader2 size={15} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={15} />
-                        )}
-                        Sí, eliminar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLimpiarConfirmando(false)}
-                        disabled={limpiarMesMutation.isPending}
-                        className="rounded-lg border border-[var(--color-border-soft)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--color-surface-container-highest)]"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })() : null}
       </article>
 
       {/* ── Diagnóstico de redondeo ingresosBs ─────────────────────────────── */}
