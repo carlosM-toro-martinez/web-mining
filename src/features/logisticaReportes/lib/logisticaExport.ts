@@ -1882,6 +1882,16 @@ function descripcionConocimiento(lote: LoteDespacho) {
   return [lote.conocimientoCarga?.descripcion, nivel].filter(Boolean).join(" — ");
 }
 
+// Observaciones impresas del Conocimiento: siempre dice en qué volqueta se
+// envió (la placa actual del lote, así un transbordo sale con la nueva) y, si el
+// lote tiene observaciones propias, van a continuación.
+function observacionesConocimiento(lote: LoteDespacho) {
+  const placa = lote.vehiculo?.placa?.trim();
+  const volqueta = placa ? `Se envió en volqueta ${placa}` : "";
+  const propias = lote.conocimientoCarga?.observaciones?.trim() ?? "";
+  return [volqueta, propias].filter(Boolean).join(". ");
+}
+
 function fechaConocimientoLarga(value: string) {
   const date = parseFecha(value);
   return `${date.getUTCDate()} de ${MESES_MAYUSCULA[date.getUTCMonth()]!.charAt(0)}${MESES_MAYUSCULA[date.getUTCMonth()]!.slice(1).toLowerCase()} de ${date.getUTCFullYear()}`;
@@ -1931,7 +1941,7 @@ export function exportConocimientoExcel(lote: LoteDespacho) {
     ["CANTIDAD", "UNIDAD", "DESCRIPCION", "", "", "", ""],
     ["", "", descripcion || "", "", "", "", ""],
     [],
-    ["Observaciones:", conocimiento?.observaciones ?? "", "", "", "", "", ""],
+    ["Observaciones:", observacionesConocimiento(lote), "", "", "", "", ""],
     [],
     [
       "Lugar y Fecha:",
@@ -2115,7 +2125,7 @@ export function exportConocimientoPdf(lote: LoteDespacho) {
   doc.text("Observaciones:", margin, y);
   dotted(margin + 92, right, y + 3);
   doc.setFont("helvetica", "normal");
-  doc.text(conocimiento?.observaciones ?? "", margin + 96, y, { maxWidth: right - margin - 100 });
+  doc.text(observacionesConocimiento(lote), margin + 96, y, { maxWidth: right - margin - 100 });
 
   y += 22;
   dotted(margin, right, y + 3);

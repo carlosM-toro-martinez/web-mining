@@ -40,9 +40,12 @@ import {
   useChoferesQuery,
   useCreateChoferMutation,
   useCreateVehiculoMutation,
+  useUpdateChoferMutation,
+  useUpdateVehiculoMutation,
   useVehiculosQuery
 } from "@/features/flota/hooks/useFlota";
-import type { EstadoVehiculo, Vehiculo } from "@/features/flota/model/flota.schema";
+import type { Chofer, EstadoVehiculo, Vehiculo } from "@/features/flota/model/flota.schema";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   useAnularLoteMutation,
   useAvanzarEstadoLoteMutation,
@@ -243,8 +246,9 @@ function VehiculoCard({
   accentBar,
   cardBg,
   cardBorder,
-  onGestionar
-}: { vehiculo: Vehiculo; onGestionar?: (vehiculo: Vehiculo) => void } & Pick<
+  onGestionar,
+  onEditar
+}: { vehiculo: Vehiculo; onGestionar?: (vehiculo: Vehiculo) => void; onEditar?: (vehiculo: Vehiculo) => void } & Pick<
   ColumnaEstilo,
   "accentBar" | "cardBg" | "cardBorder"
 >) {
@@ -271,8 +275,8 @@ function VehiculoCard({
       className={`flex shrink-0 cursor-grab touch-none overflow-hidden rounded-lg border ${cardBorder} ${cardBg} active:cursor-grabbing`}
     >
       <div className={`w-1.5 shrink-0 ${accentBar}`} />
-      <div className="flex flex-1 items-center justify-between gap-2 p-3">
-        <div className="min-w-0">
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 p-3">
+        <div className="min-w-0 flex-1">
           <p className="font-mono text-sm font-bold uppercase leading-tight">{vehiculo.placa}</p>
           <p className="text-[10px] text-[var(--color-on-surface-variant)]">{vehiculo.tipo}</p>
           {vehiculo.propietario ? (
@@ -286,7 +290,25 @@ function VehiculoCard({
             </p>
           ) : null}
         </div>
-        <Truck size={16} className="shrink-0 text-[var(--color-on-surface-variant)]/50" />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {onEditar ? (
+            // Fuera del arrastre y del clic de la tarjeta: solo abre la edición.
+            <button
+              type="button"
+              title="Editar vehículo"
+              aria-label={`Editar ${vehiculo.placa}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEditar(vehiculo);
+              }}
+              className="rounded p-1 text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
+            >
+              <Edit3 size={13} />
+            </button>
+          ) : null}
+          <Truck size={16} className="text-[var(--color-on-surface-variant)]/50" />
+        </div>
       </div>
     </div>
   );
@@ -300,8 +322,13 @@ function FlotaColumn({
   cardBg,
   cardBorder,
   vehiculos,
-  onGestionar
-}: ColumnaEstilo & { vehiculos: Vehiculo[]; onGestionar: (vehiculo: Vehiculo) => void }) {
+  onGestionar,
+  onEditar
+}: ColumnaEstilo & {
+  vehiculos: Vehiculo[];
+  onGestionar: (vehiculo: Vehiculo) => void;
+  onEditar?: (vehiculo: Vehiculo) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: estado });
   const [busqueda, setBusqueda] = useState("");
 
@@ -353,6 +380,7 @@ function FlotaColumn({
             cardBg={cardBg}
             cardBorder={cardBorder}
             onGestionar={onGestionar}
+            onEditar={onEditar}
           />
         ))}
         {vehiculosFiltrados.length === 0 ? (
@@ -1808,6 +1836,142 @@ function TransportistasSection() {
   );
 }
 
+// Corregir los datos de una volqueta ya creada. No toca su estado (eso se hace
+// con el tablero) ni los lotes que ya hizo: esos conservan su transportista.
+function EditarVehiculoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: () => void }) {
+  const { showError, showSuccess } = useToast();
+  const updateMutation = useUpdateVehiculoMutation();
+  const transportistasQuery = useTransportistasQuery();
+  const transportistas = transportistasQuery.data?.data ?? [];
+
+  const [placa, setPlaca] = useState(vehiculo.placa);
+  const [tipo, setTipo] = useState(vehiculo.tipo);
+  const [capacidadTon, setCapacidadTon] = useState(String(Number(vehiculo.capacidadTon)));
+  const [propietarioId, setPropietarioId] = useState(vehiculo.propietarioId ? String(vehiculo.propietarioId) : "");
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    updateMutation.mutate(
+      {
+        id: vehiculo.id,
+        payload: {
+          placa: placa.trim().toUpperCase(),
+          tipo: tipo.trim(),
+          capacidadTon: Number(capacidadTon),
+          propietarioId: propietarioId ? Number(propietarioId) : null
+        }
+      },
+      {
+        onSuccess: () => {
+          showSuccess(`Vehículo ${placa.trim().toUpperCase()} actualizado.`);
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo actualizar el vehículo."))
+      }
+    );
+  }
+
+  return (
+    <ModalShell onClose={onClose} maxWidthClassName="max-w-md">
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <Edit3 size={16} className="text-[var(--color-primary)]" />
+        Editar vehículo
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        Corrige los datos de <span className="font-mono font-bold uppercase">{vehiculo.placa}</span>. Los viajes que ya hizo no cambian.
+      </p>
+      <form className="space-y-3" onSubmit={handleSubmit}>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Placa</label>
+          <input required value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} className={`${inputClassName} font-mono`} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Tipo</label>
+          <input required value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputClassName} placeholder="Ej. Volqueta 10m³" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Capacidad (toneladas)</label>
+          <input required type="number" min="0.1" step="0.1" value={capacidadTon} onChange={(e) => setCapacidadTon(e.target.value)} className={inputClassName} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Transportista (dueño)</label>
+          <select value={propietarioId} onChange={(e) => setPropietarioId(e.target.value)} className={inputClassName}>
+            <option value="">Sin transportista</option>
+            {transportistas.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nombreORazonSocial}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="submit"
+          disabled={updateMutation.isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+        >
+          <Save size={14} /> {updateMutation.isPending ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </form>
+    </ModalShell>
+  );
+}
+
+function EditarChoferModal({ chofer, onClose }: { chofer: Chofer; onClose: () => void }) {
+  const { showError, showSuccess } = useToast();
+  const updateMutation = useUpdateChoferMutation();
+
+  const [nombre, setNombre] = useState(chofer.nombre);
+  const [ci, setCi] = useState(chofer.ci);
+  const [licencia, setLicencia] = useState(chofer.licencia ?? "");
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    updateMutation.mutate(
+      { id: chofer.id, payload: { nombre: nombre.trim(), ci: ci.trim(), licencia: licencia.trim() } },
+      {
+        onSuccess: () => {
+          showSuccess("Chofer actualizado.");
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo actualizar el chofer."))
+      }
+    );
+  }
+
+  return (
+    <ModalShell onClose={onClose} maxWidthClassName="max-w-md">
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+        <Edit3 size={16} className="text-[var(--color-primary)]" />
+        Editar chofer
+      </h2>
+      <p className="mb-4 text-sm text-[var(--color-on-surface-variant)]">
+        Corrige los datos de <span className="font-semibold">{chofer.nombre}</span>. Los viajes que ya hizo no cambian.
+      </p>
+      <form className="space-y-3" onSubmit={handleSubmit}>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Nombre completo</label>
+          <input required value={nombre} onChange={(e) => setNombre(e.target.value)} className={inputClassName} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Carnet de identidad</label>
+          <input required value={ci} onChange={(e) => setCi(e.target.value)} className={inputClassName} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Licencia (opcional)</label>
+          <input value={licencia} onChange={(e) => setLicencia(e.target.value)} className={inputClassName} />
+        </div>
+        <button
+          type="submit"
+          disabled={updateMutation.isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+        >
+          <Save size={14} /> {updateMutation.isPending ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </form>
+    </ModalShell>
+  );
+}
+
 export function FlotaPage() {
   const { showError, showSuccess } = useToast();
   const vehiculosQuery = useVehiculosQuery();
@@ -1815,6 +1979,11 @@ export function FlotaPage() {
   const choferesQuery = useChoferesQuery();
   const createVehiculoMutation = useCreateVehiculoMutation();
   const createChoferMutation = useCreateChoferMutation();
+  // Editar volquetas y choferes lo permite el permiso "Flota › Editar" (la API lo exige igual).
+  const { can } = usePermisos();
+  const puedeEditar = can("logistica.flota", "editar");
+  const [editarVehiculo, setEditarVehiculo] = useState<Vehiculo | null>(null);
+  const [editarChofer, setEditarChofer] = useState<Chofer | null>(null);
 
   const vehiculos = vehiculosQuery.data?.data ?? [];
   const transportistas = transportistasQuery.data?.data ?? [];
@@ -2039,6 +2208,7 @@ export function FlotaPage() {
                   {...columna}
                   vehiculos={vehiculosPorEstado.get(columna.estado) ?? []}
                   onGestionar={handleCardClick}
+                  onEditar={puedeEditar ? setEditarVehiculo : undefined}
                 />
               ))}
             </div>
@@ -2164,6 +2334,11 @@ export function FlotaPage() {
                       </p>
                     </div>
                   </div>
+                  {puedeEditar ? (
+                    <button type="button" onClick={() => setEditarChofer(chofer)} className={buttonSecondaryClassName} title="Editar chofer">
+                      <Edit3 size={13} /> Editar
+                    </button>
+                  ) : null}
                 </div>
               ))}
               {!choferesQuery.isLoading && choferesFiltrados.length === 0 ? (
@@ -2201,6 +2376,8 @@ export function FlotaPage() {
         </div>
       </article>
 
+      {editarVehiculo ? <EditarVehiculoModal vehiculo={editarVehiculo} onClose={() => setEditarVehiculo(null)} /> : null}
+      {editarChofer ? <EditarChoferModal chofer={editarChofer} onClose={() => setEditarChofer(null)} /> : null}
       {loteModalVehiculo ? <CrearLoteModal vehiculo={loteModalVehiculo} onClose={() => setLoteModalVehiculo(null)} /> : null}
       {balanzaModalVehiculo ? <RegistrarBalanzaModal vehiculo={balanzaModalVehiculo} onClose={() => setBalanzaModalVehiculo(null)} /> : null}
       {estadoModal ? (
