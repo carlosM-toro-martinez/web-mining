@@ -2,6 +2,8 @@ import Dexie, { type EntityTable } from "dexie";
 
 export type EmployeeSyncStatus = "PENDING" | "SYNCED" | "ERROR";
 export type EmployeeTipoPersonal = "OBRERO" | "TECNICO_EMPLEADO";
+// De planta entra al Rayador de mitas; con contrato no.
+export type EmployeeContratacion = "PLANTA" | "CONTRATO";
 export type SyncQueueAction = "CREATE" | "UPDATE";
 export type SyncQueueStatus = "PENDING" | "DONE" | "ERROR";
 
@@ -12,6 +14,7 @@ export interface EmployeeRecord {
   documento?: string;
   cargo?: string;
   tipoPersonal: EmployeeTipoPersonal;
+  contratacion?: EmployeeContratacion;
   deviceUserId?: string;
   activo: boolean;
   syncStatus: EmployeeSyncStatus;

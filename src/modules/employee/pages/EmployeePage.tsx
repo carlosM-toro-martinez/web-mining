@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, PencilLine, RefreshCw, Trash2, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, PencilLine, RefreshCw, Trash2, UsersRound, X } from "lucide-react";
 import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { BiometricStatusBadge } from "@/modules/employee/components/BiometricStatusBadge";
 import { EmployeeForm } from "@/modules/employee/components/EmployeeForm";
 import {
+  getContratacionLabel,
   getTipoPersonalLabel,
   tipoPersonalOptions,
   useEmployees
 } from "@/modules/employee/hooks/useEmployees";
-import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
+import type { EmployeeContratacion, EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { env } from "@/shared/config/env";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -19,6 +20,7 @@ interface EditingEmployee {
   documento?: string;
   cargo?: string;
   tipoPersonal: EmployeeTipoPersonal;
+  contratacion: EmployeeContratacion;
   activo: boolean;
 }
 
@@ -74,7 +76,22 @@ export function EmployeePage() {
     setPage(1);
   }, [search, tipoPersonalFilter, onlyActive]);
 
-  async function handleCreate(values: { nombre: string; documento?: string; cargo?: string; tipoPersonal?: EmployeeTipoPersonal; activo?: boolean }) {
+  function closeForm() {
+    setEditing(null);
+    setIsFormOpen(false);
+  }
+
+  // El modal se cierra con Escape (salvo mientras guarda)
+  useEffect(() => {
+    if (!isFormOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !employees.isSaving) closeForm();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFormOpen, employees.isSaving]);
+
+  async function handleCreate(values: { nombre: string; documento?: string; cargo?: string; tipoPersonal?: EmployeeTipoPersonal; contratacion?: EmployeeContratacion; activo?: boolean }) {
     try {
       await employees.create(values);
       setIsFormOpen(false);
@@ -84,7 +101,7 @@ export function EmployeePage() {
     }
   }
 
-  async function handleUpdate(values: { nombre: string; documento?: string; cargo?: string; tipoPersonal?: EmployeeTipoPersonal; activo?: boolean }) {
+  async function handleUpdate(values: { nombre: string; documento?: string; cargo?: string; tipoPersonal?: EmployeeTipoPersonal; contratacion?: EmployeeContratacion; activo?: boolean }) {
     if (!editing) return;
     try {
       await employees.update({ id: editing.id, ...values });
@@ -201,22 +218,23 @@ export function EmployeePage() {
         </div>
         <div className="table-scroll overflow-x-auto">
           <table className="w-full border-collapse text-left">
-            <thead><tr><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Nombre</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Documento</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cargo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Sync</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Activo</th><th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th></tr></thead>
+            <thead><tr><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Nombre</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Documento</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cargo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tipo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Contratación</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Device User ID</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Sync</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Activo</th><th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Acción</th></tr></thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
-              {employees.getAll.isLoading ? <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando empleados...</td></tr> : null}
-              {!employees.getAll.isLoading && filteredEmployees.length === 0 ? <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">No hay empleados registrados.</td></tr> : null}
+              {employees.getAll.isLoading ? <tr><td colSpan={9} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando empleados...</td></tr> : null}
+              {!employees.getAll.isLoading && filteredEmployees.length === 0 ? <tr><td colSpan={9} className="px-4 py-6 text-center text-sm text-[var(--color-on-surface-variant)]">No hay empleados registrados.</td></tr> : null}
               {paginatedEmployees.map((employee) => (
                 <tr key={employee.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
                   <td className="px-4 py-3 text-sm">{employee.nombre}</td>
                   <td className="px-4 py-3 text-xs">{employee.documento ?? "-"}</td>
                   <td className="px-4 py-3 text-xs">{employee.cargo ?? "-"}</td>
                   <td className="px-4 py-3 text-xs">{getTipoPersonalLabel(employee.tipoPersonal)}</td>
+                  <td className="px-4 py-3 text-xs">{getContratacionLabel(employee.contratacion)}</td>
                   <td className="px-4 py-3 font-mono text-xs">{employee.deviceUserId ?? "-"}</td>
                   <td className="px-4 py-3 text-xs font-semibold">{employee.syncStatus}</td>
                   <td className="px-4 py-3 text-xs">{employee.activo ? "Sí" : "No"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
-                      {puedeEditar ? <button type="button" onClick={() => { setEditing({ id: employee.id!, nombre: employee.nombre, documento: employee.documento, cargo: employee.cargo, tipoPersonal: employee.tipoPersonal, activo: employee.activo }); setIsFormOpen(true); }} className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)]"><PencilLine size={12} />Editar</button> : null}
+                      {puedeEditar ? <button type="button" onClick={() => { setEditing({ id: employee.id!, nombre: employee.nombre, documento: employee.documento, cargo: employee.cargo, tipoPersonal: employee.tipoPersonal, contratacion: employee.contratacion ?? "PLANTA", activo: employee.activo }); setIsFormOpen(true); }} className="inline-flex items-center gap-1 rounded-md border border-[var(--color-tertiary)]/45 px-3 py-1.5 text-xs font-semibold text-[var(--color-tertiary)]"><PencilLine size={12} />Editar</button> : null}
                       {puedeEliminar ? <button type="button" onClick={() => void handleDelete(employee.id!, employee.nombre)} className="inline-flex items-center gap-1 rounded-md border border-red-500/45 px-3 py-1.5 text-xs font-semibold text-red-600"><Trash2 size={12} />Eliminar</button> : null}
                     </div>
                   </td>
@@ -235,10 +253,20 @@ export function EmployeePage() {
       </article>
 
       {isFormOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-4">
-          <div className="w-full max-w-xl rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl">
-            <h2 className="mb-4 text-sm font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{editing ? "Editar empleado" : "Nuevo empleado"}</h2>
-            <EmployeeForm mode={editing ? "edit" : "create"} initialValues={editing ?? undefined} isSubmitting={employees.isSaving} onSubmit={editing ? handleUpdate : handleCreate} onCancelEdit={() => { setEditing(null); setIsFormOpen(false); }} />
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !employees.isSaving) closeForm();
+          }}
+        >
+          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{editing ? "Editar empleado" : "Nuevo empleado"}</h2>
+              <button type="button" onClick={closeForm} disabled={employees.isSaving} aria-label="Cerrar" className="rounded-md p-1.5 text-[var(--color-on-surface-variant)] transition hover:bg-[var(--color-surface-container-highest)] hover:text-[var(--color-on-surface)] disabled:opacity-40">
+                <X size={16} />
+              </button>
+            </div>
+            <EmployeeForm mode={editing ? "edit" : "create"} initialValues={editing ?? undefined} isSubmitting={employees.isSaving} onSubmit={editing ? handleUpdate : handleCreate} onCancelEdit={closeForm} />
           </div>
         </div>
       ) : null}

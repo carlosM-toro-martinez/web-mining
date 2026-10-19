@@ -86,7 +86,7 @@ export function getSafeMergeRanges(ranges: SheetMergeRange[], totalRows: number,
 }
 
 export interface RayadorFila {
-  // Una marca por día del rango: "1" | "R" | "F" | "VAC" | "LIC" | "D" | "" (vacío)
+  // Una marca por día del rango: "1" | "F" | "VAC" | "LIC" | "D" | "" (vacío)
   marks: string[];
   presentDays: number;
   domingoDays: number;
@@ -108,7 +108,7 @@ export function rangoRayador(desde: string, hasta: string) {
 
 // Marcas del rayador de un empleado. Es la ÚNICA fuente de la vista en pantalla
 // y del Excel, para que ambos coincidan siempre.
-//   1   asistió a tiempo            R   asistió con retraso (tras tolerancia)
+//   1   asistió (llegue a la hora que llegue: el retraso no cuenta aquí)
 //   F   falta o abandono            VAC vacación
 //   LIC permiso / enfermedad / feriado
 //   D   descanso, día no laboral y todo domingo sin marca
@@ -137,7 +137,7 @@ export function calcularRayadorEmpleado(
     if (position < 0 || position >= daysCount) continue;
     const status = day.estado.toUpperCase();
     if (hasAttendanceMark(day)) {
-      marks[position] = hasLateMark(day) ? "R" : "1";
+      marks[position] = "1";
       presentDays += 1;
     } else if (status === "AUSENTE") {
       if (day.fecha > hoy) {

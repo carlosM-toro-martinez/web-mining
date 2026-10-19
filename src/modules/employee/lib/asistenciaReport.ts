@@ -17,6 +17,8 @@ export interface ReportEmployee {
     documento?: string | null;
     cargo?: string | null;
     tipoPersonal?: EmployeeTipoPersonal | null;
+    // CONTRATO = no entra al Rayador de mitas
+    contratacion?: "PLANTA" | "CONTRATO" | null;
   };
   horarioActual?: { nombre: string; entrada: string; salida: string } | null;
   dias: ReportDay[];

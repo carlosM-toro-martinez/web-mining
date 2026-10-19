@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { employeeDb, type EmployeeRecord, type EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
+import { employeeDb, type EmployeeContratacion, type EmployeeRecord, type EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import { env } from "@/shared/config/env";
@@ -11,6 +11,7 @@ interface EmployeePayload {
   documento?: string;
   cargo?: string;
   tipoPersonal?: EmployeeTipoPersonal;
+  contratacion?: EmployeeContratacion;
   deviceUserId?: string;
   activo?: boolean;
 }
@@ -25,6 +26,7 @@ interface EmployeeApiItem {
   documento?: string | null;
   cargo?: string | null;
   tipoPersonal?: EmployeeTipoPersonal | null;
+  contratacion?: EmployeeContratacion | null;
   deviceUserId?: string | null;
   activo?: boolean;
   syncStatus?: "PENDING" | "SYNCED" | "ERROR";
@@ -36,6 +38,15 @@ export const tipoPersonalOptions: Array<{ value: EmployeeTipoPersonal; label: st
   { value: "OBRERO", label: "Obrero" },
   { value: "TECNICO_EMPLEADO", label: "Técnico / empleado" }
 ];
+
+export const contratacionOptions: Array<{ value: EmployeeContratacion; label: string }> = [
+  { value: "PLANTA", label: "De planta" },
+  { value: "CONTRATO", label: "Con contrato" }
+];
+
+export function getContratacionLabel(value?: EmployeeContratacion | null) {
+  return contratacionOptions.find((option) => option.value === value)?.label ?? "De planta";
+}
 
 export function getTipoPersonalLabel(value?: EmployeeTipoPersonal | null) {
   return tipoPersonalOptions.find((option) => option.value === value)?.label ?? "Obrero";
@@ -49,6 +60,7 @@ function toEmployeeRecord(item: EmployeeApiItem): EmployeeRecord {
     documento: item.documento ?? undefined,
     cargo: item.cargo ?? undefined,
     tipoPersonal: item.tipoPersonal ?? "OBRERO",
+    contratacion: item.contratacion ?? "PLANTA",
     deviceUserId: item.deviceUserId ?? undefined,
     activo: item.activo ?? true,
     syncStatus: item.syncStatus ?? "PENDING",

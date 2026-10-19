@@ -30,7 +30,7 @@ const REPORTS: Array<{ type: ReportType; title: string; description: string }> =
   {
     type: "rayador-de-mitas",
     title: "Rayador de mitas",
-    description: "Libro mensual: una marca por día de cada trabajador (1, R, F, VAC, LIC, D) y totales."
+    description: "Libro mensual: una marca por día de cada trabajador de planta (1, F, VAC, LIC, D) y totales."
   },
   {
     type: "resumen-asistencia",

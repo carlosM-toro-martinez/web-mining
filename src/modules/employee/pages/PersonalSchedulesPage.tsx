@@ -286,7 +286,7 @@ export function PersonalSchedulesPage() {
                       aria-pressed={form.dias[dia.key]}
                       title={dia.largo}
                       onClick={() => setForm({ ...form, dias: { ...form.dias, [dia.key]: !form.dias[dia.key] } })}
-                      className={`h-9 w-10 rounded-lg border text-xs font-bold transition ${
+                      className={`h-9 w-9 rounded-lg border text-xs font-bold transition ${
                         form.dias[dia.key]
                           ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
                           : "border-[var(--color-border-soft)] text-[var(--color-on-surface-variant)] hover:border-[var(--color-primary)]"

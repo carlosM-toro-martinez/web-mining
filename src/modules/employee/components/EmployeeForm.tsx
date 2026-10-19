@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
+  contratacionOptions,
   getTipoPersonalLabel,
   tipoPersonalOptions
 } from "@/modules/employee/hooks/useEmployees";
-import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
+import type { EmployeeContratacion, EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 
 const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
@@ -13,6 +14,7 @@ interface EmployeeFormValues {
   documento?: string;
   cargo?: string;
   tipoPersonal?: EmployeeTipoPersonal;
+  contratacion?: EmployeeContratacion;
   activo?: boolean;
 }
 
@@ -35,6 +37,7 @@ export function EmployeeForm({
   const [documento, setDocumento] = useState(initialValues?.documento ?? "");
   const [cargo, setCargo] = useState(initialValues?.cargo ?? "");
   const [tipoPersonal, setTipoPersonal] = useState<EmployeeTipoPersonal>(initialValues?.tipoPersonal ?? "OBRERO");
+  const [contratacion, setContratacion] = useState<EmployeeContratacion>(initialValues?.contratacion ?? "PLANTA");
   const [activo, setActivo] = useState(initialValues?.activo ?? true);
 
   useEffect(() => {
@@ -42,12 +45,14 @@ export function EmployeeForm({
     setDocumento(initialValues?.documento ?? "");
     setCargo(initialValues?.cargo ?? "");
     setTipoPersonal(initialValues?.tipoPersonal ?? "OBRERO");
+    setContratacion(initialValues?.contratacion ?? "PLANTA");
     setActivo(initialValues?.activo ?? true);
   }, [
     initialValues?.nombre,
     initialValues?.documento,
     initialValues?.cargo,
     initialValues?.tipoPersonal,
+    initialValues?.contratacion,
     initialValues?.activo
   ]);
 
@@ -58,6 +63,7 @@ export function EmployeeForm({
       documento: documento.trim() || undefined,
       cargo: cargo.trim() || undefined,
       tipoPersonal,
+      contratacion,
       activo
     });
     if (mode === "create") {
@@ -65,6 +71,7 @@ export function EmployeeForm({
       setDocumento("");
       setCargo("");
       setTipoPersonal("OBRERO");
+      setContratacion("PLANTA");
       setActivo(true);
     }
   }
@@ -125,6 +132,26 @@ export function EmployeeForm({
         </select>
       </div>
 
+      <div>
+        <label className="mb-1 block text-xs font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
+          Contratación
+        </label>
+        <select
+          value={contratacion}
+          onChange={(event) => setContratacion(event.target.value as EmployeeContratacion)}
+          className={inputClassName}
+        >
+          {contratacionOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[11px] text-[var(--color-on-surface-variant)]">
+          El personal con contrato no entra al Rayador de mitas.
+        </p>
+      </div>
+
       {mode === "edit" ? (
         <label className="flex items-center gap-2 text-sm text-[var(--color-on-surface)]">
           <input
@@ -145,7 +172,7 @@ export function EmployeeForm({
         >
           {isSubmitting ? "Guardando..." : mode === "edit" ? "Actualizar" : "Guardar"}
         </button>
-        {mode === "edit" && onCancelEdit ? (
+        {onCancelEdit ? (
           <button
             type="button"
             onClick={onCancelEdit}

@@ -23,7 +23,6 @@ const DIA_LETRA = ["D", "L", "M", "M", "J", "V", "S"];
 
 const MARK_CLASS: Record<string, string> = {
   "1": "text-emerald-600",
-  R: "bg-amber-500/20 font-bold text-red-600",
   F: "bg-rose-500/20 font-bold text-rose-600",
   VAC: "bg-sky-500/15 text-sky-600",
   LIC: "bg-sky-500/15 text-sky-600",
@@ -32,7 +31,6 @@ const MARK_CLASS: Record<string, string> = {
 
 const LEYENDA: Array<{ mark: string; texto: string }> = [
   { mark: "1", texto: "Asistió" },
-  { mark: "R", texto: "Asistió con retraso" },
   { mark: "F", texto: "Falta o abandono" },
   { mark: "VAC", texto: "Vacación" },
   { mark: "LIC", texto: "Permiso, enfermedad o feriado" },
@@ -62,8 +60,11 @@ function tooltipDia(fecha: string, mark: string, day: ReportDay | undefined) {
 
 // Reporte "Rayador de mitas": una fila por trabajador con una marca por día del
 // mes y los totales. Es el mismo contenido que el Excel "Libro rayador de mitas".
-export function RayadorMitasReport({ entries, isLoading, isError, desde, hasta }: ReportData) {
+export function RayadorMitasReport({ entries: todos, isLoading, isError, desde, hasta }: ReportData) {
   const { showError, showSuccess } = useToast();
+  // El personal con contrato no entra al rayador (ni en pantalla ni en el Excel)
+  const entries = useMemo(() => todos.filter((e) => e.empleado.contratacion !== "CONTRATO"), [todos]);
+  const excluidos = todos.length - entries.length;
   const hoy = formatDateInputValue(new Date());
   const { fromDate, daysCount, truncated, daysInRange } = useMemo(() => rangoRayador(desde, hasta), [desde, hasta]);
 
@@ -292,7 +293,6 @@ export function RayadorMitasReport({ entries, isLoading, isError, desde, hasta }
       };
       const whiteFill = { patternType: "solid", fgColor: { rgb: "FFFFFF" } };
       const yellowFill = { patternType: "solid", fgColor: { rgb: "FFFF00" } };
-      const lateFill = { patternType: "solid", fgColor: { rgb: "FCE4D6" } };
 
       function cellAddress(row: number, col: number) {
         return XLSX.utils.encode_cell({ r: row, c: col });
@@ -355,12 +355,11 @@ export function RayadorMitasReport({ entries, isLoading, isError, desde, hasta }
           for (let c = dayStartCol; c <= dayEndCol; c += 1) {
             const value = ws[cellAddress(r + 2, c)]?.v;
             applyStyle(r + 2, c, {
-              fill: value === "D" ? yellowFill : value === "R" ? lateFill : whiteFill,
+              fill: value === "D" ? yellowFill : whiteFill,
               font: {
                 name: "Calibri",
                 sz: 7,
-                bold: value === "D" || value === "R",
-                ...(value === "R" ? { color: { rgb: "C00000" } } : {})
+                bold: value === "D"
               },
               alignment: { horizontal: "center", vertical: "center" }
             });
@@ -416,8 +415,9 @@ export function RayadorMitasReport({ entries, isLoading, isError, desde, hasta }
         <div>
           <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">{titulo}</h2>
           <p className="mt-1 text-xs text-[var(--color-on-surface-variant)]">
-            Una marca por día. Pasa el cursor sobre una marca para ver el detalle de ese día. Los días futuros sin
-            marcas quedan vacíos.
+            Una marca por día: asistió o no (el retraso no se marca aquí). Pasa el cursor sobre una marca para ver el
+            detalle de ese día. Los días futuros sin marcas quedan vacíos.
+            {excluidos > 0 ? ` No incluye a ${excluidos} trabajador(es) con contrato.` : ""}
           </p>
         </div>
         <button

@@ -7,6 +7,7 @@ import type { EmployeeTipoPersonal } from "@/modules/employee/db/employee.db";
 import { httpClient } from "@/shared/api/core/httpClient";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 import { usePermisos } from "@/features/auth/hooks/usePermisos";
+import { formatFechaCorta } from "@/modules/employee/lib/asistenciaReport";
 
 interface AbsenceItem {
   id: number;
@@ -169,8 +170,8 @@ export function PersonalAbsencesPage() {
                 <tr key={item.id} className="border-t border-[var(--color-border-soft)]">
                   <td className="px-4 py-2 text-sm">{item.employee ? `${item.employee.nombre} - ${getTipoPersonalLabel(item.employee.tipoPersonal)}` : "-"}</td>
                   <td className="px-4 py-2 text-sm">{item.tipo}</td>
-                  <td className="px-4 py-2 text-sm font-mono">{item.desde}</td>
-                  <td className="px-4 py-2 text-sm font-mono">{item.hasta}</td>
+                  <td className="px-4 py-2 text-sm font-mono">{formatFechaCorta(item.desde.slice(0, 10))}</td>
+                  <td className="px-4 py-2 text-sm font-mono">{formatFechaCorta(item.hasta.slice(0, 10))}</td>
                   <td className="px-4 py-2 text-sm">{item.aprobado ? "Sí" : "No"}</td>
                   <td className="px-4 py-2 text-right">{puedeEliminar ? <button type="button" onClick={() => {
                     const quien = item.employee?.nombre ? ` de "${item.employee.nombre}"` : "";
