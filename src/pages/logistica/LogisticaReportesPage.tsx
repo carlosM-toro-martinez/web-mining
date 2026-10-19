@@ -340,6 +340,7 @@ function CuadroMensualReport() {
                     <th className="py-1 pr-3">Ingenio</th>
                     <th className="py-1 pr-3 text-right">Neto</th>
                     <th className="py-1 pr-3">F101</th>
+                    <th className="py-1 pr-3">Cód. ingenio</th>
                     <th className="py-1">Fecha fiscal</th>
                   </tr>
                 </thead>
@@ -353,11 +354,12 @@ function CuadroMensualReport() {
                       <td className="py-1 pr-3">{lote.destinoIngenio?.nombre ?? "-"}</td>
                       <td className="py-1 pr-3 text-right">{lote.pesaje?.tonelajeNeto ?? "-"}</td>
                       <td className="py-1 pr-3">{lote.formulario101 ? lote.formulario101.codigo : "Pendiente"}</td>
+                      <td className="py-1 pr-3 font-mono">{lote.codigoIngenio || "-"}</td>
                       <td className="py-1">{formatFecha(lote.fechaDocumentalFiscal)}</td>
                     </tr>
                   ))}
                   {cuadro.lotes.length === 0 ? (
-                    <tr><td colSpan={8} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin lotes en este período.</td></tr>
+                    <tr><td colSpan={9} className="py-3 text-center text-[var(--color-on-surface-variant)]">Sin lotes en este período.</td></tr>
                   ) : null}
                 </tbody>
               </table>

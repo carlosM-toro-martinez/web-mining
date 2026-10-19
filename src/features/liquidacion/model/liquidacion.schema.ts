@@ -17,6 +17,7 @@ const transportistaRef = z.object({
 const loteRef = z.object({
   id: z.string().min(1),
   correlativo: z.string().min(1),
+  codigoIngenio: z.string().nullable().optional(),
   fechaDespachoReal: z.string().optional(),
   incluyeCombustible: tipoCombustibleViajeSchema.optional(),
   vehiculoId: z.number().int().positive().optional(),
@@ -112,6 +113,7 @@ export const anularLiquidacionPayloadSchema = z.object({
 export const previewLoteLiquidacionSchema = z.object({
   loteId: z.string().min(1),
   correlativo: z.string().min(1),
+  codigoIngenio: z.string().nullable().optional(),
   fechaDespachoReal: z.string(),
   vehiculoId: z.number().int().positive(),
   vehiculoPlaca: z.string().min(1),

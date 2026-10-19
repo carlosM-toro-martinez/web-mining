@@ -156,6 +156,7 @@ function previewToLiquidacionLike(
       lote: {
         id: l.loteId,
         correlativo: l.correlativo,
+        codigoIngenio: l.codigoIngenio,
         fechaDespachoReal: l.fechaDespachoReal,
         incluyeCombustible: l.incluyeCombustible,
         vehiculoId: l.vehiculoId,
@@ -531,6 +532,7 @@ export function LiquidacionesPage() {
                   <thead>
                     <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                       <th className="py-1 pr-3">N° Lote / Conocimiento</th>
+                      <th className="py-1 pr-3">Cód. ingenio</th>
                       <th className="py-1 pr-3">Fecha</th>
                       <th className="py-1 pr-3">Placa</th>
                       <th className="py-1 pr-3">Mineral</th>
@@ -544,6 +546,7 @@ export function LiquidacionesPage() {
                     {preview.lotes.map((l: PreviewLoteLiquidacion) => (
                       <tr key={l.loteId}>
                         <td className="py-1 pr-3 font-mono">{l.correlativo}</td>
+                        <td className="py-1 pr-3 font-mono">{l.codigoIngenio || "-"}</td>
                         <td className="py-1 pr-3">{formatFecha(l.fechaDespachoReal)}</td>
                         <td className="py-1 pr-3 font-mono">{l.vehiculoPlaca}</td>
                         <td className="py-1 pr-3">{l.tipoMineral}</td>
@@ -892,6 +895,7 @@ export function LiquidacionesPage() {
                       <thead>
                         <tr className="text-[10px] uppercase tracking-wider text-[var(--color-on-surface-variant)]">
                           <th className="py-1 pr-3">N° Lote / Conocimiento</th>
+                          <th className="py-1 pr-3">Cód. ingenio</th>
                           <th className="py-1 pr-3">Placa</th>
                           <th className="py-1 pr-3">Combustible</th>
                           <th className="py-1 pr-3 text-right">Tonelaje neto</th>
@@ -903,6 +907,7 @@ export function LiquidacionesPage() {
                         {(liquidacion.detalleLotes ?? []).map((d) => (
                           <tr key={d.id}>
                             <td className="py-1 pr-3 font-mono">{d.lote?.correlativo ?? d.loteId}</td>
+                            <td className="py-1 pr-3 font-mono">{d.lote?.codigoIngenio || "-"}</td>
                             <td className="py-1 pr-3 font-mono">{d.lote?.vehiculo?.placa ?? "-"}</td>
                             <td className="py-1 pr-3">
                               {d.lote?.incluyeCombustible ? (d.lote.incluyeCombustible === "CON_COMBUSTIBLE" ? "Con" : "Sin") : "-"}

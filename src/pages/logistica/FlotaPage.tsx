@@ -688,6 +688,11 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
   const [tonelajeBruto, setTonelajeBruto] = useState("");
   const [tonelajeTara, setTonelajeTara] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [codigoIngenio, setCodigoIngenio] = useState("");
+  // Si el lote ya tenía un código anotado, el campo parte con él.
+  useEffect(() => {
+    setCodigoIngenio(lote?.codigoIngenio ?? "");
+  }, [lote?.id, lote?.codigoIngenio]);
 
   const tonelajeNetoPreview = tonelajeBruto && tonelajeTara ? Number(tonelajeBruto) - Number(tonelajeTara) : null;
   const enviando = avanzarEstadoMutation.isPending || registrarPesajeMutation.isPending;
@@ -707,14 +712,19 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
       // avanzarEstado que realmente faltan.
       if (lote.estadoLote === "REGISTRADO") {
         await avanzarEstadoMutation.mutateAsync({ id: lote.id, payload: { estado: "EN_TRANSITO" } });
-        await avanzarEstadoMutation.mutateAsync({ id: lote.id, payload: { estado: "EN_BALANZA" } });
+        await avanzarEstadoMutation.mutateAsync({ id: lote.id, payload: { estado: "EN_BALANZA", codigoIngenio: codigoIngenio.trim() || undefined } });
       } else if (lote.estadoLote === "EN_TRANSITO") {
-        await avanzarEstadoMutation.mutateAsync({ id: lote.id, payload: { estado: "EN_BALANZA" } });
+        await avanzarEstadoMutation.mutateAsync({ id: lote.id, payload: { estado: "EN_BALANZA", codigoIngenio: codigoIngenio.trim() || undefined } });
       }
 
       await registrarPesajeMutation.mutateAsync({
         id: lote.id,
-        payload: { tonelajeBruto: bruto, tonelajeTara: tara, observaciones: observaciones.trim() || undefined }
+        payload: {
+          tonelajeBruto: bruto,
+          tonelajeTara: tara,
+          observaciones: observaciones.trim() || undefined,
+          codigoIngenio: codigoIngenio.trim() || undefined
+        }
       });
 
       showSuccess(`Pesaje registrado. ${vehiculo.placa} quedó Acopiado y el vehículo vuelve a estar disponible.`);
@@ -757,6 +767,10 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
           <p className="text-sm text-[var(--color-on-surface-variant)]">
             Neto: <span className="font-bold text-[var(--color-on-surface)]">{tonelajeNetoPreview !== null ? tonelajeNetoPreview.toFixed(2) : "-"}</span>
           </p>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio (opcional)</label>
+            <input value={codigoIngenio} onChange={(e) => setCodigoIngenio(e.target.value)} className={`${inputClassName} font-mono`} placeholder="El que da la balanza" maxLength={60} />
+          </div>
           <input
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}
@@ -1057,6 +1071,10 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
   );
   const loteDetalleQuery = useLoteDespachoDetailQuery(loteResumen?.id);
   const lote = loteDetalleQuery.data?.data ?? null;
+  // Al abrir el lote, el campo del código parte con el que ya tenga anotado.
+  useEffect(() => {
+    setCodigoIngenioInput(lote?.codigoIngenio ?? "");
+  }, [lote?.id, lote?.codigoIngenio]);
 
   const vehiculosQuery = useVehiculosQuery();
   const choferesQuery = useChoferesQuery();
@@ -1111,6 +1129,7 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
   const [tonelajeBruto, setTonelajeBruto] = useState("");
   const [tonelajeTara, setTonelajeTara] = useState("");
   const [pesajeObservaciones, setPesajeObservaciones] = useState("");
+  const [codigoIngenioInput, setCodigoIngenioInput] = useState("");
   const [transbordoVehiculoId, setTransbordoVehiculoId] = useState("");
   const [transbordoChoferId, setTransbordoChoferId] = useState("");
   const [transbordoMotivo, setTransbordoMotivo] = useState("");
@@ -1183,10 +1202,11 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
 
   function handleAvanzarEstado(estado: "EN_TRANSITO" | "EN_BALANZA") {
     if (!lote) return;
+    const codigo = estado === "EN_BALANZA" ? codigoIngenioInput.trim() : "";
     avanzarEstadoMutation.mutate(
-      { id: lote.id, payload: { estado } },
+      { id: lote.id, payload: { estado, ...(codigo ? { codigoIngenio: codigo } : {}) } },
       {
-        onSuccess: () => showSuccess("Estado del lote actualizado."),
+        onSuccess: () => showSuccess(codigo ? `Lote en balanza. Código de ingenio ${codigo} anotado.` : "Estado del lote actualizado."),
         onError: (error) => showError(normalizeError(error, "No se pudo actualizar el estado del lote."))
       }
     );
@@ -1223,7 +1243,15 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
       return;
     }
     registrarPesajeMutation.mutate(
-      { id: lote.id, payload: { tonelajeBruto: bruto, tonelajeTara: tara, observaciones: pesajeObservaciones.trim() || undefined } },
+      {
+        id: lote.id,
+        payload: {
+          tonelajeBruto: bruto,
+          tonelajeTara: tara,
+          observaciones: pesajeObservaciones.trim() || undefined,
+          codigoIngenio: codigoIngenioInput.trim() || undefined
+        }
+      },
       {
         onSuccess: () => {
           showSuccess("Pesaje registrado. El lote pasó a Acopiado y el vehículo quedó En retorno.");
@@ -1330,6 +1358,10 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
                 <p className="sm:col-span-2"><span className="text-[var(--color-on-surface-variant)]">Descripción:</span> {lote.conocimientoCarga.descripcion}</p>
               ) : null}
               {lote.nivel ? <p><span className="text-[var(--color-on-surface-variant)]">Nivel:</span> {lote.nivel}</p> : null}
+              <p>
+                <span className="text-[var(--color-on-surface-variant)]">Código de ingenio:</span>{" "}
+                {lote.codigoIngenio ? <span className="font-mono font-semibold">{lote.codigoIngenio}</span> : <span className="text-[var(--color-on-surface-variant)]">sin anotar (se agrega en Lotes › Editar)</span>}
+              </p>
               {lote.conocimientoCarga.observaciones ? (
                 <p className="sm:col-span-2"><span className="text-[var(--color-on-surface-variant)]">Observaciones:</span> {lote.conocimientoCarga.observaciones}</p>
               ) : null}
@@ -1451,14 +1483,26 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
 
               {lote.estadoLote === "EN_TRANSITO" ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => handleAvanzarEstado("EN_BALANZA")}
-                    disabled={avanzarEstadoMutation.isPending}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-                  >
-                    <Scale size={14} /> Marcar en balanza
-                  </button>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div>
+                      <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio (opcional)</label>
+                      <input
+                        value={codigoIngenioInput}
+                        onChange={(e) => setCodigoIngenioInput(e.target.value)}
+                        className={`${inputClassName} w-52 font-mono`}
+                        placeholder="El que da la balanza"
+                        maxLength={60}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAvanzarEstado("EN_BALANZA")}
+                      disabled={avanzarEstadoMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                    >
+                      <Scale size={14} /> Marcar en balanza
+                    </button>
+                  </div>
 
                   <div className="w-full space-y-2 rounded-lg border border-[var(--color-border-soft)] p-3">
                     <p className="flex items-center gap-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
@@ -1512,6 +1556,10 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
                   </div>
                   <div className="px-2 text-sm text-[var(--color-on-surface-variant)]">
                     Neto: <span className="font-bold text-[var(--color-on-surface)]">{tonelajeNetoPreview !== null ? tonelajeNetoPreview.toFixed(2) : "-"}</span>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio</label>
+                    <input value={codigoIngenioInput} onChange={(e) => setCodigoIngenioInput(e.target.value)} className={`${inputClassName} w-44 font-mono`} placeholder="Opcional" maxLength={60} />
                   </div>
                   <input value={pesajeObservaciones} onChange={(e) => setPesajeObservaciones(e.target.value)} className={`${inputClassName} w-48`} placeholder="Observaciones (opcional)" />
                   <button

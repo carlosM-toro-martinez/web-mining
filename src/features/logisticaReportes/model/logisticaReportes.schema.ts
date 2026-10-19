@@ -19,6 +19,7 @@ export const loteCuadroMensualSchema = z.object({
   fechaDespachoReal: z.string(),
   fechaDocumentalFiscal: z.string(),
   nivel: z.string().nullable().optional(),
+  codigoIngenio: z.string().nullable().optional(),
   combustibleAsignadoLitros: z.union([z.string(), z.number()]).nullable().optional(),
   transportista: transportistaRef.optional(),
   vehiculo: vehiculoRef.optional(),

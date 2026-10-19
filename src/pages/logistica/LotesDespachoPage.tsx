@@ -175,6 +175,7 @@ const FILTROS_VACIOS = {
   combustible: "" as "" | "CON_COMBUSTIBLE" | "SIN_COMBUSTIBLE" | "SIN_ENTREGA",
   f101: "" as "" | "CON" | "SIN",
   pesaje: "" as "" | "CON" | "SIN",
+  codigoIngenio: "" as "" | "CON" | "SIN",
   nivel: "",
   transportistaId: "",
   municipioOrigenId: ""
@@ -481,6 +482,7 @@ function EditarLoteModal({
     lote.combustibleAsignadoLitros != null ? String(lote.combustibleAsignadoLitros) : ""
   );
   const [fechaDespachoReal, setFechaDespachoReal] = useState(lote.fechaDespachoReal.slice(0, 10));
+  const [codigoIngenio, setCodigoIngenio] = useState(lote.codigoIngenio ?? "");
   // "27/10" -> 27. El mes sale siempre de la fecha de despacho.
   const numeroActual = /^(\d+)\//.exec(lote.correlativo)?.[1] ?? "";
   const [numeroCorrelativo, setNumeroCorrelativo] = useState(numeroActual);
@@ -518,6 +520,7 @@ function EditarLoteModal({
           tipoMineralId: Number(tipoMineralId),
           destinoIngenioId: Number(destinoIngenioId),
           nivel: nivel || null,
+          codigoIngenio: codigoIngenio.trim() || null,
           incluyeCombustible,
           combustibleAsignadoLitros:
             incluyeCombustible === "CON_COMBUSTIBLE" ? Number(combustibleAsignadoLitros) : null,
@@ -570,6 +573,10 @@ function EditarLoteModal({
         <div>
           <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Fecha de despacho real</label>
           <input required type="date" value={fechaDespachoReal} onChange={(e) => setFechaDespachoReal(e.target.value)} className={inputClassName} />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio</label>
+          <input value={codigoIngenio} onChange={(e) => setCodigoIngenio(e.target.value)} className={`${inputClassName} font-mono`} placeholder="Lo asigna el ingenio en su balanza" maxLength={60} />
         </div>
         <div>
           <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">N° de Conocimiento</label>
@@ -690,6 +697,7 @@ export function LotesDespachoPage() {
     combustible: filtros.combustible || undefined,
     f101: filtros.f101 || undefined,
     pesaje: filtros.pesaje || undefined,
+    codigoIngenio: filtros.codigoIngenio || undefined,
     nivel: filtros.nivel || undefined,
     transportistaId: filtros.transportistaId ? Number(filtros.transportistaId) : undefined,
     municipioOrigenId: filtros.municipioOrigenId ? Number(filtros.municipioOrigenId) : undefined,
@@ -751,6 +759,11 @@ export function LotesDespachoPage() {
   }
   const hayFiltrosExtra = Object.values(filtros).some(Boolean) || filtroConObservaciones || Boolean(filtroEstado);
   const lote = loteDetalleQuery.data?.data ?? null;
+
+  // Al abrir un lote, el campo del código parte con el que ya tenga anotado.
+  useEffect(() => {
+    setCodigoIngenioInput(lote?.codigoIngenio ?? "");
+  }, [lote?.id, lote?.codigoIngenio]);
   const municipios = municipiosQuery.data?.data ?? [];
   const tiposMineral = tiposMineralQuery.data?.data ?? [];
   const ingenios = ingeniosQuery.data?.data ?? [];
@@ -814,6 +827,9 @@ export function LotesDespachoPage() {
   const [f101Codigo, setF101Codigo] = useState("");
   const [f101Fecha, setF101Fecha] = useState("");
   const [f101ReutilizarId, setF101ReutilizarId] = useState("");
+
+  // --- Código de ingenio (se anota al pasar a balanza o al pesar) ---
+  const [codigoIngenioInput, setCodigoIngenioInput] = useState("");
 
   // --- Form: pesaje ---
   const [tonelajeBruto, setTonelajeBruto] = useState("");
@@ -958,10 +974,11 @@ export function LotesDespachoPage() {
   }
 
   function handleAvanzarEstado(id: string, estado: "EN_TRANSITO" | "EN_BALANZA") {
+    const codigo = estado === "EN_BALANZA" ? codigoIngenioInput.trim() : "";
     avanzarEstadoMutation.mutate(
-      { id, payload: { estado } },
+      { id, payload: { estado, ...(codigo ? { codigoIngenio: codigo } : {}) } },
       {
-        onSuccess: () => showSuccess("Estado del lote actualizado."),
+        onSuccess: () => showSuccess(codigo ? `Lote en balanza. Código de ingenio ${codigo} anotado.` : "Estado del lote actualizado."),
         onError: (error) => showError(normalizeError(error, "No se pudo actualizar el estado del lote."))
       }
     );
@@ -1007,12 +1024,14 @@ export function LotesDespachoPage() {
           tonelajeBruto: bruto,
           tonelajeTara: tara,
           tonelajeNeto: netoManual,
-          observaciones: pesajeObservaciones.trim() || undefined
+          observaciones: pesajeObservaciones.trim() || undefined,
+          codigoIngenio: codigoIngenioInput.trim() || undefined
         }
       },
       {
         onSuccess: () => {
           showSuccess("Pesaje registrado. El lote pasó a Acopiado.");
+          setCodigoIngenioInput("");
           setTonelajeBruto("");
           setTonelajeTara("");
           setTonelajeNetoManual(null);
@@ -1252,7 +1271,7 @@ export function LotesDespachoPage() {
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 className={`${inputClassName} pl-9`}
-                placeholder="Busca en todos los lotes: correlativo, conocimiento, transportista, placa o F101"
+                placeholder="Busca en todos los lotes: correlativo, transportista, placa, F101 o código de ingenio"
               />
             </div>
           </div>
@@ -1296,7 +1315,7 @@ export function LotesDespachoPage() {
             Con observaciones
           </label>
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <div>
             <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Combustible</label>
             <select value={filtros.combustible} onChange={(e) => cambiarFiltro("combustible", e.target.value as typeof filtros.combustible)} className={inputClassName}>
@@ -1320,6 +1339,14 @@ export function LotesDespachoPage() {
               <option value="">Todos</option>
               <option value="CON">Pesados</option>
               <option value="SIN">Sin pesar</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio</label>
+            <select value={filtros.codigoIngenio} onChange={(e) => cambiarFiltro("codigoIngenio", e.target.value as typeof filtros.codigoIngenio)} className={inputClassName}>
+              <option value="">Todos</option>
+              <option value="CON">Con código</option>
+              <option value="SIN">Sin código (pendiente)</option>
             </select>
           </div>
           <div>
@@ -1370,7 +1397,7 @@ export function LotesDespachoPage() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
-                {["N° Lote / Conocimiento", "Transportista", "Vehículo", "Nivel", "Combustible", "Estado", "F101", "Fecha despacho", "Acciones"].map((title) => (
+                {["N° Lote / Conocimiento", "Transportista", "Vehículo", "Nivel", "Combustible", "Estado", "F101", "Cód. ingenio", "Fecha despacho", "Acciones"].map((title) => (
                   <th key={title} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     {title}
                   </th>
@@ -1379,10 +1406,10 @@ export function LotesDespachoPage() {
             </thead>
             <tbody className="divide-y divide-[var(--color-border-soft)]">
               {lotesQuery.isLoading ? (
-                <tr><td colSpan={9} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando lotes...</td></tr>
+                <tr><td colSpan={10} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">Cargando lotes...</td></tr>
               ) : null}
               {!lotesQuery.isLoading && lotes.length === 0 ? (
-                <tr><td colSpan={9} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron lotes.</td></tr>
+                <tr><td colSpan={10} className="px-3 py-4 text-center text-sm text-[var(--color-on-surface-variant)]">No se encontraron lotes.</td></tr>
               ) : null}
               {lotes.map((item) => (
                 <tr key={item.id} className="transition hover:bg-[var(--color-surface-container-highest)]">
@@ -1411,6 +1438,7 @@ export function LotesDespachoPage() {
                       {item.formulario101 ? item.formulario101.codigo : "Pendiente"}
                     </span>
                   </td>
+                  <td className="px-3 py-2 font-mono text-xs">{item.codigoIngenio ? item.codigoIngenio : <span className="text-[var(--color-on-surface-variant)]">-</span>}</td>
                   <td className="px-3 py-2 text-xs">{formatFecha(item.fechaDespachoReal)}</td>
                   <td className="px-3 py-2 text-xs">
                     <div className="flex gap-2">
@@ -1522,6 +1550,10 @@ export function LotesDespachoPage() {
                     <p className="sm:col-span-2"><span className="text-[var(--color-on-surface-variant)]">Descripción:</span> {lote.conocimientoCarga.descripcion}</p>
                   ) : null}
                   {lote.nivel ? <p><span className="text-[var(--color-on-surface-variant)]">Nivel:</span> {lote.nivel}</p> : null}
+                  <p>
+                    <span className="text-[var(--color-on-surface-variant)]">Código de ingenio:</span>{" "}
+                    {lote.codigoIngenio ? <span className="font-mono font-semibold">{lote.codigoIngenio}</span> : <span className="text-[var(--color-on-surface-variant)]">sin anotar (se agrega con Editar)</span>}
+                  </p>
                   {lote.conocimientoCarga.observaciones ? (
                     <p className="sm:col-span-2"><span className="text-[var(--color-on-surface-variant)]">Observaciones:</span> {lote.conocimientoCarga.observaciones}</p>
                   ) : null}
@@ -1648,14 +1680,26 @@ export function LotesDespachoPage() {
 
                   {lote.estadoLote === "EN_TRANSITO" ? (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => handleAvanzarEstado(lote.id, "EN_BALANZA")}
-                        disabled={avanzarEstadoMutation.isPending}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
-                      >
-                        <Scale size={14} /> Marcar en balanza
-                      </button>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div>
+                          <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio (opcional)</label>
+                          <input
+                            value={codigoIngenioInput}
+                            onChange={(e) => setCodigoIngenioInput(e.target.value)}
+                            className={`${inputClassName} w-52 font-mono`}
+                            placeholder="El que da la balanza"
+                            maxLength={60}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAvanzarEstado(lote.id, "EN_BALANZA")}
+                          disabled={avanzarEstadoMutation.isPending}
+                          className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+                        >
+                          <Scale size={14} /> Marcar en balanza
+                        </button>
+                      </div>
 
                       <div className="w-full space-y-2 rounded-lg border border-[var(--color-border-soft)] p-3">
                         <p className="flex items-center gap-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
@@ -1725,6 +1769,10 @@ export function LotesDespachoPage() {
                         <input type="number" min="0" step="0.001" value={tonelajeTara} onChange={(e) => setTonelajeTara(e.target.value)} className={`${inputClassName} w-32`} />
                       </div>
                       <CampoNeto bruto={tonelajeBruto} tara={tonelajeTara} valor={tonelajeNetoManual} onCambiar={setTonelajeNetoManual} />
+                      <div>
+                        <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">Código de ingenio</label>
+                        <input value={codigoIngenioInput} onChange={(e) => setCodigoIngenioInput(e.target.value)} className={`${inputClassName} w-44 font-mono`} placeholder="Opcional" maxLength={60} />
+                      </div>
                       <input
                         value={pesajeObservaciones}
                         onChange={(e) => setPesajeObservaciones(e.target.value)}

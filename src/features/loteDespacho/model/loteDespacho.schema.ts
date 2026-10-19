@@ -89,6 +89,8 @@ export const loteDespachoSchema = z.object({
   tipoMineralId: z.number().int().positive(),
   destinoIngenioId: z.number().int().positive(),
   nivel: z.string().nullable().optional(),
+  // Código que el ingenio le asigna al viaje en su balanza.
+  codigoIngenio: z.string().nullable().optional(),
   incluyeCombustible: tipoCombustibleViajeSchema,
   combustibleAsignadoLitros: z.union([z.string(), z.number()]).nullable().optional(),
   combustibleEntregadoLitros: z.union([z.string(), z.number()]).nullable().optional(),
@@ -135,6 +137,7 @@ export const updateLoteDespachoPayloadSchema = z.object({
   tipoMineralId: z.number().int().positive().optional(),
   destinoIngenioId: z.number().int().positive().optional(),
   nivel: nivelLoteSchema.nullable().optional(),
+  codigoIngenio: z.string().trim().max(60, "El código de ingenio es muy largo (máximo 60 caracteres).").nullable().optional(),
   incluyeCombustible: tipoCombustibleViajeSchema.optional(),
   combustibleAsignadoLitros: z.number().nonnegative("Los litros no pueden ser negativos.").nullable().optional(),
   fechaDespachoReal: z.string().trim().optional(),
@@ -149,7 +152,8 @@ export const updateLoteDespachoPayloadSchema = z.object({
 });
 
 export const avanzarEstadoLotePayloadSchema = z.object({
-  estado: z.enum(["EN_TRANSITO", "EN_BALANZA"])
+  estado: z.enum(["EN_TRANSITO", "EN_BALANZA"]),
+  codigoIngenio: z.string().trim().max(60, "El código de ingenio es muy largo (máximo 60 caracteres).").optional()
 });
 
 export const corregirEstadoLotePayloadSchema = z.object({
@@ -161,7 +165,8 @@ export const registrarPesajePayloadSchema = z.object({
   tonelajeBruto: z.number().positive("El tonelaje bruto debe ser mayor a cero."),
   tonelajeTara: z.number().nonnegative("El tara no puede ser negativo."),
   tonelajeNeto: z.number().positive("El neto debe ser mayor a cero.").optional(),
-  observaciones: z.string().trim().optional()
+  observaciones: z.string().trim().optional(),
+  codigoIngenio: z.string().trim().max(60, "El código de ingenio es muy largo (máximo 60 caracteres).").optional()
 });
 
 export const registrarCombustibleEntregadoPayloadSchema = z.object({

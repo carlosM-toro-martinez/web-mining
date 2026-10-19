@@ -304,6 +304,7 @@ export interface ViajeDetalle {
   numeroViaje: string;
   fecha: string;
   choferNombre: string;
+  codigoIngenio: string;
   tonelajeNeto: number;
 }
 
@@ -353,6 +354,7 @@ function agruparPorPlacaConViajes(liquidacion: Liquidacion): FilaPorPlacaDetalla
       numeroViaje: correlativo.split("/")[0] ?? correlativo,
       fecha: d.lote?.fechaDespachoReal ?? "",
       choferNombre: d.lote?.chofer?.nombre ?? "-",
+      codigoIngenio: d.lote?.codigoIngenio ?? "",
       tonelajeNeto
     });
     mapa.set(clave, fila);
@@ -1287,7 +1289,7 @@ const enUS2 = (v: number) =>
 
 export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
   const d = datosRespaldoPorViaje(liquidacion);
-  const lastCol = 5;
+  const lastCol = 6;
   type Celda = [string | number, Record<string, unknown> | null];
   const filas: Celda[][] = [];
   const merges: XLSX.Range[] = [];
@@ -1321,6 +1323,7 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
     vacia,
     vacia,
     vacia,
+    vacia,
     [d.folio ? `N° ${d.folio}` : "BORRADOR", est({ sz: 10, bold: true, h: "right" })]
   ]);
   fila([[`MARTE S.R.L. — NIT: ${MARTE_NIT}`, est({ sz: 8, bold: true })]]);
@@ -1348,11 +1351,12 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
       ["", borde({ fill: "D9E1F2" })],
       ["", borde({ fill: "D9E1F2" })],
       ["", borde({ fill: "D9E1F2" })],
+      ["", borde({ fill: "D9E1F2" })],
       ["", borde({ fill: "D9E1F2" })]
     ]);
     combinar(rPlaca, 0, lastCol);
     fila(
-      ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"].map(
+      ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CÓD. INGENIO", "CHOFER", "PESO NETO"].map(
         (t): Celda => [t, borde({ bold: true, h: "center" })]
       )
     );
@@ -1362,6 +1366,7 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
         [v.numeroViaje, borde({ h: "center" })],
         [formatFecha(v.fecha), borde({ h: "center" })],
         [v.correlativo, borde({ h: "center" })],
+        [v.codigoIngenio, borde({ h: "center" })],
         [v.choferNombre, borde()],
         [num3(v.tonelajeNeto), borde({ h: "right", fmt: "0.000" })]
       ]);
@@ -1373,9 +1378,10 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
         ["", borde()],
         ["", borde()],
         ["", borde()],
+        ["", borde()],
         [valor, borde({ h: "right", bold, fmt })]
       ]);
-      combinar(r, 0, 4);
+      combinar(r, 0, 5);
     };
     resumen("Suma del peso neto (3 decimales)", num3(g.pesoTotalCrudo), "0.000");
     resumen("Peso redondeado a 2 decimales (TMB)", num(g.pesoTotal), "0.00");
@@ -1394,9 +1400,10 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
     ["", borde()],
     ["", borde()],
     ["", borde()],
+    ["", borde()],
     [num(d.totales.bruto), borde({ sz: 9, bold: true, h: "right", fmt: "#,##0.00" })]
   ]);
-  combinar(rTotal, 0, 4);
+  combinar(rTotal, 0, 5);
   fila([]);
   fila([[`CONTRATISTA: ${d.contratista}`, est({ bold: true })]]);
   if (d.banco) fila([[`BANCO: ${d.banco}`, est({})]]);
@@ -1411,7 +1418,7 @@ export function exportLiquidacionPorViajeExcel(liquidacion: Liquidacion) {
       sheet[address].s = s;
     })
   );
-  sheet["!cols"] = [{ wch: 5 }, { wch: 9 }, { wch: 11 }, { wch: 13 }, { wch: 30 }, { wch: 12 }];
+  sheet["!cols"] = [{ wch: 5 }, { wch: 9 }, { wch: 11 }, { wch: 13 }, { wch: 14 }, { wch: 30 }, { wch: 12 }];
   sheet["!merges"] = merges;
   sheet["!margins"] = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
 
@@ -1467,8 +1474,9 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
     0: { cellWidth: 26, halign: "center" as const },
     1: { cellWidth: 52, halign: "center" as const },
     2: { cellWidth: 62, halign: "center" as const },
-    3: { cellWidth: 74, halign: "center" as const },
-    5: { cellWidth: 70, halign: "right" as const }
+    3: { cellWidth: 70, halign: "center" as const },
+    4: { cellWidth: 70, halign: "center" as const },
+    6: { cellWidth: 62, halign: "right" as const }
   };
 
   for (const g of d.grupos) {
@@ -1483,7 +1491,7 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
     const resumen = (etiqueta: string, valor: string, bold = false): RowInput => [
       {
         content: etiqueta,
-        colSpan: 5,
+        colSpan: 6,
         styles: { halign: "right", fontStyle: bold ? "bold" : "normal" }
       },
       { content: valor, styles: { halign: "right", fontStyle: bold ? "bold" : "normal" } }
@@ -1498,11 +1506,11 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
         [
           {
             content: `PLACA: ${g.placa}     ·     ${g.viajes} viaje(s)     ·     Precio por TMB: ${g.precioAplicado.toFixed(2)}`,
-            colSpan: 6,
+            colSpan: 7,
             styles: { halign: "left", fillColor: [217, 225, 242] }
           }
         ],
-        ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CHOFER", "PESO NETO"]
+        ["N°", "Nº VIAJE", "FECHA", "CONOCIMIENTO", "CÓD. INGENIO", "CHOFER", "PESO NETO"]
       ],
       body: [
         ...g.viajesDetalle.map(
@@ -1511,6 +1519,7 @@ export function exportLiquidacionPorViajePdf(liquidacion: Liquidacion) {
             v.numeroViaje,
             formatFecha(v.fecha),
             v.correlativo,
+            v.codigoIngenio,
             v.choferNombre,
             v.tonelajeNeto.toFixed(3)
           ]
@@ -1577,7 +1586,8 @@ const CUADRO_MENSUAL_HEADERS = [
   "PROPIETARIO",
   "CHOFER",
   "PLACA",
-  "Lote"
+  "Lote",
+  "CÓD.\nINGENIO"
 ];
 
 function construirFilasCuadroMensual(cuadro: CuadroMensual) {
@@ -1613,6 +1623,7 @@ function construirFilasCuadroMensual(cuadro: CuadroMensual) {
       propietario: l.transportista?.nombreORazonSocial ?? "",
       chofer: l.chofer?.nombre ?? "",
       placa: l.vehiculo?.placa ?? "",
+      codigoIngenio: l.codigoIngenio ?? "",
       // "Lote" = combustible ASIGNADO (lo que posiblemente le tocaba dar a
       // ese viaje) — no el real entregado; en blanco si no llevó combustible.
       lote:
@@ -1694,7 +1705,8 @@ export function exportCuadroMensualExcel(
       f.propietario,
       f.chofer,
       f.placa,
-      f.lote === "" ? "" : (f.lote as number)
+      f.lote === "" ? "" : (f.lote as number),
+      f.codigoIngenio
     ]);
     rowKinds.push("normal");
   }
@@ -1714,7 +1726,8 @@ export function exportCuadroMensualExcel(
     "",
     "",
     "",
-    "TOTAL TMB."
+    "TOTAL TMB.",
+    ""
   ]);
   rowKinds.push("total");
 
@@ -1734,7 +1747,8 @@ export function exportCuadroMensualExcel(
     { wch: 18 },
     { wch: 18 },
     { wch: 9 },
-    { wch: 7 }
+    { wch: 7 },
+    { wch: 12 }
   ];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
@@ -1833,7 +1847,7 @@ export function exportCuadroMensualPdf(
 
   drawPlainTable(doc, {
     startY: 56,
-    head: [CUADRO_MENSUAL_HEADERS],
+    head: [CUADRO_MENSUAL_HEADERS.slice(0, 15)],
     body: rows,
     styles: { ...pdfTableStyles, fontSize: 6.5, cellPadding: 2 },
     headStyles: { ...pdfHeadStyles, fontSize: 6.5 },
@@ -2208,7 +2222,7 @@ export function exportBoletaPesajeExcel(lote: LoteDespacho) {
       ""
     ],
     [`Conductor: ${lote.chofer?.nombre ?? "-"}`, "", "", "", "", "", "", ""],
-    [`Placa: ${lote.vehiculo?.placa ?? "-"}`, "", "", "", "", "", "", ""],
+    [`Placa: ${lote.vehiculo?.placa ?? "-"}`, "", "", "", `Código de ingenio: ${lote.codigoIngenio ?? "-"}`, "", "", ""],
     [],
     ["Responsable de balanza", "", "", "", "Vo.Bo. Supervisor", "", "", ""]
   ];
@@ -2339,6 +2353,7 @@ export function exportBoletaPesajePdf(lote: LoteDespacho) {
   doc.text(`Conductor: ${lote.chofer?.nombre ?? "-"}`, 20, y);
   y += 14;
   doc.text(`Placa: ${lote.vehiculo?.placa ?? "-"}`, 20, y);
+  doc.text(`Código de ingenio: ${lote.codigoIngenio ?? "-"}`, 220, y);
 
   y += 36;
   doc.text("Responsable de balanza: ......................", 20, y);
@@ -2369,6 +2384,7 @@ interface FilaVolqueta {
   nroViaje: string;
   fecha: string;
   conocimiento: string;
+  codigoIngenio: string;
   peso: number;
 }
 
@@ -2396,6 +2412,7 @@ function agruparPorVolqueta(lotes: LoteDespacho[]): GrupoVolqueta[] {
       nroViaje: lote.correlativo.split("/")[0] ?? lote.correlativo,
       fecha: formatFecha(lote.fechaDespachoReal),
       conocimiento: lote.correlativo,
+      codigoIngenio: lote.codigoIngenio ?? "",
       peso
     });
     grupo.total += peso;
@@ -2444,7 +2461,7 @@ export function exportDetalleVolquetaExcel(
     rowKinds.push("normal");
     aoa.push([`Chofer: ${grupo.chofer}`, "", "", `Placa: ${grupo.placa}`, "", "", ""]);
     rowKinds.push("subtitle");
-    aoa.push(["Nº VIAJE", "FECHA", "CONOCIMIENTO", "PESO (TMB)", "", "", ""]);
+    aoa.push(["Nº VIAJE", "FECHA", "CONOCIMIENTO", "CÓD. INGENIO", "PESO (TMB)", "", ""]);
     rowKinds.push("header");
 
     const lateral = infoLateral(grupo);
@@ -2456,14 +2473,14 @@ export function exportDetalleVolquetaExcel(
         f?.nroViaje ?? "",
         f?.fecha ?? "",
         f?.conocimiento ?? "",
+        f?.codigoIngenio ?? "",
         f ? num(f.peso) : "",
         labelLateral,
-        valorLateral,
-        ""
+        valorLateral
       ] as any);
       rowKinds.push("normal");
     }
-    aoa.push(["", "", "TOTAL", num(grupo.total), "", "", ""]);
+    aoa.push(["", "", "", "TOTAL", num(grupo.total), "", ""]);
     rowKinds.push("total");
   }
 
@@ -2472,10 +2489,10 @@ export function exportDetalleVolquetaExcel(
     { wch: 10 },
     { wch: 12 },
     { wch: 12 },
+    { wch: 14 },
     { wch: 10 },
     { wch: 16 },
-    { wch: 18 },
-    { wch: 10 }
+    { wch: 18 }
   ];
   sheet["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
@@ -2542,17 +2559,18 @@ export function exportDetalleVolquetaPdf(
       f.nroViaje,
       f.fecha,
       f.conocimiento,
+      f.codigoIngenio,
       formatBs(f.peso)
     ]);
-    rows.push(["", "", "TOTAL", formatBs(grupo.total)]);
+    rows.push(["", "", "", "TOTAL", formatBs(grupo.total)]);
 
     drawPlainTable(doc, {
       startY: y + 8,
-      head: [["Nº VIAJE", "FECHA", "CONOCIMIENTO", "PESO (TMB)"]],
+      head: [["Nº VIAJE", "FECHA", "CONOCIMIENTO", "CÓD. INGENIO", "PESO (TMB)"]],
       body: rows,
       styles: pdfTableStyles,
       headStyles: pdfHeadStyles,
-      columnStyles: { 3: { halign: "right" } },
+      columnStyles: { 4: { halign: "right" } },
       margin: { left: margin, right: pageWidth - margin - 260 }
     });
     const finalYTablaPrincipal = (doc as any).lastAutoTable.finalY;
