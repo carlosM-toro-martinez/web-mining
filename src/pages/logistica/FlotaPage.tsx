@@ -241,6 +241,62 @@ const COLUMNA_LABEL: Record<EstadoVehiculo, string> = {
 const ESTADOS_CON_LOTE_GESTIONABLE: EstadoVehiculo[] = ["EN_TRANSITO", "EN_BALANZA"];
 const ESTADOS_TARJETA_CLICKEABLE: EstadoVehiculo[] = ["EN_TRANSITO", "EN_BALANZA", "EN_RETORNO"];
 
+// El lote en curso de un vehículo. Se pide por estado (y no "los 5 más recientes"):
+// con la lista por fecha, un lote en curso con fecha de despacho anterior a otros
+// 5 viajes del mismo vehículo no aparecía y la tarjeta quedaba sin poder gestionarse.
+function useLotesActivosDelVehiculo(vehiculoId: number) {
+  const enTransito = useLotesDespachoQuery({ vehiculoId, estadoLote: "EN_TRANSITO", limit: 1 });
+  const enBalanza = useLotesDespachoQuery({ vehiculoId, estadoLote: "EN_BALANZA", limit: 1 });
+  const registrado = useLotesDespachoQuery({ vehiculoId, estadoLote: "REGISTRADO", limit: 1 });
+  return {
+    data: {
+      data: [...(enTransito.data?.data ?? []), ...(enBalanza.data?.data ?? []), ...(registrado.data?.data ?? [])]
+    },
+    isLoading: enTransito.isLoading || enBalanza.isLoading || registrado.isLoading
+  };
+}
+
+// El vehículo figura En tránsito / En balanza pero no tiene ningún lote en curso
+// (por ejemplo, el lote se anuló o se pasó a otra volqueta). Sin esto no había
+// salida: el tablero no deja arrastrarlo y aquí no había nada que gestionar.
+function SinLoteActivo({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: () => void }) {
+  const { showError, showSuccess } = useToast();
+  const cambiarEstadoMutation = useCambiarEstadoVehiculoMutation();
+
+  function handleLiberar() {
+    cambiarEstadoMutation.mutate(
+      { id: vehiculo.id, payload: { estado: "DISPONIBLE", motivo: "Sin lote activo: se libera el vehículo" } },
+      {
+        onSuccess: () => {
+          showSuccess(`${vehiculo.placa} ya está disponible de nuevo.`);
+          onClose();
+        },
+        onError: (error) => showError(normalizeError(error, "No se pudo liberar el vehículo."))
+      }
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-[var(--color-error)]">
+        No se encontró un lote activo para este vehículo. Puede que ya se haya anulado, completado o pasado a otra volqueta.
+      </p>
+      <p className="text-sm text-[var(--color-on-surface-variant)]">
+        <span className="font-mono font-bold uppercase">{vehiculo.placa}</span> figura en el tablero como "{COLUMNA_LABEL[vehiculo.estadoActual]}", pero no tiene ningún viaje en curso. Si ya no está
+        en camino, libéralo para poder usarlo de nuevo.
+      </p>
+      <button
+        type="button"
+        onClick={handleLiberar}
+        disabled={cambiarEstadoMutation.isPending}
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
+      >
+        <CheckCircle2 size={14} /> {cambiarEstadoMutation.isPending ? "Guardando..." : "Marcar como disponible"}
+      </button>
+    </div>
+  );
+}
+
 function VehiculoCard({
   vehiculo,
   accentBar,
@@ -621,7 +677,7 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
   // aquí por EN_TRANSITO no encontraba nada y bloqueaba el paso a balanza.
   // Se trae todo lo reciente del vehículo y se elige el que aún no llegó a
   // un estado terminal (el único que puede estar "activo" a la vez).
-  const loteActivoQuery = useLotesDespachoQuery({ vehiculoId: vehiculo.id, limit: 5 });
+  const loteActivoQuery = useLotesActivosDelVehiculo(vehiculo.id);
   const avanzarEstadoMutation = useAvanzarEstadoLoteMutation();
   const registrarPesajeMutation = useRegistrarPesajeMutation();
 
@@ -681,9 +737,7 @@ function RegistrarBalanzaModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onCl
       {loteActivoQuery.isLoading ? (
         <p className="text-sm text-[var(--color-on-surface-variant)]">Buscando el lote activo de este vehículo...</p>
       ) : !lote ? (
-        <p className="text-sm text-[var(--color-error)]">
-          No se encontró un lote activo para este vehículo. Puede que ya se haya anulado o completado.
-        </p>
+        <SinLoteActivo vehiculo={vehiculo} onClose={onClose} />
       ) : (
         <div className="space-y-3">
           <p className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs">
@@ -828,7 +882,7 @@ function FallaConLoteModal({
   onClose: () => void;
 }) {
   const { showError, showSuccess } = useToast();
-  const lotesQuery = useLotesDespachoQuery({ vehiculoId: vehiculo.id, limit: 5 });
+  const lotesQuery = useLotesActivosDelVehiculo(vehiculo.id);
   const lote = useMemo(
     () => (lotesQuery.data?.data ?? []).find((l) => !ESTADOS_LOTE_TERMINALES.includes(l.estadoLote)),
     [lotesQuery.data]
@@ -868,9 +922,7 @@ function FallaConLoteModal({
       {lotesQuery.isLoading ? (
         <p className="text-sm text-[var(--color-on-surface-variant)]">Buscando el lote activo de este vehículo...</p>
       ) : !lote ? (
-        <p className="text-sm text-[var(--color-error)]">
-          No se encontró un lote activo para este vehículo. Puede que ya se haya anulado o completado.
-        </p>
+        <SinLoteActivo vehiculo={vehiculo} onClose={onClose} />
       ) : (
         <div className="space-y-3">
           <p className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs">
@@ -998,7 +1050,7 @@ function CambiarEstadoModal({
 function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: () => void }) {
   const { showError, showSuccess } = useToast();
 
-  const lotesQuery = useLotesDespachoQuery({ vehiculoId: vehiculo.id, limit: 5 });
+  const lotesQuery = useLotesActivosDelVehiculo(vehiculo.id);
   const loteResumen = useMemo(
     () => (lotesQuery.data?.data ?? []).find((l) => !ESTADOS_LOTE_TERMINALES.includes(l.estadoLote)),
     [lotesQuery.data]
@@ -1234,9 +1286,7 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
       {lotesQuery.isLoading || loteDetalleQuery.isLoading ? (
         <p className="text-sm text-[var(--color-on-surface-variant)]">Cargando el lote activo de este vehículo...</p>
       ) : !lote ? (
-        <p className="text-sm text-[var(--color-error)]">
-          No se encontró un lote activo para este vehículo. Puede que ya se haya anulado o completado.
-        </p>
+        <SinLoteActivo vehiculo={vehiculo} onClose={onClose} />
       ) : (
         <div className="space-y-5 pr-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
