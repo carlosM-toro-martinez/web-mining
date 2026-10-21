@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   anularFormulario101,
+  editarFormulario101,
   getFormularios101,
   marcarPeticionEnviadaFormulario101,
   reutilizarFormulario101,
@@ -9,6 +10,7 @@ import {
 } from "@/features/formulario101/api/formulario101Api";
 import type {
   AnularFormulario101Payload,
+  EditarFormulario101Payload,
   ReutilizarFormulario101Payload,
   VincularFormulario101Payload
 } from "@/features/formulario101/model/formulario101.schema";
@@ -52,6 +54,14 @@ export function useAnularFormulario101Mutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AnularFormulario101Payload }) =>
       anularFormulario101(id, payload),
+    onSuccess: () => invalidate()
+  });
+}
+
+export function useEditarFormulario101Mutation() {
+  const invalidate = useInvalidarFormularios101();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EditarFormulario101Payload }) => editarFormulario101(id, payload),
     onSuccess: () => invalidate()
   });
 }

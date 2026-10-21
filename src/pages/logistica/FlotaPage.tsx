@@ -89,6 +89,7 @@ import {
 } from "@/features/transportista/hooks/useTransportistas";
 import type { Transportista, TipoEntidadTransportista } from "@/features/transportista/model/transportista.schema";
 import { mensajeDeError } from "@/shared/api/core/apiError";
+import { EditarF101Button } from "@/features/formulario101/components/EditarF101Button";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -1458,6 +1459,9 @@ function LoteActivoModal({ vehiculo, onClose }: { vehiculo: Vehiculo; onClose: (
                     <span>
                       Formulario 101 <strong>{lote.formulario101.codigo}</strong> vinculado el {formatFecha(lote.formulario101.fecha)}
                     </span>
+                    {lote.estadoLote !== "LIQUIDADO" && lote.estadoLote !== "ANULADO" ? (
+                      <EditarF101Button id={lote.formulario101.id} codigo={lote.formulario101.codigo} fecha={lote.formulario101.fecha} />
+                    ) : null}
                     <button
                       type="button"
                       onClick={handleAnularF101}

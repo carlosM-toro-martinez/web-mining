@@ -33,6 +33,11 @@ export const vincularFormulario101PayloadSchema = z.object({
   fecha: z.string().min(1, "La fecha del Formulario 101 es obligatoria.")
 });
 
+export const editarFormulario101PayloadSchema = z.object({
+  codigo: z.string().trim().min(1, "El código del Formulario 101 es obligatorio.").optional(),
+  fecha: z.string().min(1, "La fecha del Formulario 101 es obligatoria.").optional()
+});
+
 export const reutilizarFormulario101PayloadSchema = z.object({
   loteId: z.string().uuid("Debes elegir el lote destino.")
 });
@@ -48,5 +53,6 @@ export const anulacionFormulario101ResponseSchema = z.object({ success: z.boolea
 export type EstadoFormulario101 = z.infer<typeof estadoFormulario101Schema>;
 export type Formulario101 = z.infer<typeof formulario101Schema>;
 export type VincularFormulario101Payload = z.infer<typeof vincularFormulario101PayloadSchema>;
+export type EditarFormulario101Payload = z.infer<typeof editarFormulario101PayloadSchema>;
 export type ReutilizarFormulario101Payload = z.infer<typeof reutilizarFormulario101PayloadSchema>;
 export type AnularFormulario101Payload = z.infer<typeof anularFormulario101PayloadSchema>;

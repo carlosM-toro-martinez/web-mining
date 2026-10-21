@@ -64,6 +64,7 @@ import {
 } from "@/features/parametrosLogistica/hooks/useParametrosLogistica";
 import { useTransportistasQuery } from "@/features/transportista/hooks/useTransportistas";
 import { useChoferesQuery, useVehiculosQuery } from "@/features/flota/hooks/useFlota";
+import { EditarF101Button } from "@/features/formulario101/components/EditarF101Button";
 import { mensajeDeError } from "@/shared/api/core/apiError";
 import { AutocompleteSelect } from "@/shared/ui/AutocompleteSelect";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
@@ -1655,6 +1656,9 @@ export function LotesDespachoPage() {
                         <span>
                           Formulario 101 <strong>{lote.formulario101.codigo}</strong> vinculado el {formatFecha(lote.formulario101.fecha)}
                         </span>
+                        {lote.estadoLote !== "LIQUIDADO" && lote.estadoLote !== "ANULADO" ? (
+                          <EditarF101Button id={lote.formulario101.id} codigo={lote.formulario101.codigo} fecha={lote.formulario101.fecha} />
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => handleAnularF101(lote.formulario101!.id)}
