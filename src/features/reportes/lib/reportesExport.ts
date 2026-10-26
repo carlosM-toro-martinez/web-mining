@@ -230,7 +230,7 @@ function costoSheetMeta(sheetName: string, codigoCompleto?: string | null) {
   if (sheetName === "ROMARESNI") {
     return {
       title: "DETALLE DE MATERIALES  EMPRESA CONST. ROMARESNI S.R.L.",
-      codeLine: "22,001,008    CTAS.CTES.EMPRESA CONST. ROMARESNI S.R.L.",
+      codeLine: "22,001,008   CUENTAS POR COBRAR: EMPRESA CONST. ROMARESNI S.R.L.",
       isTransport: true
     };
   }
@@ -1803,7 +1803,7 @@ function exportCostoProduccionMultiSheetExcel(report: InventoryReportDefinition)
         put(
           13,
           1,
-          "Por la provision de materiales de acuerdo al siguiente detalle correspondiente al                                   "
+          "Provision de materiales de acuerdo al siguiente detalle, correspondiente al:                                   "
         );
         put(15, 1, `mes de     ${monthTitleCase(periodo.anio, periodo.mes)}`);
         if (!sheetName.toUpperCase().includes("EMUSA")) put(15, 7, "T-C. $us  6,96");
@@ -2665,7 +2665,9 @@ function legacyRow(item: LegacyReportItem, tab: LegacyReportTab) {
   const base = [
     formatInventoryDate(item.fecha),
     item.tipo,
-    item.productoCodigo ? `${item.productoCodigo} - ${item.productoNombre ?? "-"}` : (item.productoNombre ?? "-"),
+    item.productoCodigo
+      ? `${item.productoCodigo} - ${item.productoNombre ?? "-"}`
+      : (item.productoNombre ?? "-"),
     item.cantidad,
     item.stockAntes,
     item.stockDespues
