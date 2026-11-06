@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ClipboardList, XCircle } from "lucide-react";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { usePedidosQuery, useCancelarPedidoMutation } from "@/features/pedidos/hooks/usePedidos";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -9,9 +9,9 @@ const inputClassName =
   "w-full rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)] px-3 py-2.5 text-sm text-[var(--color-on-surface)] outline-none transition focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]";
 
 export function PedidosPage() {
-  const { user } = useAuth();
+  const { can } = usePermisos();
   const { showError, showSuccess } = useToast();
-  const canCancel = user?.role === "ADMIN";
+  const canCancel = can("inventario.pedidos", "cancelar");
   const [page, setPage] = useState(1);
   const [estado, setEstado] = useState("");
   const [proveedorId, setProveedorId] = useState("");

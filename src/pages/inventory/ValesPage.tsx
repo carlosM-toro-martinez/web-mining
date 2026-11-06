@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, PackageCheck, Plus, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { useRegisterMutation } from "@/features/auth/hooks/useRegisterMutation";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
 import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
@@ -60,8 +61,8 @@ export function ValesPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
   const queryClient = useQueryClient();
-  const canUseFlow =
-    user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE" || user?.role === "ALMACENERO";
+  const { can } = usePermisos();
+  const canUseFlow = can("inventario.vales", "ver");
 
   const usersQuery = useUsersListQuery();
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });

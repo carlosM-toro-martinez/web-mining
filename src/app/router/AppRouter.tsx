@@ -50,9 +50,7 @@ import { PersonalAsistenciaReportesPage } from "@/modules/employee/pages/Persona
 import { ProtectedRoute } from "@/app/router/guards/ProtectedRoute";
 import { PublicOnlyRoute } from "@/app/router/guards/PublicOnlyRoute";
 import { AdminRoute } from "@/app/router/guards/AdminRoute";
-import { AlmaceneroRoute } from "@/app/router/guards/AlmaceneroRoute";
-import { InventarioReportesRoute } from "@/app/router/guards/InventarioReportesRoute";
-import { WarehouseOpsRoute } from "@/app/router/guards/WarehouseOpsRoute";
+import { InventarioRoute } from "@/app/router/guards/InventarioRoute";
 import { LogisticaRoute } from "@/app/router/guards/LogisticaRoute";
 import { CajaChicaRoute } from "@/app/router/guards/CajaChicaRoute";
 import { PersonalRoute } from "@/app/router/guards/PersonalRoute";
@@ -104,38 +102,53 @@ export function AppRouter() {
           <Route path="/vales" element={<Navigate to="/inventario/vales" replace />} />
           <Route path="/compras" element={<Navigate to="/inventario/compras" replace />} />
 
-          <Route element={<AlmaceneroRoute />}>
+          <Route element={<InventarioRoute />}>
             <Route path="/inventario" element={<InventoryPage />} />
-            <Route path="/inventario/vales" element={<ValesPage />} />
-            <Route path="/inventario/vales-historicos" element={<ValesHistoricosPage />} />
-            <Route path="/inventario/compras" element={<ComprasPage />} />
-            <Route path="/inventario/pedidos" element={<PedidosPage />} />
-            <Route path="/inventario/importacion" element={<InventarioImportPage />} />
-            <Route path="/inventario/stock-inicial-editar" element={<StockInicialEditorPage />} />
-            <Route path="/inventario/categorias" element={<CategoriesPage />} />
-            <Route path="/inventario/productos" element={<ProductsPage />} />
-            <Route path="/inventario/stock" element={<StockActualPage />} />
-            <Route path="/inventario/proveedores" element={<ProveedoresPage />} />
-            <Route path="/inventario/ajustes" element={<AjustesPage />} />
-            <Route element={<WarehouseOpsRoute />}>
+            <Route element={<PermisoRoute recurso="inventario.vales" />}>
+              <Route path="/inventario/vales" element={<ValesPage />} />
               <Route path="/inventario/entregas" element={<EntregasPage />} />
               <Route
                 path="/almacen/salidas"
                 element={<Navigate to="/inventario/entregas" replace />}
               />
             </Route>
+            <Route element={<PermisoRoute recurso="inventario.vales_historicos" />}>
+              <Route path="/inventario/vales-historicos" element={<ValesHistoricosPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.compras" />}>
+              <Route path="/inventario/compras" element={<ComprasPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.pedidos" />}>
+              <Route path="/inventario/pedidos" element={<PedidosPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.stock" accion="importar" />}>
+              <Route path="/inventario/importacion" element={<InventarioImportPage />} />
+              <Route path="/inventario/stock-inicial-editar" element={<StockInicialEditorPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.productos" />}>
+              <Route path="/inventario/categorias" element={<CategoriesPage />} />
+              <Route path="/inventario/productos" element={<ProductsPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.stock" />}>
+              <Route path="/inventario/stock" element={<StockActualPage />} />
+              <Route path="/inventario/ajustes" element={<AjustesPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.proveedores" />}>
+              <Route path="/inventario/proveedores" element={<ProveedoresPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.reportes" />}>
+              <Route
+                path="/inventario/reportes"
+                element={<Navigate to="/inventario/reportes/bin-card" replace />}
+              />
+              <Route path="/inventario/reportes/:tipo" element={<ReportesPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.contabilidad" />}>
+              <Route path="/inventario/contabilidad" element={<AccountingPage />} />
+            </Route>
             <Route element={<AdminRoute />}>
               <Route path="/inventario/offline-monitor" element={<InventoryOfflineMonitorPage />} />
             </Route>
-          </Route>
-
-          <Route element={<InventarioReportesRoute />}>
-            <Route
-              path="/inventario/reportes"
-              element={<Navigate to="/inventario/reportes/bin-card" replace />}
-            />
-            <Route path="/inventario/reportes/:tipo" element={<ReportesPage />} />
-            <Route path="/inventario/contabilidad" element={<AccountingPage />} />
           </Route>
 
           <Route element={<LogisticaRoute />}>

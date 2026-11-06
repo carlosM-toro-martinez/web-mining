@@ -52,7 +52,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, canManageUsers, logout } = useAuth();
-  const { can } = usePermisos();
+  const { can, canAny } = usePermisos();
   const { mode, toggleMode } = useTheme();
   const offlinePendingQuery = useInventoryOfflinePendingCount();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -62,13 +62,11 @@ export function AppShell() {
   const [isLogisticaExpanded, setIsLogisticaExpanded] = useState(false);
   const [isCajaChicaExpanded, setIsCajaChicaExpanded] = useState(false);
   const yearLabel = useMemo(() => new Date().getFullYear(), []);
-  const isAlmacenero = user?.role === "ALMACENERO";
-  const isRecepcionista = user?.role === "RECEPCIONISTA";
   const isSuperintendente = user?.role === "SUPERINTENDENTE";
   const isAdministrador = user?.role === "ADMINISTRADOR";
   const isContador = user?.role === "CONTADOR";
-  const canSeeInventoryRoute = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
-  const canSeeInventorySection = canSeeInventoryRoute || isContador;
+  // Inventario usa permisos dinámicos (Sistema → Roles y permisos)
+  const canSeeInventorySection = canAny("inventario");
   const canSeeCajaChicaRoute = isAdmin || isAdministrador || isContador || isSuperintendente;
   // EPP y Ambiental restringidos solo a ADMIN por ahora, a pedido explícito,
   // hasta que se creen roles específicos (ej. Seguridad, Medioambiente) que
@@ -95,29 +93,24 @@ export function AppShell() {
 
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventorySection) return [];
-    if (isContador) {
-      return [
-        { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },
-        { label: "Contabilidad", icon: Landmark, to: "/inventario/contabilidad" },
-      ] as NavItem[];
-    }
-    const items: NavItem[] = [
-      // { label: "Movimientos", icon: Truck, to: "/inventario/entregas" },
-      { label: "Compras", icon: ShoppingCart, to: "/inventario/compras" },
-      { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos" },
-      { label: "Vales", icon: PackageCheck, to: "/inventario/vales" },
-      { label: "Vales históricos", icon: CalendarClock, to: "/inventario/vales-historicos" },
-      { label: "Proveedores", icon: Building2, to: "/inventario/proveedores" },
-      { label: "Stock", icon: Layers3, to: "/inventario/stock" },
-      { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes" },
-      { label: "Importación", icon: UploadCloud, to: "/inventario/importacion" },
-      { label: "Editar stock inicial", icon: PencilLine, to: "/inventario/stock-inicial-editar" }
+    const items: Array<NavItem & { recurso: string; accion?: string }> = [
+      { label: "Compras", icon: ShoppingCart, to: "/inventario/compras", recurso: "inventario.compras" },
+      { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos", recurso: "inventario.pedidos" },
+      { label: "Vales", icon: PackageCheck, to: "/inventario/vales", recurso: "inventario.vales" },
+      { label: "Vales históricos", icon: CalendarClock, to: "/inventario/vales-historicos", recurso: "inventario.vales_historicos" },
+      { label: "Proveedores", icon: Building2, to: "/inventario/proveedores", recurso: "inventario.proveedores" },
+      { label: "Stock", icon: Layers3, to: "/inventario/stock", recurso: "inventario.stock" },
+      { label: "Reportes", icon: FileBarChart2, to: "/inventario/reportes", recurso: "inventario.reportes" },
+      { label: "Contabilidad", icon: Landmark, to: "/inventario/contabilidad", recurso: "inventario.contabilidad" },
+      { label: "Importación", icon: UploadCloud, to: "/inventario/importacion", recurso: "inventario.stock", accion: "importar" },
+      { label: "Editar stock inicial", icon: PencilLine, to: "/inventario/stock-inicial-editar", recurso: "inventario.stock", accion: "importar" }
     ];
+    const visibles = items.filter((item) => can(item.recurso, item.accion ?? "ver")) as NavItem[];
     if (isAdmin) {
-      items.push({ label: "Monitoreo offline", icon: Truck, to: "/inventario/offline-monitor" });
+      visibles.push({ label: "Monitoreo offline", icon: Truck, to: "/inventario/offline-monitor" });
     }
-    return items;
-  }, [canSeeInventorySection, canSeeInventoryRoute, isAdmin, isContador]);
+    return visibles;
+  }, [canSeeInventorySection, can, isAdmin]);
 
   // Personal usa permisos dinámicos (Sistema → Roles y permisos)
   const personalNavItems = useMemo(() => {

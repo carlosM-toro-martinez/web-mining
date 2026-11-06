@@ -11,7 +11,7 @@ import {
   Plus
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   useAnulacionesHistorialQuery,
   useAnularCompraMutation,
@@ -110,9 +110,9 @@ function getCurrentMonthRange() {
 }
 
 export function ComprasPage() {
-  const { user } = useAuth();
-  const canManage =
-    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "RECEPCIONISTA";
+  const { can } = usePermisos();
+  const canCreate = can("inventario.compras", "crear");
+  const canRecibir = can("inventario.compras", "recibir");
   const { showError, showSuccess } = useToast();
   const queryClient = useQueryClient();
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -169,7 +169,7 @@ export function ComprasPage() {
   const [tieneIva, setTieneIva] = useState<boolean>(true);
   const [esGasEspecial, setEsGasEspecial] = useState<boolean>(false);
 
-  const canAnular = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const canAnular = can("inventario.compras", "anular");
 
   const productos = productosQuery.data?.data ?? [];
   const proveedores = proveedoresQuery.data?.data ?? [];
@@ -248,7 +248,7 @@ export function ComprasPage() {
 
   function handleCreateCompra(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canManage) {
+    if (!canCreate) {
       showError("No tienes permisos para crear compras.");
       return;
     }
@@ -406,7 +406,7 @@ export function ComprasPage() {
     event.target.value = "";
     if (!file) return;
 
-    if (!canManage) {
+    if (!canCreate) {
       showError("No tienes permisos para importar compras.");
       return;
     }
@@ -582,7 +582,7 @@ export function ComprasPage() {
             <button
               type="button"
               onClick={openImportDialog}
-              disabled={!canManage || isImporting}
+              disabled={!canCreate || isImporting}
               className="inline-flex items-center gap-1 rounded-md border border-[var(--color-outline-variant)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)] disabled:opacity-50"
             >
               <Upload size={13} />
@@ -629,12 +629,12 @@ export function ComprasPage() {
                 options={proveedorOptions}
                 placeholder={proveedoresQuery.isLoading ? "Cargando proveedores..." : "Buscar proveedor..."}
                 className={inputClassName}
-                disabled={!canManage || proveedoresQuery.isLoading}
+                disabled={!canCreate || proveedoresQuery.isLoading}
               />
               <button
                 type="button"
                 onClick={() => setIsCreateProveedorModalOpen(true)}
-                disabled={!canManage}
+                disabled={!canCreate}
                 className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2.5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
                 title="Crear nuevo proveedor"
               >
@@ -659,14 +659,14 @@ export function ComprasPage() {
               onChange={(event) => setNumeroFactura(event.target.value)}
               className={inputClassName}
               placeholder="Número de factura (opcional)"
-              disabled={!canManage}
+              disabled={!canCreate}
             />
             <textarea
               value={observacion}
               onChange={(event) => setObservacion(event.target.value)}
               className={`${inputClassName} min-h-[84px]`}
               placeholder="Observacion"
-              disabled={!canManage}
+              disabled={!canCreate}
             />
 
             <div className="rounded-lg border border-[var(--color-outline-variant)] p-3">
@@ -682,7 +682,7 @@ export function ComprasPage() {
                       setTieneIva(!event.target.checked);
                       if (event.target.checked) setEsGasEspecial(false);
                     }}
-                    disabled={!canManage}
+                    disabled={!canCreate}
                   />
                   <span>Sin IVA (factor × 1)</span>
                 </label>
@@ -694,7 +694,7 @@ export function ComprasPage() {
                         name="esGasEspecial"
                         checked={!esGasEspecial}
                         onChange={() => setEsGasEspecial(false)}
-                        disabled={!canManage}
+                        disabled={!canCreate}
                       />
                       <span>IVA 13% normal (× 0.87)</span>
                     </label>
@@ -704,7 +704,7 @@ export function ComprasPage() {
                         name="esGasEspecial"
                         checked={esGasEspecial}
                         onChange={() => setEsGasEspecial(true)}
-                        disabled={!canManage}
+                        disabled={!canCreate}
                       />
                       <span>Gas especial IVA (× 0.909)</span>
                     </label>
@@ -722,7 +722,7 @@ export function ComprasPage() {
                 type="button"
                 onClick={() => setIsCreateProductoModalOpen(true)}
                 className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2.5 text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10 disabled:opacity-50"
-                disabled={!canManage}
+                disabled={!canCreate}
               >
                 <Plus size={18} />
               </button>
@@ -742,7 +742,7 @@ export function ComprasPage() {
                   options={productoOptions}
                   placeholder={`Producto #${index + 1}`}
                   className={inputClassName}
-                  disabled={!canManage}
+                  disabled={!canCreate}
                 />
                 <input
                   required
@@ -755,7 +755,7 @@ export function ComprasPage() {
                   }
                   className={inputClassName}
                   placeholder={`Cantidad (${productos.find((producto) => producto.id === Number(item.productoId))?.unidad ?? "unidad"})`}
-                  disabled={!canManage}
+                  disabled={!canCreate}
                 />
                 <div className="flex flex-col gap-1">
                   <input
@@ -774,7 +774,7 @@ export function ComprasPage() {
                     }
                     className={inputClassName}
                     placeholder={item.usePrecioGlobal ? "Total factura Bs." : "Precio unit. Bs."}
-                    disabled={!canManage}
+                    disabled={!canCreate}
                   />
                   {item.usePrecioGlobal ? (
                     <p className="pl-1 text-[11px] font-semibold text-[var(--color-primary)]">
@@ -793,7 +793,7 @@ export function ComprasPage() {
                         precioUnit: ""
                       })
                     }
-                    disabled={!canManage}
+                    disabled={!canCreate}
                     tabIndex={-1}
                     className={`self-start rounded-full border px-2 py-0.5 text-[11px] font-medium transition ${
                       item.usePrecioGlobal
@@ -808,7 +808,7 @@ export function ComprasPage() {
                   type="button"
                   onClick={() => removeDraftItem(item.id)}
                   className="rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
-                  disabled={!canManage}
+                  disabled={!canCreate}
                 >
                   Quitar
                 </button>
@@ -820,14 +820,14 @@ export function ComprasPage() {
                 type="button"
                 onClick={addDraftItem}
                 className="rounded-lg border border-[var(--color-primary)]/55 px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/10"
-                disabled={!canManage}
+                disabled={!canCreate}
               >
                 Agregar item
               </button>
               <button
                 type="submit"
                 disabled={
-                  !canManage || createCompraMutation.isPending || proveedoresOrdenados.length === 0
+                  !canCreate || createCompraMutation.isPending || proveedoresOrdenados.length === 0
                 }
                 className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60"
               >
@@ -1110,7 +1110,7 @@ export function ComprasPage() {
                       }
                       className={inputClassName}
                       placeholder="0"
-                      disabled={!canManage || selectedCompra.estado === "COMPLETADO"}
+                      disabled={!canRecibir || selectedCompra.estado === "COMPLETADO"}
                     />
                   </div>
                 </div>
@@ -1145,7 +1145,7 @@ export function ComprasPage() {
             <button
               type="submit"
               disabled={
-                !canManage ||
+                !canRecibir ||
                 recibirCompraMutation.isPending ||
                 selectedCompra.estado === "COMPLETADO"
               }

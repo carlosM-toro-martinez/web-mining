@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   Building2,
   Boxes,
@@ -26,6 +28,7 @@ const cards = [
     title: "Categorias",
     description: "Define grupos y subgrupos para mantener la jerarquia de inventario.",
     to: "/inventario/categorias",
+    recurso: "inventario.productos",
     icon: FolderTree,
     available: true
   },
@@ -33,6 +36,7 @@ const cards = [
     title: "Productos",
     description: "Crea, filtra y edita productos por grupo y subgrupo.",
     to: "/inventario/productos",
+    recurso: "inventario.productos",
     icon: PackageSearch,
     available: true
   },
@@ -40,6 +44,7 @@ const cards = [
     title: "Reportes",
     description: "Consulta Bin Card y Bin Card Valorado por fecha, producto y paginacion.",
     to: "/inventario/reportes",
+    recurso: "inventario.reportes",
     icon: FileBarChart2,
     available: true
   },
@@ -47,6 +52,7 @@ const cards = [
     title: "Contabilidad",
     description: "Administra centros de costo, funciones de gasto y cuentas contables.",
     to: "/inventario/contabilidad",
+    recurso: "inventario.contabilidad",
     icon: Landmark,
     available: true
   },
@@ -54,6 +60,7 @@ const cards = [
     title: "Proveedores",
     description: "Crea y consulta proveedores para abastecimiento y trazabilidad de compras.",
     to: "/inventario/proveedores",
+    recurso: "inventario.proveedores",
     icon: Building2,
     available: true
   },
@@ -61,6 +68,7 @@ const cards = [
     title: "Compras",
     description: "Gestiona requisiciones, ordenes y recepcion de abastecimiento.",
     to: "/inventario/compras",
+    recurso: "inventario.compras",
     icon: ReceiptText,
     available: true
   },
@@ -68,6 +76,7 @@ const cards = [
     title: "Pedidos",
     description: "Ordenes de compra a proveedor para seguimiento hasta su cierre.",
     to: "/inventario/pedidos",
+    recurso: "inventario.pedidos",
     icon: ClipboardList,
     available: true
   },
@@ -75,6 +84,7 @@ const cards = [
     title: "Vales",
     description: "Control de vales de salida para consumo interno y trazabilidad.",
     to: "/inventario/vales",
+    recurso: "inventario.vales",
     icon: PackageCheck,
     available: true
   },
@@ -82,6 +92,7 @@ const cards = [
     title: "Vales históricos",
     description: "Registro de vales con fecha de operación específica para periodos históricos.",
     to: "/inventario/vales-historicos",
+    recurso: "inventario.vales_historicos",
     icon: CalendarClock,
     available: true
   },
@@ -96,6 +107,7 @@ const cards = [
     title: "EPP",
     description: "Asignacion y control de equipos de proteccion personal.",
     to: "/epp",
+    recurso: "__admin__",
     icon: HardHat,
     available: false
   },
@@ -103,12 +115,20 @@ const cards = [
     title: "Ajustes",
     description: "Sincronizar stock, ordenar el bin card del mes, backfill de CPP y revision de negativos.",
     to: "/inventario/ajustes",
+    recurso: "inventario.stock",
     icon: Settings,
     available: true
   }
 ] as const;
 
 export function InventoryPage() {
+  const { isAdmin } = useAuth();
+  const { can } = usePermisos();
+  // Solo se muestran las tarjetas de los procesos a los que el rol tiene acceso
+  const visibleCards = cards.filter((card) =>
+    card.recurso === "__admin__" ? isAdmin : can(card.recurso, "ver")
+  );
+
   return (
     <section className="space-y-6 text-[var(--color-on-surface)]">
       <header className="rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-6">
@@ -126,7 +146,7 @@ export function InventoryPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => {
+        {visibleCards.map((card) => {
           const Icon = card.icon;
           return (
             <article

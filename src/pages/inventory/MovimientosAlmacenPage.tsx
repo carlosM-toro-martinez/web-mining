@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, Boxes } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
 import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
 import {
@@ -39,8 +40,8 @@ function formatDimensionValue(value: { codigo?: string | null; nombre?: string |
 
 export function MovimientosAlmacenPage() {
   const { user } = useAuth();
-  const canOperate =
-    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "SUPERINTENDENTE";
+  const { can } = usePermisos();
+  const canOperate = can("inventario.stock", "movimientos_manuales");
   const { showError, showSuccess } = useToast();
 
   const productosQuery = useProductosQuery({ page: 1, limit: 5000, search: "" });

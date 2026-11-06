@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { FileSpreadsheet, UploadCloud } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   useDeleteSaldoMensualByIdMutation,
   useImportCatalogoMutation,
@@ -27,8 +28,9 @@ function normalizeError(error: unknown, fallback: string) {
 
 export function InventarioImportPage() {
   const { user } = useAuth();
+  const { can } = usePermisos();
   const { showError, showSuccess } = useToast();
-  const canImport = user?.role === "ADMIN" || user?.role === "ALMACENERO";
+  const canImport = can("inventario.stock", "importar");
 
   const [catalogFile, setCatalogFile] = useState<File | null>(null);
   const [catalogAnio, setCatalogAnio] = useState("");

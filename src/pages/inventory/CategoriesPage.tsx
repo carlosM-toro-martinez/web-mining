@@ -9,7 +9,7 @@ import {
   Trash2,
   Upload
 } from "lucide-react";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   useCategoriasTreeQuery,
   useCreateCategoriaMutation,
@@ -44,10 +44,9 @@ function normalizeError(error: unknown, fallbackMessage: string) {
 }
 
 export function CategoriesPage() {
-  const { user } = useAuth();
-  const canManage =
-    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "RECEPCIONISTA";
-  const canDelete = user?.role === "ADMIN";
+  const { can } = usePermisos();
+  const canManage = can("inventario.productos", "crear") || can("inventario.productos", "editar");
+  const canDelete = can("inventario.productos", "eliminar");
 
   const { showError, showSuccess } = useToast();
   const categoriasQuery = useCategoriasTreeQuery();
@@ -179,7 +178,7 @@ export function CategoriesPage() {
 
   function handleDelete(categoriaId: number) {
     if (!canDelete) {
-      showError("Solo ADMIN puede eliminar categorias.");
+      showError("No tienes permisos para eliminar categorias.");
       return;
     }
 

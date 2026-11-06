@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, PackageCheck, Plus, Search, X } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
 import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
 import { useCreateSalidaManualMutation } from "@/features/movimientos/hooks/useMovimientos";
@@ -62,10 +63,10 @@ function formatDimensionValue(
 }
 
 export function EntregasPage() {
-  const { user, isAdmin, isSuperintendente } = useAuth();
-  const canApprove = isSuperintendente || isAdmin;
-  const canDeliver =
-    user?.role === "ALMACENERO" || user?.role === "ADMIN" || user?.role === "RECEPCIONISTA";
+  const { user } = useAuth();
+  const { can } = usePermisos();
+  const canApprove = can("inventario.vales", "aprobar");
+  const canDeliver = can("inventario.vales", "entregar");
   const { showError, showSuccess } = useToast();
 
   const usersQuery = useUsersListQuery();

@@ -28,14 +28,12 @@ export function HomePage() {
   // de ruta (app/router/guards/*.tsx) — si un rol no puede entrar al módulo,
   // tampoco debe ver su tarjeta acá. Al cambiar el acceso de un módulo, hay
   // que actualizar los 3 lugares juntos (guard, menú, este panel).
-  const isAlmacenero = user?.role === "ALMACENERO";
-  const isRecepcionista = user?.role === "RECEPCIONISTA";
   const isAdministrador = user?.role === "ADMINISTRADOR";
   const isContador = user?.role === "CONTADOR";
-  // Personal y Logística ya usan permisos dinámicos (Sistema → Roles y permisos)
+  // Inventario, Personal y Logística ya usan permisos dinámicos (Sistema → Roles y permisos)
   const { canAny } = usePermisos();
 
-  const canSeeInventario = isAlmacenero || isAdmin || isRecepcionista || isSuperintendente;
+  const canSeeInventario = canAny("inventario");
   const canSeePersonal = canAny("personal");
   const canSeeLogistica = canAny("logistica");
   const canSeeCajaChica = isAdmin || isAdministrador || isContador || isSuperintendente;

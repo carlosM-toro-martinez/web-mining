@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Building2, Edit3, Eye, Save, Search, Trash2, Upload, UserPlus, X } from "lucide-react";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
   useCreateProveedorMutation,
   useDeleteProveedorMutation,
@@ -40,8 +40,11 @@ function formatNumber(value?: number | null) {
 }
 
 export function ProveedoresPage() {
-  const { user } = useAuth();
-  const canManage = user?.role === "ADMIN" || user?.role === "ALMACENERO";
+  const { can } = usePermisos();
+  const canCreate = can("inventario.proveedores", "crear");
+  const canEdit = can("inventario.proveedores", "editar");
+  const canDelete = can("inventario.proveedores", "eliminar");
+  const canManage = canCreate || canEdit;
   const { showError, showSuccess } = useToast();
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -190,7 +193,7 @@ export function ProveedoresPage() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!canManage) {
+    if (!canCreate) {
       showError("No tienes permisos para importar proveedores.");
       return;
     }
@@ -318,7 +321,7 @@ export function ProveedoresPage() {
                 ? updateProveedorMutation.isPending ? "Guardando..." : "Guardar cambios"
                 : createProveedorMutation.isPending ? "Guardando..." : "Crear proveedor"}
             </button>
-            <button type="button" onClick={openImportDialog} disabled={!canManage || isImporting} className={buttonSecondaryClassName}>
+            <button type="button" onClick={openImportDialog} disabled={!canCreate || isImporting} className={buttonSecondaryClassName}>
               <Upload size={14} />
               {isImporting ? "Importando..." : "Importar proveedores CSV/Excel"}
             </button>
@@ -391,7 +394,7 @@ export function ProveedoresPage() {
                         <Eye size={13} />
                         Ver
                       </button>
-                      <button type="button" onClick={() => startEdit(proveedor)} disabled={!canManage} className={buttonSecondaryClassName}>
+                      <button type="button" onClick={() => startEdit(proveedor)} disabled={!canEdit} className={buttonSecondaryClassName}>
                         <Edit3 size={13} />
                         Editar
                       </button>
@@ -426,14 +429,14 @@ export function ProveedoresPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => startEdit(selectedProveedor)} disabled={!canManage} className={buttonSecondaryClassName}>
+                  <button type="button" onClick={() => startEdit(selectedProveedor)} disabled={!canEdit} className={buttonSecondaryClassName}>
                     <Edit3 size={14} />
                     Editar
                   </button>
                   <button
                     type="button"
                     onClick={handleDeleteSelected}
-                    disabled={!canManage || selectedCompras.length > 0 || deleteProveedorMutation.isPending}
+                    disabled={!canDelete || selectedCompras.length > 0 || deleteProveedorMutation.isPending}
                     title={selectedCompras.length > 0 ? "No se puede eliminar un proveedor con compras asociadas" : undefined}
                     className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-error)]/45 px-3 py-2 text-xs font-semibold text-[var(--color-error)] disabled:opacity-50"
                   >

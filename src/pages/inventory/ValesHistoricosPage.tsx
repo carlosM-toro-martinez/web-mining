@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, CalendarClock, Loader2, Lock, Plus, RefreshCw, ShieldAlert, ShoppingCart, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import { useUsersListQuery } from "@/features/auth/hooks/useUsersManagement";
 import { useCuentasQuery } from "@/features/contabilidad/hooks/useContabilidad";
 import {
@@ -248,13 +249,14 @@ export function ValesHistoricosPage() {
   const deleteCierreMesMutation = useDeleteCierreMesMutation();
   const inicializarPeriodoMutation = useInicializarPeriodoHistoricoMutation();
   const updateSaldoMensualByIdMutation = useUpdateSaldoMensualByIdMutation();
-  const canUseFlow =
-    user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE" || user?.role === "ALMACENERO";
-  const canAnularHistorico =
-    user?.role === "ADMIN" || user?.role === "ALMACENERO" || user?.role === "SUPERINTENDENTE";
+  const { can } = usePermisos();
+  const canUseFlow = can("inventario.vales_historicos", "ver");
+  const canAnularHistorico = can("inventario.vales", "anular");
+  const canAnularCompraHistorica = can("inventario.compras", "anular");
   const canEditCompraItemPrecio = user?.role === "ADMIN";
   const canManagePeriods = user?.role === "ADMIN";
-  const canClosePeriod = user?.role === "ADMIN" || user?.role === "SUPERINTENDENTE";
+  const canClosePeriod = can("inventario.cierre", "cerrar_mes");
+  const canReabrirPeriod = can("inventario.cierre", "reabrir_mes");
 
   const [solicitanteId, setSolicitanteId] = useState("");
   const [fechaOperacion, setFechaOperacion] = useState("");
@@ -729,7 +731,7 @@ export function ValesHistoricosPage() {
 
   async function handleAnularValeHistorico(id: string) {
     if (!canAnularHistorico) {
-      showError("Solo ADMIN, ALMACENERO o SUPERINTENDENTE puede anular vales históricos.");
+      showError("No tienes permisos para anular vales históricos.");
       return;
     }
     const motivo = window.prompt("Motivo de anulación del vale histórico:");
@@ -750,8 +752,8 @@ export function ValesHistoricosPage() {
   }
 
   async function handleAnularCompraHistorica(id: string) {
-    if (!canAnularHistorico) {
-      showError("Solo ADMIN, ALMACENERO o SUPERINTENDENTE puede anular compras históricas.");
+    if (!canAnularCompraHistorica) {
+      showError("No tienes permisos para anular compras históricas.");
       return;
     }
     const motivo = window.prompt("Motivo de anulación de la compra histórica:");
@@ -1214,7 +1216,7 @@ export function ValesHistoricosPage() {
                         Bs. {formatNumber(getCompraTotal(compra))}
                       </td>
                       <td className="px-3 py-2 text-right text-xs">
-                        {canAnularHistorico && compra.estado !== "ANULADA" ? (
+                        {canAnularCompraHistorica && compra.estado !== "ANULADA" ? (
                           <button
                             type="button"
                             onClick={() => void handleAnularCompraHistorica(compra.id)}
@@ -2350,7 +2352,7 @@ export function ValesHistoricosPage() {
                                 Bs. {formatNumber(getCompraTotal(compra))}
                               </p>
                             </div>
-                            {canAnularHistorico && compra.estado !== "ANULADA" ? (
+                            {canAnularCompraHistorica && compra.estado !== "ANULADA" ? (
                               <button
                                 type="button"
                                 onClick={() => void handleAnularCompraHistorica(compra.id)}
@@ -2680,7 +2682,7 @@ export function ValesHistoricosPage() {
                   <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                     Cerrado en
                   </th>
-                  {canClosePeriod ? (
+                  {canReabrirPeriod ? (
                     <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
                       Acción
                     </th>
@@ -2691,7 +2693,7 @@ export function ValesHistoricosPage() {
                 {cierresMesQuery.isLoading ? (
                   <tr>
                     <td
-                      colSpan={canClosePeriod ? 3 : 2}
+                      colSpan={canReabrirPeriod ? 3 : 2}
                       className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                     >
                       Cargando períodos cerrados...
@@ -2701,7 +2703,7 @@ export function ValesHistoricosPage() {
                 {!cierresMesQuery.isLoading && cierres.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canClosePeriod ? 3 : 2}
+                      colSpan={canReabrirPeriod ? 3 : 2}
                       className="px-3 py-3 text-xs text-[var(--color-on-surface-variant)]"
                     >
                       Aún no hay períodos cerrados.
@@ -2716,7 +2718,7 @@ export function ValesHistoricosPage() {
                     <td className="px-3 py-2 text-xs">
                       {item.creadoAt ? new Date(item.creadoAt).toLocaleString() : "-"}
                     </td>
-                    {canClosePeriod ? (
+                    {canReabrirPeriod ? (
                       <td className="px-3 py-2 text-right">
                         <button
                           type="button"
