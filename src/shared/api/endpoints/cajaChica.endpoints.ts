@@ -16,6 +16,8 @@ export const cajaChicaEndpoints = {
   partidaPresupuestoById: (id: number | string) => `/api/partidas-presupuesto-caja/${id}`,
   movimientosBanco: "/api/movimientos-banco-caja",
   movimientoBancoPresupuesto: (id: string) => `/api/movimientos-banco-caja/${id}/presupuesto`,
+  movimientoBancoRemesa: (id: string) => `/api/movimientos-banco-caja/${id}/remesa`,
+  movimientoBancoAnular: (id: string) => `/api/movimientos-banco-caja/${id}/anular`,
   cuadresSaldo: "/api/cuadres-saldo",
   cuadresSaldoPrevisualizar: "/api/cuadres-saldo/previsualizar",
   presupuestos: "/api/presupuestos-caja",

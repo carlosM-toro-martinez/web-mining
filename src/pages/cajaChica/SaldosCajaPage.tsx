@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Banknote, FileSpreadsheet, FileText, Landmark, PiggyBank, Scale } from "lucide-react";
+import { Ban, Banknote, FileSpreadsheet, FileText, Landmark, PiggyBank, Scale } from "lucide-react";
 import { useEstadoCuentaBancariaQuery, useEstadoCuentaCajaQuery } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
 import { exportEstadoCuentaExcel, exportEstadoCuentaPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
 import { useCajasChicasQuery, useCuentasBancariasCajaQuery } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
@@ -11,10 +11,13 @@ import {
 import type { MonedaCaja, TipoMovimientoFondoCaja } from "@/features/gastoCaja/model/gastoCaja.schema";
 import {
   FORMA_PAGO_BANCO_LABEL,
-  type FormaPagoBanco
+  type FormaPagoBanco,
+  type MovimientoBancoCaja
 } from "@/features/movimientoBancoCaja/model/movimientoBancoCaja.schema";
 import {
+  useAnularMovimientoBancoMutation,
   useCreateMovimientoBancoCajaMutation,
+  useCrearRemesaMovimientoBancoMutation,
   useMovimientosBancoCajaQuery,
   useVincularPresupuestoMovimientoBancoMutation
 } from "@/features/movimientoBancoCaja/hooks/useMovimientoBancoCaja";
@@ -54,10 +57,22 @@ function normalizeError(error: unknown, fallbackMessage: string) {
 
 const MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-function etiquetaPresupuesto(p: Pick<PresupuestoCaja, "nombre" | "anio" | "mes" | "totalPresupuestado">) {
-  const total = p.totalPresupuestado !== undefined ? ` · presupuestado ${formatMoneda(p.totalPresupuestado)}` : "";
-  return `${p.nombre} (${MESES_CORTO[p.mes - 1]} ${p.anio})${total}`;
+function etiquetaPresupuesto(p: Pick<PresupuestoCaja, "nombre" | "anio" | "mes" | "totalPresupuestado" | "totalRecibido">) {
+  const total = p.totalPresupuestado ? ` · presupuestado ${formatMoneda(p.totalPresupuestado)}` : "";
+  const recibido = p.totalRecibido ? ` · recibido ${formatMoneda(p.totalRecibido)}` : "";
+  return `${p.nombre} (${MESES_CORTO[p.mes - 1]} ${p.anio})${total}${recibido}`;
 }
+
+// Valor del <select> de remesa que significa "crear una remesa nueva con la
+// descripción del ingreso" en esa caja.
+const PREFIJO_NUEVA = "nueva:";
+
+function anioMesDe(fecha: string) {
+  return { anio: Number(fecha.slice(0, 4)), mes: Number(fecha.slice(5, 7)) };
+}
+
+const selectSinRemesaClassName =
+  "border-[var(--color-error)] text-[var(--color-error)] ring-1 ring-[var(--color-error)]/40 font-semibold";
 
 function formatMoneda(value: number | string) {
   return Number(value).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -131,21 +146,72 @@ export function SaldosCajaPage() {
   const createFondoMutation = useCreateMovimientoFondoCajaMutation();
   const createBancoMutation = useCreateMovimientoBancoCajaMutation();
   const vincularMutation = useVincularPresupuestoMovimientoBancoMutation();
+  const crearRemesaMutation = useCrearRemesaMovimientoBancoMutation();
+  const anularMovimientoMutation = useAnularMovimientoBancoMutation();
 
-  // Remesas (presupuestos) que todavía no tienen un ingreso del banco vinculado.
+  // Cada ingreso del banco trae una remesa del MISMO mes (una remesa puede
+  // llegar en varias partes: todas sus partes se suman).
   const presupuestosQuery = usePresupuestosCajaQuery({});
   const presupuestos = presupuestosQuery.data?.data ?? [];
-  const presupuestosLibres = presupuestos.filter((p) => !p.asignadoMovimientoBancoId);
-  const ingresosBanco = movimientosBanco.filter((m) => m.tipo === "INGRESO").slice(0, 10);
+  const cajasActivas = cajas.filter((c) => c.activo);
+  function remesasDelMes(fecha: string) {
+    const { anio, mes } = anioMesDe(fecha);
+    return presupuestos.filter((p) => p.activo && p.anio === anio && p.mes === mes);
+  }
+  // Los últimos 10 ingresos, y además cualquiera que todavía no tenga remesa.
+  const ingresosBanco = movimientosBanco
+    .filter((m) => m.tipo === "INGRESO")
+    .filter((m, i) => i < 10 || (!m.anulado && !m.presupuesto));
+  const salidasBanco = movimientosBanco.filter((m) => m.tipo === "SALIDA_A_CAJA").slice(0, 8);
 
-  function handleVincular(movimientoId: string, valor: string) {
+  function handleVincular(movimiento: MovimientoBancoCaja, valor: string) {
+    if (valor.startsWith(PREFIJO_NUEVA)) {
+      const cajaNueva = Number(valor.slice(PREFIJO_NUEVA.length));
+      crearRemesaMutation.mutate(
+        { id: movimiento.id, cajaId: cajaNueva || undefined },
+        {
+          onSuccess: (r) => showSuccess(`Remesa "${r.data.presupuesto?.nombre ?? ""}" lista. Ya cuenta en la caja y en el Excel.`),
+          onError: (error) => showError(normalizeError(error, "No se pudo crear la remesa."))
+        }
+      );
+      return;
+    }
     vincularMutation.mutate(
-      { id: movimientoId, presupuestoId: valor ? Number(valor) : null },
+      { id: movimiento.id, presupuestoId: valor ? Number(valor) : null },
       {
-        onSuccess: () => showSuccess(valor ? "Ingreso vinculado al presupuesto." : "Ingreso desvinculado del presupuesto."),
-        onError: (error) => showError(normalizeError(error, "No se pudo vincular el presupuesto."))
+        onSuccess: () => showSuccess(valor ? "Ingreso vinculado a la remesa." : "Ingreso sin remesa: ya no cuenta en la caja."),
+        onError: (error) => showError(normalizeError(error, "No se pudo vincular la remesa."))
       }
     );
+  }
+
+  function handleAnularMovimiento(movimiento: MovimientoBancoCaja) {
+    const que = movimiento.tipo === "INGRESO" ? "ingreso" : "salida";
+    const motivo = window.prompt(
+      `Anular ${que} del ${formatFecha(movimiento.fecha)} · ${movimiento.descripcion} · ${movimiento.moneda} ${formatMoneda(movimiento.monto)}.\n\n` +
+        "Deja de contar en el saldo del banco" +
+        (movimiento.tipo === "INGRESO" ? " y, si traía una remesa, sale de la caja y del Excel" : "") +
+        ".\n\nMotivo (ej. Registrado dos veces):"
+    );
+    if (!motivo || !motivo.trim()) return;
+    anularMovimientoMutation.mutate(
+      { id: movimiento.id, motivo: motivo.trim() },
+      {
+        onSuccess: () => showSuccess(`${que === "ingreso" ? "Ingreso anulado" : "Salida anulada"}.`),
+        onError: (error) => showError(normalizeError(error, "No se pudo anular el movimiento."))
+      }
+    );
+  }
+
+  // Opciones "+ Crear remesa" del <select>: una por caja activa (normalmente una sola).
+  function opcionesNuevaRemesa(descripcion: string) {
+    const nombre = descripcion.trim().toUpperCase();
+    if (!nombre) return [<option key="nueva-vacia" value="" disabled>＋ Crear remesa nueva (primero escribe la descripción)</option>];
+    return cajasActivas.map((c) => (
+      <option key={`nueva-${c.id}`} value={`${PREFIJO_NUEVA}${c.id}`}>
+        ＋ Crear remesa «{nombre}»{cajasActivas.length > 1 ? ` en ${c.nombre}` : ""}
+      </option>
+    ));
   }
 
   // --- Form: registrar fondo directo a la caja (sin pasar por un banco) ---
@@ -174,6 +240,15 @@ export function SaldosCajaPage() {
   const [ingresoDepositante, setIngresoDepositante] = useState("");
   const [ingresoDescripcion, setIngresoDescripcion] = useState("");
   const [ingresoPresupuestoId, setIngresoPresupuestoId] = useState("");
+  const remesasDelMesIngreso = remesasDelMes(ingresoFecha);
+  // Si cambia la fecha a otro mes, la remesa elegida deja de valer.
+  useEffect(() => {
+    if (ingresoPresupuestoId && !ingresoPresupuestoId.startsWith(PREFIJO_NUEVA)
+      && !remesasDelMesIngreso.some((p) => String(p.id) === ingresoPresupuestoId)) {
+      setIngresoPresupuestoId("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingresoFecha]);
 
   useEffect(() => {
     if (cajas.length === 0) return;
@@ -249,6 +324,27 @@ export function SaldosCajaPage() {
       showError("Elige una cuenta bancaria.");
       return;
     }
+    if (!ingresoPresupuestoId) {
+      showError("Elige la remesa que trajo este ingreso o crea una nueva.");
+      return;
+    }
+    // Aviso contra el error más común: registrar dos veces el mismo depósito.
+    const monto = Number(ingresoMonto);
+    const parecido = movimientosBanco.find(
+      (m) =>
+        m.tipo === "INGRESO" && !m.anulado && String(m.cuentaBancariaId) === ingresoCuentaBancariaId &&
+        Math.abs(Number(m.monto) - monto) < 0.005 &&
+        Math.abs(new Date(m.fecha).getTime() - new Date(ingresoFecha).getTime()) <= 31 * 86400000
+    );
+    if (
+      parecido &&
+      !window.confirm(
+        `Ya hay un ingreso igual: ${formatFecha(parecido.fecha)} · ${parecido.descripcion} · ${parecido.moneda} ${formatMoneda(parecido.monto)}.\n\n¿Es otro depósito distinto y quieres registrarlo igual?`
+      )
+    ) {
+      return;
+    }
+    const nueva = ingresoPresupuestoId.startsWith(PREFIJO_NUEVA);
     createBancoMutation.mutate(
       {
         cuentaBancariaId: Number(ingresoCuentaBancariaId),
@@ -259,11 +355,13 @@ export function SaldosCajaPage() {
         moneda: ingresoCuenta.monedaBase,
         depositanteNombre: ingresoDepositante.trim() || undefined,
         descripcion: ingresoDescripcion,
-        presupuestoId: ingresoPresupuestoId ? Number(ingresoPresupuestoId) : undefined
+        presupuestoId: nueva ? undefined : Number(ingresoPresupuestoId),
+        nuevaRemesa: nueva ? true : undefined,
+        nuevaRemesaCajaId: nueva ? Number(ingresoPresupuestoId.slice(PREFIJO_NUEVA.length)) || undefined : undefined
       },
       {
-        onSuccess: () => {
-          showSuccess("Ingreso a la cuenta bancaria registrado.");
+        onSuccess: (r) => {
+          showSuccess(`Ingreso registrado en la remesa "${r.data.presupuesto?.nombre ?? ""}".`);
           setIngresoMonto("");
           setIngresoDepositante("");
           setIngresoDescripcion("");
@@ -598,7 +696,11 @@ export function SaldosCajaPage() {
           <div className="mt-4 space-y-2 text-xs">
             {movimientosFondo.slice(0, 5).map((item) => (
               <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
-                <span>{formatFecha(item.fecha)}{item.referencia ? ` · ${item.referencia}` : ""}</span>
+                <span>
+                  {formatFecha(item.fecha)}
+                  {item.movimientoBanco?.presupuesto ? ` · ${item.movimientoBanco.presupuesto.nombre} (por el banco)` : ""}
+                  {item.referencia ? ` · ${item.referencia}` : ""}
+                </span>
                 <span className="font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
               </div>
             ))}
@@ -665,6 +767,39 @@ export function SaldosCajaPage() {
               {createBancoMutation.isPending ? "Guardando..." : "Registrar salida"}
             </button>
           </form>
+          <div className="mt-4 space-y-2 text-xs">
+            {salidasBanco.length > 0 ? (
+              <p className="font-semibold text-[var(--color-on-surface-variant)]">Últimas salidas</p>
+            ) : null}
+            {salidasBanco.map((item) => (
+              <div
+                key={item.id}
+                className={`rounded-lg border px-3 py-2 ${item.anulado ? "border-dashed border-[var(--color-border-soft)] opacity-70" : "border-[var(--color-border-soft)]"}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`min-w-0 break-words ${item.anulado ? "line-through" : ""}`}>
+                    {formatFecha(item.fecha)} · {item.descripcion}
+                    {item.numeroCheque ? ` · CH-${item.numeroCheque}` : ""}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className={`font-mono font-bold ${item.anulado ? "line-through" : ""}`}>{item.moneda} {formatMoneda(item.monto)}</span>
+                    {item.anulado ? null : (
+                      <button
+                        type="button"
+                        onClick={() => handleAnularMovimiento(item)}
+                        disabled={anularMovimientoMutation.isPending}
+                        className="rounded p-1 text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                        title="Anular esta salida (p. ej. si se registró dos veces)"
+                      >
+                        <Ban size={13} />
+                      </button>
+                    )}
+                  </span>
+                </div>
+                {item.anulado ? <p className="mt-1 font-semibold text-[var(--color-error)]">Anulada: {item.motivoAnulacion}</p> : null}
+              </div>
+            ))}
+          </div>
         </article>
 
         <article className="rounded-xl border-2 border-[var(--color-primary)]/40 bg-[var(--color-primary)]/[0.05] p-5">
@@ -708,15 +843,26 @@ export function SaldosCajaPage() {
             <input value={ingresoDepositante} onChange={(e) => setIngresoDepositante(e.target.value)} className={inputClassName} placeholder="Depositante (opcional)" />
             <input required value={ingresoDescripcion} onChange={(e) => setIngresoDescripcion(e.target.value)} className={inputClassName} placeholder="Descripción (ej. Presupuesto octubre)" />
             <div>
-              <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">
-                ¿Para qué presupuesto llegó este dinero? (opcional)
+              <label className="mb-1 block text-[11px] font-semibold text-[var(--color-on-surface-variant)]">
+                Remesa que trajo este dinero (obligatoria, del mismo mes)
               </label>
-              <select value={ingresoPresupuestoId} onChange={(e) => setIngresoPresupuestoId(e.target.value)} className={inputClassName}>
-                <option value="">Sin presupuesto (sueldos, otros)</option>
-                {presupuestosLibres.map((p) => (
+              <select
+                required
+                value={ingresoPresupuestoId}
+                onChange={(e) => setIngresoPresupuestoId(e.target.value)}
+                className={`${inputClassName} ${ingresoPresupuestoId ? "" : selectSinRemesaClassName}`}
+              >
+                <option value="">Sin remesa: elige una o créala</option>
+                {remesasDelMesIngreso.map((p) => (
                   <option key={p.id} value={p.id}>{etiquetaPresupuesto(p)}</option>
                 ))}
+                {opcionesNuevaRemesa(ingresoDescripcion)}
               </select>
+              {remesasDelMesIngreso.length === 0 ? (
+                <p className="mt-1 text-[11px] font-semibold text-[var(--color-error)]">
+                  No hay remesas de {MESES_CORTO[anioMesDe(ingresoFecha).mes - 1]} {anioMesDe(ingresoFecha).anio}: créala con la descripción del ingreso.
+                </p>
+              ) : null}
             </div>
             <button type="submit" disabled={createBancoMutation.isPending} className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] disabled:opacity-60">
               {createBancoMutation.isPending ? "Guardando..." : "Registrar ingreso"}
@@ -724,45 +870,78 @@ export function SaldosCajaPage() {
           </form>
           <div className="mt-4 space-y-2 text-xs">
             <p className="font-semibold text-[var(--color-on-surface-variant)]">
-              Últimos ingresos: indica (o cambia) para qué presupuesto llegó cada uno
+              Últimos ingresos: cada uno debe tener su remesa del mismo mes (en rojo los que no la tienen)
             </p>
             {ingresosBanco.length === 0 ? (
               <p className="text-[var(--color-on-surface-variant)]">Todavía no hay ingresos registrados.</p>
             ) : null}
             {ingresosBanco.map((item) => {
-              const vinculado = item.presupuestosAsignados ?? null;
-              const presupuestoVinculado = vinculado ? presupuestos.find((p) => p.id === vinculado.id) : undefined;
+              if (item.anulado) {
+                return (
+                  <div key={item.id} className="rounded-lg border border-dashed border-[var(--color-border-soft)] px-3 py-2 opacity-70">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 break-words line-through">{formatFecha(item.fecha)} · {item.descripcion}</span>
+                      <span className="shrink-0 font-mono line-through">{item.moneda} {formatMoneda(item.monto)}</span>
+                    </div>
+                    <p className="mt-1 font-semibold text-[var(--color-error)]">Anulado: {item.motivoAnulacion}</p>
+                  </div>
+                );
+              }
+              const vinculado = item.presupuesto ?? null;
+              const delMes = remesasDelMes(item.fecha);
+              const remesa = vinculado ? presupuestos.find((p) => p.id === vinculado.id) : undefined;
               const diferencia =
-                presupuestoVinculado?.totalPresupuestado !== undefined
-                  ? Number(item.monto) - presupuestoVinculado.totalPresupuestado
+                remesa && remesa.totalPresupuestado && remesa.totalRecibido !== undefined
+                  ? remesa.totalRecibido - remesa.totalPresupuestado
                   : null;
+              const ocupado = vincularMutation.isPending || crearRemesaMutation.isPending;
               return (
-                <div key={item.id} className="space-y-1.5 rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                <div
+                  key={item.id}
+                  className={`space-y-1.5 rounded-lg border px-3 py-2 ${
+                    vinculado ? "border-[var(--color-border-soft)]" : "border-[var(--color-error)]/60 bg-[var(--color-error)]/[0.06]"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate">
+                    <span className="min-w-0 break-words">
                       {formatFecha(item.fecha)} · {item.descripcion}
                     </span>
-                    <span className="shrink-0 font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAnularMovimiento(item)}
+                        disabled={anularMovimientoMutation.isPending}
+                        className="rounded p-1 text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                        title="Anular este ingreso (p. ej. si se registró dos veces)"
+                      >
+                        <Ban size={13} />
+                      </button>
+                    </span>
                   </div>
                   <select
                     value={vinculado ? String(vinculado.id) : ""}
-                    onChange={(e) => handleVincular(item.id, e.target.value)}
-                    disabled={vincularMutation.isPending}
-                    className={`${inputClassName} py-1.5 text-xs`}
+                    onChange={(e) => handleVincular(item, e.target.value)}
+                    disabled={ocupado}
+                    className={`${inputClassName} py-1.5 text-xs ${vinculado ? "" : selectSinRemesaClassName}`}
                   >
-                    <option value="">Sin presupuesto</option>
-                    {vinculado ? (
-                      <option value={vinculado.id}>
-                        {etiquetaPresupuesto({ ...vinculado, totalPresupuestado: presupuestoVinculado?.totalPresupuestado })}
-                      </option>
+                    <option value="">Sin remesa: elige o crea una</option>
+                    {vinculado && !delMes.some((p) => p.id === vinculado.id) ? (
+                      <option value={vinculado.id}>{etiquetaPresupuesto({ ...vinculado, ...remesa })}</option>
                     ) : null}
-                    {presupuestosLibres.map((p) => (
+                    {delMes.map((p) => (
                       <option key={p.id} value={p.id}>{etiquetaPresupuesto(p)}</option>
                     ))}
+                    {opcionesNuevaRemesa(item.descripcion)}
                   </select>
+                  {vinculado && !item.fondoCaja ? (
+                    <p className="text-[var(--color-on-surface-variant)]">
+                      No suma a la caja: es de un período que ya se cuadró o se rindió.
+                    </p>
+                  ) : null}
                   {diferencia !== null && Math.abs(diferencia) > 0.009 ? (
                     <p className="text-[var(--color-on-surface-variant)]">
-                      {diferencia > 0 ? "Llegó" : "Faltó"} {formatMoneda(Math.abs(diferencia))} respecto a lo presupuestado.
+                      La remesa {diferencia > 0 ? "recibió" : "todavía espera"} {formatMoneda(Math.abs(diferencia))} {diferencia > 0 ? "más de" : "para llegar a"} lo presupuestado.
                     </p>
                   ) : null}
                 </div>

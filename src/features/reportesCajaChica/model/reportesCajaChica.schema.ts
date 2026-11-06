@@ -129,7 +129,9 @@ const movimientoFondoRefSchema = z.object({
   monto: z.union([z.string(), z.number()]),
   moneda: z.enum(["BOB", "USD"]),
   fecha: z.string(),
-  referencia: z.string().nullable().optional()
+  referencia: z.string().nullable().optional(),
+  // Nombre de la remesa cuando llegó por el banco (una línea por remesa).
+  descripcion: z.string().nullable().optional()
 });
 
 const gastoRendicionSchema = z.object({

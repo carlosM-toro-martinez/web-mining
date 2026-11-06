@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const cajaRef = z.object({ id: z.number().int().positive(), nombre: z.string().min(1) });
 const cuentaBancariaRef = z.object({ id: z.number().int().positive(), banco: z.string().min(1), nombreCuenta: z.string().min(1) });
-const movimientoAsignadoRef = z.object({
+const ingresoDeRemesaRef = z.object({
   id: z.string().min(1),
   monto: z.union([z.string(), z.number()]),
   moneda: z.enum(["BOB", "USD"]),
@@ -26,11 +26,11 @@ export const presupuestoCajaSchema = z.object({
   nombre: z.string().min(1),
   activo: z.boolean(),
   createdAt: z.string(),
-  asignadoMovimientoBancoId: z.string().nullable().optional(),
-  asignadoEn: z.string().nullable().optional(),
   caja: cajaRef.optional(),
   partidas: z.array(partidaDeRemesaSchema).optional(),
-  asignadoMovimientoBanco: movimientoAsignadoRef.nullable().optional(),
+  // Ingresos del banco que trajeron la remesa (puede llegar en partes).
+  ingresos: z.array(ingresoDeRemesaRef).optional(),
+  totalRecibido: z.number().optional(),
   totalPresupuestado: z.number().optional(),
   totalGastado: z.number().optional(),
   saldoAFavor: z.number().optional(),

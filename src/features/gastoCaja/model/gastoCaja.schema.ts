@@ -169,7 +169,12 @@ export const movimientoFondoCajaSchema = z.object({
   fecha: z.string(),
   referencia: z.string().nullable().optional(),
   createdAt: z.string(),
-  caja: refConNombre.optional()
+  caja: refConNombre.optional(),
+  // Si el fondo es una remesa que llegó por el banco: su nombre.
+  movimientoBanco: z
+    .object({ presupuesto: z.object({ nombre: z.string() }).nullable().optional() })
+    .nullable()
+    .optional()
 });
 
 export const createMovimientoFondoCajaPayloadSchema = z.object({

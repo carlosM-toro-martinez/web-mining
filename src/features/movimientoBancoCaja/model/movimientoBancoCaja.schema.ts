@@ -36,11 +36,16 @@ export const movimientoBancoCajaSchema = z.object({
   createdAt: z.string(),
   cuentaBancaria: cuentaBancariaRef.optional(),
   caja: refConNombre.nullable().optional(),
-  // Remesa (presupuesto) que cubre este ingreso.
-  presupuestosAsignados: z
-    .object({ id: z.number().int().positive(), nombre: z.string(), anio: z.number().int(), mes: z.number().int() })
+  // Remesa (presupuesto) que trajo este ingreso, y el fondo que generó en
+  // su caja (no lo hay si el ingreso es de un período ya cuadrado).
+  presupuesto: z
+    .object({ id: z.number().int().positive(), nombre: z.string(), anio: z.number().int(), mes: z.number().int(), cajaId: z.number().int() })
     .nullable()
-    .optional()
+    .optional(),
+  fondoCaja: z.object({ id: z.string(), cajaId: z.number().int() }).nullable().optional(),
+  anulado: z.boolean().optional(),
+  motivoAnulacion: z.string().nullable().optional(),
+  anuladoEn: z.string().nullable().optional()
 });
 
 export const createMovimientoBancoCajaPayloadSchema = z
@@ -55,11 +60,18 @@ export const createMovimientoBancoCajaPayloadSchema = z
     moneda: monedaCajaSchema,
     depositanteNombre: z.string().trim().optional(),
     descripcion: z.string().trim().min(1, "La descripción es obligatoria."),
-    presupuestoId: z.number().int().positive().optional()
+    presupuestoId: z.number().int().positive().optional(),
+    // Crea la remesa del mes con la descripción del ingreso.
+    nuevaRemesa: z.boolean().optional(),
+    nuevaRemesaCajaId: z.number().int().positive().optional()
   })
   .refine((data) => data.formaPago !== "CHEQUE" || Boolean(data.numeroCheque), {
     message: "El número de cheque es obligatorio cuando la forma de pago es Cheque.",
     path: ["numeroCheque"]
+  })
+  .refine((data) => data.tipo !== "INGRESO" || Boolean(data.presupuestoId) || Boolean(data.nuevaRemesa), {
+    message: "Elige la remesa que trajo este ingreso o crea una nueva.",
+    path: ["presupuestoId"]
   })
   .refine((data) => data.tipo !== "SALIDA_A_CAJA" || Boolean(data.cajaId), {
     message: "Debes elegir la caja destino.",

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  anularMovimientoBanco,
   createMovimientoBancoCaja,
+  crearRemesaMovimientoBanco,
   getMovimientosBancoCaja,
   vincularPresupuestoMovimientoBanco,
   type MovimientoBancoCajaQueryParams
@@ -15,28 +17,51 @@ export function useMovimientosBancoCajaQuery(params: MovimientoBancoCajaQueryPar
   });
 }
 
-export function useVincularPresupuestoMovimientoBancoMutation() {
+// Un ingreso vinculado a una remesa es dinero de la caja: cualquier cambio
+// mueve el banco, las remesas, los fondos de la caja, sus saldos y reportes.
+function useInvalidarMovimientosBanco() {
   const queryClient = useQueryClient();
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.movimientoBancoCaja.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.presupuestoCaja.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.gastoCaja.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.reportesCajaChica.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.rendicionCaja.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() })
+    ]);
+  };
+}
+
+export function useVincularPresupuestoMovimientoBancoMutation() {
+  const invalidar = useInvalidarMovimientosBanco();
   return useMutation({
     mutationFn: ({ id, presupuestoId }: { id: string; presupuestoId: number | null }) =>
       vincularPresupuestoMovimientoBanco(id, presupuestoId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.movimientoBancoCaja.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.presupuestoCaja.all });
-    }
+    onSuccess: () => invalidar()
+  });
+}
+
+export function useCrearRemesaMovimientoBancoMutation() {
+  const invalidar = useInvalidarMovimientosBanco();
+  return useMutation({
+    mutationFn: ({ id, cajaId }: { id: string; cajaId?: number }) => crearRemesaMovimientoBanco(id, cajaId),
+    onSuccess: () => invalidar()
+  });
+}
+
+export function useAnularMovimientoBancoMutation() {
+  const invalidar = useInvalidarMovimientosBanco();
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: string; motivo: string }) => anularMovimientoBanco(id, motivo),
+    onSuccess: () => invalidar()
   });
 }
 
 export function useCreateMovimientoBancoCajaMutation() {
-  const queryClient = useQueryClient();
+  const invalidar = useInvalidarMovimientosBanco();
   return useMutation({
     mutationFn: (payload: CreateMovimientoBancoCajaPayload) => createMovimientoBancoCaja(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.movimientoBancoCaja.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.presupuestoCaja.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportesCajaChica.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rendicionCaja.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.parametrosCajaChica.cuentasBancarias() });
-    }
+    onSuccess: () => invalidar()
   });
 }

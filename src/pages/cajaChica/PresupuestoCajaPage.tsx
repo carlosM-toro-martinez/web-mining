@@ -53,8 +53,10 @@ function formatMoneda(value: number) {
   return value.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// timeZone "UTC": son fechas calendario guardadas a medianoche UTC; sin esto
+// un navegador en Bolivia (UTC-4) las muestra un día antes.
 function formatFecha(value: string) {
-  return new Date(value).toLocaleDateString("es-BO");
+  return new Date(value).toLocaleDateString("es-BO", { timeZone: "UTC" });
 }
 
 function normalizeError(error: unknown, fallbackMessage: string) {
@@ -104,7 +106,8 @@ function RemesaCard({ presupuesto, centroOptions, funcionOptions, cuentaOptions 
   const totalGastado = presupuesto.totalGastado ?? 0;
   const saldoAFavor = presupuesto.saldoAFavor ?? 0;
   const porcentajeEjecucion = presupuesto.porcentajeEjecucion ?? 0;
-  const yaAsignado = Boolean(presupuesto.asignadoMovimientoBancoId);
+  const ingresos = presupuesto.ingresos ?? [];
+  const yaAsignado = ingresos.length > 0;
 
   function handleCreatePartida(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -269,27 +272,29 @@ function RemesaCard({ presupuesto, centroOptions, funcionOptions, cuentaOptions 
         )}
       </div>
 
-      {yaAsignado && presupuesto.asignadoMovimientoBanco ? (
+      {yaAsignado ? (
         (() => {
-          const ingreso = Number(presupuesto.asignadoMovimientoBanco.monto);
-          const diferencia = ingreso - totalPresupuestado;
+          const recibido = presupuesto.totalRecibido ?? ingresos.reduce((acc, i) => acc + Number(i.monto), 0);
+          const diferencia = recibido - totalPresupuestado;
           return (
             <div className="mb-4 rounded-lg border border-[var(--color-success)]/35 bg-[var(--color-success)]/8 px-3 py-2 text-xs">
-              <p className="flex flex-wrap items-center gap-1 font-semibold text-[var(--color-success)]">
-                <Check size={14} />
-                Ingresó {formatMoneda(ingreso)} {presupuesto.asignadoMovimientoBanco.moneda} el{" "}
-                {formatFecha(presupuesto.asignadoMovimientoBanco.fecha)}
-                {presupuesto.asignadoMovimientoBanco.cuentaBancaria
-                  ? ` a ${presupuesto.asignadoMovimientoBanco.cuentaBancaria.banco} · ${presupuesto.asignadoMovimientoBanco.cuentaBancaria.nombreCuenta}`
-                  : ""}
-              </p>
-              {Math.abs(diferencia) > 0.009 ? (
+              {ingresos.map((i) => (
+                <p key={i.id} className="flex flex-wrap items-center gap-1 font-semibold text-[var(--color-success)]">
+                  <Check size={14} />
+                  Ingresó {formatMoneda(Number(i.monto))} {i.moneda} el {formatFecha(i.fecha)}
+                  {i.cuentaBancaria ? ` a ${i.cuentaBancaria.banco} · ${i.cuentaBancaria.nombreCuenta}` : ""}
+                </p>
+              ))}
+              {ingresos.length > 1 ? (
+                <p className="mt-0.5 font-semibold">Llegó en {ingresos.length} partes: total {formatMoneda(recibido)}.</p>
+              ) : null}
+              {totalPresupuestado > 0 && Math.abs(diferencia) > 0.009 ? (
                 <p className="mt-0.5 text-[var(--color-on-surface-variant)]">
                   {diferencia > 0 ? "Llegó" : "Faltó"} {formatMoneda(Math.abs(diferencia))} respecto a lo presupuestado.
                 </p>
               ) : null}
               <p className="mt-0.5 text-[var(--color-on-surface-variant)]">
-                Sus partidas quedan fijas. Para cambiar el ingreso vinculado, ve a Saldos.
+                Sus partidas quedan fijas. Para cambiar los ingresos vinculados, ve a Saldos.
               </p>
             </div>
           );

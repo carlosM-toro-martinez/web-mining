@@ -30,6 +30,22 @@ export async function vincularPresupuestoMovimientoBanco(id: string, presupuesto
   });
 }
 
+export async function crearRemesaMovimientoBanco(id: string, cajaId?: number) {
+  return postRequest({
+    url: apiEndpoints.cajaChica.movimientoBancoRemesa(id),
+    body: cajaId ? { cajaId } : {},
+    schema: movimientoBancoCajaResponseSchema
+  });
+}
+
+export async function anularMovimientoBanco(id: string, motivo: string) {
+  return postRequest({
+    url: apiEndpoints.cajaChica.movimientoBancoAnular(id),
+    body: { motivo },
+    schema: movimientoBancoCajaResponseSchema
+  });
+}
+
 export async function createMovimientoBancoCaja(payload: CreateMovimientoBancoCajaPayload) {
   const body = createMovimientoBancoCajaPayloadSchema.parse(payload);
   return postRequest({ url: apiEndpoints.cajaChica.movimientosBanco, body, schema: movimientoBancoCajaResponseSchema });

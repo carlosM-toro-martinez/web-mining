@@ -381,7 +381,7 @@ export function exportReporteRendicionExcel(reporte: ReporteRendicion) {
     filaFondo(
       [formatFecha(f.fecha), estilo({ sz: 9, h: "center", borde: fino })],
       [f.referencia ?? "", estilo({ sz: 9, h: "center", borde: fino })],
-      [TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo, estilo({ sz: 9, h: "left", borde: bordes("thin", undefined, "thin", "thin") })],
+      [f.descripcion ?? TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo, estilo({ sz: 9, h: "left", borde: bordes("thin", undefined, "thin", "thin") })],
       [num(Number(f.monto)), estilo({ sz: 9, h: "right", fmt: "#,##0.00", borde: fino })]
     );
   }
@@ -558,7 +558,7 @@ export function exportReporteRendicionPdf(reporte: ReporteRendicion) {
       ...reporte.fondos.map((f): RowInput => [
         { content: formatFecha(f.fecha), styles: { halign: "center" } },
         { content: f.referencia ?? "", styles: { halign: "center" } },
-        TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo,
+        f.descripcion ?? TIPO_MOVIMIENTO_LABEL[f.tipo] ?? f.tipo,
         formatBs(Number(f.monto)),
         ""
       ]),
