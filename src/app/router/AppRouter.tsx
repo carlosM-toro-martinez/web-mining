@@ -10,7 +10,8 @@ import { AccountingPage } from "@/pages/inventory/AccountingPage";
 import { ValesPage } from "@/pages/inventory/ValesPage";
 import { ValesHistoricosPage } from "@/pages/inventory/ValesHistoricosPage";
 import { EntregasPage } from "@/pages/inventory/EntregasPage";
-import { ComprasPage } from "@/pages/inventory/ComprasPage";
+import { PedidosCompraPage } from "@/pages/inventory/PedidosCompraPage";
+import { RecepcionComprasPage } from "@/pages/inventory/RecepcionComprasPage";
 import { ProveedoresPage } from "@/pages/inventory/ProveedoresPage";
 import { StockActualPage } from "@/pages/inventory/StockActualPage";
 import { ReportesPage } from "@/pages/inventory/ReportesPage";
@@ -116,7 +117,10 @@ export function AppRouter() {
               <Route path="/inventario/vales-historicos" element={<ValesHistoricosPage />} />
             </Route>
             <Route element={<PermisoRoute recurso="inventario.compras" />}>
-              <Route path="/inventario/compras" element={<ComprasPage />} />
+              <Route path="/inventario/compras" element={<PedidosCompraPage />} />
+            </Route>
+            <Route element={<PermisoRoute recurso="inventario.recepcion" />}>
+              <Route path="/inventario/recepcion" element={<RecepcionComprasPage />} />
             </Route>
             <Route element={<PermisoRoute recurso="inventario.pedidos" />}>
               <Route path="/inventario/pedidos" element={<PedidosPage />} />

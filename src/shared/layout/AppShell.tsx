@@ -18,6 +18,7 @@ import {
   PackageSearch,
   Building2,
   ShoppingCart,
+  ClipboardCheck,
   ClipboardList,
   ReceiptText,
   Landmark,
@@ -94,8 +95,8 @@ export function AppShell() {
   const inventoryNavItems = useMemo(() => {
     if (!canSeeInventorySection) return [];
     const items: Array<NavItem & { recurso: string; accion?: string }> = [
-      { label: "Compras", icon: ShoppingCart, to: "/inventario/compras", recurso: "inventario.compras" },
-      { label: "Pedidos", icon: ClipboardList, to: "/inventario/pedidos", recurso: "inventario.pedidos" },
+      { label: "Pedidos de compra", icon: ShoppingCart, to: "/inventario/compras", recurso: "inventario.compras" },
+      { label: "Recepción", icon: ClipboardCheck, to: "/inventario/recepcion", recurso: "inventario.recepcion" },
       { label: "Vales", icon: PackageCheck, to: "/inventario/vales", recurso: "inventario.vales" },
       { label: "Vales históricos", icon: CalendarClock, to: "/inventario/vales-historicos", recurso: "inventario.vales_historicos" },
       { label: "Proveedores", icon: Building2, to: "/inventario/proveedores", recurso: "inventario.proveedores" },

@@ -3,6 +3,8 @@ import { movimientoSchema } from "@/features/movimientos/model/movimientos.schem
 
 const numberLikeSchema = z.coerce.number();
 
+export const tipoDocumentoCompraSchema = z.enum(["FACTURA", "RECIBO", "SIN_DOCUMENTO"]);
+
 export const compraEstadoSchema = z
   .enum(["PENDIENTE", "PARCIAL", "COMPLETADO", "ANULADA"])
   .or(z.string().min(1));
@@ -51,6 +53,16 @@ export const compraItemSchema = z.preprocess(
   })
 );
 
+// Cada entrada de stock que generó la compra (llegadas registradas)
+export const compraRecepcionSchema = z.object({
+  id: z.string(),
+  createdAt: z.string(),
+  cantidad: numberLikeSchema,
+  productoId: numberLikeSchema.int().positive(),
+  esRetroactivo: z.boolean().optional().default(false),
+  usuario: compraUsuarioSchema.optional().nullable()
+});
+
 export const compraSchema = z.object({
   id: z.union([z.string(), numberLikeSchema]).transform((value) => String(value)),
   proveedorId: numberLikeSchema.int().positive().optional().nullable(),
@@ -58,6 +70,8 @@ export const compraSchema = z.object({
   usuarioRecibeId: numberLikeSchema.int().positive().optional().nullable(),
   estado: compraEstadoSchema,
   numeroFactura: z.string().optional().nullable(),
+  tipoDocumento: tipoDocumentoCompraSchema.optional().nullable(),
+  documentoRegistradoAt: z.string().optional().nullable(),
   observacion: z.string().optional().nullable(),
   fechaOperacion: z.string().optional().nullable(),
   esGasEspecial: z.boolean().optional().nullable(),
@@ -67,6 +81,7 @@ export const compraSchema = z.object({
   usuarioRegistro: compraUsuarioSchema.optional().nullable(),
   usuarioRecibe: compraUsuarioSchema.optional().nullable(),
   anulacion: z.any().optional().nullable(),
+  recepciones: z.array(compraRecepcionSchema).optional().default([]),
   items: z.array(compraItemSchema).optional().default([])
 });
 
@@ -122,6 +137,46 @@ export const anulacionCompraSchema = z.object({
   compra: compraSchema.optional().nullable()
 });
 
+const compraDocumentoCountsSchema = z.object({
+  FACTURA: numberLikeSchema.int().nonnegative(),
+  RECIBO: numberLikeSchema.int().nonnegative(),
+  SIN_DOCUMENTO: numberLikeSchema.int().nonnegative(),
+  PENDIENTE: numberLikeSchema.int().nonnegative()
+});
+
+export const comprasResumenResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    total: numberLikeSchema.int().nonnegative(),
+    estados: z.object({
+      PENDIENTE: numberLikeSchema.int().nonnegative(),
+      PARCIAL: numberLikeSchema.int().nonnegative(),
+      COMPLETADO: numberLikeSchema.int().nonnegative(),
+      ANULADA: numberLikeSchema.int().nonnegative()
+    }),
+    documentos: compraDocumentoCountsSchema,
+    recibidosSinDocumento: numberLikeSchema.int().nonnegative()
+  })
+});
+
+export const registrarDocumentoPayloadSchema = z
+  .object({
+    tipoDocumento: tipoDocumentoCompraSchema,
+    numeroFactura: z.string().trim().optional()
+  })
+  .refine(
+    (value) => value.tipoDocumento === "SIN_DOCUMENTO" || (value.numeroFactura ?? "").length > 0,
+    { message: "La factura o el recibo necesitan su número.", path: ["numeroFactura"] }
+  );
+
+export const registrarDocumentoResponseSchema = z.object({
+  success: z.boolean().optional().default(true),
+  data: z.object({
+    compra: compraSchema,
+    advertenciaDuplicado: z.boolean().optional().default(false)
+  })
+});
+
 export const anularCompraPayloadSchema = z.object({
   motivo: z.string().trim().min(1, "El motivo es obligatorio.")
 });
@@ -162,6 +217,7 @@ export const anulacionesHistorialResponseSchema = z.object({
 export const createCompraPayloadSchema = z.object({
   proveedorId: numberLikeSchema.int().positive("Proveedor invalido."),
   numeroFactura: z.string().trim().min(1).optional(),
+  tipoDocumento: tipoDocumentoCompraSchema.optional(),
   observacion: z.string().trim().optional(),
   fechaOperacion: z.string().datetime().optional(),
   tieneIva: z.boolean().optional(),
@@ -180,6 +236,9 @@ export const createCompraPayloadSchema = z.object({
 
 export const comprasQueryParamsSchema = z.object({
   estado: z.string().trim().optional(),
+  pendientes: z.boolean().optional(),
+  documento: z.enum(["FACTURA", "RECIBO", "SIN_DOCUMENTO", "PENDIENTE"]).optional(),
+  busqueda: z.string().trim().optional(),
   proveedorId: numberLikeSchema.int().positive().optional(),
   anio: numberLikeSchema.int().min(2000).max(2100).optional(),
   mes: numberLikeSchema.int().min(1).max(12).optional(),
@@ -195,6 +254,10 @@ export const recibirCompraPayloadSchema = z.object({
 });
 
 export type AnulacionCompra = z.infer<typeof anulacionCompraSchema>;
+export type ComprasResumen = z.infer<typeof comprasResumenResponseSchema>["data"];
+export type CompraRecepcion = z.infer<typeof compraRecepcionSchema>;
+export type RegistrarDocumentoPayload = z.infer<typeof registrarDocumentoPayloadSchema>;
+export type TipoDocumentoCompra = z.infer<typeof tipoDocumentoCompraSchema>;
 export type ActualizarCompraItemPrecioPayload = z.infer<
   typeof actualizarCompraItemPrecioPayloadSchema
 >;

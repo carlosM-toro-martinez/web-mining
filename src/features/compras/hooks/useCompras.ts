@@ -6,7 +6,9 @@ import {
   getAnulacionesHistorial,
   getCompraById,
   getCompras,
-  recibirCompra
+  getComprasResumen,
+  recibirCompra,
+  registrarDocumentoCompra
 } from "@/features/compras/api/comprasApi";
 import {
   enqueueInventoryOperation,
@@ -22,7 +24,8 @@ import type {
   Compra,
   ComprasQueryParams,
   CreateCompraPayload,
-  RecibirCompraPayload
+  RecibirCompraPayload,
+  RegistrarDocumentoPayload
 } from "@/features/compras/model/compras.schema";
 import { queryKeys } from "@/shared/lib/queryKeys";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
@@ -38,6 +41,28 @@ export function useComprasQuery(
     enabled,
     refetchOnMount: "always",
     ...options
+  });
+}
+
+// Contadores del tablero de seguimiento (por estado de llegada y por documento)
+export function useComprasResumenQuery(params: ComprasQueryParams, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.compras.all, "resumen", params.proveedorId, params.fechaInicio, params.fechaFin, params.busqueda],
+    queryFn: () => getComprasResumen(params),
+    enabled,
+    refetchOnMount: "always"
+  });
+}
+
+export function useRegistrarDocumentoCompraMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: RegistrarDocumentoPayload }) =>
+      registrarDocumentoCompra(id, payload),
+    onSuccess: async (_response, variables) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.compras.detail(variables.id) });
+    }
   });
 }
 
@@ -63,12 +88,10 @@ export function useAnularCompraMutation() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AnularCompraPayload }) =>
       anularCompra(id, payload),
-    onSuccess: async (response) => {
+    // El detalle se recarga con invalidateQueries: así trae también las llegadas y la
+    // anulación, que la respuesta de anular no incluye.
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
-      await queryClient.setQueryData(queryKeys.compras.detail(response.data.compra.id), {
-        success: true,
-        data: response.data.compra
-      });
     }
   });
 }
@@ -115,6 +138,9 @@ export function useCreateCompraMutation() {
           observacion: payload.observacion ?? "Registro offline pendiente de sincronización",
           createdAt: nowIso,
           recibidoAt: null,
+          tipoDocumento: payload.tipoDocumento ?? (payload.numeroFactura ? "FACTURA" : null),
+          numeroFactura: payload.numeroFactura ?? null,
+          recepciones: [],
           items: payload.items.map((item, index) => ({
             id: `${tempId}-item-${index + 1}`,
             productoId: item.productoId,
@@ -202,13 +228,11 @@ export function useRecibirCompraMutation() {
         // ignore
       }
     },
-    onSuccess: async (response) => {
+    // Igual que en anular: el detalle se recarga completo (con sus llegadas) en vez de
+    // reemplazarlo por la respuesta de recibir, que no las trae.
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.compras.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.productos.all });
-      await queryClient.setQueryData(queryKeys.compras.detail(response.data.compra.id), {
-        success: true,
-        data: response.data.compra
-      });
     }
   });
 }
