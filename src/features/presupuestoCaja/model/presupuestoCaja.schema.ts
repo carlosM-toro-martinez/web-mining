@@ -25,6 +25,8 @@ export const presupuestoCajaSchema = z.object({
   mes: z.number().int(),
   nombre: z.string().min(1),
   activo: z.boolean(),
+  // "Otros gastos": existe sola cada mes y no recibe dinero del banco.
+  esPorDefecto: z.boolean().optional(),
   createdAt: z.string(),
   caja: cajaRef.optional(),
   partidas: z.array(partidaDeRemesaSchema).optional(),

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Ban, Banknote, FileSpreadsheet, FileText, Landmark, PiggyBank, Scale } from "lucide-react";
+import { Ban, Banknote, FileSpreadsheet, FileText, Landmark, List, PiggyBank, Scale } from "lucide-react";
 import { useEstadoCuentaBancariaQuery, useEstadoCuentaCajaQuery } from "@/features/reportesCajaChica/hooks/useReportesCajaChica";
 import { exportEstadoCuentaExcel, exportEstadoCuentaPdf } from "@/features/reportesCajaChica/lib/cajaChicaExport";
 import { useCajasChicasQuery, useCuentasBancariasCajaQuery } from "@/features/parametrosCajaChica/hooks/useParametrosCajaChica";
@@ -26,6 +26,8 @@ import type { PresupuestoCaja } from "@/features/presupuestoCaja/model/presupues
 import { mensajeDeError } from "@/shared/api/core/apiError";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { CuadreSaldoCard } from "@/features/cuadreSaldo/ui/CuadreSaldoCard";
+import { Modal } from "@/shared/ui/Modal";
+import { MonthNavigator, mesActual, mismoMes, periodoDeFecha, type PeriodoMes } from "@/shared/ui/MonthNavigator";
 import { SubrouteBackButton } from "@/shared/ui/SubrouteBackButton";
 import { useToast } from "@/shared/ui/toast/ToastProvider";
 
@@ -156,13 +158,23 @@ export function SaldosCajaPage() {
   const cajasActivas = cajas.filter((c) => c.activo);
   function remesasDelMes(fecha: string) {
     const { anio, mes } = anioMesDe(fecha);
-    return presupuestos.filter((p) => p.activo && p.anio === anio && p.mes === mes);
+    // "Otros gastos" no recibe dinero del banco: no se ofrece como remesa de un ingreso.
+    return presupuestos.filter((p) => p.activo && !p.esPorDefecto && p.anio === anio && p.mes === mes);
   }
-  // Los últimos 10 ingresos, y además cualquiera que todavía no tenga remesa.
-  const ingresosBanco = movimientosBanco
-    .filter((m) => m.tipo === "INGRESO")
-    .filter((m, i) => i < 10 || (!m.anulado && !m.presupuesto));
-  const salidasBanco = movimientosBanco.filter((m) => m.tipo === "SALIDA_A_CAJA").slice(0, 8);
+
+  // Las listas de ingresos, salidas y fondos viven en una ventana con selector de
+  // mes: abre siempre en el mes actual y se puede mover a otros meses.
+  const [lista, setLista] = useState<null | "INGRESOS" | "SALIDAS" | "FONDOS">(null);
+  const [mesLista, setMesLista] = useState<PeriodoMes>(mesActual);
+  function abrirLista(tipo: "INGRESOS" | "SALIDAS" | "FONDOS") {
+    setMesLista(mesActual());
+    setLista(tipo);
+  }
+  const ingresosDelMes = movimientosBanco.filter((m) => m.tipo === "INGRESO" && mismoMes(periodoDeFecha(m.fecha), mesLista));
+  const salidasDelMes = movimientosBanco.filter((m) => m.tipo === "SALIDA_A_CAJA" && mismoMes(periodoDeFecha(m.fecha), mesLista));
+  const fondosDelMes = movimientosFondo.filter((f) => mismoMes(periodoDeFecha(f.fecha), mesLista));
+  // Ingresos sin remesa en cualquier mes: se avisa en el botón aunque la ventana esté en otro mes.
+  const ingresosSinRemesa = movimientosBanco.filter((m) => m.tipo === "INGRESO" && !m.anulado && !m.presupuesto).length;
 
   function handleVincular(movimiento: MovimientoBancoCaja, valor: string) {
     if (valor.startsWith(PREFIJO_NUEVA)) {
@@ -693,18 +705,13 @@ export function SaldosCajaPage() {
               {createFondoMutation.isPending ? "Guardando..." : "Registrar fondo"}
             </button>
           </form>
-          <div className="mt-4 space-y-2 text-xs">
-            {movimientosFondo.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
-                <span>
-                  {formatFecha(item.fecha)}
-                  {item.movimientoBanco?.presupuesto ? ` · ${item.movimientoBanco.presupuesto.nombre} (por el banco)` : ""}
-                  {item.referencia ? ` · ${item.referencia}` : ""}
-                </span>
-                <span className="font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
-              </div>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => abrirLista("FONDOS")}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+          >
+            <List size={13} /> Ver todo el dinero que entró a la caja
+          </button>
         </article>
 
         <article className="rounded-xl border-2 border-[var(--color-tertiary)]/40 bg-[var(--color-tertiary)]/[0.05] p-5">
@@ -767,39 +774,13 @@ export function SaldosCajaPage() {
               {createBancoMutation.isPending ? "Guardando..." : "Registrar salida"}
             </button>
           </form>
-          <div className="mt-4 space-y-2 text-xs">
-            {salidasBanco.length > 0 ? (
-              <p className="font-semibold text-[var(--color-on-surface-variant)]">Últimas salidas</p>
-            ) : null}
-            {salidasBanco.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-lg border px-3 py-2 ${item.anulado ? "border-dashed border-[var(--color-border-soft)] opacity-70" : "border-[var(--color-border-soft)]"}`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`min-w-0 break-words ${item.anulado ? "line-through" : ""}`}>
-                    {formatFecha(item.fecha)} · {item.descripcion}
-                    {item.numeroCheque ? ` · CH-${item.numeroCheque}` : ""}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <span className={`font-mono font-bold ${item.anulado ? "line-through" : ""}`}>{item.moneda} {formatMoneda(item.monto)}</span>
-                    {item.anulado ? null : (
-                      <button
-                        type="button"
-                        onClick={() => handleAnularMovimiento(item)}
-                        disabled={anularMovimientoMutation.isPending}
-                        className="rounded p-1 text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
-                        title="Anular esta salida (p. ej. si se registró dos veces)"
-                      >
-                        <Ban size={13} />
-                      </button>
-                    )}
-                  </span>
-                </div>
-                {item.anulado ? <p className="mt-1 font-semibold text-[var(--color-error)]">Anulada: {item.motivoAnulacion}</p> : null}
-              </div>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => abrirLista("SALIDAS")}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+          >
+            <List size={13} /> Ver todas las salidas del banco
+          </button>
         </article>
 
         <article className="rounded-xl border-2 border-[var(--color-primary)]/40 bg-[var(--color-primary)]/[0.05] p-5">
@@ -868,14 +849,49 @@ export function SaldosCajaPage() {
               {createBancoMutation.isPending ? "Guardando..." : "Registrar ingreso"}
             </button>
           </form>
-          <div className="mt-4 space-y-2 text-xs">
-            <p className="font-semibold text-[var(--color-on-surface-variant)]">
-              Últimos ingresos: cada uno debe tener su remesa del mismo mes (en rojo los que no la tienen)
-            </p>
-            {ingresosBanco.length === 0 ? (
-              <p className="text-[var(--color-on-surface-variant)]">Todavía no hay ingresos registrados.</p>
+          <button
+            type="button"
+            onClick={() => abrirLista("INGRESOS")}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-outline-variant)] px-3 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-on-surface)]"
+          >
+            <List size={13} /> Ver todos los ingresos
+            {ingresosSinRemesa > 0 ? (
+              <span className="rounded-full bg-[var(--color-error)] px-2 py-0.5 text-[10px] font-bold text-white">{ingresosSinRemesa} sin remesa</span>
             ) : null}
-            {ingresosBanco.map((item) => {
+          </button>
+        </article>
+      </div>
+
+      {lista ? (
+        <Modal
+          titulo={
+            lista === "INGRESOS"
+              ? "Ingresos a cuenta bancaria"
+              : lista === "SALIDAS"
+                ? "Salidas del banco hacia la caja"
+                : "Dinero que entró a la caja"
+          }
+          descripcion={
+            lista === "INGRESOS"
+              ? "Cada depósito debe decir a qué remesa pertenece. Los que están en rojo no tienen remesa: no cuentan en la caja ni en el Excel."
+              : lista === "SALIDAS"
+                ? "Si una salida se registró dos veces, anula la repetida."
+                : 'Es lo que sale en "Fondos recibidos" del Excel de la caja.'
+          }
+          onClose={() => setLista(null)}
+          anchoClassName="max-w-3xl"
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <MonthNavigator valor={mesLista} onChange={setMesLista} />
+            <button type="button" onClick={() => setMesLista(mesActual())} className={buttonSecondaryClassName}>
+              Mes actual
+            </button>
+          </div>
+          <div className="space-y-2 text-xs">
+            {lista === "INGRESOS" ? (
+              <>
+                {ingresosDelMes.length === 0 ? <p className="text-[var(--color-on-surface-variant)]">No llegó dinero al banco este mes.</p> : null}
+                {ingresosDelMes.map((item) => {
               if (item.anulado) {
                 return (
                   <div key={item.id} className="rounded-lg border border-dashed border-[var(--color-border-soft)] px-3 py-2 opacity-70">
@@ -947,9 +963,60 @@ export function SaldosCajaPage() {
                 </div>
               );
             })}
+              </>
+            ) : null}
+            {lista === "SALIDAS" ? (
+              <>
+                {salidasDelMes.length === 0 ? <p className="text-[var(--color-on-surface-variant)]">No hubo salidas este mes.</p> : null}
+                {salidasDelMes.map((item) => (
+              <div
+                key={item.id}
+                className={`rounded-lg border px-3 py-2 ${item.anulado ? "border-dashed border-[var(--color-border-soft)] opacity-70" : "border-[var(--color-border-soft)]"}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`min-w-0 break-words ${item.anulado ? "line-through" : ""}`}>
+                    {formatFecha(item.fecha)} · {item.descripcion}
+                    {item.numeroCheque ? ` · CH-${item.numeroCheque}` : ""}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className={`font-mono font-bold ${item.anulado ? "line-through" : ""}`}>{item.moneda} {formatMoneda(item.monto)}</span>
+                    {item.anulado ? null : (
+                      <button
+                        type="button"
+                        onClick={() => handleAnularMovimiento(item)}
+                        disabled={anularMovimientoMutation.isPending}
+                        className="rounded p-1 text-[var(--color-error)] transition hover:bg-[var(--color-error)]/10 disabled:opacity-50"
+                        title="Anular esta salida (p. ej. si se registró dos veces)"
+                      >
+                        <Ban size={13} />
+                      </button>
+                    )}
+                  </span>
+                </div>
+                {item.anulado ? <p className="mt-1 font-semibold text-[var(--color-error)]">Anulada: {item.motivoAnulacion}</p> : null}
+              </div>
+            ))}
+              </>
+            ) : null}
+            {lista === "FONDOS" ? (
+              <>
+            {fondosDelMes.length === 0 ? <p className="text-[var(--color-on-surface-variant)]">No entró dinero a la caja este mes.</p> : null}
+            {fondosDelMes.map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border-soft)] px-3 py-2">
+                <span className="min-w-0 break-words">
+                  {formatFecha(item.fecha)}
+                  {" · "}
+                  {item.movimientoBanco?.presupuesto ? `${item.movimientoBanco.presupuesto.nombre} (por el banco)` : DETALLE_FONDO[item.tipo] ?? item.tipo}
+                  {item.referencia ? ` · ${item.referencia}` : ""}
+                </span>
+                <span className="shrink-0 font-mono font-bold">{item.moneda} {formatMoneda(item.monto)}</span>
+              </div>
+            ))}
+              </>
+            ) : null}
           </div>
-        </article>
-      </div>
+        </Modal>
+      ) : null}
     </section>
   );
 }

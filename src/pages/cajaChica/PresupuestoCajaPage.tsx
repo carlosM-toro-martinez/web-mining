@@ -243,7 +243,7 @@ function RemesaCard({ presupuesto, centroOptions, funcionOptions, cuentaOptions 
           ) : (
             <h3 className="flex items-center gap-2 text-lg font-bold">
               {presupuesto.nombre}
-              {yaAsignado ? null : (
+              {yaAsignado || presupuesto.esPorDefecto ? null : (
                 <button
                   type="button"
                   onClick={handleStartEditNombre}
@@ -260,7 +260,7 @@ function RemesaCard({ presupuesto, centroOptions, funcionOptions, cuentaOptions 
             <span className="font-semibold">{formatMoneda(saldoAFavor)}</span> · {porcentajeEjecucion.toFixed(1)}%
           </p>
         </div>
-        {yaAsignado ? null : (
+        {yaAsignado || presupuesto.esPorDefecto ? null : (
           <button
             type="button"
             onClick={handleDeleteRemesa}
@@ -302,7 +302,9 @@ function RemesaCard({ presupuesto, centroOptions, funcionOptions, cuentaOptions 
       ) : (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] px-3 py-2 text-xs text-[var(--color-on-surface-variant)]">
           <Landmark size={14} className="shrink-0 text-[var(--color-primary)]" />
-          Todavía sin ingreso del banco. Cuando llegue el depósito, regístralo (o elígelo) en Saldos y vincúlalo a esta remesa.
+          {presupuesto.esPorDefecto
+            ? "Existe sola cada mes, para los gastos que no estaban presupuestados. No recibe dinero del banco."
+            : "Todavía sin ingreso del banco. Cuando llegue el depósito, regístralo (o elígelo) en Saldos y vincúlalo a esta remesa."}
         </div>
       )}
 
