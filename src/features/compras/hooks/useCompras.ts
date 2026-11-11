@@ -141,6 +141,7 @@ export function useCreateCompraMutation() {
           tipoDocumento: payload.tipoDocumento ?? (payload.numeroFactura ? "FACTURA" : null),
           numeroFactura: payload.numeroFactura ?? null,
           recepciones: [],
+          solicitudesPago: [],
           items: payload.items.map((item, index) => ({
             id: `${tempId}-item-${index + 1}`,
             productoId: item.productoId,

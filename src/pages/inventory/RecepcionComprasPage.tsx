@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ClipboardList, PackageCheck, Search } from "lucide-react";
 import { usePermisos } from "@/features/auth/hooks/usePermisos";
 import {
+  useAnularCompraMutation,
   useCompraByIdQuery,
   useComprasQuery,
   useComprasResumenQuery,
@@ -16,9 +17,11 @@ import {
   formatCantidad,
   formatFecha,
   llegadaDeEstado,
-  pendienteDeItem
+  pendienteDeItem,
+  tieneRecepcion
 } from "@/features/compras/lib/compraResumen";
 import type { Compra } from "@/features/compras/model/compras.schema";
+import { AnulacionesComprasPanel } from "@/features/compras/ui/AnulacionesComprasPanel";
 import { BarraAvance, DocumentoBadge, LlegadaBadge } from "@/features/compras/ui/CompraBadges";
 import { LineaTiempoCompra } from "@/features/compras/ui/LineaTiempoCompra";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
@@ -44,21 +47,65 @@ function useValorRetrasado<T>(valor: T, ms = 350): T {
 }
 
 // ── Confirmar lo que llegó de un pedido ──────────────────────────────────────
-function ConfirmarRecepcion({ compraId, canRecibir }: { compraId: string; canRecibir: boolean }) {
+type Vista = "por_recibir" | "recibidas" | "anulaciones";
+
+function rangoDias(periodo: "30" | "90" | "todo") {
+  if (periodo === "todo") return { fechaInicio: undefined, fechaFin: undefined };
+  const hasta = new Date();
+  const desde = new Date(hasta);
+  desde.setDate(desde.getDate() - Number(periodo));
+  const iso = (fecha: Date) =>
+    `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+  return { fechaInicio: iso(desde), fechaFin: iso(hasta) };
+}
+
+type FormulaIva = "normal" | "gas" | "sin";
+
+const FORMULAS_IVA: Array<{ valor: FormulaIva; etiqueta: string }> = [
+  { valor: "normal", etiqueta: "IVA 13% normal (× 0.87)" },
+  { valor: "gas", etiqueta: "Gas especial IVA (× 0.909)" },
+  { valor: "sin", etiqueta: "Sin IVA (× 1)" }
+];
+
+function formulaDeCompra(compra: Pick<Compra, "tieneIva" | "esGasEspecial">): FormulaIva {
+  if (compra.tieneIva === false) return "sin";
+  return compra.esGasEspecial ? "gas" : "normal";
+}
+
+function ConfirmarRecepcion({
+  compraId,
+  canRecibir,
+  canAnular
+}: {
+  compraId: string;
+  canRecibir: boolean;
+  canAnular: boolean;
+}) {
   const { showError, showSuccess } = useToast();
   const query = useCompraByIdQuery(compraId);
   const recibirMutation = useRecibirCompraMutation();
+  const anularMutation = useAnularCompraMutation();
   const compra: Compra | undefined = query.data?.data;
 
   // Lo que el almacén cuenta que llegó ahora, por ítem. Empieza vacío a propósito:
   // la cantidad se escribe a partir del conteo real, no se acepta por defecto.
   const [llego, setLlego] = useState<Record<string, string>>({});
   const [confirmando, setConfirmando] = useState(false);
+  // Fórmula de IVA: la confirma quien recibe. Parte con la que dejó el pedido.
+  const [iva, setIva] = useState<FormulaIva>("normal");
+  const [mostrarAnular, setMostrarAnular] = useState(false);
+  const [motivo, setMotivo] = useState("");
 
   useEffect(() => {
     setLlego({});
     setConfirmando(false);
+    setMostrarAnular(false);
+    setMotivo("");
   }, [compraId]);
+
+  useEffect(() => {
+    if (compra) setIva(formulaDeCompra(compra));
+  }, [compra?.id, compra?.tieneIva, compra?.esGasEspecial]);
 
   const calculo = useMemo(() => {
     if (!compra) return null;
@@ -91,6 +138,8 @@ function ConfirmarRecepcion({ compraId, canRecibir }: { compraId: string; canRec
   const llegada = llegadaDeEstado(pedido.estado);
   const cerrada = pedido.estado === "COMPLETADO" || pedido.estado === "ANULADA";
   const dias = diasDesde(fechaDeCompra(pedido));
+  const yaRecibio = tieneRecepcion(pedido);
+  const formulaActual = formulaDeCompra(pedido);
   const puedeConfirmar = canRecibir && !cerrada && calculo.itemsConLlegada > 0 && !calculo.hayError && !recibirMutation.isPending;
 
   function cargarTodoPendiente() {
@@ -109,10 +158,15 @@ function ConfirmarRecepcion({ compraId, canRecibir }: { compraId: string; canRec
       const cantidad = Number(llego[item.id] ?? 0);
       cantidades[item.id] = Number.isNaN(cantidad) ? 0 : cantidad;
     }
+    // La fórmula solo se envía si quien recibe la cambió (y mientras no haya llegado nada)
+    const cambioIva = !yaRecibio && iva !== formulaActual;
     recibirMutation.mutate(
       {
         id: pedido.id,
-        payload: { cantidadesRecibidas: cantidades },
+        payload: {
+          cantidadesRecibidas: cantidades,
+          ...(cambioIva ? { tieneIva: iva !== "sin", esGasEspecial: iva === "sin" ? null : iva === "gas" } : {})
+        },
         stockAdjustments: pedido.items
           .map((item) => ({ productoId: item.productoId, deltaCantidad: cantidades[item.id] ?? 0 }))
           .filter((item) => item.deltaCantidad > 0)
@@ -274,6 +328,36 @@ function ConfirmarRecepcion({ compraId, canRecibir }: { compraId: string; canRec
             })}
           </ul>
 
+          <fieldset className="space-y-2 rounded-lg border border-[var(--color-border-soft)] p-3">
+            <legend className="px-1 text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]">
+              Fórmula de IVA
+            </legend>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {FORMULAS_IVA.map((formula) => (
+                <label key={formula.valor} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name={`iva-${pedido.id}`}
+                    checked={iva === formula.valor}
+                    onChange={() => {
+                      setIva(formula.valor);
+                      setConfirmando(false);
+                    }}
+                    disabled={!canRecibir || yaRecibio}
+                  />
+                  <span>{formula.etiqueta}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-[var(--color-on-surface-variant)]">
+              {yaRecibio
+                ? "Ya llegó una parte de este pedido: la fórmula quedó fijada y no se puede cambiar."
+                : pedido.tieneIva !== false && pedido.esGasEspecial == null
+                  ? "Este pedido usa la regla automática por producto (gasolina y diésel). Si eliges una opción, queda fijada."
+                  : "Confirma cómo se factura lo que llegó. Define el valor del ingreso al stock."}
+            </p>
+          </fieldset>
+
           <div className="space-y-3 rounded-lg bg-[var(--color-surface-container-high)] p-4">
             {calculo.itemsConLlegada === 0 ? (
               <p className="text-sm text-[var(--color-on-surface-variant)]">Aún no escribiste ninguna cantidad.</p>
@@ -333,6 +417,69 @@ function ConfirmarRecepcion({ compraId, canRecibir }: { compraId: string; canRec
         <h4 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Historial del pedido</h4>
         <LineaTiempoCompra compra={pedido} />
       </section>
+
+      {canAnular && yaRecibio && pedido.estado !== "ANULADA" ? (
+        <section className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-4">
+          {!mostrarAnular ? (
+            <button
+              type="button"
+              onClick={() => setMostrarAnular(true)}
+              className="text-xs font-semibold text-[var(--color-error)] hover:underline"
+            >
+              Anular esta compra recibida
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-[var(--color-error)]">Anular compra recibida — acción irreversible</p>
+              <p className="text-xs text-[var(--color-on-surface-variant)]">
+                Úsalo cuando la recepción se registró con un error (por ejemplo de tipeo). Se descuenta del stock todo lo que
+                se recibió de esta compra, con sus contra-asientos, y la compra queda anulada. Para un pedido que no llegó,
+                la anulación se hace en Pedidos de compra.
+              </p>
+              <textarea
+                value={motivo}
+                onChange={(event) => setMotivo(event.target.value)}
+                rows={2}
+                placeholder="Motivo de la anulación (obligatorio)"
+                className={`${inputClassName} text-xs`}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!motivo.trim() || anularMutation.isPending}
+                  onClick={() =>
+                    anularMutation.mutate(
+                      { id: pedido.id, payload: { motivo: motivo.trim() } },
+                      {
+                        onSuccess: (response) => {
+                          showSuccess(`Compra anulada. Contra-asientos generados: ${response.data.contraAsientos}.`);
+                          setMotivo("");
+                          setMostrarAnular(false);
+                        },
+                        onError: (error) =>
+                          showError(error instanceof ApiError ? error.message : "No se pudo anular la compra.")
+                      }
+                    )
+                  }
+                  className="rounded-lg bg-[var(--color-error)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                >
+                  {anularMutation.isPending ? "Anulando..." : "Confirmar anulación"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarAnular(false);
+                    setMotivo("");
+                  }}
+                  className="rounded-lg border border-[var(--color-outline-variant)] px-4 py-2 text-xs font-semibold text-[var(--color-on-surface-variant)] transition hover:border-[var(--color-primary)]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -341,6 +488,8 @@ function ConfirmarRecepcion({ compraId, canRecibir }: { compraId: string; canRec
 export function RecepcionComprasPage() {
   const { can } = usePermisos();
   const canRecibir = can("inventario.recepcion", "recibir");
+  const canAnular = can("inventario.recepcion", "anular");
+  const canVerAnulaciones = can("inventario.recepcion", "ver_anulaciones");
   const canVerPedidos = can("inventario.compras", "ver");
   const { showError, showSuccess } = useToast();
   const pendingOfflineQuery = useInventoryOfflinePendingCount();
@@ -348,6 +497,11 @@ export function RecepcionComprasPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("pedido") ?? "";
+  // Qué se está viendo: lo que falta recibir, lo ya recibido, o las compras recibidas que se anularon
+  const vistaParam = searchParams.get("vista");
+  const vista: Vista =
+    vistaParam === "recibidas" ? "recibidas" : vistaParam === "anulaciones" && canVerAnulaciones ? "anulaciones" : "por_recibir";
+  const [periodo, setPeriodo] = useState<"30" | "90" | "todo">("30");
   const [proveedorId, setProveedorId] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
@@ -370,11 +524,13 @@ export function RecepcionComprasPage() {
     {
       page,
       limit: 10,
-      pendientes: true,
+      ...(vista === "recibidas"
+        ? { estado: "COMPLETADO", ...rangoDias(periodo) }
+        : { pendientes: true }),
       proveedorId: proveedorId ? Number(proveedorId) : undefined,
       busqueda: busquedaRetrasada || undefined
     },
-    true,
+    vista !== "anulaciones",
     { refetchInterval: 60_000 }
   );
   const resumenQuery = useComprasResumenQuery({ page: 1, limit: 10 });
@@ -387,6 +543,13 @@ export function RecepcionComprasPage() {
     if (id) next.set("pedido", id);
     else next.delete("pedido");
     setSearchParams(next, { replace: true });
+  }
+
+  function cambiarVista(nueva: Vista) {
+    const next = new URLSearchParams();
+    if (nueva !== "por_recibir") next.set("vista", nueva);
+    setSearchParams(next, { replace: true });
+    setPage(1);
   }
 
   return (
@@ -444,13 +607,50 @@ export function RecepcionComprasPage() {
             <dd className="font-headline text-2xl font-extrabold">{resumen ? resumen.estados.PARCIAL : "–"}</dd>
           </div>
         </dl>
+
+        <nav className="mt-6 flex flex-wrap gap-1 border-b border-[var(--color-border-soft)]" aria-label="Vistas de recepción">
+          {[
+            { clave: "por_recibir" as const, etiqueta: "Por recibir", visible: true },
+            { clave: "recibidas" as const, etiqueta: "Ya recibidas", visible: true },
+            { clave: "anulaciones" as const, etiqueta: "Compras recibidas anuladas", visible: canVerAnulaciones }
+          ]
+            .filter((item) => item.visible)
+            .map((item) => (
+              <button
+                key={item.clave}
+                type="button"
+                onClick={() => cambiarVista(item.clave)}
+                aria-current={vista === item.clave ? "page" : undefined}
+                className={`-mb-px rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+                  vista === item.clave
+                    ? "border-[var(--color-primary)] text-[var(--color-primary)]"
+                    : "border-transparent text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]"
+                }`}
+              >
+                {item.etiqueta}
+              </button>
+            ))}
+        </nav>
       </header>
+
+      {vista === "anulaciones" ? (
+        <article className="rounded-xl border border-[var(--color-error)]/25 bg-[var(--color-surface-container-low)] p-5">
+          <h2 className="text-lg font-bold">Compras recibidas anuladas</h2>
+          <p className="mb-4 mt-1 text-sm text-[var(--color-on-surface-variant)]">
+            Compras que ya habían llegado al almacén y se anularon (por ejemplo por un error de tipeo). En cada una se
+            revirtió el stock con contra-asientos. Los pedidos que se anularon antes de llegar están en Pedidos de compra.
+          </p>
+          <AnulacionesComprasPanel tipo="recepcion" />
+        </article>
+      ) : (
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <article className="min-w-0 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="mb-1 text-lg font-bold">Pedidos por recibir</h2>
+          <h2 className="mb-1 text-lg font-bold">{vista === "recibidas" ? "Compras ya recibidas" : "Pedidos por recibir"}</h2>
           <p className="mb-4 text-xs text-[var(--color-on-surface-variant)]">
-            Solo se muestran los que todavía tienen algo pendiente de llegar.
+            {vista === "recibidas"
+              ? "Compras que ya llegaron completas. Si una se registró con un error, puedes anularla desde su detalle."
+              : "Solo se muestran los que todavía tienen algo pendiente de llegar."}
           </p>
 
           <div className="mb-4 grid grid-cols-1 gap-3">
@@ -477,6 +677,21 @@ export function RecepcionComprasPage() {
               placeholder="Todos los proveedores"
               className={inputClassName}
             />
+            {vista === "recibidas" ? (
+              <select
+                value={periodo}
+                onChange={(event) => {
+                  setPeriodo(event.target.value as "30" | "90" | "todo");
+                  setPage(1);
+                }}
+                className={inputClassName}
+                aria-label="Período"
+              >
+                <option value="30">Últimos 30 días</option>
+                <option value="90">Últimos 90 días</option>
+                <option value="todo">Todo el historial</option>
+              </select>
+            ) : null}
           </div>
 
           <ul className="space-y-2">
@@ -485,7 +700,11 @@ export function RecepcionComprasPage() {
             ) : null}
             {!comprasQuery.isLoading && compras.length === 0 ? (
               <li className="rounded-lg border border-dashed border-[var(--color-border-soft)] px-3 py-8 text-center text-sm text-[var(--color-on-surface-variant)]">
-                {busqueda || proveedorId ? "Ningún pedido pendiente coincide con el filtro." : "No hay pedidos por recibir."}
+                {busqueda || proveedorId
+                  ? "Ninguna compra coincide con el filtro."
+                  : vista === "recibidas"
+                    ? "No hay compras recibidas en este período."
+                    : "No hay pedidos por recibir."}
               </li>
             ) : null}
             {compras.map((compra) => {
@@ -518,9 +737,15 @@ export function RecepcionComprasPage() {
                     </div>
                     <BarraAvance porcentaje={avance.porcentaje} tono={llegada.tono} />
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--color-on-surface-variant)]">
-                      <span>
-                        Falta recibir <strong className="text-[var(--color-warning)]">{formatBs(avance.pendienteBs)}</strong>
-                      </span>
+                      {vista === "recibidas" ? (
+                        <span>
+                          Recibido <strong className="text-[var(--color-success)]">{formatBs(avance.recibidoBs)}</strong>
+                        </span>
+                      ) : (
+                        <span>
+                          Falta recibir <strong className="text-[var(--color-warning)]">{formatBs(avance.pendienteBs)}</strong>
+                        </span>
+                      )}
                       <DocumentoBadge compra={compra} />
                     </div>
                   </button>
@@ -557,16 +782,19 @@ export function RecepcionComprasPage() {
         </article>
 
         <article className="min-w-0 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface-container-low)] p-5 xl:sticky xl:top-4 xl:self-start">
-          <h2 className="mb-4 text-lg font-bold">Confirmar recepción</h2>
+          <h2 className="mb-4 text-lg font-bold">{vista === "recibidas" ? "Detalle de la recepción" : "Confirmar recepción"}</h2>
           {selectedId ? (
-            <ConfirmarRecepcion compraId={selectedId} canRecibir={canRecibir} />
+            <ConfirmarRecepcion compraId={selectedId} canRecibir={canRecibir} canAnular={canAnular} />
           ) : (
             <p className="text-sm text-[var(--color-on-surface-variant)]">
-              Elige un pedido de la lista para escribir lo que llegó.
+              {vista === "recibidas"
+                ? "Elige una compra de la lista para ver lo que llegó o anularla si se registró con un error."
+                : "Elige un pedido de la lista para escribir lo que llegó."}
             </p>
           )}
         </article>
       </div>
+      )}
     </section>
   );
 }

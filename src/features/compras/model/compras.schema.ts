@@ -74,6 +74,7 @@ export const compraSchema = z.object({
   documentoRegistradoAt: z.string().optional().nullable(),
   observacion: z.string().optional().nullable(),
   fechaOperacion: z.string().optional().nullable(),
+  tieneIva: z.boolean().optional().nullable(),
   esGasEspecial: z.boolean().optional().nullable(),
   createdAt: z.string().optional().nullable(),
   recibidoAt: z.string().optional().nullable(),
@@ -82,6 +83,19 @@ export const compraSchema = z.object({
   usuarioRecibe: compraUsuarioSchema.optional().nullable(),
   anulacion: z.any().optional().nullable(),
   recepciones: z.array(compraRecepcionSchema).optional().default([]),
+  solicitudesPago: z
+    .array(
+      z.object({
+        id: z.string(),
+        numero: numberLikeSchema,
+        anio: numberLikeSchema,
+        mes: numberLikeSchema,
+        estado: z.string(),
+        total: numberLikeSchema
+      })
+    )
+    .optional()
+    .default([]),
   items: z.array(compraItemSchema).optional().default([])
 });
 
@@ -250,7 +264,10 @@ export const comprasQueryParamsSchema = z.object({
 });
 
 export const recibirCompraPayloadSchema = z.object({
-  cantidadesRecibidas: z.record(z.string(), numberLikeSchema.min(0))
+  cantidadesRecibidas: z.record(z.string(), numberLikeSchema.min(0)),
+  // Fórmula de IVA confirmada al recibir (solo si cambió respecto al pedido)
+  tieneIva: z.boolean().optional(),
+  esGasEspecial: z.boolean().nullable().optional()
 });
 
 export type AnulacionCompra = z.infer<typeof anulacionCompraSchema>;

@@ -29,6 +29,7 @@ import {
   useComprasQuery,
   useRecibirCompraMutation
 } from "@/features/compras/hooks/useCompras";
+import { tieneRecepcion } from "@/features/compras/lib/compraResumen";
 import type { Compra, CompraItem } from "@/features/compras/model/compras.schema";
 import { useProveedoresQuery } from "@/features/proveedores/hooks/useProveedores";
 import { ApiError } from "@/shared/api/core/apiError";
@@ -252,7 +253,11 @@ export function ValesHistoricosPage() {
   const { can } = usePermisos();
   const canUseFlow = can("inventario.vales_historicos", "ver");
   const canAnularHistorico = can("inventario.vales", "anular");
-  const canAnularCompraHistorica = can("inventario.compras", "anular");
+  // Anular una compra con mercadería recibida revierte el stock: pide el permiso de Recepción.
+  // Si todavía no llegó nada, basta el de Pedidos de compra.
+  const canAnularCompraHistorica = can("inventario.recepcion", "anular") || can("inventario.compras", "anular");
+  const puedeAnularCompra = (compra: Compra) =>
+    tieneRecepcion(compra) ? can("inventario.recepcion", "anular") : can("inventario.compras", "anular");
   const canEditCompraItemPrecio = user?.role === "ADMIN";
   const canManagePeriods = user?.role === "ADMIN";
   const canClosePeriod = can("inventario.cierre", "cerrar_mes");
@@ -1216,7 +1221,7 @@ export function ValesHistoricosPage() {
                         Bs. {formatNumber(getCompraTotal(compra))}
                       </td>
                       <td className="px-3 py-2 text-right text-xs">
-                        {canAnularCompraHistorica && compra.estado !== "ANULADA" ? (
+                        {puedeAnularCompra(compra) && compra.estado !== "ANULADA" ? (
                           <button
                             type="button"
                             onClick={() => void handleAnularCompraHistorica(compra.id)}
@@ -2352,7 +2357,7 @@ export function ValesHistoricosPage() {
                                 Bs. {formatNumber(getCompraTotal(compra))}
                               </p>
                             </div>
-                            {canAnularCompraHistorica && compra.estado !== "ANULADA" ? (
+                            {puedeAnularCompra(compra) && compra.estado !== "ANULADA" ? (
                               <button
                                 type="button"
                                 onClick={() => void handleAnularCompraHistorica(compra.id)}

@@ -16,7 +16,8 @@ import {
   formatCantidad,
   formatFecha,
   llegadaDeEstado,
-  pendienteDeItem
+  pendienteDeItem,
+  tieneRecepcion
 } from "@/features/compras/lib/compraResumen";
 import type { Compra, ComprasQueryParams } from "@/features/compras/model/compras.schema";
 import { BarraAvance, DocumentoBadge, LlegadaBadge } from "@/features/compras/ui/CompraBadges";
@@ -104,12 +105,14 @@ function DetallePedido({
   compraId,
   canDocumento,
   canAnular,
-  canRecibir
+  canRecibir,
+  canAnularRecibida
 }: {
   compraId: string;
   canDocumento: boolean;
   canAnular: boolean;
   canRecibir: boolean;
+  canAnularRecibida: boolean;
 }) {
   const { showError, showSuccess } = useToast();
   const query = useCompraByIdQuery(compraId);
@@ -132,6 +135,9 @@ function DetallePedido({
   const avance = avanceDeCompra(compra);
   const anulada = compra.estado === "ANULADA";
   const porRecibir = compra.estado === "PENDIENTE" || compra.estado === "PARCIAL";
+  // Un pedido se anula solo si todavía no llegó nada. Con mercadería recibida, anular
+  // revierte el stock y se hace desde Recepción.
+  const yaRecibio = tieneRecepcion(compra);
 
   async function confirmarAnulacion() {
     if (!compra) return;
@@ -247,12 +253,45 @@ function DetallePedido({
         ) : null}
       </section>
 
+      {compra.solicitudesPago.length > 0 ? (
+        <section className="space-y-2">
+          <h4 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Solicitudes de pago</h4>
+          {compra.solicitudesPago.map((sp) => (
+            <Link
+              key={sp.id}
+              to={`/pagos/solicitudes?anio=${sp.anio}&mes=${sp.mes}&abrir=${sp.id}`}
+              className="flex items-center justify-between rounded-lg border border-[var(--color-border-soft)] px-3 py-2 text-xs transition hover:border-[var(--color-primary)]"
+            >
+              <span className="font-semibold">Solicitud Nº {sp.numero} · {String(sp.mes).padStart(2, "0")}/{sp.anio}</span>
+              <span className="text-[var(--color-on-surface-variant)]">
+                {sp.estado === "PAGADA" ? "Pagada" : sp.estado === "SOLICITADA" ? "Pedida · falta pago" : "Por pedir"} · Bs {Number(sp.total).toFixed(2)}
+              </span>
+            </Link>
+          ))}
+        </section>
+      ) : null}
+
       <section className="space-y-3">
         <h4 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Historial del pedido</h4>
         <LineaTiempoCompra compra={compra} />
       </section>
 
-      {canAnular && !anulada ? (
+      {!anulada && yaRecibio ? (
+        <section className="rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-high)] p-4 text-xs text-[var(--color-on-surface-variant)]">
+          Este pedido ya tiene mercadería recibida, así que no se anula desde aquí: anularlo revierte el stock.
+          {canAnularRecibida ? (
+            <>
+              {" "}
+              <Link to={`/inventario/recepcion?pedido=${compra.id}&vista=recibidas`} className="font-semibold text-[var(--color-primary)] hover:underline">
+                Anular desde Recepción
+              </Link>
+              .
+            </>
+          ) : null}
+        </section>
+      ) : null}
+
+      {canAnular && !anulada && !yaRecibio ? (
         <section className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 p-4">
           {!mostrarAnular ? (
             <button
@@ -266,7 +305,7 @@ function DetallePedido({
             <div className="space-y-3">
               <p className="text-xs font-bold text-[var(--color-error)]">Anular pedido — acción irreversible</p>
               <p className="text-xs text-[var(--color-on-surface-variant)]">
-                Se crearán contra-movimientos por los ítems ya recibidos y el pedido quedará marcado como anulado.
+                Como todavía no llegó nada, el pedido solo quedará marcado como anulado: no se mueve el stock.
               </p>
               <textarea
                 value={motivo}
@@ -312,6 +351,7 @@ export function PedidosCompraPage() {
   const canVerAnulaciones = can("inventario.compras", "ver_anulaciones");
   const canVerRecepcion = can("inventario.recepcion", "ver");
   const canRecibir = can("inventario.recepcion", "recibir");
+  const canAnularRecibida = can("inventario.recepcion", "anular");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("pedido") ?? "";
@@ -389,7 +429,7 @@ export function PedidosCompraPage() {
   const pestanas: Array<{ clave: Pestana; etiqueta: string; visible: boolean }> = [
     { clave: "seguimiento", etiqueta: "Seguimiento", visible: true },
     { clave: "nuevo", etiqueta: "Nuevo pedido", visible: canCreate },
-    { clave: "anulaciones", etiqueta: "Anulaciones", visible: canVerAnulaciones }
+    { clave: "anulaciones", etiqueta: "Pedidos anulados", visible: canVerAnulaciones }
   ];
 
   return (
@@ -458,11 +498,12 @@ export function PedidosCompraPage() {
 
       {pestana === "anulaciones" && canVerAnulaciones ? (
         <article className="rounded-xl border border-[var(--color-error)]/25 bg-[var(--color-surface-container-low)] p-5">
-          <h2 className="text-lg font-bold">Historial de anulaciones</h2>
+          <h2 className="text-lg font-bold">Pedidos anulados</h2>
           <p className="mb-4 mt-1 text-sm text-[var(--color-on-surface-variant)]">
-            Pedidos que se anularon: cuándo, por qué y quién lo hizo. Abre una fila para ver sus ítems.
+            Pedidos que se cancelaron antes de que llegara mercadería: no movieron el stock. Las compras ya recibidas que
+            se anularon están en Recepción.
           </p>
-          <AnulacionesComprasPanel />
+          <AnulacionesComprasPanel tipo="pedido" />
         </article>
       ) : null}
 
@@ -713,6 +754,7 @@ export function PedidosCompraPage() {
                   canDocumento={canDocumento}
                   canAnular={canAnular}
                   canRecibir={canRecibir}
+                  canAnularRecibida={canAnularRecibida}
                 />
               ) : (
                 <p className="text-sm text-[var(--color-on-surface-variant)]">

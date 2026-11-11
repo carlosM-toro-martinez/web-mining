@@ -122,8 +122,6 @@ export function NuevoPedidoCompraForm({ canCreate, onCreated }: NuevoPedidoCompr
   const [nextDraftItemId, setNextDraftItemId] = useState(2);
   const [isCreateProveedorModalOpen, setIsCreateProveedorModalOpen] = useState(false);
   const [isCreateProductoModalOpen, setIsCreateProductoModalOpen] = useState(false);
-  const [tieneIva, setTieneIva] = useState<boolean>(true);
-  const [esGasEspecial, setEsGasEspecial] = useState<boolean>(false);
 
   const productos = productosQuery.data?.data ?? [];
   const proveedores = proveedoresQuery.data?.data ?? [];
@@ -187,8 +185,9 @@ export function NuevoPedidoCompraForm({ canCreate, onCreated }: NuevoPedidoCompr
       ...(tipoDocumento ? { tipoDocumento } : {}),
       ...(necesitaNumero && numeroFactura.trim() ? { numeroFactura: numeroFactura.trim() } : {}),
       observacion: observacion.trim() || undefined,
-      tieneIva,
-      esGasEspecial: tieneIva ? esGasEspecial : null,
+      // La fórmula de IVA la confirma quien recibe en almacén; aquí parte con la normal
+      tieneIva: true,
+      esGasEspecial: false,
       items: draftItems.map((item) => ({
         productoId: Number(item.productoId),
         cantidadPedida: Number(item.cantidadPedida),
@@ -228,8 +227,6 @@ export function NuevoPedidoCompraForm({ canCreate, onCreated }: NuevoPedidoCompr
         setTipoDocumento("");
         setNumeroFactura("");
         setObservacion("");
-        setTieneIva(true);
-        setEsGasEspecial(false);
         setDraftItems([nuevoItem(1)]);
         setNextDraftItemId(2);
         onCreated(response.data.id);
@@ -529,50 +526,7 @@ export function NuevoPedidoCompraForm({ canCreate, onCreated }: NuevoPedidoCompr
           />
         </Paso>
 
-        <Paso numero={2} titulo="Fórmula de IVA">
-          <div className="flex flex-wrap gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={!tieneIva}
-                onChange={(event) => {
-                  setTieneIva(!event.target.checked);
-                  if (event.target.checked) setEsGasEspecial(false);
-                }}
-                disabled={!canCreate}
-              />
-              <span>Sin IVA (factor × 1)</span>
-            </label>
-            {tieneIva ? (
-              <>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="esGasEspecial"
-                    checked={!esGasEspecial}
-                    onChange={() => setEsGasEspecial(false)}
-                    disabled={!canCreate}
-                  />
-                  <span>IVA 13% normal (× 0.87)</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="esGasEspecial"
-                    checked={esGasEspecial}
-                    onChange={() => setEsGasEspecial(true)}
-                    disabled={!canCreate}
-                  />
-                  <span>Gas especial IVA (× 0.909)</span>
-                </label>
-              </>
-            ) : (
-              <span className="text-xs text-[var(--color-on-surface-variant)]">Precio registrado sin descuento de IVA</span>
-            )}
-          </div>
-        </Paso>
-
-        <Paso numero={3} titulo="Productos del pedido">
+        <Paso numero={2} titulo="Productos del pedido">
           <div className="flex items-center gap-2">
             <button
               type="button"

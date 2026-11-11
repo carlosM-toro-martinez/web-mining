@@ -56,7 +56,9 @@ export const movimientoSchema = z.object({
   usuarioId: numberLikeSchema.int().positive().optional(),
   usuarioEntregaId: numberLikeSchema.int().positive().optional().nullable(),
   usuarioRecibidoId: numberLikeSchema.int().positive().optional().nullable(),
-  cuentaId: numberLikeSchema.int().positive().optional(),
+  // El servidor guarda null cuando el movimiento no tiene cuenta (por ejemplo al recibir una
+  // compra); sin esto null se leía como 0 y la respuesta se rechazaba aunque la operación ya estaba hecha
+  cuentaId: z.preprocess((value) => (value === null ? undefined : value), numberLikeSchema.int().positive().optional()),
   referencia: z.string().optional().nullable(),
   referenciaId: z.union([z.string(), numberLikeSchema]).optional().nullable(),
   producto: z.any().optional().nullable(),

@@ -28,6 +28,7 @@ import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { MapPage } from "@/pages/map/MapPage";
 import { AmbientalPage } from "@/pages/ambiental/AmbientalPage";
+import { SolicitudesPagoPage } from "@/pages/pagos/SolicitudesPagoPage";
 import { LogisticaPage } from "@/pages/logistica/LogisticaPage";
 import { ParametrosLogisticaPage } from "@/pages/logistica/ParametrosLogisticaPage";
 import { FlotaPage } from "@/pages/logistica/FlotaPage";
@@ -155,6 +156,9 @@ export function AppRouter() {
             </Route>
           </Route>
 
+          <Route element={<PermisoRoute recurso="pagos.solicitudes" />}>
+            <Route path="/pagos/solicitudes" element={<SolicitudesPagoPage />} />
+          </Route>
           <Route element={<LogisticaRoute />}>
             <Route path="/logistica" element={<LogisticaPage />} />
             <Route element={<PermisoRoute recurso="logistica.parametros" />}>

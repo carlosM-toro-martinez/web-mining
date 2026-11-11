@@ -101,6 +101,12 @@ export function avanceDeCompra(compra: Pick<Compra, "items">): AvanceCompra {
   };
 }
 
+// ¿Ya llegó mercadería de esta compra? Si sí, anularla revierte el stock (contra-asientos);
+// si no, solo queda marcada como anulada y no mueve nada.
+export function tieneRecepcion(compra: Pick<Compra, "items">): boolean {
+  return compra.items.some((item) => (item.cantidadRecibida ?? 0) > 0);
+}
+
 export function pendienteDeItem(item: Pick<CompraItem, "cantidadPedida" | "cantidadRecibida">): number {
   return Math.max(item.cantidadPedida - (item.cantidadRecibida ?? 0), 0);
 }

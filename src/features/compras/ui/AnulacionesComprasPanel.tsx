@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useAnulacionesHistorialQuery } from "@/features/compras/hooks/useCompras";
-import { avanceDeCompra, fechaDeCompra, formatBs, formatCantidad, formatFecha } from "@/features/compras/lib/compraResumen";
+import { avanceDeCompra, fechaDeCompra, formatBs, formatCantidad, formatFecha, tieneRecepcion } from "@/features/compras/lib/compraResumen";
 import { DocumentoBadge } from "@/features/compras/ui/CompraBadges";
 
 const PAGE_SIZE = 10;
@@ -12,8 +12,14 @@ const inputClassName =
 const thClassName =
   "px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]";
 
-// Historial de pedidos anulados: quién, cuándo, por qué y cuánto valían.
-export function AnulacionesComprasPanel() {
+interface AnulacionesComprasPanelProps {
+  // "pedido": pedidos anulados que todavía no habían llegado (no movieron stock).
+  // "recepcion": compras ya recibidas que se anularon (se revirtió el stock).
+  tipo: "pedido" | "recepcion";
+}
+
+// Historial de anulaciones: quién, cuándo, por qué y cuánto valían.
+export function AnulacionesComprasPanel({ tipo }: AnulacionesComprasPanelProps) {
   const query = useAnulacionesHistorialQuery();
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
@@ -22,6 +28,9 @@ export function AnulacionesComprasPanel() {
   const filas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
     return (query.data?.data ?? []).filter((anulacion) => {
+      // Se separan por lo que pasó con la compra: ¿ya había llegado mercadería?
+      const recibida = anulacion.compra ? tieneRecepcion(anulacion.compra) : false;
+      if ((tipo === "recepcion") !== recibida) return false;
       if (!texto) return true;
       const compra = anulacion.compra;
       const productos = (compra?.items ?? []).map((item) => `${item.producto?.nombre ?? ""} ${item.producto?.codigo ?? ""}`).join(" ");
@@ -37,7 +46,7 @@ export function AnulacionesComprasPanel() {
         .toLowerCase()
         .includes(texto);
     });
-  }, [query.data, busqueda]);
+  }, [query.data, busqueda, tipo]);
 
   const totalPaginas = Math.max(Math.ceil(filas.length / PAGE_SIZE), 1);
   const paginaActual = Math.min(page, totalPaginas);
@@ -74,7 +83,11 @@ export function AnulacionesComprasPanel() {
 
       {filas.length === 0 ? (
         <p className="rounded-lg border border-dashed border-[var(--color-border-soft)] p-6 text-center text-sm text-[var(--color-on-surface-variant)]">
-          {busqueda ? "Ninguna anulación coincide con la búsqueda." : "No hay anulaciones registradas."}
+          {busqueda
+            ? "Ninguna anulación coincide con la búsqueda."
+            : tipo === "pedido"
+              ? "No hay pedidos anulados."
+              : "No hay compras recibidas anuladas."}
         </p>
       ) : (
         <div className="table-scroll overflow-x-auto">
@@ -131,7 +144,7 @@ export function AnulacionesComprasPanel() {
                       <tr className="bg-[var(--color-surface-container-high)]">
                         <td colSpan={7} className="px-4 py-3">
                           <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-on-surface-variant)]">
-                            Ítems del pedido anulado
+                            {tipo === "pedido" ? "Ítems del pedido anulado (no llegó nada, no se movió el stock)" : "Ítems de la compra anulada (se revirtió lo recibido)"}
                           </p>
                           <ul className="space-y-1">
                             {(compra.items ?? []).map((item) => (

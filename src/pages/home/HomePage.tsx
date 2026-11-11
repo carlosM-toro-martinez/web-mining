@@ -9,6 +9,7 @@ import {
   MoveRight,
   PiggyBank,
   Truck,
+  Wallet,
   UserPlus
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -36,6 +37,7 @@ export function HomePage() {
   const canSeeInventario = canAny("inventario");
   const canSeePersonal = canAny("personal");
   const canSeeLogistica = canAny("logistica");
+  const canSeePagos = canAny("pagos");
   const canSeeCajaChica = isAdmin || isAdministrador || isContador || isSuperintendente;
   // EPP y Ambiental: solo ADMIN por ahora, a pedido explícito, hasta que se
   // creen roles específicos (ej. Seguridad, Medioambiente) que deban verlos.
@@ -77,6 +79,15 @@ export function HomePage() {
       description: "Flota, lotes de despacho, liquidaciones y transportistas.",
       to: "/logistica",
       icon: Truck
+    });
+  }
+
+  if (canSeePagos) {
+    items.push({
+      title: "Solicitudes de pago",
+      description: "Pedidos de pago, firmas, facturas pendientes y planilla mensual.",
+      to: "/pagos/solicitudes",
+      icon: Wallet
     });
   }
 

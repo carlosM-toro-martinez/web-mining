@@ -75,6 +75,14 @@ export const queryKeys = {
       [...queryKeys.compras.all, "list", params] as const,
     detail: (id: string) => [...queryKeys.compras.all, "detail", id] as const
   },
+  solicitudesPago: {
+    all: ["solicitudes-pago"] as const,
+    list: (params: unknown) => [...queryKeys.solicitudesPago.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.solicitudesPago.all, "detail", id] as const,
+    resumen: (params: unknown) => [...queryKeys.solicitudesPago.all, "resumen", params] as const,
+    defaults: (anio: number, mes: number) => [...queryKeys.solicitudesPago.all, "defaults", anio, mes] as const,
+    beneficiarios: (search: string) => [...queryKeys.solicitudesPago.all, "beneficiarios", search] as const
+  },
   proveedores: {
     all: ["proveedores"] as const,
     list: (params: { page: number; limit: number; search?: string }) =>

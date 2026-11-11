@@ -474,6 +474,25 @@ export function AppShell() {
             </>
           ) : null}
 
+          {can("pagos.solicitudes", "ver") ? (
+            <NavLink
+              to="/pagos/solicitudes"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `mt-2 flex items-center py-3 text-sm font-semibold transition-all ${
+                  isSidebarCollapsed ? "w-full justify-center px-2" : "gap-3 px-4"
+                } ${
+                  isActive
+                    ? "border-l-4 border-[var(--color-primary)] bg-[var(--color-surface-container-high)] text-[var(--color-primary)]"
+                    : "text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container)] hover:text-[var(--color-on-surface)]"
+                }`
+              }
+            >
+              <Wallet size={18} />
+              {isSidebarCollapsed ? null : <span>Solicitudes de pago</span>}
+            </NavLink>
+          ) : null}
+
           {cajaChicaNavItems.length > 0 ? (
             <>
               <div
