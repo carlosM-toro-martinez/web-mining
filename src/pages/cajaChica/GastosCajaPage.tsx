@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardList,
+  Copy,
   Eye,
   FileSpreadsheet,
   FileText,
@@ -373,6 +374,8 @@ export function GastosCajaPage() {
   const [filtroMontoMin, setFiltroMontoMin] = useState("");
   const [filtroMontoMax, setFiltroMontoMax] = useState("");
   const [filtroClasificacion, setFiltroClasificacion] = useState<"" | "true" | "false">("");
+  const [soloRepetidos, setSoloRepetidos] = useState(false);
+  const [soloSinPartida, setSoloSinPartida] = useState(false);
   const [orden, setOrden] = useState<OrdenGastos>("fecha_desc");
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -398,6 +401,8 @@ export function GastosCajaPage() {
     montoMin: montoMinAplicado !== "" && !Number.isNaN(Number(montoMinAplicado)) ? Number(montoMinAplicado) : undefined,
     montoMax: montoMaxAplicado !== "" && !Number.isNaN(Number(montoMaxAplicado)) ? Number(montoMaxAplicado) : undefined,
     informacionIncompleta: filtroClasificacion || undefined,
+    posiblesRepetidos: soloRepetidos ? "true" : undefined,
+    sinPartida: soloSinPartida ? "true" : undefined,
     orden,
     page: pagina,
     limit: 20
@@ -417,6 +422,8 @@ export function GastosCajaPage() {
   const handleCambiarEstado = conReinicioDePagina(setFiltroEstado);
   const handleCambiarOrigen = conReinicioDePagina(setFiltroOrigen);
   const handleCambiarClasificacion = conReinicioDePagina(setFiltroClasificacion);
+  const handleAlternarRepetidos = () => conReinicioDePagina(setSoloRepetidos)(!soloRepetidos);
+  const handleAlternarSinPartida = () => conReinicioDePagina(setSoloSinPartida)(!soloSinPartida);
   const handleCambiarOrden = conReinicioDePagina(setOrden);
 
   const filtrosActivos = [
@@ -426,7 +433,9 @@ export function GastosCajaPage() {
     filtroOrigen,
     filtroMontoMin,
     filtroMontoMax,
-    filtroClasificacion
+    filtroClasificacion,
+    soloRepetidos,
+    soloSinPartida
   ].filter(Boolean).length;
 
   function handleLimpiarFiltros() {
@@ -438,6 +447,8 @@ export function GastosCajaPage() {
     setFiltroMontoMin("");
     setFiltroMontoMax("");
     setFiltroClasificacion("");
+    setSoloRepetidos(false);
+    setSoloSinPartida(false);
     setOrden("fecha_desc");
     setFiltroFechaInicio("");
     setFiltroFechaFin("");
@@ -1562,6 +1573,26 @@ export function GastosCajaPage() {
             </select>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-[var(--color-on-surface-variant)]">Para cerrar el mes:</span>
+            <button
+              type="button"
+              aria-pressed={soloRepetidos}
+              onClick={() => handleAlternarRepetidos()}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${soloRepetidos ? "border-[var(--color-error)] bg-[var(--color-error)]/15 text-[var(--color-error)]" : "border-[var(--color-border-soft)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)]"}`}
+            >
+              <Copy size={13} /> Posibles repetidos
+            </button>
+            <button
+              type="button"
+              aria-pressed={soloSinPartida}
+              onClick={() => handleAlternarSinPartida()}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${soloSinPartida ? "border-[var(--color-warning)] bg-[var(--color-warning)]/18 text-[var(--color-warning)]" : "border-[var(--color-border-soft)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)]"}`}
+            >
+              <AlertTriangle size={13} /> Sin partida
+            </button>
+          </div>
+
           {mostrarFiltros ? (
             <div className="grid gap-3 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface-container-highest)]/40 p-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
@@ -1707,6 +1738,16 @@ export function GastosCajaPage() {
                 </label>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+                  {item.estado !== "ANULADO" && item.posibleRepetido ? (
+                    <span className="flex items-center gap-1 rounded-full bg-[var(--color-error)]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-error)]">
+                      <Copy size={10} /> Posible repetido
+                    </span>
+                  ) : null}
+                  {item.estado !== "ANULADO" && !item.partidaPresupuesto ? (
+                    <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
+                      <AlertTriangle size={10} /> Sin partida
+                    </span>
+                  ) : null}
                   {item.informacionIncompleta ? (
                     <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
                       <AlertTriangle size={10} /> Info incompleta
@@ -1830,6 +1871,16 @@ export function GastosCajaPage() {
                   <td className="px-3 py-2 text-xs">
                     <div className="flex flex-col items-start gap-1">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${ESTADO_CLASS[item.estado]}`}>{ESTADO_LABEL[item.estado]}</span>
+                      {item.estado !== "ANULADO" && item.posibleRepetido ? (
+                        <span className="flex items-center gap-1 rounded-full bg-[var(--color-error)]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-error)]">
+                          <Copy size={10} /> Posible repetido
+                        </span>
+                      ) : null}
+                      {item.estado !== "ANULADO" && !item.partidaPresupuesto ? (
+                        <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
+                          <AlertTriangle size={10} /> Sin partida
+                        </span>
+                      ) : null}
                       {item.informacionIncompleta ? (
                         <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">
                           <AlertTriangle size={10} /> Info incompleta

@@ -31,6 +31,8 @@ export interface GastosCajaQueryParams {
   montoMin?: number;
   montoMax?: number;
   informacionIncompleta?: "true" | "false";
+  sinPartida?: "true";
+  posiblesRepetidos?: "true";
   orden?: "fecha_desc" | "fecha_asc" | "monto_desc" | "monto_asc";
   page?: number;
   limit?: number;

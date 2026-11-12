@@ -80,6 +80,9 @@ export const gastoCajaSchema = z.object({
   // Calculado por el backend (nunca guardado): true si falta centro de
   // costo, función de gasto, cuenta contable o partida de presupuesto.
   informacionIncompleta: z.boolean().optional(),
+  // Calculado por el backend: parece repetido de otro gasto (mismo monto y
+  // proveedor parecido, o mismo n° de respaldo).
+  posibleRepetido: z.boolean().optional(),
   createdAt: z.string(),
   caja: refConNombre.nullable().optional(),
   cuentaBancariaCaja: cuentaBancariaRef.nullable().optional(),
