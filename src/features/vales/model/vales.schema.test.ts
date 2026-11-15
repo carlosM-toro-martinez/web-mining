@@ -38,6 +38,28 @@ describe("vales.schema", () => {
     expect(parsed.data.items[0]?.producto?.stock?.cantidadDisponible).toBe("40");
   });
 
+  it("accepts a product without stock row (stock: null)", () => {
+    const parsed = valeResponseSchema.parse({
+      success: true,
+      data: {
+        id: "vale-2",
+        solicitanteId: 5,
+        estado: "COMPLETADO",
+        items: [
+          {
+            id: "item-2",
+            productoId: 40,
+            cantidadSolicitada: 2,
+            cantidadEntregada: 2,
+            producto: { id: 40, nombre: "FILTRO DE ACEITE SFO 4407", stock: null }
+          }
+        ]
+      }
+    });
+
+    expect(parsed.data.items[0]?.producto?.stock).toBeNull();
+  });
+
   it("normalizes vales list and keeps pagination meta", () => {
     const parsed = valesListResponseSchema.parse({
       success: true,

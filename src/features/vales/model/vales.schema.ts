@@ -25,7 +25,8 @@ const valeProductoSchema = z.object({
   nombre: z.string().min(1).optional().nullable(),
   codigo: z.string().optional().nullable(),
   unidad: z.string().optional().nullable(),
-  stock: valeProductoStockSchema.optional()
+  // Un producto sin fila de stock llega con stock: null
+  stock: valeProductoStockSchema.nullable().optional()
 });
 
 export const valeItemSchema = z.preprocess(
