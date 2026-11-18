@@ -1041,7 +1041,7 @@ export function ValesPage() {
                       </td>
                       <td className="px-3 py-2 text-xs">
                         <div className="flex flex-wrap gap-1.5">
-                          {canAnularVale(vale.estado) ? (
+                          {canAnularVale(vale.estado) && can("inventario.vales", "anular") ? (
                             <button
                               type="button"
                               onClick={() => openAnularModal(vale.id)}
