@@ -64,7 +64,8 @@ const TIPO_DOCUMENTO_LABEL: Record<string, string> = {
   FACTURA: "Factura",
   CONTRATO_RETENCION: "Contrato / Retención",
   RECIBO: "Recibo",
-  RECIBO_DIRECTO: "Recibo directo"
+  RECIBO_DIRECTO: "Recibo directo",
+  PLANILLA: "Por planilla"
 };
 
 const REPORT_GROUPS: Array<{

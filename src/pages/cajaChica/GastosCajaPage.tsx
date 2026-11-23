@@ -100,21 +100,24 @@ const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoGasto, string> = {
   FACTURA: "Factura",
   RECIBO: "Recibo (sin crédito fiscal)",
   CONTRATO_RETENCION: "Sin factura, con retención",
-  RECIBO_DIRECTO: "Sin comprobante"
+  RECIBO_DIRECTO: "Sin comprobante",
+  PLANILLA: "Por planilla"
 };
 
 const TIPO_DOCUMENTO_OPCIONES: Array<{ value: TipoDocumentoGasto; label: string }> = [
   { value: "FACTURA", label: TIPO_DOCUMENTO_LABEL.FACTURA },
   { value: "RECIBO", label: TIPO_DOCUMENTO_LABEL.RECIBO },
   { value: "CONTRATO_RETENCION", label: TIPO_DOCUMENTO_LABEL.CONTRATO_RETENCION },
-  { value: "RECIBO_DIRECTO", label: TIPO_DOCUMENTO_LABEL.RECIBO_DIRECTO }
+  { value: "RECIBO_DIRECTO", label: TIPO_DOCUMENTO_LABEL.RECIBO_DIRECTO },
+  { value: "PLANILLA", label: TIPO_DOCUMENTO_LABEL.PLANILLA }
 ];
 
 const TIPO_DOCUMENTO_AYUDA: Record<TipoDocumentoGasto, string> = {
   FACTURA: "Anota el número de la factura.",
   RECIBO: "Recibo de una empresa o de una persona. Anota su número.",
   CONTRATO_RETENCION: "Quien cobra no da factura: se le descuenta el impuesto. El sistema calcula cuánto.",
-  RECIBO_DIRECTO: "No hay ningún papel (por ejemplo, un viático)."
+  RECIBO_DIRECTO: "No hay ningún papel (por ejemplo, un viático).",
+  PLANILLA: "Pago de sueldos o jornales según planilla. No lleva impuestos."
 };
 
 const CAMPO_FALTANTE_LABEL: Record<"centroCostoCaja" | "funcionGastoCaja" | "cuentaContableCaja" | "partidaPresupuesto", string> = {
@@ -390,7 +393,8 @@ export function GastosCajaPage() {
   }, [busquedaAplicada, montoMinAplicado, montoMaxAplicado]);
 
   const gastosQuery = useGastosCajaQuery({
-    cajaId: filtroCaja ? Number(filtroCaja) : undefined,
+    cajaId: filtroCaja.startsWith("caja:") ? Number(filtroCaja.slice(5)) : undefined,
+    cuentaBancariaCajaId: filtroCaja.startsWith("banco:") ? Number(filtroCaja.slice(6)) : undefined,
     fechaInicio: filtroFechaInicio || undefined,
     fechaFin: filtroFechaFin || undefined,
     search: busquedaAplicada || undefined,
@@ -629,13 +633,12 @@ export function GastosCajaPage() {
       : null;
   })();
 
-  // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona
+  // Caja Bolivianos Lipeña es la única que se usa a diario: se preselecciona en el formulario
   // sola en cuanto carga la lista.
   useEffect(() => {
     if (cajas.length === 0) return;
     const lipena = String(encontrarCajaLipena(cajas)?.id ?? "");
     if (!cajaId) setCajaId(lipena);
-    if (!filtroCaja) setFiltroCaja(lipena);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cajas]);
 
@@ -1501,10 +1504,17 @@ export function GastosCajaPage() {
               onChange={(e) => handleCambiarFiltroCaja(e.target.value)}
               className={`${inputClassName} w-full sm:w-56`}
             >
-              <option value="">Todas las cajas</option>
-              {cajas.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
+              <option value="">Todas (cajas y bancos)</option>
+              <optgroup label="Cajas">
+                {cajas.map((c) => (
+                  <option key={`caja-${c.id}`} value={`caja:${c.id}`}>{c.nombre}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Bancos">
+                {cuentasBancarias.map((c) => (
+                  <option key={`banco-${c.id}`} value={`banco:${c.id}`}>{c.banco} · {c.nombreCuenta}</option>
+                ))}
+              </optgroup>
             </select>
             <input
               type="date"
