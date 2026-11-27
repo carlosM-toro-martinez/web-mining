@@ -31,6 +31,7 @@ import {
   useProveedoresCajaQuery,
   useUpdateGastoCajaMutation
 } from "@/features/gastoCaja/hooks/useGastoCaja";
+import { COMPROBANTES_BASE, useComprobantesGastoQuery, type ComprobanteGasto } from "@/features/comprobantesGasto/comprobantesGasto";
 import { useGastoCajaOfflineQueue } from "@/features/gastoCaja/hooks/useGastoCajaOfflineQueue";
 import {
   CATEGORIA_RENDICION_LABEL,
@@ -78,6 +79,9 @@ function inicioDeMesActual() {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
 
+// Los comprobantes de respaldo (sin conexión) no tienen id: se distinguen por tratamiento.
+const claveComprobante = (c: ComprobanteGasto) => (c.id ? String(c.id) : c.tratamiento);
+
 type OrdenGastos = "fecha_desc" | "fecha_asc" | "monto_desc" | "monto_asc";
 
 const ORDEN_LABEL: Record<OrdenGastos, string> = {
@@ -102,22 +106,6 @@ const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoGasto, string> = {
   CONTRATO_RETENCION: "Sin factura, con retención",
   RECIBO_DIRECTO: "Sin comprobante",
   PLANILLA: "Por planilla"
-};
-
-const TIPO_DOCUMENTO_OPCIONES: Array<{ value: TipoDocumentoGasto; label: string }> = [
-  { value: "FACTURA", label: TIPO_DOCUMENTO_LABEL.FACTURA },
-  { value: "RECIBO", label: TIPO_DOCUMENTO_LABEL.RECIBO },
-  { value: "CONTRATO_RETENCION", label: TIPO_DOCUMENTO_LABEL.CONTRATO_RETENCION },
-  { value: "RECIBO_DIRECTO", label: TIPO_DOCUMENTO_LABEL.RECIBO_DIRECTO },
-  { value: "PLANILLA", label: TIPO_DOCUMENTO_LABEL.PLANILLA }
-];
-
-const TIPO_DOCUMENTO_AYUDA: Record<TipoDocumentoGasto, string> = {
-  FACTURA: "Anota el número de la factura.",
-  RECIBO: "Recibo de una empresa o de una persona. Anota su número.",
-  CONTRATO_RETENCION: "Quien cobra no da factura: se le descuenta el impuesto. El sistema calcula cuánto.",
-  RECIBO_DIRECTO: "No hay ningún papel (por ejemplo, un viático).",
-  PLANILLA: "Pago de sueldos o jornales según planilla. No lleva impuestos."
 };
 
 const CAMPO_FALTANTE_LABEL: Record<"centroCostoCaja" | "funcionGastoCaja" | "cuentaContableCaja" | "partidaPresupuesto", string> = {
@@ -371,7 +359,9 @@ export function GastosCajaPage() {
   const [filtroFechaFin, setFiltroFechaFin] = useState(today);
   const [busqueda, setBusqueda] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
-  const [filtroTipoDocumento, setFiltroTipoDocumento] = useState("");
+  const [filtroComprobante, setFiltroComprobante] = useState("");
+  const comprobantesQuery = useComprobantesGastoQuery();
+  const comprobantes = comprobantesQuery.data?.data.length ? comprobantesQuery.data.data : COMPROBANTES_BASE;
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroOrigen, setFiltroOrigen] = useState("");
   const [filtroMontoMin, setFiltroMontoMin] = useState("");
@@ -399,7 +389,7 @@ export function GastosCajaPage() {
     fechaFin: filtroFechaFin || undefined,
     search: busquedaAplicada || undefined,
     categoriaRendicion: filtroCategoria || undefined,
-    tipoDocumento: filtroTipoDocumento || undefined,
+    comprobanteId: filtroComprobante ? Number(filtroComprobante) : undefined,
     estado: filtroEstado || undefined,
     origen: filtroOrigen || undefined,
     montoMin: montoMinAplicado !== "" && !Number.isNaN(Number(montoMinAplicado)) ? Number(montoMinAplicado) : undefined,
@@ -422,7 +412,7 @@ export function GastosCajaPage() {
   const handleCambiarFiltroFechaInicio = conReinicioDePagina(setFiltroFechaInicio);
   const handleCambiarFiltroFechaFin = conReinicioDePagina(setFiltroFechaFin);
   const handleCambiarCategoria = conReinicioDePagina(setFiltroCategoria);
-  const handleCambiarTipoDocumento = conReinicioDePagina(setFiltroTipoDocumento);
+  const handleCambiarComprobante = conReinicioDePagina(setFiltroComprobante);
   const handleCambiarEstado = conReinicioDePagina(setFiltroEstado);
   const handleCambiarOrigen = conReinicioDePagina(setFiltroOrigen);
   const handleCambiarClasificacion = conReinicioDePagina(setFiltroClasificacion);
@@ -432,7 +422,7 @@ export function GastosCajaPage() {
 
   const filtrosActivos = [
     filtroCategoria,
-    filtroTipoDocumento,
+    filtroComprobante,
     filtroEstado,
     filtroOrigen,
     filtroMontoMin,
@@ -445,7 +435,7 @@ export function GastosCajaPage() {
   function handleLimpiarFiltros() {
     setBusqueda("");
     setFiltroCategoria("");
-    setFiltroTipoDocumento("");
+    setFiltroComprobante("");
     setFiltroEstado("");
     setFiltroOrigen("");
     setFiltroMontoMin("");
@@ -597,7 +587,11 @@ export function GastosCajaPage() {
   const [cajaId, setCajaId] = useState("");
   const [cuentaBancariaCajaId, setCuentaBancariaCajaId] = useState("");
   const [fecha, setFecha] = useState(today);
-  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumentoGasto>("FACTURA");
+  const [comprobanteClave, setComprobanteClave] = useState("");
+  const opcionesComprobante = comprobantes.filter((c) => c.activo);
+  const comprobante: ComprobanteGasto =
+    opcionesComprobante.find((c) => claveComprobante(c) === comprobanteClave) ?? opcionesComprobante[0] ?? COMPROBANTES_BASE[0]!;
+  const tipoDocumento = comprobante.tratamiento;
   const [categoriaRetencion, setCategoriaRetencion] = useState<CategoriaRetencionGasto>("SERVICIO");
   const [esCombustible, setEsCombustible] = useState(false);
   const [esNoDeducible, setEsNoDeducible] = useState(false);
@@ -712,6 +706,7 @@ export function GastosCajaPage() {
       cuentaBancariaCajaId: origen === "BANCO" ? Number(cuentaBancariaCajaId) : undefined,
       fecha,
       tipoDocumento,
+      comprobanteId: comprobante.id || undefined,
       categoriaRetencion: tipoDocumento === "CONTRATO_RETENCION" ? categoriaRetencion : undefined,
       esCombustible: tipoDocumento === "FACTURA" ? esCombustible : false,
       esNoDeducible: tipoDocumento === "FACTURA" || tipoDocumento === "RECIBO" ? esNoDeducible : undefined,
@@ -802,6 +797,7 @@ export function GastosCajaPage() {
     id: string;
     fecha: string;
     tipoDocumento: TipoDocumentoGasto;
+    comprobanteId: number | null;
     categoriaRetencion: CategoriaRetencionGasto;
     esCombustible: boolean;
     esNoDeducible: boolean;
@@ -825,6 +821,7 @@ export function GastosCajaPage() {
       id: item.id,
       fecha: item.fecha.slice(0, 10),
       tipoDocumento: item.tipoDocumento,
+      comprobanteId: item.comprobanteId ?? null,
       categoriaRetencion: item.categoriaRetencion ?? "SERVICIO",
       esCombustible: Boolean(item.esCombustible),
       esNoDeducible: item.tipoDocumento === "RECIBO_DIRECTO" ? false : item.esNoDeducible,
@@ -853,6 +850,7 @@ export function GastosCajaPage() {
         payload: {
           fecha: editDraft.fecha,
           tipoDocumento: editDraft.tipoDocumento,
+          comprobanteId: editDraft.comprobanteId ?? undefined,
           categoriaRetencion: editDraft.tipoDocumento === "CONTRATO_RETENCION" ? editDraft.categoriaRetencion : null,
           esCombustible: editDraft.tipoDocumento === "FACTURA" ? editDraft.esCombustible : false,
           esNoDeducible: editDraft.tipoDocumento === "FACTURA" || editDraft.tipoDocumento === "RECIBO" ? editDraft.esNoDeducible : undefined,
@@ -1079,15 +1077,15 @@ export function GastosCajaPage() {
             <div className={tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}>
               <label className="mb-1 block text-[11px] text-[var(--color-on-surface-variant)]">¿Qué comprobante te dieron?</label>
               <select
-                value={tipoDocumento}
-                onChange={(e) => setTipoDocumento(e.target.value as TipoDocumentoGasto)}
+                value={claveComprobante(comprobante)}
+                onChange={(e) => setComprobanteClave(e.target.value)}
                 className={inputClassName}
               >
-                {TIPO_DOCUMENTO_OPCIONES.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {opcionesComprobante.map((c) => (
+                  <option key={claveComprobante(c)} value={claveComprobante(c)}>{c.nombre}</option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-[var(--color-on-surface-variant)]">{TIPO_DOCUMENTO_AYUDA[tipoDocumento]}</p>
+              {comprobante.ayuda ? <p className="mt-1 text-[11px] text-[var(--color-on-surface-variant)]">{comprobante.ayuda}</p> : null}
             </div>
             {tipoDocumento === "CONTRATO_RETENCION" ? (
               <div>
@@ -1288,13 +1286,22 @@ export function GastosCajaPage() {
             <input required type="date" value={editDraft.fecha} onChange={(e) => setEditDraft({ ...editDraft, fecha: e.target.value })} className={inputClassName} />
 
             <select
-              value={editDraft.tipoDocumento}
-              onChange={(e) => setEditDraft({ ...editDraft, tipoDocumento: e.target.value as TipoDocumentoGasto })}
+              value={claveComprobante(
+                comprobantes.find((c) => c.id === editDraft.comprobanteId && c.tratamiento === editDraft.tipoDocumento) ??
+                  comprobantes.find((c) => c.tratamiento === editDraft.tipoDocumento) ??
+                  comprobantes[0]!
+              )}
+              onChange={(e) => {
+                const elegido = comprobantes.find((c) => claveComprobante(c) === e.target.value);
+                if (elegido) setEditDraft({ ...editDraft, tipoDocumento: elegido.tratamiento, comprobanteId: elegido.id || null });
+              }}
               className={`${inputClassName} ${editDraft.tipoDocumento === "CONTRATO_RETENCION" ? "" : "sm:col-span-2"}`}
             >
-              {TIPO_DOCUMENTO_OPCIONES.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
+              {comprobantes
+                .filter((c) => c.activo || c.id === editDraft.comprobanteId)
+                .map((c) => (
+                  <option key={claveComprobante(c)} value={claveComprobante(c)}>{c.nombre}</option>
+                ))}
             </select>
             {editDraft.tipoDocumento === "CONTRATO_RETENCION" ? (
               <select
@@ -1615,11 +1622,11 @@ export function GastosCajaPage() {
                 </select>
               </label>
               <label className="space-y-1 text-xs font-semibold text-[var(--color-on-surface-variant)]">
-                Tipo de documento
-                <select value={filtroTipoDocumento} onChange={(e) => handleCambiarTipoDocumento(e.target.value)} className={inputClassName}>
+                Comprobante
+                <select value={filtroComprobante} onChange={(e) => handleCambiarComprobante(e.target.value)} className={inputClassName}>
                   <option value="">Todos</option>
-                  {(Object.keys(TIPO_DOCUMENTO_LABEL) as TipoDocumentoGasto[]).map((key) => (
-                    <option key={key} value={key}>{TIPO_DOCUMENTO_LABEL[key]}</option>
+                  {(comprobantesQuery.data?.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
               </label>
@@ -1985,7 +1992,7 @@ export function GastosCajaPage() {
                 {ESTADO_LABEL[viewingGasto.estado]}
               </span>
               <span className="rounded-full bg-[var(--color-surface-container-highest)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-on-surface-variant)]">
-                {TIPO_DOCUMENTO_LABEL[viewingGasto.tipoDocumento]}
+                {viewingGasto.comprobante?.nombre ?? TIPO_DOCUMENTO_LABEL[viewingGasto.tipoDocumento]}
               </span>
               {viewingGasto.esNoDeducible ? (
                 <span className="rounded-full bg-[var(--color-warning)]/18 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-warning)]">

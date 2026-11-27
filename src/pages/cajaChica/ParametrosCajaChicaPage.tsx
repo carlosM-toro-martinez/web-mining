@@ -1,3 +1,4 @@
+import { ComprobantesGastoCard } from "@/features/comprobantesGasto/ComprobantesGastoCard";
 import { FormEvent, useMemo, useState } from "react";
 import { AlertTriangle, Banknote, Check, FolderTree, Landmark, ListTree, Pencil, Percent, PiggyBank, RotateCcw, Search, Trash2, X } from "lucide-react";
 import {
@@ -730,6 +731,10 @@ export function ParametrosCajaChicaPage() {
           </div>
         </div>
       </article>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <ComprobantesGastoCard />
+      </div>
 
       {isAdmin ? (
         <details className="rounded-xl border border-[var(--color-error)]/40 bg-[var(--color-error)]/6 p-5">

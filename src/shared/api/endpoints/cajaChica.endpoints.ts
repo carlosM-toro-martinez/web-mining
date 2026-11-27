@@ -6,6 +6,8 @@ export const cajaChicaEndpoints = {
   centroCostoById: (id: number | string) => `/api/centros-costo-caja/${id}`,
   funcionesGasto: "/api/funciones-gasto-caja",
   funcionGastoById: (id: number | string) => `/api/funciones-gasto-caja/${id}`,
+  comprobantesGasto: "/api/comprobantes-gasto-caja",
+  comprobanteGastoById: (id: number | string) => `/api/comprobantes-gasto-caja/${id}`,
   cuentasContables: "/api/cuentas-contables-caja",
   cuentaContableById: (id: number | string) => `/api/cuentas-contables-caja/${id}`,
   conceptosRetencion: "/api/conceptos-retencion-caja",

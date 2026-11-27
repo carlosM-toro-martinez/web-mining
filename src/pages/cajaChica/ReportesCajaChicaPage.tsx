@@ -65,7 +65,7 @@ const TIPO_DOCUMENTO_LABEL: Record<string, string> = {
   CONTRATO_RETENCION: "Contrato / Retención",
   RECIBO: "Recibo",
   RECIBO_DIRECTO: "Recibo directo",
-  PLANILLA: "Por planilla"
+  PLANILLA: "Sin impuestos (planilla y otros)"
 };
 
 const REPORT_GROUPS: Array<{
@@ -305,7 +305,7 @@ function ImpuestosReport() {
       columnas: ["Fecha", "Tipo Documento", "Proveedor", "Glosa", "Monto Total", "Créd. Fiscal IVA", "RC-IVA", "IUE Compras", "IT"],
       filas: impuestos.gastos.map((g) => [
         formatFecha(g.fecha),
-        TIPO_DOCUMENTO_LABEL[g.tipoDocumento ?? ""] ?? g.tipoDocumento ?? "-",
+        g.comprobante?.nombre ?? TIPO_DOCUMENTO_LABEL[g.tipoDocumento ?? ""] ?? g.tipoDocumento ?? "-",
         g.proveedorNombre,
         g.glosa,
         Number(g.montoTotal),
@@ -337,7 +337,7 @@ function ImpuestosReport() {
       columnas: ["Fecha", "Tipo Doc.", "Proveedor", "Glosa", "Monto Total", "Créd. Fiscal IVA", "RC-IVA", "IUE Compras", "IT"],
       filas: impuestos.gastos.map((g) => [
         formatFecha(g.fecha),
-        TIPO_DOCUMENTO_LABEL[g.tipoDocumento ?? ""] ?? g.tipoDocumento ?? "-",
+        g.comprobante?.nombre ?? TIPO_DOCUMENTO_LABEL[g.tipoDocumento ?? ""] ?? g.tipoDocumento ?? "-",
         g.proveedorNombre,
         g.glosa,
         formatMoneda(Number(g.montoTotal)),
@@ -437,7 +437,7 @@ function ImpuestosReport() {
                     {impuestos.gastos.map((g) => (
                       <tr key={g.id}>
                         <td className="py-1 pr-3">{formatFecha(g.fecha)}</td>
-                        <td className="py-1 pr-3">{TIPO_DOCUMENTO_LABEL[g.tipoDocumento ?? ""] ?? g.tipoDocumento}</td>
+                        <td className="py-1 pr-3">{g.comprobante?.nombre ?? TIPO_DOCUMENTO_LABEL[g.tipoDocumento ?? ""] ?? g.tipoDocumento}</td>
                         <td className="py-1 pr-3">{g.proveedorNombre}</td>
                         <td className="py-1 pr-3 text-right">{formatMoneda(Number(g.montoTotal))}</td>
                         <td className="py-1 pr-3 text-right">{formatMoneda(Number(g.montoCreditoFiscalIva ?? 0))}</td>

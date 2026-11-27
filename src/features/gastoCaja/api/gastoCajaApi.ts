@@ -28,6 +28,7 @@ export interface GastosCajaQueryParams {
   search?: string;
   categoriaRendicion?: string;
   tipoDocumento?: string;
+  comprobanteId?: number;
   montoMin?: number;
   montoMax?: number;
   informacionIncompleta?: "true" | "false";

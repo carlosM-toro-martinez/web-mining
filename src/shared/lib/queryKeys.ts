@@ -236,6 +236,7 @@ export const queryKeys = {
     cajas: () => [...queryKeys.parametrosCajaChica.all, "cajas"] as const,
     centrosCosto: () => [...queryKeys.parametrosCajaChica.all, "centros-costo"] as const,
     funcionesGasto: () => [...queryKeys.parametrosCajaChica.all, "funciones-gasto"] as const,
+    comprobantesGasto: () => [...queryKeys.parametrosCajaChica.all, "comprobantes-gasto"] as const,
     cuentasContables: () => [...queryKeys.parametrosCajaChica.all, "cuentas-contables"] as const,
     conceptosRetencion: () => [...queryKeys.parametrosCajaChica.all, "conceptos-retencion"] as const,
     cuentasBancarias: () => [...queryKeys.parametrosCajaChica.all, "cuentas-bancarias"] as const,

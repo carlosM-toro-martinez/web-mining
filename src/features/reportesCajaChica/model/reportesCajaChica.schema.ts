@@ -9,6 +9,7 @@ const gastoReporteSchema = z.object({
   id: z.string().min(1),
   fecha: z.string(),
   tipoDocumento: z.enum(["FACTURA", "CONTRATO_RETENCION", "RECIBO", "RECIBO_DIRECTO", "PLANILLA"]).optional(),
+  comprobante: z.object({ nombre: z.string() }).nullable().optional(),
   proveedorNombre: z.string().min(1),
   glosa: z.string().min(1),
   montoTotal: z.union([z.string(), z.number()]),
